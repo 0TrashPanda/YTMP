@@ -19,6 +19,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import io.ktor.http.ContentType
+
 
 class KtorServerService : Service() {
 
@@ -40,10 +42,18 @@ class KtorServerService : Service() {
     private fun startServer() {
         server = embeddedServer(CIO, port = 8080, host = "0.0.0.0") {
             routing {
+                // get("/") {
+                //     val time = LocalDateTime.now()
+                //         .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+                //     call.respondText("Hello from Ktor! Time: $time")
+                // }
                 get("/") {
-                    val time = LocalDateTime.now()
-                        .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
-                    call.respondText("Hello from Ktor! Time: $time")
+                    val html = applicationContext.assets
+                        .open("templates/index.html")
+                        .bufferedReader()
+                        .use { it.readText() }
+
+                    call.respondText(html, ContentType.Text.Html)
                 }
             }
         }.start(wait = false)
