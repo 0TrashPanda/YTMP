@@ -10,6 +10,14 @@ import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
+import dev.trashpanda.ytmp.routes.searchRoutes
+import io.ktor.client.request.parameter
+import io.ktor.client.request.header
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+
 
 // install(ContentNegotiation) {
 //     json()
@@ -40,25 +48,28 @@ fun Application.module() {
             defaultResource("static/index.html")
         }
 
-        // API example
-        route("/api") {
-            get("/play") {
-                val query = call.request.queryParameters["query"] ?: ""
-                call.respondText("Playing: $query")
-            }
+        val client = HttpClient()
+        searchRoutes(client)
 
-            get("/search") {
-                val query = call.request.queryParameters["query"] ?: ""
+        // // API example
+        // route("/api") {
+        //     get("/play") {
+        //         val query = call.request.queryParameters["query"] ?: ""
+        //         call.respondText("Playing: $query")
+        //     }
 
-                // Return some dummy songs
-                val dummySongs = listOf(
-                    Song("1", "Song One", "Artist A", "3:15"),
-                    Song("2", "Song Two", "Artist B", "4:05"),
-                    Song("3", "Another Song", "Artist C", "2:58")
-                ).filter { it.title.contains(query, ignoreCase = true) }
+        //     get("/search") {
+        //         val query = call.request.queryParameters["query"] ?: ""
 
-                call.respond(dummySongs)
-            }
-        }
+        //         // Return some dummy songs
+        //         val dummySongs = listOf(
+        //             Song("1", "Song One", "Artist A", "3:15"),
+        //             Song("2", "Song Two", "Artist B", "4:05"),
+        //             Song("3", "Another Song", "Artist C", "2:58")
+        //         ).filter { it.title.contains(query, ignoreCase = true) }
+
+        //         call.respond(dummySongs)
+        //     }
+        // }
     }
 }
