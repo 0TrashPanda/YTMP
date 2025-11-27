@@ -11,8 +11,8 @@ import io.ktor.client.call.*
 
 fun Route.searchRoutes(http: HttpClient) {
 
-    route("/api") {
-        get("/search") {
+    route("/api/queue") {
+        get("/playnext") {
             val query = call.request.queryParameters["q"] ?: ""
             if (query.isBlank()) {
                 call.respond(emptyList<Any>())
@@ -25,5 +25,3 @@ fun Route.searchRoutes(http: HttpClient) {
             }.bodyAsText()
             call.respondText(result, ContentType.Application.Json)
         }
-    }
-}
