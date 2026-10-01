@@ -1,0 +1,193 @@
+# Module HTTP API
+
+> Status: **draft for review**.
+
+## What is this?
+
+This is the **contract that every source module follows**: the list of things the host can
+ask a source ("search for X", "give me a playable stream for song Y", "give me a radio
+from song Y", …). It is **not** the YTM module itself. The YTM module is the **first
+module that implements it**. A future SoundCloud module, for example, would implement
+the same contract.
+
+The same operations reach a module in three ways (see [modules](modules.md)):
+
+| Module runs… | How the host calls it | Example |
+|--------------|-----------------------|---------|
+| as a **separate program** | **HTTP**, as described on this page | YTM service on the server |
+| **inside the app**, in Kotlin | normal Kotlin function calls (a `SourceModule` interface with the same operations) | local files, Plex |
+| **inside the app**, in Python | Chaquopy function calls | YTM on Android |
+
+This page describes the HTTP form, because that's the one that needs an exact
+definition: the host and the module are separate programs, possibly in different
+languages.
+
+### Example: from search to playback
+
+1. Someone types *daft punk* in the search bar. The frontend asks the host.
+2. The host asks every enabled source: `GET /search?q=daft punk` on the YTM module, and
+   the same operation on the local files and Plex modules. It merges the results.
+3. Someone taps *One More Time* (`ytm:FGBhQbmPwH8`). It goes into the queue.
+4. When the song is about to play, the host asks `GET /songs/ytm:FGBhQbmPwH8/stream`
+   and gets a playable URL, which it sends to the listening clients.
+5. A client that can't use that URL gets the audio through the host instead, which uses
+   `GET /songs/ytm:FGBhQbmPwH8/audio`.
+
+### Not every module supports everything
+
+`GET /info` returns a list of **capabilities**. A module only implements what it can.
+For example, a module for internet radio stations has no `lyrics`, and only a module with
+user accounts has `library`. The host hides features a module doesn't support.
+
+### What modules do *not* do
+
+- **Matching** songs across sources ("which YTM song is this local file?") is done by the
+  **host**, using the module's `search`. See [storage](storage.md#song-matching).
+- **Downloads** (a finished, tagged file) are made by the **host**, using the module's
+  `audio`. See [downloads](downloads.md).
+
+That way this logic is written once, and works the same for every source.
+
+### What is YTM-specific?
+
+The contract is generic. A few parts only make sense for YTM/YT, and other modules
+leave them out:
+
+- `X-YTMP-Credentials` (the linked YouTube account), and the `/me/...` library endpoints
+- `/admin/update` (updating yt-dlp)
+- `loudnessDb` from YouTube, used for loudness normalisation
+
+## Code layout of the Python YTM module
+
+```
+ytmp_ytm/            # Python package: all YTM/YT logic (ytmusicapi + yt-dlp)
+  core.py            # plain functions: search(), song(), stream(), radio(), …
+  http.py            # thin HTTP layer (e.g. FastAPI) that exposes core.py as this API
+```
+
+- **Server**: runs `http.py` as a service. The host's *remote adapter* calls it over HTTP.
+- **Android**: Chaquopy calls `core.py` **directly**, with no HTTP. The *embedded Python
+  adapter* maps the same operations onto function calls.
+
+So the operations below are the contract for both. HTTP is only the transport on the server.
+
+## General
+
+- JSON over HTTP. The base URL and a **shared key** are set in the host's config.
+  Every request sends `Authorization: Bearer <key>`.
+- IDs are **namespaced**: `ytm:dQw4w9WgXcQ`, `yt:…`. The prefix is the module ID.
+- Lists are **paginated** with an opaque `cursor`: the response has `next` (or `null`).
+- **User-scoped** calls (a linked YouTube account) get the user's credentials per request
+  in the `X-YTMP-Credentials` header. The module stores no user data.
+- Errors:
+
+  ```json
+  { "error": { "code": "unavailable", "message": "Video unavailable in this country" } }
+  ```
+
+  Codes: `not_found`, `unavailable`, `auth_required`, `auth_expired`, `rate_limited`,
+  `upstream_error`, `unsupported`.
+
+## Data types
+
+```jsonc
+// Song
+{
+  "id": "ytm:dQw4w9WgXcQ",
+  "title": "Never Gonna Give You Up",
+  "artists": [{ "id": "ytm:UCuAXFkgsw1L7xaCfnd5JJOw", "name": "Rick Astley" }],
+  "album": { "id": "ytm:MPREb_…", "name": "Whenever You Need Somebody" },
+  "durationMs": 213000,
+  "thumbnails": [{ "url": "https://…", "width": 544, "height": 544 }],
+  "explicit": false,
+  "isrc": null                 // when known, helps matching songs across sources
+}
+// Album, Artist, Playlist: id, name/title, thumbnails, and their songs/albums (paginated)
+```
+
+## Endpoints
+
+### Module info
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/info` | `{ id, name, version, apiVersion, capabilities: [...] }` |
+| GET | `/health` | Liveness check |
+
+`capabilities` tells the host which of the optional endpoints below are supported:
+`search`, `suggestions`, `browse`, `home`, `explore`, `resolve_url`, `stream`, `audio`,
+`radio`, `related`, `lyrics`, `library`, `isrc_lookup`.
+
+### Search & browse
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/search?q=&type=song\|album\|artist\|playlist\|all&cursor=` | Search |
+| GET | `/search/suggestions?q=` | Suggestions while typing |
+| GET | `/search?isrc=` | Find a song by ISRC (optional `isrc_lookup` capability, helps [matching](storage.md#song-matching)) |
+| GET | `/songs/{id}` | Song details |
+| GET | `/albums/{id}` | Album with songs |
+| GET | `/artists/{id}` | Artist: top songs, albums, singles |
+| GET | `/playlists/{id}?cursor=` | Public playlist with songs |
+| GET | `/resolve?url=` | Turn a YTM/YT URL into `{ type, item }` (for links pasted in search) |
+| GET | `/home` | Home page sections (mixes, recommendations, …). Personalised with credentials. |
+| GET | `/explore` | Explore page: new releases, charts, moods & genres |
+| GET | `/explore/{sectionId}` | One explore section, for example a mood or genre |
+
+### Playback
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/songs/{id}/stream` | Resolve a **direct stream URL** on demand: `{ url, expiresAt, mimeType, bitrate, loudnessDb }` |
+| GET | `/songs/{id}/audio?format=` | The **audio bytes** themselves, with HTTP `Range` support. Used for proxying, the cache, and [downloads](downloads.md). `format` is a preference (for example `m4a`). |
+
+- `/stream` is for the direct path of the [hybrid approach](playback-sync.md). `/audio` is
+  for the proxied path and the cache.
+- `loudnessDb` (YouTube's loudness value, when available) is used for loudness normalisation.
+
+### Recommendations
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/radio?seed=&cursor=` | YTM radio from a song, artist, album or playlist ID (`seed`): an endless list via `cursor` |
+| GET | `/songs/{id}/related` | Related songs |
+
+The host stores every radio/related result as **YTM edges** in the song graph (see
+[storage](storage.md#song-graph)).
+
+### Lyrics
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/songs/{id}/lyrics` | `{ plain, synced: [{ timeMs, text }] \| null, source }` |
+
+Lyrics from modules are a **fallback**. The host first looks up the song on **LRCLIB**
+itself (by title, artist, album and duration), so synced lyrics work for every source,
+including local files.
+
+### Library (user-scoped, needs `X-YTMP-Credentials`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/me/playlists` | The user's YTM playlists |
+| GET | `/me/likes?cursor=` | Liked songs |
+| PUT / DELETE | `/me/likes/{songId}` | Like / unlike |
+| POST | `/me/playlists` | Create a playlist: `{ title, description, privacy }` |
+| POST | `/me/playlists/{id}/songs` | Add songs: `{ songIds: [...] }` |
+| DELETE | `/me/playlists/{id}/songs/{songId}` | Remove a song |
+| GET | `/me/check` | Are the credentials still valid? (for the "relink your account" message) |
+
+### Admin
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/status` | yt-dlp / ytmusicapi versions, cache size, last update |
+| POST | `/admin/update` | Update yt-dlp now |
+| DELETE | `/admin/cache` | Clear the audio cache |
+
+## Output modules
+
+Remote **output** modules (for example a future Discord bot) would use a similar,
+much smaller API: `POST /play { audioUrl, positionMs }`, `POST /pause`,
+`POST /volume { level }`, `GET /state`. This will be defined when the first remote
+output module is built.

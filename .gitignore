@@ -1,0 +1,13 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Local config and secrets
+ytmp.toml
+!deploy/ytmp.example.toml
+*.keystore
+*.jks
+.env
