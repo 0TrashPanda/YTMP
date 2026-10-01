@@ -9,6 +9,25 @@ YTMP has two kinds of modules:
 | **Source** (input) | Search, metadata, resolving a playable stream | YTM, YT, local files, media servers (Plex, Jellyfin, Subsonic, file servers), Spotify, SoundCloud |
 | **Output** | Playing a stream somewhere | Local audio, Sonos (HTTP), Chromecast, Discord bot (future) |
 
+## Modules and source instances
+
+A **module** is code (one per kind of service). A **source** is a configured instance of a
+module (see [features/sources](../features/sources.md#modules-vs-sources)):
+
+```
+source = { id, module: "plex", owner: host | account, name,
+           addresses: ["http://192.168.1.10:32400", "https://plex.example.com"],
+           credentials (encrypted), sharedWithRooms: [...], downloadsEnabled }
+```
+
+- **Host sources** are defined in the server config (or the phone's settings).
+- **Account sources** are stored with the account on the auth server. When the user joins a
+  room, the host loads them and creates a source instance for that room.
+- **Addresses** are tried in order. The first one that answers a health check is used,
+  re-checked on errors and every few minutes.
+- **Songs sent from a client device** go into a temporary per-room upload store on the host,
+  exposed as a hidden "uploads" source for that room.
+
 ## Requirements
 
 - A host can have **multiple sources** active, so a queue can mix sources.

@@ -34,8 +34,9 @@ and your room defaults are saved to your account.
 - With a linked YouTube account you can also **create** YTM playlists.
 
 ### Linked media servers
-Link a file server, Plex server or other music server to search and add songs from it
-(see [sources](sources.md#media-servers)).
+Link a file server, Plex server or other music server to search and add songs from it.
+A server can have several addresses (local first, internet as fallback), and can be
+shared with a room (see [sources](sources.md#where-sources-are-added)).
 
 ### Listening history
 Optional history of every played song, used for recaps and radio/mix

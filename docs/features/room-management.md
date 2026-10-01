@@ -38,7 +38,7 @@ set individual permissions.
 
 | Group | Permissions |
 |-------|-------------|
-| **Queue** | Add songs · Play now · Remove own songs · Remove others' songs · Reorder · Start radio (replaces queue) · Autoplay from here (replaces autoplay queue) |
+| **Queue** | Add songs · Send songs from own device · Play now · Remove own songs · Remove others' songs · Reorder · Start radio (replaces queue) · Autoplay from here (replaces autoplay queue) |
 | **Playback control** | Play/pause · Skip · Seek · Repeat · Vote to skip · Host output volume |
 | **Listening** | Play audio locally on own device |
 | **Outputs** | Change host outputs |
