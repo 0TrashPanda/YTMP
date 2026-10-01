@@ -35,9 +35,21 @@ server/         Kotlin (Ktor): Linux server, web UI hosting, auth server, admin 
 android/        Kotlin: Android app (WebView, Media3, Chaquopy, Ktor host)
 frontend/       Svelte 5 + SvelteKit (static) + Tailwind + TypeScript
 ytm-module/     Python: ytmp_ytm package (core.py + http.py)
+modules/        Kotlin: built-in modules (local-files, plex, sonos, chromecast, …)
 docs/           these docs
 deploy/         docker-compose.yml, example ytmp.toml, Caddyfile
 ```
+
+### Where modules live
+
+- **Built-in modules** (shipped inside the app and server) live **in this repo**: YTM/YT,
+  local files, media servers, Sonos, Chromecast. They change together with the host and
+  the [module API](module-api.md), in the same commit.
+- **External modules** (separate programs that only talk to YTMP over the module API,
+  for example a future Discord bot, or modules written by others) get **their own repo**.
+- The **YTM module** still gets its **own Docker image and version** (`ytmp-ytm`), so it can
+  be released on its own when YouTube breaks something, without a full YTMP release.
+- A module can be moved to its own repo later (with its history) if there's a reason to.
 
 ## Tooling
 
