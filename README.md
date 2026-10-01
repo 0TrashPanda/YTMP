@@ -3,8 +3,8 @@
 **A shared music queue for you and your friends.** Like Spotify Jam, but for YouTube
 Music, without Premium, and not tied to a single music service.
 
-> 🚧 **Early development.** The design is written down in [`docs/`](docs/README.md).
-> Code is coming.
+> 🚧 **Early development.** Milestone 1 works: host or join a room in the browser, search
+> YouTube Music, share a queue and play in sync. The full design is in [`docs/`](docs/README.md).
 
 ## What it does
 
@@ -28,10 +28,37 @@ Music, without Premium, and not tied to a single music service.
 
 | Platform | Status |
 |----------|--------|
-| Linux server (Docker) | Planned: hosts rooms and serves the web app |
+| Linux server (Docker) | ✅ Milestone 1: hosts rooms and serves the web app |
 | Android 13+ | Planned: host and join, works without a server |
-| Web browser | Planned: join, or host through a server |
+| Web browser | ✅ Milestone 1: join, or host through a server |
 | iOS | Not supported (the web app may work, but background playback won't) |
+
+## Running a server
+
+Needs Docker with Compose.
+
+```sh
+cd deploy
+cp ytmp.example.toml ytmp.toml          # optional, every setting has a default
+echo "YTMP_MODULE_KEY=$(openssl rand -hex 32)" > .env
+docker compose up -d --build
+```
+
+Open `http://<server>:8080`. For HTTPS, put a reverse proxy such as Caddy in front of it.
+
+## Development
+
+| Part | Folder | Run |
+|------|--------|-----|
+| YTM module (Python 3.12+) | `ytm-module/` | `python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'`, then `YTMP_MODULE_KEY=dev YTMP_YTM_JS_RUNTIME=node .venv/bin/ytmp-ytm` |
+| Server (Kotlin, JDK 21 is downloaded by Gradle) | `server/`, `core/`, `protocol/` | `YTMP_MODULE_KEY=dev ./gradlew :server:run` |
+| Web app (Svelte, pnpm) | `frontend/` | `pnpm install && pnpm dev`, then open http://localhost:5173 |
+
+- Tests: `./gradlew test` and `cd ytm-module && .venv/bin/pytest`.
+- After changing anything in `protocol/`, run `./gradlew :protocol:generateTs` to update the
+  web app's types (`frontend/src/lib/protocol.gen.ts`).
+- yt-dlp needs a JavaScript runtime for YouTube: Deno by default, or set
+  `YTMP_YTM_JS_RUNTIME=node` to use Node.
 
 ## Documentation
 

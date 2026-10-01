@@ -1,7 +1,7 @@
 # Protocol Messages
 
-> Status: **draft for review**. Names follow the final feature names
-> (Play next, Start radio, Autoplay from here, …).
+> Status: **partly implemented.** Everything marked ✅ exists in milestone 1 (see
+> `protocol/src/main/kotlin`, which is the source of truth). The rest is still a draft.
 
 The design is in [protocol.md](protocol.md): commands from clients, events from the host,
 and a snapshot on connect. Types are Kotlin `@Serializable` classes, and TypeScript types are
@@ -17,11 +17,11 @@ generated from them.
 ## Envelope
 
 ```jsonc
-// client → host
+// client → host  (message types: hello, command, ping, request_snapshot)
 { "type": "command", "id": "c42", "command": { "kind": "AddSongs", ... } }
 
-// host → client
-{ "type": "result",   "id": "c42", "ok": true }                        // or "error": { code, message }
+// host → client  (message types: welcome, rejected, result, event, snapshot, pong)
+{ "type": "result",   "id": "c42", "error": null }                     // or "error": { code, message }
 { "type": "event",    "seq": 1017, "event": { "kind": "QueueItemsAdded", ... } }
 { "type": "snapshot", "seq": 1016, "state": { ... } }
 ```
@@ -34,12 +34,15 @@ generated from them.
 
 | Direction | Message | Content |
 |-----------|---------|---------|
-| → | `Hello` | `protocolVersion`, `roomCode`, auth: `{ token }` (account) or `{ guestName, guestCookie }`, `listenedWithOptOut` |
-| ← | `Welcome` | `participantId`, `guestCookie` (new guests), then a `snapshot` |
-| ← | `Rejected` | `reason`: `room_not_found`, `banned`, `accounts_only`, `untrusted_auth_server`, `version_mismatch` |
-| ⇄ | `Ping` / `Pong` | `clientTime` / `clientTime, hostTime`, for clock sync |
+| → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`. Later: account `token`, `listenedWithOptOut` |
+| ← | `welcome` ✅ | `participantId`, `guestToken`, `seq`, `state` (the snapshot) |
+| ← | `rejected` ✅ | `reason`: `room_not_found`, `version_mismatch`, `invalid_name`, `replaced` ✅. Later: `banned`, `accounts_only`, `untrusted_auth_server` |
+| ⇄ | `ping` / `pong` ✅ | `clientTime` / `clientTime, hostTime`, for clock sync |
 
 ## Snapshot (`RoomState`)
+
+Milestone 1 has `room`, `participants`, `queue`, `history`, `nowPlaying` (`{ item, streamUrl }`)
+and `playback`. The other fields come with permissions, roles, outputs and vote to skip.
 
 ```jsonc
 {
@@ -69,11 +72,11 @@ Each command lists the permission it needs (see [room management](../features/ro
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `AddSongs` | `songIds`, `position: "next" \| "end"` | Add songs |
-| `PlayNow` | `songId` | Play now |
-| `JumpTo` | `itemId` (a queue or history item) | Play now |
-| `RemoveQueueItem` | `itemId` | Remove own / others' songs |
-| `MoveQueueItem` | `itemId`, `toIndex` | Reorder |
+| `AddSongs` ✅ | `songs` (full song objects from search), `position: "next" \| "end"` | Add songs |
+| `PlayNow` ✅ | `song` | Play now |
+| `JumpTo` ✅ | `itemId` (a queue or history item) | Play now |
+| `RemoveQueueItem` ✅ | `itemId` | Remove own / others' songs |
+| `MoveQueueItem` ✅ | `itemId`, `toIndex` | Reorder |
 | `ShuffleQueue` | – | Reorder |
 | `StartRadio` | `seedId` (song, artist, album or playlist) | Start radio |
 | `AutoplayFromHere` | `seedId` (song, artist, album or playlist) | Autoplay from here |
@@ -83,9 +86,9 @@ Each command lists the permission it needs (see [room management](../features/ro
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `Play` / `Pause` | – | Play/pause |
-| `Skip` / `Previous` | – | Skip |
-| `Seek` | `positionMs` | Seek |
+| `Play` / `Pause` ✅ | – | Play/pause |
+| `Skip` / `Previous` ✅ | – | Skip |
+| `Seek` ✅ | `positionMs` | Seek |
 | `SetRepeat` | `mode: "off" \| "queue" \| "one"` | Repeat |
 | `VoteSkip` / `UnvoteSkip` | – | Vote to skip |
 | `SetOutputs` | `outputIds` | Change host outputs |
@@ -95,8 +98,10 @@ Each command lists the permission it needs (see [room management](../features/ro
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `SetListening` | `on` | Play audio locally |
-| `RequestProxyStream` | `itemId` | Play audio locally. Sent when the direct URL fails (hybrid). The result contains the proxied URL. |
+| `SetListening` ✅ | `on` | Play audio locally |
+
+No command is needed for the proxied stream: when the direct URL fails, the client uses
+`/api/audio/{songId}` on the host.
 
 ### People & roles
 
@@ -118,23 +123,26 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `CloneRoom` | `visibility: "public" \| "solo"` | Clone room. The result has the new room's code. |
 | `SendMigration` | `targetRoom`, `mode: "invite" \| "forced"` | Send migration message |
 | `CloseRoom` | – | Owner only |
-| `RequestSnapshot` | – | – |
+| `request_snapshot` ✅ | – (a message type, not a command) | – |
 
 ## Events (host → client)
 
 | Event | Fields | Sent to |
 |-------|--------|---------|
-| `ParticipantJoined` / `ParticipantLeft` | participant | everyone |
-| `ParticipantUpdated` | participant (role, permissions, name, listening) | everyone |
+| `ParticipantJoined` ✅ / `ParticipantLeft` ✅ | participant / `participantId` | everyone |
+| `ParticipantUpdated` ✅ | participant (role, permissions, name, online, listening) | everyone |
 | `YouWereKicked` / `YouWereBanned` | – | that participant |
-| `QueueItemsAdded` | `items`, `positions` | everyone |
-| `QueueItemRemoved` | `itemId` | everyone |
-| `QueueItemMoved` | `itemId`, `toIndex` | everyone |
+| `QueueItemsAdded` ✅ | `items`, `index` | everyone |
+| `QueueItemRemoved` ✅ | `itemId` | everyone |
+| `QueueItemMoved` ✅ | `itemId`, `toIndex` | everyone |
 | `QueueReplaced` | `items` (Start radio, Shuffle, fair-ordering re-sort) | everyone |
 | `AutoplayReplaced` / `AutoplayExtended` | `seed?`, `items` | everyone |
-| `NowPlayingChanged` | `item`, `streamUrl` (direct, see hybrid) | everyone |
-| `HistoryAppended` | `item` (with `result: played/skipped`) | everyone |
-| `PlaybackState` | `playing`, `positionMs`, `hostTimeMs` (on change, and periodically) | everyone |
+| `NowPlayingChanged` ✅ | `item` (or null) | everyone |
+| `StreamReady` ✅ | `itemId`, `streamUrl` (direct URL, once the host has resolved it) | everyone |
+| `HistoryAppended` ✅ | `item` (with `result: played/skipped`) | everyone |
+| `HistoryItemRemoved` ✅ | `itemId` (when jumping back) | everyone |
+| `PlaybackChanged` ✅ | `playback: { playing, positionMs, hostTimeMs }` (on every change) | everyone |
+| `Notice` ✅ | `message` (for example a song that can't be played) | everyone |
 | `RepeatChanged` | `mode` | everyone |
 | `SkipVotesChanged` | `votes`, `needed` | everyone |
 | `OutputsChanged` | `outputs` | everyone |

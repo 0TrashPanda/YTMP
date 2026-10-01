@@ -1,0 +1,16 @@
+# YTMP server settings. Every value is optional; these are the defaults.
+# YTMP_PORT, YTMP_YTM_URL and YTMP_MODULE_KEY environment variables override this file.
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[ytm]
+# Where the YouTube Music module runs, and the key shared with it.
+url = "http://127.0.0.1:8401"
+key = ""
+
+[rooms]
+# letters | digits | alnum
+code_style = "letters"
+code_length = 4

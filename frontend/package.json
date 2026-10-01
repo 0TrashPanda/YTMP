@@ -26,5 +26,6 @@
 	"imports": {
 		"#lib": "./src/lib/index.js",
 		"#lib/*": "./src/lib/*"
-	}
+	},
+	"packageManager": "pnpm@10.24.0"
 }

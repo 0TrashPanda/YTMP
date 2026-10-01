@@ -17,8 +17,20 @@ data class Config(
     companion object {
         private val toml = Toml(TomlInputConfig(ignoreUnknownNames = true))
 
-        fun load(file: File?): Config =
-            if (file != null && file.exists()) toml.decodeFromString(serializer(), file.readText()) else Config()
+        /** Reads [file] (if it exists), then applies `YTMP_*` environment variables on top. */
+        fun load(file: File?, env: Map<String, String> = System.getenv()): Config {
+            val base = if (file != null && file.isFile) toml.decodeFromString(serializer(), file.readText()) else Config()
+            return base.copy(
+                server = base.server.copy(
+                    port = env["YTMP_PORT"]?.toInt() ?: base.server.port,
+                    frontend = env["YTMP_FRONTEND"] ?: base.server.frontend,
+                ),
+                ytm = base.ytm.copy(
+                    url = env["YTMP_YTM_URL"] ?: base.ytm.url,
+                    key = env["YTMP_MODULE_KEY"] ?: base.ytm.key,
+                ),
+            )
+        }
     }
 }
 

@@ -1,0 +1,29 @@
+# Run YTMP on a server:
+#   cp ytmp.example.toml ytmp.toml   (optional, every setting has a default)
+#   echo "YTMP_MODULE_KEY=$(openssl rand -hex 32)" > .env
+#   docker compose up -d --build
+# Then open http://<server>:8080. Put a reverse proxy (e.g. Caddy) in front for HTTPS.
+
+services:
+  ytmp:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      YTMP_YTM_URL: http://ytm:8401
+      YTMP_MODULE_KEY: ${YTMP_MODULE_KEY:?set YTMP_MODULE_KEY in .env}
+    volumes:
+      - ./ytmp.toml:/config/ytmp.toml:ro
+    depends_on:
+      - ytm
+    restart: unless-stopped
+
+  ytm:
+    build: ../ytm-module
+    environment:
+      YTMP_MODULE_KEY: ${YTMP_MODULE_KEY:?set YTMP_MODULE_KEY in .env}
+      YTMP_YTM_LANGUAGE: en
+      YTMP_YTM_LOCATION: BE
+    restart: unless-stopped

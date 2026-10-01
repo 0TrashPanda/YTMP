@@ -1,0 +1,9 @@
+**/node_modules
+**/build
+**/.gradle
+**/.kotlin
+**/.svelte-kit
+**/.venv
+**/__pycache__
+.git
+docs
