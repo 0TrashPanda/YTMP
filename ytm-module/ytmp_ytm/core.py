@@ -1,0 +1,132 @@
+"""YouTube Music logic as plain functions, with no HTTP.
+
+The server wraps this in http.py; on Android, Chaquopy will call it directly.
+See docs/implementation/module-api.md.
+"""
+
+from __future__ import annotations
+
+import re
+import threading
+import time
+import urllib.parse
+from dataclasses import dataclass, field
+
+import yt_dlp
+from ytmusicapi import YTMusic
+
+MODULE_ID = "ytm"
+_PREFIXES = ("ytm:", "yt:")
+_LARGE_ART = 544
+# Re-resolve stream URLs this long before YouTube says they expire.
+_EXPIRY_MARGIN_S = 10 * 60
+
+
+class NotFound(Exception):
+    pass
+
+
+class Unavailable(Exception):
+    pass
+
+
+@dataclass
+class StreamInfo:
+    url: str
+    expires_at: float
+    mime_type: str
+    bitrate: float | None
+    http_headers: dict[str, str] = field(default_factory=dict)
+
+    def to_json(self) -> dict:
+        return {
+            "url": self.url,
+            "expiresAt": int(self.expires_at * 1000),
+            "mimeType": self.mime_type,
+            "bitrate": self.bitrate,
+            "loudnessDb": None,
+        }
+
+
+def video_id(song_id: str) -> str:
+    """'ytm:abc' -> 'abc'. Plain IDs are accepted too."""
+    for prefix in _PREFIXES:
+        if song_id.startswith(prefix):
+            return song_id[len(prefix):]
+    return song_id
+
+
+class YtmCore:
+    def __init__(self, language: str = "en", location: str = "BE", js_runtime: str | None = None):
+        self._ytm = YTMusic(language=language, location=location)
+        self._ydl_opts = {
+            "format": "bestaudio[ext=m4a]/bestaudio",
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+        }
+        if js_runtime:
+            self._ydl_opts["js_runtimes"] = {js_runtime: {}}
+        self._streams: dict[str, StreamInfo] = {}
+        self._lock = threading.Lock()
+
+    def search(self, query: str, limit: int = 20) -> list[dict]:
+        results = self._ytm.search(query, filter="songs", limit=limit)
+        # ytmusicapi treats limit as a minimum, so cut the list ourselves.
+        return [song for r in results if (song := _song_from_search(r))][:limit]
+
+    def stream(self, song_id: str) -> StreamInfo:
+        """Direct stream URL, resolved on demand and cached until shortly before it expires."""
+        vid = video_id(song_id)
+        with self._lock:
+            cached = self._streams.get(vid)
+        if cached and cached.expires_at - _EXPIRY_MARGIN_S > time.time():
+            return cached
+
+        try:
+            with yt_dlp.YoutubeDL(self._ydl_opts) as ydl:
+                info = ydl.extract_info(f"https://music.youtube.com/watch?v={vid}", download=False)
+        except yt_dlp.utils.DownloadError as e:
+            raise Unavailable(_clean_error(str(e))) from e
+
+        url = info["url"]
+        expires = urllib.parse.parse_qs(urllib.parse.urlparse(url).query).get("expire", [None])[0]
+        stream = StreamInfo(
+            url=url,
+            expires_at=float(expires) if expires else time.time() + 3600,
+            mime_type="audio/mp4" if info.get("ext") == "m4a" else f"audio/{info.get('ext', 'webm')}",
+            bitrate=info.get("abr"),
+            http_headers=dict(info.get("http_headers") or {}),
+        )
+        with self._lock:
+            self._streams[vid] = stream
+        return stream
+
+
+def _song_from_search(r: dict) -> dict | None:
+    vid = r.get("videoId")
+    if not vid:
+        return None
+    album = r.get("album")
+    return {
+        "id": f"{MODULE_ID}:{vid}",
+        "title": r.get("title") or "",
+        "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in r.get("artists") or []],
+        "album": {"id": album.get("id"), "name": album.get("name", "")} if album else None,
+        "durationMs": int((r.get("duration_seconds") or 0) * 1000),
+        "thumbnails": _thumbnails(r.get("thumbnails") or []),
+        "explicit": bool(r.get("isExplicit")),
+    }
+
+
+def _thumbnails(thumbs: list[dict]) -> list[dict]:
+    out = [{"url": t["url"], "width": t.get("width", 0), "height": t.get("height", 0)} for t in thumbs]
+    # YTM only lists small sizes; the same image is available larger by changing the URL.
+    if thumbs and re.search(r"=w\d+-h\d+", thumbs[-1]["url"]):
+        large = re.sub(r"=w\d+-h\d+", f"=w{_LARGE_ART}-h{_LARGE_ART}", thumbs[-1]["url"])
+        out.append({"url": large, "width": _LARGE_ART, "height": _LARGE_ART})
+    return out
+
+
+def _clean_error(message: str) -> str:
+    return re.sub(r"^ERROR: (\[[^\]]+\] )?([\w-]+: )?", "", message).strip()

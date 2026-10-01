@@ -1,0 +1,24 @@
+@import 'tailwindcss';
+
+@theme {
+	--color-bg: #030303;
+	--color-surface: #0f0f0f;
+	--color-raised: #1f1f1f;
+	--color-line: #2a2a2a;
+	--color-muted: #aaaaaa;
+	--color-accent: #ff0033;
+	--font-sans: 'Roboto', ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+	background: var(--color-bg);
+	color: white;
+	height: 100%;
+}
+
+/* Thin scrollbars like YTM. */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: #444 transparent;
+}

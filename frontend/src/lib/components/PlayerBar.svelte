@@ -1,0 +1,95 @@
+<script lang="ts">
+	import { artistNames, formatTime } from '../format';
+	import type { Player } from '../player.svelte';
+	import type { RoomConnection } from '../room.svelte';
+	import Art from './Art.svelte';
+	import Icon from './Icon.svelte';
+
+	let { room, player, positionMs }: { room: RoomConnection; player: Player; positionMs: number } = $props();
+
+	const current = $derived(room.state?.nowPlaying ?? null);
+	const playback = $derived(room.state?.playback);
+	const duration = $derived(current?.item.song.durationMs ?? 0);
+	const loading = $derived(current !== null && current.streamUrl === null);
+
+	// While dragging the progress bar, show the drag position instead of the live one.
+	let seeking = $state<number | null>(null);
+	const shown = $derived(seeking ?? Math.min(positionMs, duration));
+</script>
+
+<footer class="border-t border-line bg-surface">
+	<input
+		type="range"
+		class="block h-1 w-full cursor-pointer appearance-none bg-line accent-accent"
+		min="0"
+		max={duration || 1}
+		value={shown}
+		disabled={!current}
+		aria-label="Position"
+		oninput={(e) => (seeking = Number(e.currentTarget.value))}
+		onchange={(e) => {
+			room.run({ kind: 'Seek', positionMs: Number(e.currentTarget.value) });
+			seeking = null;
+		}}
+		style="background: linear-gradient(to right, var(--color-accent) {(shown / (duration || 1)) * 100}%, var(--color-line) 0)"
+	/>
+	<div class="flex h-18 items-center gap-2 px-2 sm:gap-4 sm:px-4">
+		<div class="flex items-center">
+			<button class="rounded-full p-2 hover:bg-raised" aria-label="Previous" onclick={() => room.run({ kind: 'Previous' })}>
+				<Icon name="previous" />
+			</button>
+			<button
+				class="rounded-full p-2 hover:bg-raised"
+				aria-label={playback?.playing ? 'Pause' : 'Play'}
+				onclick={() => room.run({ kind: playback?.playing ? 'Pause' : 'Play' })}
+			>
+				<Icon name={playback?.playing ? 'pause' : 'play'} size={36} />
+			</button>
+			<button class="rounded-full p-2 hover:bg-raised" aria-label="Next" onclick={() => room.run({ kind: 'Skip' })}>
+				<Icon name="next" />
+			</button>
+			<span class="hidden pl-2 text-xs text-muted tabular-nums sm:inline">
+				{formatTime(shown)} / {formatTime(duration)}
+			</span>
+		</div>
+
+		<div class="flex min-w-0 flex-1 items-center gap-3">
+			<Art song={current?.item.song ?? null} size={48} class="h-10 w-10 sm:h-12 sm:w-12" />
+			<div class="min-w-0">
+				<div class="truncate font-medium">{current?.item.song.title ?? 'Nothing playing'}</div>
+				<div class="truncate text-sm text-muted">
+					{#if current}
+						{artistNames(current.item.song)}{loading ? ' • loading…' : player.buffering ? ' • buffering…' : ''}
+					{/if}
+				</div>
+			</div>
+		</div>
+
+		<div class="flex items-center gap-2">
+			{#if player.enabled}
+				<input
+					type="range"
+					class="hidden w-24 accent-white sm:block"
+					min="0"
+					max="1"
+					step="0.01"
+					value={player.volume}
+					aria-label="Volume"
+					oninput={(e) => player.setVolume(Number(e.currentTarget.value))}
+				/>
+			{/if}
+			<button
+				class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium
+					{player.enabled ? 'bg-white text-black' : 'bg-raised hover:bg-line'}"
+				onclick={() => (player.enabled ? player.disable() : player.enable())}
+				title="Play the music on this device"
+			>
+				<Icon name="headphones" size={20} />
+				<span class="hidden sm:inline">{player.enabled ? 'Playing here' : 'Play here'}</span>
+			</button>
+		</div>
+	</div>
+	{#if player.error}
+		<p class="px-4 pb-2 text-sm text-accent">{player.error}</p>
+	{/if}
+</footer>

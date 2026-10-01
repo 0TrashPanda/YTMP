@@ -11,3 +11,12 @@ ytmp.toml
 *.keystore
 *.jks
 .env
+
+# Build output
+.gradle/
+.kotlin/
+build/
+__pycache__/
+.venv/
+*.egg-info/
+.pytest_cache/
