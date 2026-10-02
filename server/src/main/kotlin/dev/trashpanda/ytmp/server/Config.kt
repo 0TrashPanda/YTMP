@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp.server
 import com.akuleshov7.ktoml.Toml
 import com.akuleshov7.ktoml.TomlInputConfig
 import dev.trashpanda.ytmp.core.RoomCodeStyle
+import dev.trashpanda.ytmp.protocol.SignupMode
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -15,6 +16,7 @@ data class Config(
     val rooms: RoomsConfig = RoomsConfig(),
     val cast: CastConfig = CastConfig(),
     val database: DatabaseConfig = DatabaseConfig(),
+    val accounts: AccountsConfig = AccountsConfig(),
 ) {
     companion object {
         private val toml = Toml(TomlInputConfig(ignoreUnknownNames = true))
@@ -30,6 +32,9 @@ data class Config(
                 ytm = base.ytm.copy(
                     url = env["YTMP_YTM_URL"] ?: base.ytm.url,
                     key = env["YTMP_MODULE_KEY"] ?: base.ytm.key,
+                ),
+                accounts = base.accounts.copy(
+                    url = env["YTMP_URL"] ?: base.accounts.url,
                 ),
                 database = base.database.copy(
                     type = env["YTMP_DB_TYPE"] ?: base.database.type,
@@ -82,6 +87,28 @@ data class DatabaseConfig(
     /** PostgreSQL, e.g. "postgresql://ytmp:secret@localhost/ytmp". */
     val url: String = "",
 )
+
+/** See docs/features/accounts.md and docs/implementation/auth.md. */
+@Serializable
+data class AccountsConfig(
+    /**
+     * This server's public address, e.g. "https://ytmp.example.com". Account tokens for pages
+     * served from there are accepted, and other hosts use it to log in. Without it, only
+     * this machine's own IP addresses (and localhost) work.
+     */
+    val url: String = "",
+    /**
+     * The server's name in account IDs (`user@name`). Default: the host name of [url], or of
+     * this machine, remembered on first start. Changing it later changes everyone's account ID.
+     */
+    val name: String = "",
+    /** Who may create accounts: open | invite | admin. The first account is always allowed and becomes the server admin. */
+    val signup: String = "invite",
+    /** Other YTMP servers (URLs) whose accounts may join rooms here. */
+    val trusted: List<String> = emptyList(),
+) {
+    fun signupMode(): SignupMode = SignupMode.valueOf(signup.uppercase())
+}
 
 @Serializable
 data class RoomsConfig(

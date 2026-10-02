@@ -29,6 +29,7 @@ class LocalHost(private val context: Context) {
     /** Chromecasts on the network; they fetch the audio from this phone. */
     val casts = CastOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
     val castFinder = CastFinder(context, casts)
+    val authLink = AuthLink(context, PORT)
     val rooms = RoomManager(streams = { ytm.resolveStream(it) }, scope = scope, outputs = casts.devices, store = PhoneRoomStore(context))
 
     fun start() {
@@ -46,7 +47,9 @@ class LocalHost(private val context: Context) {
                     shareUrl = ::lanUrl,
                     localOnlyRoomManagement = true,
                     supportsPrivateRooms = true,
+                    auth = authLink.auth,
                 ),
+                extraApi = { authLink.routes(this) },
             )
         }.start(wait = false)
         Log.i(TAG, "Hosting on port $PORT")

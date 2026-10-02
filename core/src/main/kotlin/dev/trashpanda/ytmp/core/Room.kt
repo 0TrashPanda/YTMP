@@ -42,6 +42,8 @@ class Room(
     visibility: RoomVisibility,
     private val streams: StreamResolver,
     private val scope: CoroutineScope,
+    /** The account that created the room: it is the owner on any device. */
+    val ownerAccount: String? = null,
     /** Called when the room's [info] changes, e.g. it was made public. */
     private val onInfoChanged: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
@@ -56,12 +58,13 @@ class Room(
         val id: String,
         val token: String,
         var name: String,
-        val isOwner: Boolean,
+        var isOwner: Boolean,
         var outbox: Outbox?,
+        var accountId: String? = null,
         var listening: Boolean = false,
         var offlineSince: Long? = null,
     ) {
-        fun toParticipant() = Participant(id, name, isOwner, online = outbox != null, listening = listening)
+        fun toParticipant() = Participant(id, name, isOwner, online = outbox != null, listening = listening, accountId = accountId)
     }
 
     private val mutex = Mutex()
@@ -98,9 +101,11 @@ class Room(
 
     /**
      * Adds a participant. [local] means the connection comes from the hosting device itself;
-     * only local connections may join a private (solo) room.
+     * only local connections may join a private (solo) room. [account] is set when the
+     * participant proved an account; it then shows on them, and the room's account owner
+     * is recognised on any device.
      */
-    suspend fun join(hello: ClientMessage.Hello, outbox: Outbox, local: Boolean = true): String? = mutex.withLock {
+    suspend fun join(hello: ClientMessage.Hello, outbox: Outbox, local: Boolean = true, account: AccountIdentity? = null): String? = mutex.withLock {
         if (visibility == RoomVisibility.PRIVATE && !local) {
             outbox.send(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM))
             return null
@@ -115,22 +120,26 @@ class Room(
             return null
         }
 
+        val isOwner = hello.ownerToken == ownerToken || (account != null && account.id == ownerAccount)
         val returning = members.values.firstOrNull { it.token == hello.guestToken }
         val member = returning ?: Member(
             id = Ids.short(),
             token = Ids.token(),
             name = name,
-            isOwner = hello.ownerToken == ownerToken,
+            isOwner = isOwner,
             outbox = null,
         ).also { members[it.id] = it }
 
         member.outbox?.takeIf { it !== outbox }?.send(ServerMessage.Rejected(RejectReason.REPLACED))
         member.outbox = outbox
-        member.name = name
+        member.name = account?.displayName ?: name
+        member.accountId = account?.id
+        // Logging in later (same guest token, now with the owner's account) makes you the owner.
+        member.isOwner = member.isOwner || isOwner
         member.offlineSince = null
         lastActive = clock()
 
-        outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot()))
+        outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = account?.id))
         emit(if (returning == null) Event.ParticipantJoined(member.toParticipant()) else Event.ParticipantUpdated(member.toParticipant()))
         member.id
     }
@@ -183,20 +192,21 @@ class Room(
             name = name,
             ownerToken = ownerToken,
             visibility = visibility,
-            members = members.values.map { SavedMember(it.id, it.token, it.name, it.isOwner) },
+            members = members.values.map { SavedMember(it.id, it.token, it.name, it.isOwner, it.accountId) },
             queue = queue.toList(),
             history = history.takeLast(SAVED_HISTORY),
             current = current,
             positionMs = position(),
             // Someone connected right now counts as activity, so the room isn't deleted as stale on restore.
             lastActive = if (members.values.any { it.outbox != null }) clock() else lastActive,
+            ownerAccount = ownerAccount,
         )
     }
 
     /** Fills a new room from [saved]. Everyone starts offline and playback starts paused. */
     private fun restore(saved: SavedRoom) {
         val now = clock()
-        for (m in saved.members) members[m.id] = Member(m.id, m.token, m.name, m.isOwner, outbox = null, offlineSince = now)
+        for (m in saved.members) members[m.id] = Member(m.id, m.token, m.name, m.isOwner, outbox = null, accountId = m.accountId, offlineSince = now)
         queue += saved.queue
         history += saved.history
         // The stream URL has probably expired; it is resolved again when someone presses play.
@@ -519,7 +529,7 @@ class Room(
             scope: CoroutineScope,
             onInfoChanged: () -> Unit = {},
             clock: () -> Long = System::currentTimeMillis,
-        ) = Room(saved.code, saved.name, saved.ownerToken, saved.visibility, streams, scope, onInfoChanged, clock)
+        ) = Room(saved.code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, onInfoChanged, clock)
             .apply { restore(saved) }
     }
 }

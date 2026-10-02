@@ -84,6 +84,8 @@ data class HostOptions(
     val supportsPrivateRooms: Boolean = false,
     /** Whether a request comes from the hosting device itself. Overridable for tests. */
     val isLocal: (ApplicationCall) -> Boolean = ::isLoopback,
+    /** Which accounts can join. */
+    val auth: HostAuth = NoAuth,
 )
 
 fun isLoopback(call: ApplicationCall): Boolean {
@@ -97,6 +99,8 @@ fun Application.ytmpModule(
     audio: AudioProxy?,
     webApp: File?,
     options: HostOptions,
+    /** More `/api` routes: the account API on a server, linking an auth server on a phone. */
+    extraApi: Route.() -> Unit = {},
 ) {
     install(ContentNegotiation) { json(ProtocolJson) }
     install(WebSockets) {
@@ -125,6 +129,7 @@ fun Application.ytmpModule(
                         shareUrl = options.shareUrl(),
                         canCreateRooms = call.mayManageRooms(),
                         supportsPrivateRooms = options.supportsPrivateRooms,
+                        authServers = options.auth.servers(),
                     ),
                 )
             }
@@ -141,8 +146,9 @@ fun Application.ytmpModule(
                 if (request.visibility == RoomVisibility.PRIVATE && !options.supportsPrivateRooms) {
                     throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Solo rooms aren't supported here")
                 }
-                val room = rooms.create(name, request.visibility)
-                log.info("Created room {} ({}, {})", room.code, room.name, room.visibility)
+                val account = call.bearerToken()?.let(options.auth::verify)
+                val room = rooms.create(name, request.visibility, ownerAccount = account?.id)
+                log.info("Created room {} ({}, {}{})", room.code, room.name, room.visibility, account?.let { ", owner ${it.id}" } ?: "")
                 call.respond(CreateRoomResponse(room.code, room.ownerToken))
             }
             get("/rooms/{code}") {
@@ -167,6 +173,7 @@ fun Application.ytmpModule(
                 val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")
                 proxy.respond(call, call.parameters["songId"]!!, call.request.header(HttpHeaders.Range))
             }
+            extraApi()
         }
 
         webSocket("/ws") {
@@ -188,7 +195,9 @@ fun Application.ytmpModule(
                 sender.join()
                 return@webSocket
             }
-            val participantId = room.join(hello, outbox, local = options.isLocal(call))
+            val account = hello.accountToken?.let(options.auth::verify)
+            if (hello.accountToken != null && account == null) log.info("Room {}: account token not accepted, joining as a guest", room.code)
+            val participantId = room.join(hello, outbox, local = options.isLocal(call), account = account)
             if (participantId == null) {
                 outgoing.close()
                 sender.join()
@@ -212,6 +221,10 @@ fun Application.ytmpModule(
         }
     }
 }
+
+/** The token in `Authorization: Bearer …`, if any. */
+fun ApplicationCall.bearerToken(): String? =
+    request.header(HttpHeaders.Authorization)?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }?.substring(7)?.trim()?.ifEmpty { null }
 
 private fun forbidden() = ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Only the hosting device can do this")
 

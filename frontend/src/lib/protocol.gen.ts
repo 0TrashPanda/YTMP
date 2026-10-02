@@ -132,6 +132,7 @@ export interface ClientMessageHello {
   guestName: string;
   guestToken: string | null;
   ownerToken: string | null;
+  accountToken: string | null;
 }
 
 export interface ClientMessagePing {
@@ -201,6 +202,7 @@ export interface Participant {
   isOwner: boolean;
   online: boolean;
   listening: boolean;
+  accountId: string | null;
 }
 
 export interface EventParticipantJoined {
@@ -338,6 +340,7 @@ export interface ServerMessageWelcome {
   guestToken: string;
   seq: number;
   state: RoomState;
+  accountId: string | null;
 }
 
 export type ServerMessage =
@@ -368,13 +371,90 @@ export interface ApiError {
 
 export type HostKind = "server" | "phone";
 
+export interface AuthServerRef {
+  url: string | null;
+  issuer: string;
+}
+
 export interface HostInfo {
   kind: HostKind;
   shareUrl: string | null;
   canCreateRooms: boolean;
   supportsPrivateRooms: boolean;
+  authServers: AuthServerRef[];
 }
 
 export interface RoomListResponse {
   rooms: RoomInfo[];
+}
+
+export type SignupMode = "open" | "invite" | "admin";
+
+export interface AuthServerInfo {
+  issuer: string;
+  publicKey: string;
+  signup: SignupMode;
+  needsAdmin: boolean;
+}
+
+export interface AccountInfo {
+  id: string;
+  username: string;
+  displayName: string;
+  isAdmin: boolean;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface SignupRequest {
+  username: string;
+  password: string;
+  displayName: string | null;
+  invite: string | null;
+}
+
+export interface SessionResponse {
+  sessionToken: string;
+  account: AccountInfo;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface HostTokenRequest {
+  origin: string;
+}
+
+export interface HostTokenResponse {
+  token: string;
+  expiresAt: number;
+  account: AccountInfo;
+}
+
+export interface AccountListResponse {
+  accounts: AccountInfo[];
+}
+
+export interface CreateAccountRequest {
+  username: string;
+  password: string;
+  displayName: string | null;
+}
+
+export interface SetPasswordRequest {
+  password: string;
+}
+
+export interface InviteResponse {
+  code: string;
+  expiresAt: number;
+}
+
+export interface LinkAuthServerRequest {
+  url: string | null;
 }

@@ -31,6 +31,7 @@ data class SavedRoom(
     val current: QueueItem?,
     val positionMs: Long,
     val lastActive: Long,
+    val ownerAccount: String? = null,
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 
@@ -41,4 +42,4 @@ data class SavedRoom(
 
 /** A participant, so guests come back as themselves (same name, same songs) after a restart. */
 @Serializable
-data class SavedMember(val id: String, val token: String, val name: String, val isOwner: Boolean)
+data class SavedMember(val id: String, val token: String, val name: String, val isOwner: Boolean, val accountId: String? = null)

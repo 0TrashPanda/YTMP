@@ -17,14 +17,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 		const body = (await response.json().catch(() => null)) as ApiError | null;
 		throw new ApiRequestError(body?.error.message ?? `Request failed (${response.status})`);
 	}
-	return response.json() as Promise<T>;
+	return (response.status === 204 ? null : response.json()) as Promise<T>;
 }
 
-export function createRoom(name: string, visibility: RoomVisibility = 'public'): Promise<CreateRoomResponse> {
-	return request('/api/rooms', {
-		method: 'POST',
+/** [accountToken] makes your account the owner, on every device you log in on. */
+export function createRoom(name: string, visibility: RoomVisibility = 'public', accountToken: string | null = null): Promise<CreateRoomResponse> {
+	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+	if (accountToken) headers['Authorization'] = `Bearer ${accountToken}`;
+	return request('/api/rooms', { method: 'POST', headers, body: JSON.stringify({ name, visibility }) });
+}
+
+/** On the phone: use a YTMP server for accounts, or none (null). */
+export async function linkAuthServer(url: string | null): Promise<void> {
+	await request<null>('/api/host/auth-server', {
+		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ name, visibility })
+		body: JSON.stringify({ url })
 	});
 }
 

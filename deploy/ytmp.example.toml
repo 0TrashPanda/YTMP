@@ -18,6 +18,18 @@ path = "ytmp.db"
 # PostgreSQL, e.g. "postgresql://ytmp:secret@localhost/ytmp"
 url = ""
 
+[accounts]
+# This server's public address. Logins on pages served from there work; without it only
+# this machine's own IP addresses do. YTMP_URL overrides it.
+url = ""
+# The name in account IDs (user@name). Default: the host name of url, or of this machine.
+# It is remembered on first start; changing it later changes everyone's account ID.
+name = ""
+# Who may create accounts: open | invite | admin. The first account becomes the server admin.
+signup = "invite"
+# Other YTMP servers whose accounts may join rooms here.
+trusted = []
+
 [rooms]
 # letters | digits | alnum
 code_style = "letters"

@@ -167,9 +167,15 @@ class MainActivity : ComponentActivity() {
 
     private fun isLocalHost(uri: Uri) = uri.host == "127.0.0.1" && uri.port == LocalHost.PORT
 
-    /** Pages the app shows itself: its own host, the configured server, and hosts on the local network. */
+    /** Pages the app shows itself: its own host, the configured server, the account server, and hosts on the local network. */
     private fun isAppPage(uri: Uri): Boolean =
-        isLocalHost(uri) || isServerUrl(uri) || uri.host == WebViewAssetLoader.DEFAULT_DOMAIN || isPrivateAddress(uri.host)
+        isLocalHost(uri) || isServerUrl(uri) || isAuthServer(uri) || uri.host == WebViewAssetLoader.DEFAULT_DOMAIN || isPrivateAddress(uri.host)
+
+    /** Logging in happens on the account server's own pages (see docs/implementation/auth.md). */
+    private fun isAuthServer(uri: Uri): Boolean {
+        val auth = app.host.authLink.url?.let(Uri::parse) ?: return false
+        return uri.host == auth.host && uri.port == auth.port
+    }
 
     private fun isPrivateAddress(host: String?): Boolean {
         val parts = host?.split('.')?.mapNotNull(String::toIntOrNull)?.takeIf { it.size == 4 } ?: return false

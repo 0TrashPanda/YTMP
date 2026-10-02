@@ -50,8 +50,14 @@ A YTMP account can be linked to a **YouTube account**. This lets the user:
 
 ## Creating an account
 
-Who can create an account on a server is set in the **server config** (for example
-open sign-up, invite only, or only the server admin creates accounts).
+Who can create an account on a server is set in the **server config**: open sign-up,
+invite only (the default), or only the server admin creates accounts. The **first account**
+made on a new server becomes the **server admin**, who makes invite links and accounts and
+can set someone's password (there is no e-mail).
+
+Accounts are a **username and password**, shown as `username@server`. You always log in on
+your own server's page; a room on another host only gets proof of who you are, never your
+password.
 
 ## Auth servers
 

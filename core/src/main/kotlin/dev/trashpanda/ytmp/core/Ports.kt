@@ -51,3 +51,10 @@ internal object Ids {
         repeat(length) { append(ALPHABET[random.nextInt(ALPHABET.length)]) }
     }
 }
+
+/** An account a participant proved with a token from a trusted auth server. */
+data class AccountIdentity(
+    /** `username@issuer` */
+    val id: String,
+    val displayName: String,
+)

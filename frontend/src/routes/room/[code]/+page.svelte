@@ -13,11 +13,14 @@
 	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
 	import { saved } from '../../../lib/storage';
+	import { identity } from '../../../lib/account';
 	import type { Participant } from '../../../lib/protocol.gen';
 
 	const code = page.params.code!.toUpperCase();
 
-	let name = $state(saved.displayName);
+	// Logged in: the host takes the name from the account.
+	const initialName = identity.stored?.account.displayName ?? saved.displayName;
+	let name = $state(initialName);
 	let room = $state<RoomConnection | null>(null);
 	let player = $state<RoomPlayer | null>(null);
 	let query = $state('');
@@ -26,12 +29,12 @@
 	let toastId = 0;
 
 	function start() {
-		saved.displayName = name.trim();
+		if (!identity.stored) saved.displayName = name.trim();
 		room = new RoomConnection(code, name.trim());
 		player = createPlayer(room);
 		room.connect();
 	}
-	if (saved.displayName.trim()) start();
+	if (initialName.trim()) start();
 
 	// Tick for the progress bar.
 	const clock = setInterval(() => (now = Date.now()), 250);
@@ -97,7 +100,7 @@
 			class="flex flex-col gap-3"
 			onsubmit={(e) => {
 				e.preventDefault();
-				if (name.trim()) start();
+				if (initialName.trim()) start();
 			}}
 		>
 			<input
@@ -158,7 +161,10 @@
 				</button>
 				<span
 					class="hidden items-center gap-1 text-sm text-muted sm:flex"
-					title={room.state?.participants.filter((p: Participant) => p.online).map((p: Participant) => p.name + (p.listening ? ' 🎧' : '')).join(', ')}
+					title={room.state?.participants
+						.filter((p: Participant) => p.online)
+						.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
+						.join(', ')}
 				>
 					<Icon name="people" size={20} />
 					{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}

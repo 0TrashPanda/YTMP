@@ -4,6 +4,9 @@ For the person running a YTMP server.
 
 ## Admin page
 
+> So far: the server admin manages accounts on `/account` (invite links, create accounts,
+> set passwords). The rest below is still to do.
+
 A web page (for server admins only) to manage the server without editing config files
 by hand:
 

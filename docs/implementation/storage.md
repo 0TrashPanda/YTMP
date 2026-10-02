@@ -14,9 +14,20 @@ path = "/var/lib/ytmp/ytmp.db"     # sqlite
 - SQLite is the default, because it's one file with no extra service and backups are easy.
   It's plenty for a group of friends.
 - PostgreSQL is for people who already run it, or want it.
-- To support both, the code uses a Kotlin SQL library that works with both, such as
-  **Exposed** or **jOOQ**, plus migrations that run on both (for example **Flyway**).
-  Queries stay in portable SQL, with no database-specific features.
+- To support both, queries stay in portable SQL, with no database-specific features. So far
+  that is plain JDBC through one connection (`server/.../Database.kt`), with a small
+  migration list of its own: a `schema_version` table and numbered steps that run in order
+  on start. A SQL library (Exposed, jOOQ) or Flyway can still come later if queries grow.
+
+### Tables so far
+
+| Table | What |
+|-------|------|
+| `rooms` | One row per room, its state as JSON (see *Rooms* below) |
+| `accounts` | `id`, `username` (unique, lowercase), `display_name`, `password_hash` (PBKDF2-SHA256), `is_admin` |
+| `sessions` | Logins on the server's own pages: SHA-256 of the token, account, created / last used |
+| `invites` | SHA-256 of the invite code, who made it, expiry, who used it |
+| `settings` | Server values: the token signing key, the issuer name |
 
 On **Android**, the app has its own local **SQLite** database for its rooms (solo rooms
 survive restarts), the local copy of joined rooms (for cloning), downloads and settings.
@@ -45,8 +56,7 @@ rooms
 - One JSON column keeps the room format free to change: new fields get a default. The room's
   history here is only for the room itself; the listening history below gets its own tables.
 - Server: `JdbcRoomStore` (plain JDBC; the same SQL works on SQLite and PostgreSQL, upsert
-  with `ON CONFLICT`). The table is created with `CREATE TABLE IF NOT EXISTS`; real
-  migrations (Flyway) come with the first schema that needs them (accounts). Phone:
+  with `ON CONFLICT`). Phone:
   `PhoneRoomStore` (Android SQLite).
 
 ## Song graph

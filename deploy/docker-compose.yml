@@ -13,6 +13,8 @@ services:
       - "8080:8080"
     environment:
       YTMP_YTM_URL: http://ytm:8401
+      # Your server's public address, needed for logins, e.g. https://ytmp.example.com
+      YTMP_URL: ${YTMP_URL:-}
       YTMP_MODULE_KEY: ${YTMP_MODULE_KEY:?set YTMP_MODULE_KEY in .env}
     volumes:
       - ./ytmp.toml:/config/ytmp.toml:ro

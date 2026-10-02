@@ -68,6 +68,8 @@ data class Participant(
     val isOwner: Boolean,
     val online: Boolean,
     val listening: Boolean,
+    /** `username@issuer`, or null for a guest. */
+    val accountId: String? = null,
 )
 
 @Serializable

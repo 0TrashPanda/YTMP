@@ -8,6 +8,7 @@ import {
 	type RoomState,
 	type ServerMessage
 } from './protocol.gen';
+import { identity } from './account';
 import { saved } from './storage';
 
 /** How long a host notice (e.g. "Couldn't play …") stays on screen. */
@@ -47,6 +48,7 @@ export class RoomConnection {
 	private retryDelay = 1000;
 	private closed = false;
 	private noticeId = 0;
+	private sentAccountToken = false;
 
 	constructor(
 		readonly roomCode: string,
@@ -70,13 +72,16 @@ export class RoomConnection {
 
 		socket.onopen = () => {
 			this.retryDelay = 1000;
+			const accountToken = identity.token;
+			this.sentAccountToken = !!accountToken;
 			this.sendRaw({
 				type: 'hello',
 				protocolVersion: PROTOCOL_VERSION,
 				roomCode: this.roomCode,
 				guestName: this.name,
 				guestToken: saved.guestToken(this.roomCode),
-				ownerToken: saved.ownerToken(this.roomCode)
+				ownerToken: saved.ownerToken(this.roomCode),
+				accountToken
 			});
 		};
 		socket.onmessage = (event) => this.receive(JSON.parse(event.data) as ServerMessage);
@@ -124,6 +129,11 @@ export class RoomConnection {
 				saved.setGuestToken(this.roomCode, message.guestToken);
 				this.participantId = message.participantId;
 				this.state = message.state;
+				if (this.sentAccountToken && !message.accountId) {
+					// Expired, or from an auth server this host doesn't trust (any more).
+					identity.forget();
+					this.addNotice("Your login isn't accepted here, so you joined as a guest.");
+				}
 				this.seq = message.seq;
 				this.waitingForSnapshot = false;
 				this.status = 'connected';
@@ -205,13 +215,16 @@ export class RoomConnection {
 			case 'RoomUpdated':
 				s.room = e.room;
 				break;
-			case 'Notice': {
-				const id = ++this.noticeId;
-				this.notices.push({ id, text: e.message });
-				setTimeout(() => this.dismissNotice(id), NOTICE_MS);
+			case 'Notice':
+				this.addNotice(e.message);
 				break;
-			}
 		}
+	}
+
+	private addNotice(text: string): void {
+		const id = ++this.noticeId;
+		this.notices.push({ id, text });
+		setTimeout(() => this.dismissNotice(id), NOTICE_MS);
 	}
 
 	private startClockSync(): void {

@@ -6,6 +6,19 @@ import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.protocol.HostInfo
 import dev.trashpanda.ytmp.protocol.RoomListResponse
+import dev.trashpanda.ytmp.protocol.AuthServerInfo
+import dev.trashpanda.ytmp.protocol.AccountInfo
+import dev.trashpanda.ytmp.protocol.LoginRequest
+import dev.trashpanda.ytmp.protocol.SignupRequest
+import dev.trashpanda.ytmp.protocol.SessionResponse
+import dev.trashpanda.ytmp.protocol.ChangePasswordRequest
+import dev.trashpanda.ytmp.protocol.HostTokenRequest
+import dev.trashpanda.ytmp.protocol.HostTokenResponse
+import dev.trashpanda.ytmp.protocol.AccountListResponse
+import dev.trashpanda.ytmp.protocol.CreateAccountRequest
+import dev.trashpanda.ytmp.protocol.SetPasswordRequest
+import dev.trashpanda.ytmp.protocol.InviteResponse
+import dev.trashpanda.ytmp.protocol.LinkAuthServerRequest
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.ServerMessage
@@ -120,6 +133,19 @@ fun main(args: Array<String>) {
     generator.addRoot(ApiError.serializer().descriptor)
     generator.addRoot(HostInfo.serializer().descriptor)
     generator.addRoot(RoomListResponse.serializer().descriptor)
+    generator.addRoot(AuthServerInfo.serializer().descriptor)
+    generator.addRoot(AccountInfo.serializer().descriptor)
+    generator.addRoot(LoginRequest.serializer().descriptor)
+    generator.addRoot(SignupRequest.serializer().descriptor)
+    generator.addRoot(SessionResponse.serializer().descriptor)
+    generator.addRoot(ChangePasswordRequest.serializer().descriptor)
+    generator.addRoot(HostTokenRequest.serializer().descriptor)
+    generator.addRoot(HostTokenResponse.serializer().descriptor)
+    generator.addRoot(AccountListResponse.serializer().descriptor)
+    generator.addRoot(CreateAccountRequest.serializer().descriptor)
+    generator.addRoot(SetPasswordRequest.serializer().descriptor)
+    generator.addRoot(InviteResponse.serializer().descriptor)
+    generator.addRoot(LinkAuthServerRequest.serializer().descriptor)
     out.parentFile.mkdirs()
     out.writeText(generator.render())
     println("Wrote ${out.path}")

@@ -21,6 +21,8 @@ sealed interface ClientMessage {
         val guestToken: String?,
         /** Proves the sender created the room. */
         val ownerToken: String?,
+        /** Joins with an account: a host token from the account's auth server. */
+        val accountToken: String? = null,
     ) : ClientMessage
 
     @Serializable
@@ -119,6 +121,8 @@ sealed interface ServerMessage {
         val guestToken: String,
         val seq: Long,
         val state: RoomState,
+        /** The account the participant joined with, or null if they joined as a guest (also when the token wasn't accepted). */
+        val accountId: String? = null,
     ) : ServerMessage
 
     @Serializable

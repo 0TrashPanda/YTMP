@@ -23,9 +23,9 @@ class JdbcRoomStoreTest {
 
     private fun stores(): List<() -> JdbcRoomStore> {
         val dir = Files.createTempDirectory("ytmp")
-        val sqlite = { JdbcRoomStore.open(DatabaseConfig(type = "sqlite", path = dir.resolve("sub/ytmp.db").toString())) }
+        val sqlite = { JdbcRoomStore(Database.open(DatabaseConfig(type = "sqlite", path = dir.resolve("sub/ytmp.db").toString()))) }
         // Set YTMP_TEST_POSTGRES (e.g. postgresql://ytmp:ytmp@localhost/ytmp) to also test PostgreSQL.
-        val postgres = System.getenv("YTMP_TEST_POSTGRES")?.let { url -> { JdbcRoomStore.open(DatabaseConfig(type = "postgres", url = url)) } }
+        val postgres = System.getenv("YTMP_TEST_POSTGRES")?.let { url -> { JdbcRoomStore(Database.open(DatabaseConfig(type = "postgres", url = url))) } }
         return listOfNotNull(sqlite, postgres)
     }
 

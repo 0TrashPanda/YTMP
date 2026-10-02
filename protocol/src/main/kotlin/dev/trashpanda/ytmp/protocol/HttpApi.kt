@@ -45,6 +45,8 @@ data class HostInfo(
     val canCreateRooms: Boolean,
     /** Whether solo (private) rooms can be created here. */
     val supportsPrivateRooms: Boolean,
+    /** Auth servers whose accounts can join here. Empty: guests only. */
+    val authServers: List<AuthServerRef> = emptyList(),
 )
 
 /** `GET /api/rooms`: the rooms on this host (only for the hosting device). */

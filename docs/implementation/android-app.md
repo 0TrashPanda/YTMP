@@ -37,6 +37,9 @@
   public rooms, pauses solo ones), plus Wi-Fi and wake locks so friends' devices keep getting
   answers with the screen off. An idle solo room doesn't need it.
 - Chromecast discovery (`CastFinder`) runs while the app is on screen or the service runs.
+- **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
+  account holders of that server can join its rooms (see [auth](auth.md)). The WebView keeps
+  that server's pages in the app, for logging in.
 - **Discovery** (`Nearby`): public rooms are announced with mDNS (`_ytmp._tcp`, TXT
   `code`/`name`/`v`), and the start page lists rooms found on the network. Not yet verified
   between two phones: the dev PC's firewall blocks mDNS on Wi-Fi.

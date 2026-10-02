@@ -34,8 +34,8 @@ generated from them.
 
 | Direction | Message | Content |
 |-----------|---------|---------|
-| → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`. Later: account `token`, `listenedWithOptOut` |
-| ← | `welcome` ✅ | `participantId`, `guestToken`, `seq`, `state` (the snapshot) |
+| → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`, `accountToken` ✅ (a host token, see [auth](auth.md)). Later: `listenedWithOptOut` |
+| ← | `welcome` ✅ | `participantId`, `guestToken`, `seq`, `state` (the snapshot), `accountId` ✅ (null when joined as a guest, also when the token wasn't accepted) |
 | ← | `rejected` ✅ | `reason`: `room_not_found`, `version_mismatch`, `invalid_name`, `replaced` ✅. Later: `banned`, `accounts_only`, `untrusted_auth_server` |
 | ⇄ | `ping` / `pong` ✅ | `clientTime` / `clientTime, hostTime`, for clock sync |
 
@@ -48,7 +48,7 @@ and `playback`. The other fields come with permissions, roles, outputs and vote 
 {
   "room":        { "id", "code", "name", "visibility", "ownerId", "settings": { ... } },
   "me":          { "participantId", "roleId", "permissions": [...] },
-  "participants":[ { "id", "name", "accountId?", "roleId", "listening": true } ],
+  "participants":[ { "id", "name", "accountId?", "roleId", "listening": true } ],   // accountId ✅
   "roles":       [ { "id", "name", "permissions": [...] } ],
   "queue":       [ QueueItem ],
   "autoplay":    { "seed": Song | Artist | Album | Playlist, "items": [ QueueItem ] },

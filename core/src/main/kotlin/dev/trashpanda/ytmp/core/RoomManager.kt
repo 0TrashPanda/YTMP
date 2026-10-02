@@ -79,10 +79,11 @@ class RoomManager(
         }
     }
 
-    fun create(name: String, visibility: RoomVisibility = RoomVisibility.PUBLIC): Room {
+    /** Creates a room. [ownerAccount] (`username@issuer`) is the owner on any device it logs in from. */
+    fun create(name: String, visibility: RoomVisibility = RoomVisibility.PUBLIC, ownerAccount: String? = null): Room {
         while (true) {
             val code = newCode()
-            val room = Room(code, name, Ids.token(), visibility, streams, scope, onInfoChanged = { roomChanged(code) }, clock = clock)
+            val room = Room(code, name, Ids.token(), visibility, streams, scope, onInfoChanged = { roomChanged(code) }, clock = clock, ownerAccount = ownerAccount)
             if (add(room)) {
                 roomChanged(code)
                 return room
