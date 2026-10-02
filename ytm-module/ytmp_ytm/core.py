@@ -132,6 +132,25 @@ def _thumbnails(thumbs: list[dict]) -> list[dict]:
     return out
 
 
+# Fetch YouTube audio in pieces this big: requests without a range are throttled.
+CHUNK_SIZE = 1024 * 1024
+_OPEN_END = 1 << 62
+
+
+def parse_range(header: str | None) -> tuple[int, int]:
+    """'bytes=100-' -> (100, open end); no header -> the whole file. Suffix ranges aren't supported."""
+    match = re.fullmatch(r"bytes=(\d+)-(\d*)", (header or "").strip())
+    if not match:
+        return 0, _OPEN_END
+    return int(match.group(1)), int(match.group(2)) if match.group(2) else _OPEN_END
+
+
+def total_size(content_range: str | None) -> int | None:
+    """'bytes 0-1023/5000' -> 5000."""
+    match = re.search(r"/(\d+)$", content_range or "")
+    return int(match.group(1)) if match else None
+
+
 def _clean_error(message: str) -> str:
     if "confirm you" in message and "not a bot" in message:
         # YouTube's bot check: it blocks this network for a while after many requests.

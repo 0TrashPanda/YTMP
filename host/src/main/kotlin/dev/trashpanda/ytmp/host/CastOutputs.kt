@@ -82,11 +82,11 @@ class CastOutputs(
                     val device = known.value[id] ?: continue
                     val session = sessions.getOrPut(id) { CastSession(device) }
                     try {
-                        session.sync(view, volume) { actual -> room.reportOutputVolume(id, actual) }
+                        session.sync(view, volume, report = room::notice) { actual -> room.reportOutputVolume(id, actual) }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        log.warn("Cast device {} failed: {}", device.name, e.message)
+                        log.warn("Cast device {} failed", device.name, e)
                         session.close()
                         sessions.remove(id) // Reconnect on the next round.
                     }
@@ -104,8 +104,9 @@ class CastOutputs(
         private var loadedItemId: String? = null
         private var settledAt = 0L
         private var appliedVolume: Double? = null
+        private var failed = false
 
-        suspend fun sync(view: RoomView, wantedVolume: Double?, reportVolume: suspend (Double) -> Unit) {
+        suspend fun sync(view: RoomView, wantedVolume: Double?, report: suspend (String) -> Unit, reportVolume: suspend (Double) -> Unit) {
             val player = connect(reportVolume)
             if (wantedVolume != null && wantedVolume != appliedVolume) {
                 player.setVolume(wantedVolume)
@@ -127,11 +128,21 @@ class CastOutputs(
                     album = item.song.album?.name,
                     imageUrl = item.song.thumbnails.maxByOrNull { it.width }?.url,
                 )
-                player.load(url, "audio/mp4", metadata, expected + LOAD_LEAD_MS, autoplay = view.playing)
+                log.info("Cast device {}: loading {} from {}", device.name, item.song.title, url)
                 loadedItemId = item.itemId
                 settledAt = now + SETTLE_MS
+                failed = false
+                try {
+                    player.load(url, "audio/mp4", metadata, expected + LOAD_LEAD_MS, autoplay = view.playing)
+                } catch (e: IllegalStateException) {
+                    // Don't keep retrying this song; the next song gets a new try.
+                    failed = true
+                    log.warn("Cast device {} couldn't play {}: {}", device.name, item.song.title, e.message)
+                    report("${device.name} couldn't play \"${item.song.title}\"")
+                }
                 return
             }
+            if (failed) return
 
             val status = player.status() ?: return
             when {

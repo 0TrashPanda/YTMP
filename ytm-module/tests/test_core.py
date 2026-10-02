@@ -59,3 +59,12 @@ def test_fresh_stream_skips_the_cache(monkeypatch):
 def test_bot_check_gets_a_clear_message():
     message = "ERROR: [youtube] abc: Sign in to confirm you\u2019re not a bot. Use --cookies-from-browser or --cookies"
     assert "bot check" in core._clean_error(message)
+
+
+def test_parse_range():
+    assert core.parse_range(None)[0] == 0
+    assert core.parse_range("bytes=100-") == (100, core._OPEN_END)
+    assert core.parse_range("bytes=0-1023") == (0, 1023)
+    assert core.total_size("bytes 0-1023/5000") == 5000
+    assert core.total_size(None) is None
+

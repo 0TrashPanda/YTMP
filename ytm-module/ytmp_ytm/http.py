@@ -11,13 +11,11 @@ import uvicorn
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
-from starlette.background import BackgroundTask
 
 from . import core
 
 API_VERSION = 1
 VERSION = "0.1.0"
-_PASSED_RESPONSE_HEADERS = ("content-type", "content-length", "content-range", "accept-ranges")
 
 
 def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
@@ -70,31 +68,54 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
 
     @app.get("/songs/{song_id}/audio", dependencies=[Depends(check_key)])
     async def audio(song_id: str, range: str | None = Header(default=None)):
-        async def fetch(info: core.StreamInfo) -> httpx.Response:
-            headers = dict(info.http_headers)
-            if range:
-                headers["Range"] = range
+        info = await run_in_threadpool(ytm.stream, song_id)
+
+        async def fetch(info: core.StreamInfo, start: int, end: int) -> httpx.Response:
+            headers = dict(info.http_headers, Range=f"bytes={start}-{end}")
             return await http.send(http.build_request("GET", info.url, headers=headers), stream=True)
 
-        info = await run_in_threadpool(ytm.stream, song_id)
-        upstream = await fetch(info)
-        if upstream.status_code == 403:
+        # YouTube answers requests without a range (or with a huge one) very slowly, so always
+        # fetch it in chunks with an explicit range, like yt-dlp does, and pass them on as one stream.
+        start, end = core.parse_range(range)
+        first = await fetch(info, start, min(end, start + core.CHUNK_SIZE - 1))
+        if first.status_code == 403:
             # The cached URL went bad before its expiry; get a fresh one and try once more.
-            await upstream.aclose()
+            await first.aclose()
             info = await run_in_threadpool(ytm.stream, song_id, True)
-            upstream = await fetch(info)
-        if upstream.status_code >= 400:
-            await upstream.aclose()
-            raise _ApiError(502, "upstream_error", f"YouTube answered {upstream.status_code}")
-        passed = {k: v for k, v in upstream.headers.items() if k.lower() in _PASSED_RESPONSE_HEADERS}
-        passed.setdefault("accept-ranges", "bytes")
-        return StreamingResponse(
-            upstream.aiter_raw(),
-            status_code=upstream.status_code,
-            headers=passed,
-            media_type=info.mime_type,
-            background=BackgroundTask(upstream.aclose),
-        )
+            first = await fetch(info, start, min(end, start + core.CHUNK_SIZE - 1))
+        if first.status_code == 416:
+            await first.aclose()
+            raise _ApiError(416, "invalid", "Range not satisfiable")
+        if first.status_code >= 400:
+            await first.aclose()
+            raise _ApiError(502, "upstream_error", f"YouTube answered {first.status_code}")
+
+        total = core.total_size(first.headers.get("content-range"))
+        end = min(end, total - 1) if total else end
+
+        async def body():
+            response = first
+            position = start
+            try:
+                while True:
+                    async for chunk in response.aiter_raw():
+                        position += len(chunk)
+                        yield chunk
+                    await response.aclose()
+                    if total is None or position > end:
+                        return
+                    response = await fetch(info, position, min(end, position + core.CHUNK_SIZE - 1))
+                    if response.status_code >= 400:
+                        return
+            finally:
+                await response.aclose()
+
+        headers = {"accept-ranges": "bytes"}
+        if total is not None:
+            headers["content-length"] = str(end - start + 1)
+        if range and total is not None:
+            headers["content-range"] = f"bytes {start}-{end}/{total}"
+        return StreamingResponse(body(), status_code=206 if range else 200, headers=headers, media_type=info.mime_type)
 
     return app
 

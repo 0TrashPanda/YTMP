@@ -191,6 +191,9 @@ class Room(
         }
     }
 
+    /** Tells everyone in the room about a problem, e.g. a speaker that couldn't play a song. */
+    suspend fun notice(message: String) = mutex.withLock { emit(Event.Notice(message)) }
+
     /** [listener] is called (on any thread, without waiting) after every change. Read [view] to see what changed. */
     fun addChangeListener(listener: () -> Unit) {
         changeListeners += listener

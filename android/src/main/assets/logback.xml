@@ -1,0 +1,13 @@
+<configuration>
+    <appender name="logcat" class="ch.qos.logback.classic.android.LogcatAppender">
+        <tagEncoder>
+            <pattern>ytmp</pattern>
+        </tagEncoder>
+        <encoder>
+            <pattern>%logger{20}: %msg</pattern>
+        </encoder>
+    </appender>
+    <root level="INFO">
+        <appender-ref ref="logcat" />
+    </root>
+</configuration>

@@ -3,6 +3,11 @@ package dev.trashpanda.ytmp.cast
 import dev.trashpanda.ytmp.cast.CastChannel.Companion.NS_MEDIA
 import dev.trashpanda.ytmp.cast.CastChannel.Companion.NS_RECEIVER
 import dev.trashpanda.ytmp.cast.CastChannel.Companion.RECEIVER
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -72,16 +77,38 @@ class CastMediaPlayer(private val channel: CastChannel) {
                 ),
             ),
         )
-        val reply = mediaRequest(
-            payload(
-                "LOAD",
-                "media" to media,
-                "currentTime" to JsonPrimitive(positionMs / 1000.0),
-                "autoplay" to JsonPrimitive(autoplay),
-            ),
-        )
-        if (reply.type == "LOAD_FAILED" || reply.type == "LOAD_CANCELLED") error("The Cast device couldn't load the song (${reply.type})")
-        return parseMedia(reply) ?: error("No media status after loading")
+        // The first answer is often just "IDLE"; the real outcome (playing, or failed) follows.
+        return coroutineScope {
+            val outcome = async(start = CoroutineStart.UNDISPATCHED) {
+                withTimeoutOrNull(LOAD_TIMEOUT_MS) {
+                    channel.messages.first { (namespace, json) -> namespace == NS_MEDIA && loadOutcome(json) != null }.second
+                }
+            }
+            val reply = mediaRequest(
+                payload(
+                    "LOAD",
+                    "media" to media,
+                    "currentTime" to JsonPrimitive(positionMs / 1000.0),
+                    "autoplay" to JsonPrimitive(autoplay),
+                ),
+            )
+            val result = if (loadOutcome(reply) != null) reply.also { outcome.cancel() } else outcome.await()
+            when (loadOutcome(result ?: error("The Cast device didn't start the song in time"))) {
+                true -> parseMedia(result)!!
+                else -> error("The Cast device couldn't play the song (${result.type ?: "error"})")
+            }
+        }
+    }
+
+    /** true = loaded, false = failed, null = not decided yet. */
+    private fun loadOutcome(message: JsonObject): Boolean? {
+        if (message.type == "LOAD_FAILED" || message.type == "LOAD_CANCELLED") return false
+        val status = message["status"]?.jsonArray?.firstOrNull()?.jsonObject ?: return null
+        return when (status["playerState"]?.jsonPrimitive?.content) {
+            "PLAYING", "PAUSED", "BUFFERING" -> true
+            "IDLE" -> if (status["idleReason"]?.jsonPrimitive?.content == "ERROR") false else null
+            else -> null
+        }
     }
 
     suspend fun play() = control("PLAY")
@@ -158,5 +185,6 @@ class CastMediaPlayer(private val channel: CastChannel) {
     companion object {
         /** Google's built-in media player app, available on every Cast device. */
         const val DEFAULT_MEDIA_RECEIVER = "CC1AD845"
+        private const val LOAD_TIMEOUT_MS = 20_000L
     }
 }
