@@ -14,6 +14,7 @@ data class Config(
     val ytm: YtmConfig = YtmConfig(),
     val rooms: RoomsConfig = RoomsConfig(),
     val cast: CastConfig = CastConfig(),
+    val database: DatabaseConfig = DatabaseConfig(),
 ) {
     companion object {
         private val toml = Toml(TomlInputConfig(ignoreUnknownNames = true))
@@ -29,6 +30,11 @@ data class Config(
                 ytm = base.ytm.copy(
                     url = env["YTMP_YTM_URL"] ?: base.ytm.url,
                     key = env["YTMP_MODULE_KEY"] ?: base.ytm.key,
+                ),
+                database = base.database.copy(
+                    type = env["YTMP_DB_TYPE"] ?: base.database.type,
+                    path = env["YTMP_DB_PATH"] ?: base.database.path,
+                    url = env["YTMP_DB_URL"] ?: base.database.url,
                 ),
             )
         }
@@ -64,6 +70,17 @@ data class CastConfig(
      */
     @SerialName("audio_base_url")
     val audioBaseUrl: String = "",
+)
+
+/** See docs/implementation/storage.md. */
+@Serializable
+data class DatabaseConfig(
+    /** sqlite | postgres */
+    val type: String = "sqlite",
+    /** SQLite file. */
+    val path: String = "ytmp.db",
+    /** PostgreSQL, e.g. "postgresql://ytmp:secret@localhost/ytmp". */
+    val url: String = "",
 )
 
 @Serializable

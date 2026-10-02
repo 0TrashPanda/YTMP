@@ -1,5 +1,5 @@
 # YTMP server settings. Every value is optional; these are the defaults.
-# YTMP_PORT, YTMP_YTM_URL and YTMP_MODULE_KEY environment variables override this file.
+# YTMP_PORT, YTMP_YTM_URL, YTMP_MODULE_KEY and YTMP_DB_* environment variables override this file.
 
 [server]
 host = "0.0.0.0"
@@ -9,6 +9,14 @@ port = 8080
 # Where the YouTube Music module runs, and the key shared with it.
 url = "http://127.0.0.1:8401"
 key = ""
+
+[database]
+# Rooms (and later accounts, history, …) are kept here. sqlite | postgres
+type = "sqlite"
+# SQLite file. The Docker image uses /var/lib/ytmp/ytmp.db.
+path = "ytmp.db"
+# PostgreSQL, e.g. "postgresql://ytmp:secret@localhost/ytmp"
+url = ""
 
 [rooms]
 # letters | digits | alnum

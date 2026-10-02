@@ -12,7 +12,9 @@ plugins {
 
 rootProject.name = "ytmp"
 
-include(":protocol", ":core", ":host", ":cast", ":server", ":android")
+include(":protocol", ":core", ":host", ":cast", ":server")
+// Not in the server Docker build, which copies only what the server needs.
+if (file("android").isDirectory) include(":android")
 
 dependencyResolutionManagement {
     repositories {

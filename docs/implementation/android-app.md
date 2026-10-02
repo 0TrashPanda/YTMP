@@ -32,13 +32,18 @@
 - **Who can do what:** only the phone itself (loopback) can create, list and close rooms, and
   join **solo** (private) rooms. Friends on the same Wi-Fi can join **public** rooms at
   `http://<phone-ip>:8765/room/CODE` (QR code in the share sheet).
-- **`HostService`**: a foreground service (type *connected device*) while the phone has rooms,
-  with a "Hosting …" notification and *Stop hosting*, plus Wi-Fi and wake locks so friends'
-  devices keep getting answers with the screen off.
+- **`HostService`**: a foreground service (type *connected device*) while the phone has public
+  rooms or a room is playing, with a "Hosting …" notification and *Stop hosting* (closes the
+  public rooms, pauses solo ones), plus Wi-Fi and wake locks so friends' devices keep getting
+  answers with the screen off. An idle solo room doesn't need it.
+- Chromecast discovery (`CastFinder`) runs while the app is on screen or the service runs.
 - **Discovery** (`Nearby`): public rooms are announced with mDNS (`_ytmp._tcp`, TXT
   `code`/`name`/`v`), and the start page lists rooms found on the network. Not yet verified
   between two phones: the dev PC's firewall blocks mDNS on Wi-Fi.
-- Rooms live in memory: they are gone when the app process stops (persistence is a later step).
+- **Rooms survive app restarts** (`PhoneRoomStore`, SQLite `ytmp.db` in app storage): each
+  room is saved about a second after it changes, and every 15 s while playing (for the
+  position). They come back paused; the stream is resolved again on *play*. Which speakers a
+  room played on is not kept.
 - Android's asset packer skips folders starting with `_` by default, which dropped the web
   app's `_app/`; `ignoreAssetsPattern` is overridden for that.
 

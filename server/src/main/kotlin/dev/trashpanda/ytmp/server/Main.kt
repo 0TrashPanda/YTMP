@@ -11,8 +11,10 @@ import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /** Usage: `server [path/to/ytmp.toml]`, or set YTMP_CONFIG. */
@@ -38,8 +40,10 @@ fun main(args: Array<String>) {
         casts.addConfigured(config.cast.devices)
         if (config.cast.discovery) casts.discover()
 
-        val rooms = RoomManager(ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = casts.devices)
+        val store = JdbcRoomStore.open(config.database)
+        val rooms = RoomManager(ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = casts.devices, store = store)
         rooms.startCleanup()
+        monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
         casts.attach(rooms)
         ytmpModule(rooms, search = ytm, audio = ytm, webApp = File(config.server.frontend), HostOptions(kind = HostKind.SERVER))
     }.start(wait = true)

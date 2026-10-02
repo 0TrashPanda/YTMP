@@ -25,6 +25,30 @@ Things that belong to an account are synced to the account's server.
 Stored on the server: accounts, role templates, room defaults, playlists, rooms (for
 server-hosted and synced solo rooms), listening history, and the song graph.
 
+## Rooms (implemented)
+
+Rooms are kept across restarts on both hosts, through one interface in core (`RoomStore`):
+
+```
+rooms
+  code        PRIMARY KEY
+  data        -- JSON: name, owner token, visibility, participants (id, token, name),
+              -- queue, last 500 history items, current song, position, last activity
+  updated_at
+```
+
+- `RoomManager` loads all rooms on start and saves a room about a second after it changes
+  (a burst of events is one write), every 15 s while it plays, and all rooms on shutdown.
+  Store calls run one at a time, off the main thread.
+- A restored room is **paused**, everyone in it is offline (they reconnect with their guest
+  token), and the stream URL is resolved again on *play*. Active speakers are not restored.
+- One JSON column keeps the room format free to change: new fields get a default. The room's
+  history here is only for the room itself; the listening history below gets its own tables.
+- Server: `JdbcRoomStore` (plain JDBC; the same SQL works on SQLite and PostgreSQL, upsert
+  with `ON CONFLICT`). The table is created with `CREATE TABLE IF NOT EXISTS`; real
+  migrations (Flyway) come with the first schema that needs them (accounts). Phone:
+  `PhoneRoomStore` (Android SQLite).
+
 ## Song graph
 
 ### Why not a graph database?

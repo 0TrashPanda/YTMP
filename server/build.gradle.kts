@@ -22,6 +22,8 @@ dependencies {
     implementation(libs.ktoml.core)
     implementation(libs.jmdns)
     implementation(libs.logback.classic)
+    implementation(libs.sqlite.jdbc)
+    implementation(libs.postgresql)
 
     testImplementation(kotlin("test"))
     testImplementation(libs.ktor.server.test.host)

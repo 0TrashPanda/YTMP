@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        app.visible.value = true
         app.nearby.startDiscovery()
         nearbyUpdates = lifecycleScope.launch {
             app.nearby.rooms.collect { rooms ->
@@ -120,6 +121,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        app.visible.value = false
         nearbyUpdates?.cancel()
         app.nearby.stopDiscovery()
         controller?.let(MediaController::releaseFuture)

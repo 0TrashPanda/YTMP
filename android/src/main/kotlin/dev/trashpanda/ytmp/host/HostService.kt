@@ -16,9 +16,9 @@ import dev.trashpanda.ytmp.R
 import dev.trashpanda.ytmp.YtmpApp
 
 /**
- * Keeps the phone hosting while it has rooms: a foreground notification so Android doesn't
- * stop the app, plus Wi-Fi and wake locks so friends' devices keep getting answers with the
- * screen off. Started and stopped by [YtmpApp] as rooms come and go.
+ * Keeps the phone hosting while it has public rooms or plays music: a foreground notification
+ * so Android doesn't stop the app, plus Wi-Fi and wake locks so friends' devices keep getting
+ * answers with the screen off. Started and stopped by [YtmpApp]. Idle solo rooms don't need it.
  */
 class HostService : Service() {
     private var wifiLock: WifiManager.WifiLock? = null
@@ -28,7 +28,7 @@ class HostService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            (application as YtmpApp).host.closeAllRooms()
+            (application as YtmpApp).host.stopHosting()
             stopSelf()
             return START_NOT_STICKY
         }

@@ -7,11 +7,13 @@ import android.util.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.protocol.HostKind
+import dev.trashpanda.ytmp.protocol.RoomVisibility
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.io.File
 import java.net.Inet4Address
 
@@ -27,7 +29,7 @@ class LocalHost(private val context: Context) {
     /** Chromecasts on the network; they fetch the audio from this phone. */
     val casts = CastOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
     val castFinder = CastFinder(context, casts)
-    val rooms = RoomManager(streams = { ytm.resolveStream(it) }, scope = scope, outputs = casts.devices)
+    val rooms = RoomManager(streams = { ytm.resolveStream(it) }, scope = scope, outputs = casts.devices, store = PhoneRoomStore(context))
 
     fun start() {
         val webApp = installWebApp()
@@ -84,8 +86,11 @@ class LocalHost(private val context: Context) {
         }
     }
 
-    fun closeAllRooms() {
-        for (room in rooms.list.value) rooms.close(room.code)
+    /** "Stop hosting": public rooms end, solo rooms pause (they stay until closed). */
+    fun stopHosting() {
+        for (room in rooms.all()) {
+            if (room.visibility == RoomVisibility.PUBLIC) rooms.close(room.code) else scope.launch { room.pause() }
+        }
     }
 
     companion object {

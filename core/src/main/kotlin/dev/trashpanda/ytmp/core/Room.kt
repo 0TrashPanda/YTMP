@@ -91,6 +91,11 @@ class Room(
     var lastActive: Long = clock()
         private set
 
+    /** The room wants music to play (it may still be loading the stream). */
+    @Volatile
+    var isPlaying: Boolean = false
+        private set
+
     /**
      * Adds a participant. [local] means the connection comes from the hosting device itself;
      * only local connections may join a private (solo) room.
@@ -166,6 +171,39 @@ class Room(
             emit(Event.ParticipantLeft(member.id))
         }
         members.values.none { it.outbox != null }
+    }
+
+    /** Pauses playback, e.g. when the phone stops hosting. */
+    suspend fun pause() = mutex.withLock { pausePlayback() }
+
+    /** Everything needed to bring this room back after a restart. */
+    suspend fun save(): SavedRoom = mutex.withLock {
+        SavedRoom(
+            code = code,
+            name = name,
+            ownerToken = ownerToken,
+            visibility = visibility,
+            members = members.values.map { SavedMember(it.id, it.token, it.name, it.isOwner) },
+            queue = queue.toList(),
+            history = history.takeLast(SAVED_HISTORY),
+            current = current,
+            positionMs = position(),
+            // Someone connected right now counts as activity, so the room isn't deleted as stale on restore.
+            lastActive = if (members.values.any { it.outbox != null }) clock() else lastActive,
+        )
+    }
+
+    /** Fills a new room from [saved]. Everyone starts offline and playback starts paused. */
+    private fun restore(saved: SavedRoom) {
+        val now = clock()
+        for (m in saved.members) members[m.id] = Member(m.id, m.token, m.name, m.isOwner, outbox = null, offlineSince = now)
+        queue += saved.queue
+        history += saved.history
+        // The stream URL has probably expired; it is resolved again when someone presses play.
+        current = saved.current
+        positionAtAnchor = saved.positionMs
+        anchorTime = now
+        lastActive = saved.lastActive
     }
 
     fun close() {
@@ -257,14 +295,11 @@ class Room(
                     wantPlaying = true
                     anchorTime = clock()
                     emitPlayback()
+                    // A restored room has a current song but no stream yet.
+                    if (streamUrl == null && resolveJob?.isActive != true) resolve(current!!)
                 }
             }
-            Command.Pause -> if (wantPlaying) {
-                positionAtAnchor = position()
-                anchorTime = clock()
-                wantPlaying = false
-                emitPlayback()
-            }
+            Command.Pause -> pausePlayback()
             Command.Skip -> {
                 if (current == null) return invalid("Nothing is playing")
                 retireCurrent(QueueItemResult.SKIPPED)
@@ -341,6 +376,14 @@ class Room(
 
     // --- playback ---------------------------------------------------------------------
 
+    private fun pausePlayback() {
+        if (!wantPlaying) return
+        positionAtAnchor = position()
+        anchorTime = clock()
+        wantPlaying = false
+        emitPlayback()
+    }
+
     private fun position(): Long {
         val playing = wantPlaying && streamUrl != null
         return if (playing) positionAtAnchor + (clock() - anchorTime) else positionAtAnchor
@@ -381,8 +424,12 @@ class Room(
         if (item == null) wantPlaying = false
         emit(Event.NowPlayingChanged(item))
         emitPlayback()
-        if (item == null) return
+        if (item != null) resolve(item)
+    }
 
+    /** Resolves the stream of the current [item], then starts it (or skips it if it can't play). */
+    private fun resolve(item: QueueItem) {
+        resolveJob?.cancel()
         resolveJob = scope.launch {
             val url = runCatching { streams.resolveStream(item.song.id) }
             val next = mutex.withLock {
@@ -450,6 +497,7 @@ class Room(
 
     private fun emit(event: Event) {
         val message = ServerMessage.EventMessage(++seq, event)
+        isPlaying = wantPlaying
         for (member in members.values) member.outbox?.send(message)
         for (listener in changeListeners) listener()
     }
@@ -462,5 +510,16 @@ class Room(
         const val MAX_NAME_LENGTH = 32
         const val PREVIOUS_RESTART_MS = 3_000L
         const val SNAPSHOT_HISTORY = 200
+        const val SAVED_HISTORY = 500
+
+        /** Brings back a room saved with [save]. */
+        fun restore(
+            saved: SavedRoom,
+            streams: StreamResolver,
+            scope: CoroutineScope,
+            onInfoChanged: () -> Unit = {},
+            clock: () -> Long = System::currentTimeMillis,
+        ) = Room(saved.code, saved.name, saved.ownerToken, saved.visibility, streams, scope, onInfoChanged, clock)
+            .apply { restore(saved) }
     }
 }

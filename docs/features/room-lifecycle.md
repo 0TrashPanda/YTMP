@@ -42,6 +42,11 @@ an admin and without participants. Both are configurable (see
 
 The phone *is* the host. When it disconnects, the room ends.
 
+A restart of the app (an update, Android stopping it, a crash) is not the end: the phone
+keeps its rooms, public and solo, and brings them back with the same code, queue, history
+and participants. Playback comes back **paused** where it was. Friends' devices reconnect on
+their own. A public room is still deleted after the usual timeout without anyone connected.
+
 To avoid losing the queue, **clients using the app** keep a local copy of the room's
 queue (they receive it anyway to display it). When the host disappears, they can
 still **clone the room** from that local copy. Browser clients do not keep a copy.

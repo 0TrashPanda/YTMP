@@ -16,6 +16,7 @@ services:
       YTMP_MODULE_KEY: ${YTMP_MODULE_KEY:?set YTMP_MODULE_KEY in .env}
     volumes:
       - ./ytmp.toml:/config/ytmp.toml:ro
+      - ytmp-data:/var/lib/ytmp
     depends_on:
       - ytm
     restart: unless-stopped
@@ -27,3 +28,6 @@ services:
       YTMP_YTM_LANGUAGE: en
       YTMP_YTM_LOCATION: BE
     restart: unless-stopped
+
+volumes:
+  ytmp-data:

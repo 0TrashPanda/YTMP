@@ -62,6 +62,7 @@ Options:
 |---------|---------|
 | No admin connected → prompt participants to clone the room | **5 minutes** |
 | No admin **and** nobody connected → delete the room | **1 hour** |
+| Solo room | Never deleted automatically, only when closed |
 | "Always on" room | Never deleted |
 | Client disconnects → their guest identity (name, role, songs) is kept for | **15 minutes** (recognised by cookie) |
 
