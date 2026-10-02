@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { authServer, session } from '../../lib/account';
 	import LoginForm from '../../lib/components/LoginForm.svelte';
+	import TemplateSettings from '../../lib/components/settings/TemplateSettings.svelte';
 	import type { AccountInfo, AuthServerInfo } from '../../lib/protocol.gen';
 
 	const invite = page.url.searchParams.get('invite');
@@ -15,6 +16,7 @@
 	let message = $state<string | null>(null);
 	let busy = $state(false);
 
+	let editingRoles = $state(false);
 	let currentPassword = $state('');
 	let newPassword = $state('');
 
@@ -129,6 +131,12 @@
 			</div>
 		</section>
 
+		<section class={card}>
+			<h2 class="font-bold">Your roles</h2>
+			<p class="text-sm text-muted">The roles and permissions every room you create starts with (Admin, DJ, Listener unless you change them).</p>
+			<button class="rounded-full bg-raised py-2 font-medium hover:bg-line" onclick={() => (editingRoles = true)}>Edit roles</button>
+		</section>
+
 		<form class={card} onsubmit={changePassword}>
 			<h2 class="font-bold">Change password</h2>
 			<input class={input} type="password" bind:value={currentPassword} placeholder="Current password" autocomplete="current-password" />
@@ -188,3 +196,7 @@
 	{/if}
 	<a href="/" class="text-center text-sm text-muted underline">Back</a>
 </main>
+
+{#if editingRoles}
+	<TemplateSettings onClose={() => (editingRoles = false)} />
+{/if}

@@ -75,6 +75,8 @@ class Database private constructor(private val url: String, private val user: St
                 "CREATE TABLE invites (code_hash VARCHAR(64) PRIMARY KEY, created_by VARCHAR(32) NOT NULL, created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL, used_by VARCHAR(32))",
                 "CREATE TABLE settings (name VARCHAR(64) PRIMARY KEY, value TEXT NOT NULL)",
             ),
+            // 3: things saved to an account (role template, later preferences, …), as JSON
+            listOf("CREATE TABLE account_data (account_id VARCHAR(32) NOT NULL, name VARCHAR(64) NOT NULL, value TEXT NOT NULL, PRIMARY KEY (account_id, name))"),
         )
 
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {

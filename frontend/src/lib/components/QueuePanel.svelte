@@ -67,9 +67,9 @@
 	>
 		<button
 			class="flex min-w-0 flex-1 items-center gap-3 text-left"
-			disabled={variant === 'current'}
+			disabled={variant === 'current' || !room.can('play_now')}
 			onclick={() => room.run({ kind: 'JumpTo', itemId: item.itemId })}
-			title={variant === 'current' ? undefined : 'Jump to this song'}
+			title={variant === 'current' || !room.can('play_now') ? undefined : 'Jump to this song'}
 		>
 			<Art song={item.song} size={40} class="h-10 w-10" />
 			<div class="min-w-0 flex-1">
@@ -80,7 +80,7 @@
 			</div>
 			<span class="text-xs text-muted tabular-nums">{formatTime(item.song.durationMs)}</span>
 		</button>
-		{#if variant === 'upcoming'}
+		{#if variant === 'upcoming' && room.can(item.addedBy === room.participantId ? 'remove_own' : 'remove_others')}
 			<button
 				class="rounded-full p-1.5 text-muted hover:bg-line hover:text-white"
 				aria-label="Remove from queue"
@@ -88,6 +88,8 @@
 			>
 				<Icon name="remove" size={18} />
 			</button>
+		{/if}
+		{#if variant === 'upcoming' && room.can('reorder')}
 			<button
 				class="cursor-grab touch-none rounded-full p-1.5 text-muted hover:text-white active:cursor-grabbing"
 				aria-label="Drag to move"

@@ -18,6 +18,10 @@ import dev.trashpanda.ytmp.protocol.HostTokenResponse
 import dev.trashpanda.ytmp.protocol.InviteResponse
 import dev.trashpanda.ytmp.protocol.LoginRequest
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
+import dev.trashpanda.ytmp.protocol.Permission
+import dev.trashpanda.ytmp.protocol.Role
+import dev.trashpanda.ytmp.protocol.RoleTemplate
+import dev.trashpanda.ytmp.protocol.RoomSettings
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.SessionResponse
@@ -31,6 +35,7 @@ import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
@@ -59,7 +64,7 @@ class AccountApiTest {
         val accounts = Accounts(db)
         val key = accounts.signingKey()
         val service = AccountService(accounts, "test.example", key, signup)
-        val auth = TrustedAuthServers(isOwnOrigin = { it == origin }).apply { trust(AuthServerRef(null, "test.example"), key.public) }
+        val auth = TrustedAuthServers(isOwnOrigin = { it == origin }, ownTemplates = service::roleTemplate).apply { trust(AuthServerRef(null, "test.example"), key.public) }
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
             ytmpModule(rooms, { emptyList() }, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = { service.routes(this) })
@@ -144,6 +149,38 @@ class AccountApiTest {
             val welcome = assertIs<ServerMessage.Welcome>(ProtocolJson.decodeFromString(ServerMessage.serializer(), (incoming.receive() as Frame.Text).readText()))
             assertNull(welcome.accountId)
             assertEquals(false, welcome.state.participants.first { it.id == welcome.participantId }.isOwner)
+        }
+    }
+
+    @Test
+    fun `rooms you create start with the roles saved to your account`() = testApplication {
+        setup(SignupMode.OPEN)
+        val client = jsonClient()
+        val session = client.postJson("/api/account/signup", SignupRequest("anna", "password123")).body<SessionResponse>().sessionToken
+        val template = RoleTemplate(
+            listOf(Role("boss", "Boss", "#ffaa00", Permission.entries), Role("crowd", "Crowd", "#00aaff", listOf(Permission.ADD_SONGS))),
+            RoomSettings("crowd", "crowd"),
+        )
+        assertEquals(template, client.put("/api/account/role-template") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(session)
+            setBody(template)
+        }.body<RoleTemplate>())
+
+        val token = client.postJson("/api/account/host-token", HostTokenRequest(origin), session).body<HostTokenResponse>().token
+        // What a host on another machine would do with the token:
+        assertEquals(template, client.get("/api/auth/role-template") { bearerAuth(token) }.body<RoleTemplate>())
+
+        val created = client.post("/api/rooms") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(CreateRoomRequest("Party"))
+        }.body<CreateRoomResponse>()
+        client.webSocket("/ws") {
+            send(Frame.Text(ProtocolJson.encodeToString(ClientMessage.serializer(), ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Guest", null, null))))
+            val welcome = assertIs<ServerMessage.Welcome>(ProtocolJson.decodeFromString(ServerMessage.serializer(), (incoming.receive() as Frame.Text).readText()))
+            assertEquals(template.roles, welcome.state.roles)
+            assertEquals("crowd", welcome.state.participants.single().roleId)
         }
     }
 

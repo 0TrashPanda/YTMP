@@ -102,9 +102,11 @@
 					<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => add(song, 'end')}>
 						<Icon name="playlistAdd" size={20} /> Add to queue
 					</button>
-					<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => playNow(song)}>
-						<Icon name="play" size={20} /> Play now
-					</button>
+					{#if room.can('play_now')}
+						<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => playNow(song)}>
+							<Icon name="play" size={20} /> Play now
+						</button>
+					{/if}
 				</div>
 			{/if}
 		</div>

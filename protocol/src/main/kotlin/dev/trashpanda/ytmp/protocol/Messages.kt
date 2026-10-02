@@ -109,6 +109,60 @@ sealed interface Command {
     @Serializable
     @SerialName("SetVisibility")
     data class SetVisibility(val visibility: RoomVisibility) : Command
+
+    // --- people & roles (see Roles.kt) ---
+
+    /** Removes someone; they can rejoin right away. */
+    @Serializable
+    @SerialName("Kick")
+    data class Kick(val participantId: String) : Command
+
+    /** Removes someone for good (by account, or a guest by their guest token). */
+    @Serializable
+    @SerialName("Ban")
+    data class Ban(val participantId: String) : Command
+
+    @Serializable
+    @SerialName("Unban")
+    data class Unban(val banId: String) : Command
+
+    @Serializable
+    @SerialName("AssignRole")
+    data class AssignRole(val participantId: String, val roleId: String) : Command
+
+    /** Per-person overrides on top of their role. A permission in neither list follows the role. */
+    @Serializable
+    @SerialName("SetParticipantPermissions")
+    data class SetParticipantPermissions(val participantId: String, val allow: List<Permission>, val deny: List<Permission>) : Command
+
+    /** Adds a role at the bottom of the list. */
+    @Serializable
+    @SerialName("CreateRole")
+    data class CreateRole(val name: String, val color: String, val permissions: List<Permission>) : Command
+
+    /** Changes a role's name, color and permissions (matched by id). */
+    @Serializable
+    @SerialName("UpdateRole")
+    data class UpdateRole(val role: Role) : Command
+
+    /** Deletes a role; its people get the default role for their kind (guest or account). */
+    @Serializable
+    @SerialName("DeleteRole")
+    data class DeleteRole(val roleId: String) : Command
+
+    /** Moves a role in the ranking (0 = top). */
+    @Serializable
+    @SerialName("MoveRole")
+    data class MoveRole(val roleId: String, val toIndex: Int) : Command
+
+    /** Room name and settings. Null fields stay as they are. */
+    @Serializable
+    @SerialName("UpdateSettings")
+    data class UpdateSettings(
+        val name: String? = null,
+        val defaultGuestRole: String? = null,
+        val defaultAccountRole: String? = null,
+    ) : Command
 }
 
 /** Host → client. */
@@ -167,6 +221,11 @@ enum class RejectReason {
 
     /** A solo room; only the hosting device can join it. */
     @SerialName("private_room") PRIVATE_ROOM,
+
+    /** Removed by an admin; joining again is allowed. */
+    @SerialName("kicked") KICKED,
+
+    @SerialName("banned") BANNED,
 }
 
 @Serializable
@@ -242,6 +301,19 @@ sealed interface Event {
     @Serializable
     @SerialName("RoomUpdated")
     data class RoomUpdated(val room: RoomInfo) : Event
+
+    /** Roles were created, changed, deleted or reordered: the whole list. */
+    @Serializable
+    @SerialName("RolesChanged")
+    data class RolesChanged(val roles: List<Role>) : Event
+
+    @Serializable
+    @SerialName("SettingsChanged")
+    data class SettingsChanged(val settings: RoomSettings) : Event
+
+    @Serializable
+    @SerialName("BansChanged")
+    data class BansChanged(val bans: List<BanInfo>) : Event
 
     /** Something went wrong that everyone should know about, e.g. a song that can't be played. */
     @Serializable

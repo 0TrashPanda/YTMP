@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.core
 
 import kotlinx.coroutines.CoroutineScope
+import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.RoomInfo
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import kotlinx.coroutines.CancellationException
@@ -79,11 +80,17 @@ class RoomManager(
         }
     }
 
-    /** Creates a room. [ownerAccount] (`username@issuer`) is the owner on any device it logs in from. */
-    fun create(name: String, visibility: RoomVisibility = RoomVisibility.PUBLIC, ownerAccount: String? = null): Room {
+    /**
+     * Creates a room. [ownerAccount] (`username@issuer`) is the owner on any device it logs in
+     * from; [template] is their role template (default roles if null).
+     */
+    fun create(name: String, visibility: RoomVisibility = RoomVisibility.PUBLIC, ownerAccount: String? = null, template: RoleTemplate? = null): Room {
         while (true) {
             val code = newCode()
-            val room = Room(code, name, Ids.token(), visibility, streams, scope, onInfoChanged = { roomChanged(code) }, clock = clock, ownerAccount = ownerAccount)
+            val room = Room(
+                code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template,
+                onInfoChanged = { roomChanged(code) }, clock = clock,
+            )
             if (add(room)) {
                 roomChanged(code)
                 return room

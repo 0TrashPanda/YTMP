@@ -7,6 +7,7 @@
 	import QueuePanel from '../../../lib/components/QueuePanel.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
+	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
 	import { getHost } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
 	import { artistNames } from '../../../lib/format';
@@ -85,6 +86,7 @@
 	}
 
 	let sharing = $state(false);
+	let settings = $state<'overview' | 'roles' | 'members' | 'bans' | null>(null);
 	let host = $state<HostInfo | null>(null);
 	getHost().then((h) => (host = h)).catch(() => {});
 </script>
@@ -159,16 +161,28 @@
 					{code}
 					<Icon name="share" size={16} class="text-muted" />
 				</button>
-				<span
-					class="hidden items-center gap-1 text-sm text-muted sm:flex"
+				<button
+					class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
+					aria-label="People in this room"
+					onclick={() => (settings = 'members')}
 					title={room.state?.participants
 						.filter((p: Participant) => p.online)
 						.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
 						.join(', ')}
 				>
 					<Icon name="people" size={20} />
-					{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}
-				</span>
+					<span class="hidden sm:inline">{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}</span>
+				</button>
+				{#if room.can('change_settings') || room.can('edit_roles')}
+					<button
+						class="rounded-full p-1.5 text-muted hover:bg-raised hover:text-white"
+						aria-label="Room settings"
+						title="Room settings"
+						onclick={() => (settings = room?.can('change_settings') ? 'overview' : 'roles')}
+					>
+						<Icon name="settings" size={20} />
+					</button>
+				{/if}
 			</div>
 		</header>
 
@@ -210,6 +224,10 @@
 			<PlayerBar {room} {player} {positionMs} onToast={toast} />
 		{/if}
 	</div>
+
+	{#if settings && room.state}
+		<RoomSettings {room} start={settings} onClose={() => (settings = null)} />
+	{/if}
 
 	{#if sharing}
 		<ShareSheet {room} {host} onClose={() => (sharing = false)} onToast={toast} />

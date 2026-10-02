@@ -66,9 +66,10 @@ class RoomTest {
     private fun TestScope.newRoom(): Room =
         Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> "https://stream/$id" }, backgroundScope) { testScheduler.currentTime }
 
+    /** Joins as the owner, who may do everything (permissions are tested in RolesTest). */
     private suspend fun Room.connect(name: String = "Anna"): FakeClient {
         val client = FakeClient()
-        join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", name, null, null), client)
+        join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", name, null, "owner-token"), client)
         return client
     }
 
@@ -229,7 +230,8 @@ class RoomTest {
     @Test
     fun `only the owner can change visibility`() = runTest {
         val room = newRoom()
-        val guest = room.connect("Guest")
+        val guest = FakeClient()
+        room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Guest", null, null), guest)
         room.run(guest, Command.SetVisibility(RoomVisibility.PRIVATE))
         val result = guest.messages.filterIsInstance<ServerMessage.Result>().single()
         assertEquals(dev.trashpanda.ytmp.protocol.ErrorCode.PERMISSION_DENIED, result.error?.code)

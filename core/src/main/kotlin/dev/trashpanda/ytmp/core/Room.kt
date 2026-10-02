@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.core
 
+import dev.trashpanda.ytmp.protocol.BanInfo
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ErrorCode
@@ -9,12 +10,16 @@ import dev.trashpanda.ytmp.protocol.NowPlaying
 import dev.trashpanda.ytmp.protocol.OutputInfo
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.Participant
+import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.PlaybackStatus
 import dev.trashpanda.ytmp.protocol.QueueItem
 import dev.trashpanda.ytmp.protocol.QueueItemResult
 import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.RejectReason
+import dev.trashpanda.ytmp.protocol.Role
+import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.RoomInfo
+import dev.trashpanda.ytmp.protocol.RoomSettings
 import dev.trashpanda.ytmp.protocol.RoomState
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ServerMessage
@@ -37,19 +42,25 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class Room(
     val code: String,
-    val name: String,
+    name: String,
     val ownerToken: String,
     visibility: RoomVisibility,
     private val streams: StreamResolver,
     private val scope: CoroutineScope,
     /** The account that created the room: it is the owner on any device. */
     val ownerAccount: String? = null,
+    /** The roles the room starts with (the creator's template, or the defaults). */
+    template: RoleTemplate = DefaultRoles.template,
     /** Called when the room's [info] changes, e.g. it was made public. */
     private val onInfoChanged: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     @Volatile
     var visibility: RoomVisibility = visibility
+        private set
+
+    @Volatile
+    var name: String = name
         private set
 
     val info: RoomInfo get() = RoomInfo(code, name, visibility)
@@ -60,18 +71,38 @@ class Room(
         var name: String,
         var isOwner: Boolean,
         var outbox: Outbox?,
+        var roleId: String,
         var accountId: String? = null,
         var listening: Boolean = false,
         var offlineSince: Long? = null,
+        var allow: Set<Permission> = emptySet(),
+        var deny: Set<Permission> = emptySet(),
     ) {
-        fun toParticipant() = Participant(id, name, isOwner, online = outbox != null, listening = listening, accountId = accountId)
+        fun toParticipant() = Participant(
+            id, name, isOwner, online = outbox != null, listening = listening, accountId = accountId,
+            roleId = roleId, allow = allow.sorted(), deny = deny.sorted(),
+        )
     }
+
+    /** A ban; guests are recognised by the guest token they had. */
+    private class Ban(val info: BanInfo, val guestToken: String?)
 
     private val mutex = Mutex()
     private val members = LinkedHashMap<String, Member>()
     private val queue = ArrayList<QueueItem>()
     private val history = ArrayList<QueueItem>()
     private var seq = 0L
+
+    /** Ranked, highest first. */
+    private val roles = ArrayList<Role>()
+    private var settings: RoomSettings
+    private val bans = ArrayList<Ban>()
+
+    init {
+        val start = Permissions.sanitize(template)
+        roles += start.roles
+        settings = start.settings
+    }
 
     private var current: QueueItem? = null
     private var streamUrl: String? = null
@@ -121,6 +152,11 @@ class Room(
         }
 
         val isOwner = hello.ownerToken == ownerToken || (account != null && account.id == ownerAccount)
+        val banned = bans.any { (account != null && it.info.accountId == account.id) || (it.guestToken != null && it.guestToken == hello.guestToken) }
+        if (banned && !isOwner) {
+            outbox.send(ServerMessage.Rejected(RejectReason.BANNED))
+            return null
+        }
         val returning = members.values.firstOrNull { it.token == hello.guestToken }
         val member = returning ?: Member(
             id = Ids.short(),
@@ -128,6 +164,11 @@ class Room(
             name = name,
             isOwner = isOwner,
             outbox = null,
+            roleId = when {
+                isOwner -> roles.first().id
+                account != null -> settings.defaultAccountRole
+                else -> settings.defaultGuestRole
+            },
         ).also { members[it.id] = it }
 
         member.outbox?.takeIf { it !== outbox }?.send(ServerMessage.Rejected(RejectReason.REPLACED))
@@ -192,7 +233,7 @@ class Room(
             name = name,
             ownerToken = ownerToken,
             visibility = visibility,
-            members = members.values.map { SavedMember(it.id, it.token, it.name, it.isOwner, it.accountId) },
+            members = members.values.map { SavedMember(it.id, it.token, it.name, it.isOwner, it.accountId, it.roleId, it.allow.sorted(), it.deny.sorted()) },
             queue = queue.toList(),
             history = history.takeLast(SAVED_HISTORY),
             current = current,
@@ -200,13 +241,31 @@ class Room(
             // Someone connected right now counts as activity, so the room isn't deleted as stale on restore.
             lastActive = if (members.values.any { it.outbox != null }) clock() else lastActive,
             ownerAccount = ownerAccount,
+            roles = roles.toList(),
+            settings = settings,
+            bans = bans.map { SavedBan(it.info, it.guestToken) },
         )
     }
 
     /** Fills a new room from [saved]. Everyone starts offline and playback starts paused. */
     private fun restore(saved: SavedRoom) {
         val now = clock()
-        for (m in saved.members) members[m.id] = Member(m.id, m.token, m.name, m.isOwner, outbox = null, accountId = m.accountId, offlineSince = now)
+        if (saved.roles != null && saved.settings != null) {
+            val restored = Permissions.sanitize(RoleTemplate(saved.roles, saved.settings))
+            roles.clear()
+            roles += restored.roles
+            settings = restored.settings
+        }
+        for (b in saved.bans) bans += Ban(b.info, b.guestToken)
+        val roleIds = roles.map { it.id }.toSet()
+        for (m in saved.members) {
+            val roleId = m.roleId?.takeIf { it in roleIds }
+                ?: if (m.isOwner) roles.first().id else if (m.accountId != null) settings.defaultAccountRole else settings.defaultGuestRole
+            members[m.id] = Member(
+                m.id, m.token, m.name, m.isOwner, outbox = null, roleId = roleId, accountId = m.accountId,
+                offlineSince = now, allow = m.allow.toSet(), deny = m.deny.toSet(),
+            )
+        }
         queue += saved.queue
         history += saved.history
         // The stream URL has probably expired; it is resolved again when someone presses play.
@@ -268,6 +327,7 @@ class Room(
     private fun execute(member: Member, command: Command): ErrorInfo? {
         when (command) {
             is Command.AddSongs -> {
+                need(member, Permission.ADD_SONGS)?.let { return it }
                 if (command.songs.isEmpty()) return invalid("No songs")
                 val items = command.songs.map { newItem(it, member) }
                 val index = if (command.position == QueuePosition.NEXT) 0 else queue.size
@@ -279,15 +339,19 @@ class Room(
                 }
             }
             is Command.PlayNow -> {
+                need(member, Permission.PLAY_NOW)?.let { return it }
                 retireCurrent(QueueItemResult.SKIPPED)
                 wantPlaying = true
                 setCurrent(newItem(command.song, member))
             }
             is Command.RemoveQueueItem -> {
-                if (!queue.removeIf { it.itemId == command.itemId }) return notFound()
+                val item = queue.firstOrNull { it.itemId == command.itemId } ?: return notFound()
+                need(member, if (item.addedBy == member.id) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS)?.let { return it }
+                queue.remove(item)
                 emit(Event.QueueItemRemoved(command.itemId))
             }
             is Command.MoveQueueItem -> {
+                need(member, Permission.REORDER)?.let { return it }
                 val from = queue.indexOfFirst { it.itemId == command.itemId }
                 if (from < 0) return notFound()
                 val item = queue.removeAt(from)
@@ -295,8 +359,12 @@ class Room(
                 queue.add(to, item)
                 emit(Event.QueueItemMoved(item.itemId, to))
             }
-            is Command.JumpTo -> return jumpTo(command.itemId)
+            is Command.JumpTo -> {
+                need(member, Permission.PLAY_NOW)?.let { return it }
+                return jumpTo(command.itemId)
+            }
             Command.Play -> {
+                need(member, Permission.PLAY_PAUSE)?.let { return it }
                 if (current == null) {
                     if (queue.isEmpty()) return invalid("The queue is empty")
                     wantPlaying = true
@@ -309,30 +377,39 @@ class Room(
                     if (streamUrl == null && resolveJob?.isActive != true) resolve(current!!)
                 }
             }
-            Command.Pause -> pausePlayback()
+            Command.Pause -> {
+                need(member, Permission.PLAY_PAUSE)?.let { return it }
+                pausePlayback()
+            }
             Command.Skip -> {
+                need(member, Permission.SKIP)?.let { return it }
                 if (current == null) return invalid("Nothing is playing")
                 retireCurrent(QueueItemResult.SKIPPED)
                 playNextFromQueue()
             }
             Command.Previous -> {
+                need(member, Permission.SKIP)?.let { return it }
                 val last = history.lastOrNull()
                 if (position() > PREVIOUS_RESTART_MS || last == null) seek(0) else return jumpTo(last.itemId)
             }
             is Command.Seek -> {
+                need(member, Permission.SEEK)?.let { return it }
                 if (current == null) return invalid("Nothing is playing")
                 seek(command.positionMs)
             }
             is Command.SetListening -> {
+                if (command.on) need(member, Permission.LISTEN_LOCALLY)?.let { return it }
                 member.listening = command.on
                 emit(Event.ParticipantUpdated(member.toParticipant()))
             }
             is Command.SetOutput -> {
+                need(member, Permission.CHANGE_OUTPUTS)?.let { return it }
                 if (availableOutputs.none { it.id == command.outputId }) return ErrorInfo(ErrorCode.NOT_FOUND, "That speaker isn't available")
                 if (command.active) activeOutputs.putIfAbsent(command.outputId, null) else activeOutputs.remove(command.outputId)
                 emit(Event.OutputsChanged(outputInfos()))
             }
             is Command.SetOutputVolume -> {
+                need(member, Permission.OUTPUT_VOLUME)?.let { return it }
                 if (command.outputId !in activeOutputs) return ErrorInfo(ErrorCode.NOT_FOUND, "Not playing on that speaker")
                 activeOutputs[command.outputId] = command.volume.coerceIn(0.0, 1.0)
                 emit(Event.OutputsChanged(outputInfos()))
@@ -345,9 +422,149 @@ class Room(
                     onInfoChanged()
                 }
             }
+            is Command.Kick, is Command.Ban, is Command.Unban, is Command.AssignRole, is Command.SetParticipantPermissions,
+            is Command.CreateRole, is Command.UpdateRole, is Command.DeleteRole, is Command.MoveRole, is Command.UpdateSettings,
+            -> return manage(member, command)
         }
         return null
     }
+
+    // --- people, roles, settings --------------------------------------------------------
+
+    /** Kicks, bans, roles and settings. Called with [mutex] held. */
+    private fun manage(actor: Member, command: Command): ErrorInfo? {
+        when (command) {
+            is Command.Kick, is Command.Ban -> {
+                val targetId = if (command is Command.Kick) command.participantId else (command as Command.Ban).participantId
+                val ban = command is Command.Ban
+                need(actor, if (ban) Permission.BAN else Permission.KICK)?.let { return it }
+                val target = members[targetId] ?: return notFoundPerson()
+                if (target === actor) return invalid("You can't remove yourself")
+                if (!outranks(actor, target)) return outranked()
+                members.remove(target.id)
+                if (ban) bans += Ban(BanInfo(Ids.short(), target.name, target.accountId), target.token)
+                target.outbox?.send(ServerMessage.Rejected(if (ban) RejectReason.BANNED else RejectReason.KICKED))
+                target.outbox = null
+                emit(Event.ParticipantLeft(target.id))
+                if (ban) emit(Event.BansChanged(banInfos()))
+            }
+            is Command.Unban -> {
+                need(actor, Permission.BAN)?.let { return it }
+                if (!bans.removeIf { it.info.id == command.banId }) return ErrorInfo(ErrorCode.NOT_FOUND, "Not banned")
+                emit(Event.BansChanged(banInfos()))
+            }
+            is Command.AssignRole -> {
+                need(actor, Permission.ASSIGN_ROLES)?.let { return it }
+                val target = members[command.participantId] ?: return notFoundPerson()
+                if (!outranks(actor, target)) return outranked()
+                val index = roles.indexOfFirst { it.id == command.roleId }
+                if (index < 0) return notFoundRole()
+                if (!canManageRole(actor, index)) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "You can only give roles below your own")
+                target.roleId = command.roleId
+                emit(Event.ParticipantUpdated(target.toParticipant()))
+            }
+            is Command.SetParticipantPermissions -> {
+                need(actor, Permission.ASSIGN_ROLES)?.let { return it }
+                val target = members[command.participantId] ?: return notFoundPerson()
+                if (!outranks(actor, target)) return outranked()
+                val allow = command.allow.toSet()
+                cannotGrant(actor, allow - target.allow)?.let { return it }
+                target.allow = allow
+                target.deny = command.deny.toSet() - allow
+                emit(Event.ParticipantUpdated(target.toParticipant()))
+            }
+            is Command.CreateRole -> {
+                need(actor, Permission.EDIT_ROLES)?.let { return it }
+                val name = command.name.trim()
+                if (name.isEmpty() || name.length > Permissions.MAX_ROLE_NAME) return invalid("Role names are 1–${Permissions.MAX_ROLE_NAME} characters")
+                if (roles.size >= Permissions.MAX_ROLES) return invalid("A room can have at most ${Permissions.MAX_ROLES} roles")
+                cannotGrant(actor, command.permissions.toSet())?.let { return it }
+                roles += Role(Ids.short(), name, Permissions.validColor(command.color), command.permissions.distinct())
+                emit(Event.RolesChanged(roles.toList()))
+            }
+            is Command.UpdateRole -> {
+                need(actor, Permission.EDIT_ROLES)?.let { return it }
+                val index = roles.indexOfFirst { it.id == command.role.id }
+                if (index < 0) return notFoundRole()
+                if (!canManageRole(actor, index)) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "You can only change roles below your own")
+                val name = command.role.name.trim()
+                if (name.isEmpty() || name.length > Permissions.MAX_ROLE_NAME) return invalid("Role names are 1–${Permissions.MAX_ROLE_NAME} characters")
+                cannotGrant(actor, command.role.permissions.toSet() - roles[index].permissions.toSet())?.let { return it }
+                roles[index] = Role(command.role.id, name, Permissions.validColor(command.role.color), command.role.permissions.distinct())
+                emit(Event.RolesChanged(roles.toList()))
+            }
+            is Command.DeleteRole -> {
+                need(actor, Permission.EDIT_ROLES)?.let { return it }
+                val index = roles.indexOfFirst { it.id == command.roleId }
+                if (index < 0) return notFoundRole()
+                if (!canManageRole(actor, index)) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "You can only delete roles below your own")
+                if (command.roleId == settings.defaultGuestRole || command.roleId == settings.defaultAccountRole) {
+                    return invalid("New people get this role. Pick another default role first.")
+                }
+                roles.removeAt(index)
+                emit(Event.RolesChanged(roles.toList()))
+                for (m in members.values.filter { it.roleId == command.roleId }) {
+                    m.roleId = if (m.accountId != null) settings.defaultAccountRole else settings.defaultGuestRole
+                    emit(Event.ParticipantUpdated(m.toParticipant()))
+                }
+            }
+            is Command.MoveRole -> {
+                need(actor, Permission.EDIT_ROLES)?.let { return it }
+                val from = roles.indexOfFirst { it.id == command.roleId }
+                if (from < 0) return notFoundRole()
+                val to = command.toIndex.coerceIn(0, roles.size - 1)
+                if (!canManageRole(actor, from) || !canManageRole(actor, to)) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "You can only move roles below your own")
+                roles.add(to, roles.removeAt(from))
+                emit(Event.RolesChanged(roles.toList()))
+            }
+            is Command.UpdateSettings -> {
+                need(actor, Permission.CHANGE_SETTINGS)?.let { return it }
+                val newName = command.name?.trim()
+                if (newName != null && (newName.isEmpty() || newName.length > 64)) return invalid("Room names are 1–64 characters")
+                val ids = roles.map { it.id }.toSet()
+                if (listOfNotNull(command.defaultGuestRole, command.defaultAccountRole).any { it !in ids }) return notFoundRole()
+                if (newName != null && newName != name) {
+                    name = newName
+                    emit(Event.RoomUpdated(info))
+                    onInfoChanged()
+                }
+                val updated = RoomSettings(command.defaultGuestRole ?: settings.defaultGuestRole, command.defaultAccountRole ?: settings.defaultAccountRole)
+                if (updated != settings) {
+                    settings = updated
+                    emit(Event.SettingsChanged(settings))
+                }
+            }
+            else -> Unit
+        }
+        return null
+    }
+
+    private fun can(member: Member, permission: Permission): Boolean =
+        permission in Permissions.effective(roles.firstOrNull { it.id == member.roleId }, member.allow, member.deny, member.isOwner)
+
+    private fun need(member: Member, permission: Permission): ErrorInfo? =
+        if (can(member, permission)) null else ErrorInfo(ErrorCode.PERMISSION_DENIED, "Your role doesn't allow this")
+
+    /** 0 is the top role; the owner is above every role. */
+    private fun rank(member: Member): Int =
+        if (member.isOwner) -1 else roles.indexOfFirst { it.id == member.roleId }.let { if (it < 0) roles.size else it }
+
+    /** Like Discord: you can only manage people whose role is below yours. Nobody manages the owner. */
+    private fun outranks(actor: Member, target: Member) = !target.isOwner && (actor.isOwner || rank(actor) < rank(target))
+
+    private fun canManageRole(actor: Member, roleIndex: Int) = actor.isOwner || roleIndex > rank(actor)
+
+    /** You can't hand out permissions you don't have yourself. */
+    private fun cannotGrant(actor: Member, permissions: Set<Permission>): ErrorInfo? =
+        if (permissions.all { can(actor, it) }) null else ErrorInfo(ErrorCode.PERMISSION_DENIED, "You can't give permissions you don't have")
+
+    private fun outranked() = ErrorInfo(ErrorCode.PERMISSION_DENIED, "Their role is not below yours")
+
+    private fun notFoundPerson() = ErrorInfo(ErrorCode.NOT_FOUND, "That person isn't in the room")
+
+    private fun notFoundRole() = ErrorInfo(ErrorCode.NOT_FOUND, "No such role")
+
+    private fun banInfos() = bans.map { it.info }
 
     private fun jumpTo(itemId: String): ErrorInfo? {
         val queueIndex = queue.indexOfFirst { it.itemId == itemId }
@@ -500,6 +717,9 @@ class Room(
         nowPlaying = current?.let { NowPlaying(it, streamUrl) },
         playback = playbackStatus(),
         outputs = outputInfos(),
+        roles = roles.toList(),
+        settings = settings,
+        bans = banInfos(),
     )
 
     private fun newItem(song: Song, member: Member) =
@@ -529,7 +749,7 @@ class Room(
             scope: CoroutineScope,
             onInfoChanged: () -> Unit = {},
             clock: () -> Long = System::currentTimeMillis,
-        ) = Room(saved.code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, onInfoChanged, clock)
+        ) = Room(saved.code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, onInfoChanged = onInfoChanged, clock = clock)
             .apply { restore(saved) }
     }
 }

@@ -40,7 +40,7 @@
 		min="0"
 		max={duration || 1}
 		value={shown}
-		disabled={!current}
+		disabled={!current || !room.can('seek')}
 		aria-label="Position"
 		oninput={(e) => (seeking = Number(e.currentTarget.value))}
 		onchange={(e) => {
@@ -51,17 +51,18 @@
 	/>
 	<div class="flex h-18 items-center gap-2 px-2 sm:gap-4 sm:px-4">
 		<div class="flex items-center">
-			<button class="rounded-full p-2 hover:bg-raised" aria-label="Previous" onclick={() => room.run({ kind: 'Previous' })}>
+			<button class="rounded-full p-2 hover:bg-raised disabled:opacity-40" aria-label="Previous" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Previous' })}>
 				<Icon name="previous" />
 			</button>
 			<button
-				class="rounded-full p-2 hover:bg-raised"
+				class="rounded-full p-2 hover:bg-raised disabled:opacity-40"
+				disabled={!room.can('play_pause')}
 				aria-label={playback?.playing ? 'Pause' : 'Play'}
 				onclick={() => room.run({ kind: playback?.playing ? 'Pause' : 'Play' })}
 			>
 				<Icon name={playback?.playing ? 'pause' : 'play'} size={36} />
 			</button>
-			<button class="rounded-full p-2 hover:bg-raised" aria-label="Next" onclick={() => room.run({ kind: 'Skip' })}>
+			<button class="rounded-full p-2 hover:bg-raised disabled:opacity-40" aria-label="Next" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Skip' })}>
 				<Icon name="next" />
 			</button>
 			<span class="hidden pl-2 text-xs text-muted tabular-nums sm:inline">

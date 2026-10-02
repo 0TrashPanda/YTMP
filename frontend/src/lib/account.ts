@@ -14,6 +14,7 @@ import type {
 	AuthServerRef,
 	HostTokenResponse,
 	InviteResponse,
+	RoleTemplate,
 	SessionResponse
 } from './protocol.gen';
 
@@ -89,6 +90,9 @@ export const authServer = {
 		session.current = await call<SessionResponse>('/api/account/password', { currentPassword, newPassword });
 	},
 	hostToken: (origin: string) => call<HostTokenResponse>('/api/account/host-token', { origin }),
+
+	roleTemplate: () => call<RoleTemplate>('/api/account/role-template'),
+	saveRoleTemplate: (template: RoleTemplate) => call<RoleTemplate>('/api/account/role-template', template, 'PUT'),
 
 	listAccounts: async () => (await call<AccountListResponse>('/api/admin/accounts')).accounts,
 	createAccount: (username: string, password: string, displayName: string) =>

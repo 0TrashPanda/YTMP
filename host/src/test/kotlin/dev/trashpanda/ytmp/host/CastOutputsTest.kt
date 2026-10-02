@@ -35,7 +35,7 @@ class CastOutputsTest {
             casts.attach(rooms)
 
             val room = rooms.create("Party")
-            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, null), Outbox { })!!
+            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { })!!
             suspend fun run(command: Command) = room.handle(me, ClientMessage.CommandMessage("c", command))
 
             run(Command.AddSongs(listOf(song), QueuePosition.END))
@@ -73,7 +73,7 @@ class CastOutputsTest {
         val rooms = RoomManager({ "https://stream/$it" }, scope, outputs = casts.devices)
         casts.attach(rooms)
         val room = rooms.create("Party")
-        val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, null), Outbox { })!!
+        val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { })!!
         room.handle(me, ClientMessage.CommandMessage("a", Command.AddSongs(listOf(song), QueuePosition.END)))
         eventually { casts.devices.value.isNotEmpty() && room.view().current != null }
         room.handle(me, ClientMessage.CommandMessage("b", Command.SetOutput("cast:fake", active = true)))

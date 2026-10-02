@@ -78,3 +78,11 @@ A token that isn't accepted is ignored: you join as a guest, and `welcome.accoun
 - A phone has no accounts. On its home screen it can be linked to one YTMP server
   (`PUT /api/host/auth-server`, phone only), which it then trusts. The link and the public
   key are kept, so tokens are checked without reaching the server.
+
+### Role templates
+
+An account's role template (roles + default roles) is stored on its auth server
+(`account_data`), edited on `/account` (`GET`/`PUT /api/account/role-template`). When a
+room is created with a host token, the host asks the account's auth server for it
+(`GET /api/auth/role-template`, `Authorization: Bearer <host token>`; a server reads its own
+accounts' templates directly). If that fails, the room gets the default roles.

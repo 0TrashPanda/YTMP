@@ -137,6 +137,28 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
         if (used != 1) throw AccountException("This invite link is invalid, expired or already used")
     }
 
+    // --- account data -----------------------------------------------------------------
+
+    fun data(accountId: String, name: String): String? = db.use { c ->
+        c.prepareStatement("SELECT value FROM account_data WHERE account_id = ? AND name = ?").use {
+            it.setString(1, accountId)
+            it.setString(2, name)
+            it.executeQuery().use { rows -> if (rows.next()) rows.getString(1) else null }
+        }
+    }
+
+    fun setData(accountId: String, name: String, value: String) = db.use { c ->
+        c.prepareStatement(
+            "INSERT INTO account_data (account_id, name, value) VALUES (?, ?, ?) ON CONFLICT (account_id, name) DO UPDATE SET value = excluded.value",
+        ).use {
+            it.setString(1, accountId)
+            it.setString(2, name)
+            it.setString(3, value)
+            it.executeUpdate()
+        }
+        Unit
+    }
+
     // --- settings ---------------------------------------------------------------------
 
     /** The key account tokens are signed with; made on first start. */

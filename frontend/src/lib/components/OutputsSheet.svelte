@@ -39,6 +39,7 @@
 						type="checkbox"
 						class="h-5 w-5 accent-accent"
 						checked={output.active}
+						disabled={!room.can('change_outputs')}
 						onchange={(e) => toggle(output.id, e.currentTarget.checked)}
 					/>
 				</label>
@@ -50,6 +51,7 @@
 						max="1"
 						step="0.02"
 						value={output.volume}
+						disabled={!room.can('output_volume')}
 						aria-label="Volume of {output.name}"
 						onchange={(e) => setVolume(output.id, Number(e.currentTarget.value))}
 					/>

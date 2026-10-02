@@ -26,10 +26,36 @@ guests can join (see [accounts](accounts.md#authentication-on-phone-hosts)).
 
 ## Permissions
 
-Permissions are **very granular**. They can be set:
+Permissions are **very granular**. Everyone in a room has **one role**: a named set of
+permissions. On top of their role, a person can get **their own overrides** per permission:
+allow (✓), deny (✗), or follow the role (/), like Discord's channel overrides. The
+**owner** can always do everything.
 
-- **per user**, directly, or
-- through **roles**: a named set of permissions given to one or more participants.
+Roles are **ranked** (top = highest), like Discord: you can only kick, ban, change the role
+or permissions of people whose role is **below yours**, only give or edit roles below
+yours, and never hand out a permission you don't have yourself. Nobody can manage the owner.
+
+The settings screen (people icon or gear in the room bar) looks like Discord's server
+settings: **Overview** (name, default roles), **Roles** (ranked list, drag to reorder; each
+role has *Display*, *Permissions* and *Manage Members* tabs, and an unsaved-changes bar),
+**Members** (role per person, per-person permissions, kick, ban) and **Bans**.
+
+### Implemented permissions
+
+| Group | Permissions |
+|-------|-------------|
+| **Queue** | Add songs · Play now (also jumping in the queue/history) · Remove own songs · Remove others' songs · Reorder |
+| **Playback** | Play/pause · Skip (and previous) · Seek |
+| **Listening** | Play audio on own device |
+| **Speakers** | Change speakers · Speaker volume |
+| **People** | Kick · Ban / unban · Manage members (give roles, own permissions) · Manage roles |
+| **Room** | Manage room (name, default roles) |
+
+Default roles: **Admin** (everything), **DJ** (Listener + play now, reorder, remove others'
+songs, seek, speakers and volume) and **Listener** (add songs, remove own songs, play/pause,
+skip, play on own device). New guests and account holders get *Listener*.
+
+### All planned permissions
 
 ### Permission groups (initial list, to be refined)
 
@@ -49,8 +75,9 @@ set individual permissions.
 
 Roles exist on **two levels**:
 
-- **Account role templates**: YTMP ships with **default roles** (proposal: *Admin*,
-  *DJ*, *Listener*). Users with a **YTMP account** can edit them and create their own.
+- **Account role templates**: YTMP ships with **default roles** (*Admin*, *DJ*,
+  *Listener*). Users with a **YTMP account** can edit them and create their own, on their
+  account page (*Your roles*), in the same Discord-style editor.
   These are saved to the account and applied to every room they create, so nobody is
   stuck with defaults they don't like.
 - **Per-room roles**: inside a room, admins can adjust the roles or add new ones for

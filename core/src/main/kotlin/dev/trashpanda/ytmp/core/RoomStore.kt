@@ -1,6 +1,10 @@
 package dev.trashpanda.ytmp.core
 
+import dev.trashpanda.ytmp.protocol.BanInfo
+import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import dev.trashpanda.ytmp.protocol.Role
+import dev.trashpanda.ytmp.protocol.RoomSettings
 import dev.trashpanda.ytmp.protocol.QueueItem
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import kotlinx.serialization.Serializable
@@ -32,6 +36,10 @@ data class SavedRoom(
     val positionMs: Long,
     val lastActive: Long,
     val ownerAccount: String? = null,
+    /** Null in rooms saved before roles existed: they get the default roles. */
+    val roles: List<Role>? = null,
+    val settings: RoomSettings? = null,
+    val bans: List<SavedBan> = emptyList(),
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 
@@ -42,4 +50,16 @@ data class SavedRoom(
 
 /** A participant, so guests come back as themselves (same name, same songs) after a restart. */
 @Serializable
-data class SavedMember(val id: String, val token: String, val name: String, val isOwner: Boolean, val accountId: String? = null)
+data class SavedMember(
+    val id: String,
+    val token: String,
+    val name: String,
+    val isOwner: Boolean,
+    val accountId: String? = null,
+    val roleId: String? = null,
+    val allow: List<Permission> = emptyList(),
+    val deny: List<Permission> = emptyList(),
+)
+
+@Serializable
+data class SavedBan(val info: BanInfo, val guestToken: String?)

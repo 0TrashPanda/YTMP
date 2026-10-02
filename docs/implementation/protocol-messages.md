@@ -107,18 +107,18 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `Kick` | `participantId` | Kick |
-| `Ban` / `Unban` | `participantId` / `banId` | Ban / unban |
-| `AssignRole` | `participantId`, `roleId` | Assign roles |
-| `SetParticipantPermissions` | `participantId`, `permissions` | Assign roles |
-| `CreateRole` / `UpdateRole` / `DeleteRole` | role | Edit roles |
+| `Kick` ✅ | `participantId` | Kick |
+| `Ban` / `Unban` ✅ | `participantId` / `banId` | Ban / unban |
+| `AssignRole` ✅ | `participantId`, `roleId` | Assign roles |
+| `SetParticipantPermissions` ✅ | `participantId`, `allow`, `deny` | Assign roles |
+| `CreateRole` / `UpdateRole` / `DeleteRole` / `MoveRole` ✅ | role / `roleId`, `toIndex` | Edit roles |
 | `SetDisplayName` | `name` | – (own name) |
 
 ### Room
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `UpdateSettings` | partial `settings` (name, visibility, ordering, access, limits, vote to skip, always on, …) | Change settings |
+| `UpdateSettings` ✅ (name, default roles) | partial `settings` (name, visibility, ordering, access, limits, vote to skip, always on, …) | Change settings |
 | `ChangeOwner` | `participantId` | Owner only |
 | `CloneRoom` | `visibility: "public" \| "solo"` | Clone room. The result has the new room's code. |
 | `SendMigration` | `targetRoom`, `mode: "invite" \| "forced"` | Send migration message |
@@ -131,7 +131,7 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 |-------|--------|---------|
 | `ParticipantJoined` ✅ / `ParticipantLeft` ✅ | participant / `participantId` | everyone |
 | `ParticipantUpdated` ✅ | participant (role, permissions, name, online, listening) | everyone |
-| `YouWereKicked` / `YouWereBanned` | – | that participant |
+| `YouWereKicked` / `YouWereBanned` (done as `rejected` with reason `kicked` / `banned` ✅) | – | that participant |
 | `QueueItemsAdded` ✅ | `items`, `index` | everyone |
 | `QueueItemRemoved` ✅ | `itemId` | everyone |
 | `QueueItemMoved` ✅ | `itemId`, `toIndex` | everyone |
@@ -146,8 +146,9 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 | `RepeatChanged` | `mode` | everyone |
 | `SkipVotesChanged` | `votes`, `needed` | everyone |
 | `OutputsChanged` ✅ | `outputs` (id, name, kind, active, volume) | everyone |
-| `RoomSettingsChanged` | `settings` | everyone |
-| `RolesChanged` | `roles` | everyone |
+| `SettingsChanged` ✅ | `settings` (default roles so far) | everyone |
+| `RolesChanged` ✅ | `roles` (all, ranked) | everyone |
+| `BansChanged` ✅ | `bans` | everyone |
 | `OwnerChanged` | `participantId` | everyone |
 | `MigrationOffered` | `targetRoom`, `mode`, `from` | everyone |
 | `AdminlessPrompt` | – (no admin for 5 min: "you can clone this room") | everyone |

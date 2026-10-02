@@ -7,6 +7,23 @@
 	--color-line: #2a2a2a;
 	--color-muted: #aaaaaa;
 	--color-accent: #ff0033;
+
+	/* Room settings and the role editor look like Discord's settings. */
+	--color-d-bg: #313338;
+	--color-d-side: #2b2d31;
+	--color-d-deep: #1e1f22;
+	--color-d-bar: #111214;
+	--color-d-text: #dbdee1;
+	--color-d-head: #f2f3f5;
+	--color-d-muted: #b5bac1;
+	--color-d-faint: #949ba4;
+	--color-d-line: #3f4147;
+	--color-d-hover: #35373c;
+	--color-d-active: #404249;
+	--color-d-blurple: #5865f2;
+	--color-d-green: #23a55a;
+	--color-d-greenbtn: #248046;
+	--color-d-red: #da373c;
 	--font-sans: 'Roboto', ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -21,4 +38,13 @@ body {
 * {
 	scrollbar-width: thin;
 	scrollbar-color: #444 transparent;
+}
+
+@keyframes d-shake {
+	0%, 100% { transform: translateX(0); }
+	20%, 60% { transform: translateX(-6px); }
+	40%, 80% { transform: translateX(6px); }
+}
+.d-shake {
+	animation: d-shake 0.3s;
 }

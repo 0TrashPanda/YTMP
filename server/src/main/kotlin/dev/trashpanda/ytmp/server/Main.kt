@@ -69,7 +69,7 @@ fun main(args: Array<String>) {
         }
         val key = accounts.signingKey()
         val service = AccountService(accounts, issuer, key, config.accounts.signupMode())
-        val auth = TrustedAuthServers(isOwnOrigin = { it == ownUrl || it in localOrigins(config.server.port) })
+        val auth = TrustedAuthServers(isOwnOrigin = { it == ownUrl || it in localOrigins(config.server.port) }, ownTemplates = service::roleTemplate)
         auth.trust(AuthServerRef(url = null, issuer = issuer), key.public)
         trustServers(auth, config.accounts.trusted, ownIssuer = issuer)
         if (ownUrl == null) log.warn("accounts.url (YTMP_URL) is not set: account logins only work on this machine's own addresses")

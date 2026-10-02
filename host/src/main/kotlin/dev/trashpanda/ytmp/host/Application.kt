@@ -146,8 +146,11 @@ fun Application.ytmpModule(
                 if (request.visibility == RoomVisibility.PRIVATE && !options.supportsPrivateRooms) {
                     throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Solo rooms aren't supported here")
                 }
-                val account = call.bearerToken()?.let(options.auth::verify)
-                val room = rooms.create(name, request.visibility, ownerAccount = account?.id)
+                val token = call.bearerToken()
+                val account = token?.let(options.auth::verify)
+                // The creator's own roles, if they saved a template to their account.
+                val template = if (account != null) options.auth.roleTemplate(token) else null
+                val room = rooms.create(name, request.visibility, ownerAccount = account?.id, template = template)
                 log.info("Created room {} ({}, {}{})", room.code, room.name, room.visibility, account?.let { ", owner ${it.id}" } ?: "")
                 call.respond(CreateRoomResponse(room.code, room.ownerToken))
             }

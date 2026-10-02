@@ -70,6 +70,10 @@ data class Participant(
     val listening: Boolean,
     /** `username@issuer`, or null for a guest. */
     val accountId: String? = null,
+    val roleId: String = "",
+    /** Per-person overrides on top of the role. */
+    val allow: List<Permission> = emptyList(),
+    val deny: List<Permission> = emptyList(),
 )
 
 @Serializable
@@ -137,4 +141,8 @@ data class RoomState(
     val nowPlaying: NowPlaying?,
     val playback: PlaybackStatus,
     val outputs: List<OutputInfo>,
+    /** Ranked, highest first. */
+    val roles: List<Role> = emptyList(),
+    val settings: RoomSettings = RoomSettings("", ""),
+    val bans: List<BanInfo> = emptyList(),
 )

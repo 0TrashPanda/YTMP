@@ -25,6 +25,11 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
+import dev.trashpanda.ytmp.core.DefaultRoles
+import dev.trashpanda.ytmp.core.Permissions
+import dev.trashpanda.ytmp.protocol.ProtocolJson
+import dev.trashpanda.ytmp.protocol.RoleTemplate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -58,8 +63,38 @@ class AccountService(
         return HostTokenResponse(AccountTokens.sign(claims, key.private), exp * 1000, toInfo(account))
     }
 
+    /** The account's role template, or the default roles. */
+    fun roleTemplate(account: Accounts.Account): RoleTemplate =
+        accounts.data(account.id, "role_template")
+            ?.let { runCatching { ProtocolJson.decodeFromString(RoleTemplate.serializer(), it) }.getOrNull() }
+            ?.let(Permissions::sanitize)
+            ?: DefaultRoles.template
+
+    /** For a host checking a token of ours: the template of [username]. */
+    fun roleTemplate(username: String): RoleTemplate? = accounts.find(username)?.let(::roleTemplate)
+
     fun routes(route: Route) = with(route) {
         get("/auth/info") { call.respond(io { info }) }
+
+        // A host creating a room for an account asks for the account's roles, with the
+        // host token the account gave it (it doesn't have to be for this server's origin).
+        get("/auth/role-template") {
+            val token = call.bearerToken() ?: throw notLoggedIn()
+            val claims = AccountTokens.verify(token, { if (it == issuer) key.public else null }, clock() / 1000) ?: throw notLoggedIn()
+            call.respond(io { roleTemplate(claims.sub) } ?: throw notLoggedIn())
+        }
+
+        get("/account/role-template") {
+            val account = call.account()
+            call.respond(io { roleTemplate(account) })
+        }
+
+        put("/account/role-template") {
+            val account = call.account()
+            val template = Permissions.sanitize(call.receive<RoleTemplate>())
+            io { accounts.setData(account.id, "role_template", ProtocolJson.encodeToString(RoleTemplate.serializer(), template)) }
+            call.respond(template)
+        }
 
         post("/account/signup") {
             val request = call.receive<SignupRequest>()

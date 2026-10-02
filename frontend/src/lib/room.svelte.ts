@@ -4,11 +4,13 @@ import {
 	type Command,
 	type ErrorInfo,
 	type Event,
+	type Permission,
 	type RejectReason,
 	type RoomState,
 	type ServerMessage
 } from './protocol.gen';
 import { identity } from './account';
+import { effectivePermissions } from './permissions';
 import { saved } from './storage';
 
 /** How long a host notice (e.g. "Couldn't play …") stays on screen. */
@@ -21,7 +23,9 @@ const REJECT_MESSAGES: Record<RejectReason, string> = {
 	version_mismatch: 'This app and the host are different versions. Reload the page.',
 	invalid_name: 'Pick a name of 1–32 characters.',
 	replaced: 'You opened this room somewhere else.',
-	private_room: 'This is a solo room; only the phone that hosts it can join.'
+	private_room: 'This is a solo room; only the phone that hosts it can join.',
+	kicked: 'You were removed from this room. You can join again.',
+	banned: "You're banned from this room."
 };
 
 /**
@@ -57,6 +61,15 @@ export class RoomConnection {
 
 	get me() {
 		return this.state?.participants.find((p) => p.id === this.participantId) ?? null;
+	}
+
+	/** What I may do here (see permissions.ts). */
+	get permissions(): Set<Permission> {
+		return effectivePermissions(this.me, this.state?.roles ?? []);
+	}
+
+	can(permission: Permission): boolean {
+		return this.permissions.has(permission);
 	}
 
 	/** The host's current time, as far as we can tell. */
@@ -110,7 +123,11 @@ export class RoomConnection {
 			return Promise.resolve({ code: 'invalid', message: 'Not connected' });
 		}
 		return new Promise((resolve) => {
-			this.pending.set(id, resolve);
+			this.pending.set(id, (error) => {
+				// Not allowed: say so wherever the command came from.
+				if (error?.code === 'permission_denied') this.addNotice(error.message);
+				resolve(error);
+			});
 			this.sendRaw({ type: 'command', id, command });
 		});
 	}
@@ -214,6 +231,15 @@ export class RoomConnection {
 				break;
 			case 'RoomUpdated':
 				s.room = e.room;
+				break;
+			case 'RolesChanged':
+				s.roles = e.roles;
+				break;
+			case 'SettingsChanged':
+				s.settings = e.settings;
+				break;
+			case 'BansChanged':
+				s.bans = e.bans;
 				break;
 			case 'Notice':
 				this.addNotice(e.message);

@@ -37,14 +37,50 @@ export interface CommandAddSongs {
   position: QueuePosition;
 }
 
+export interface CommandAssignRole {
+  kind: "AssignRole";
+  participantId: string;
+  roleId: string;
+}
+
+export interface CommandBan {
+  kind: "Ban";
+  participantId: string;
+}
+
+export type Permission = "add_songs" | "play_now" | "remove_own" | "remove_others" | "reorder" | "play_pause" | "skip" | "seek" | "listen_locally" | "change_outputs" | "output_volume" | "kick" | "ban" | "assign_roles" | "edit_roles" | "change_settings";
+
+export interface CommandCreateRole {
+  kind: "CreateRole";
+  name: string;
+  color: string;
+  permissions: Permission[];
+}
+
+export interface CommandDeleteRole {
+  kind: "DeleteRole";
+  roleId: string;
+}
+
 export interface CommandJumpTo {
   kind: "JumpTo";
   itemId: string;
 }
 
+export interface CommandKick {
+  kind: "Kick";
+  participantId: string;
+}
+
 export interface CommandMoveQueueItem {
   kind: "MoveQueueItem";
   itemId: string;
+  toIndex: number;
+}
+
+export interface CommandMoveRole {
+  kind: "MoveRole";
+  roleId: string;
   toIndex: number;
 }
 
@@ -92,6 +128,13 @@ export interface CommandSetOutputVolume {
   volume: number;
 }
 
+export interface CommandSetParticipantPermissions {
+  kind: "SetParticipantPermissions";
+  participantId: string;
+  allow: Permission[];
+  deny: Permission[];
+}
+
 export type RoomVisibility = "public" | "private";
 
 export interface CommandSetVisibility {
@@ -103,10 +146,40 @@ export interface CommandSkip {
   kind: "Skip";
 }
 
+export interface CommandUnban {
+  kind: "Unban";
+  banId: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  color: string;
+  permissions: Permission[];
+}
+
+export interface CommandUpdateRole {
+  kind: "UpdateRole";
+  role: Role;
+}
+
+export interface CommandUpdateSettings {
+  kind: "UpdateSettings";
+  name: string | null;
+  defaultGuestRole: string | null;
+  defaultAccountRole: string | null;
+}
+
 export type Command =
   | CommandAddSongs
+  | CommandAssignRole
+  | CommandBan
+  | CommandCreateRole
+  | CommandDeleteRole
   | CommandJumpTo
+  | CommandKick
   | CommandMoveQueueItem
+  | CommandMoveRole
   | CommandPause
   | CommandPlay
   | CommandPlayNow
@@ -116,8 +189,12 @@ export type Command =
   | CommandSetListening
   | CommandSetOutput
   | CommandSetOutputVolume
+  | CommandSetParticipantPermissions
   | CommandSetVisibility
-  | CommandSkip;
+  | CommandSkip
+  | CommandUnban
+  | CommandUpdateRole
+  | CommandUpdateSettings;
 
 export interface ClientMessageCommand {
   type: "command";
@@ -149,6 +226,17 @@ export type ClientMessage =
   | ClientMessageHello
   | ClientMessagePing
   | ClientMessageRequestSnapshot;
+
+export interface BanInfo {
+  id: string;
+  name: string;
+  accountId: string | null;
+}
+
+export interface EventBansChanged {
+  kind: "BansChanged";
+  bans: BanInfo[];
+}
 
 export type QueueItemResult = "played" | "skipped";
 
@@ -203,6 +291,9 @@ export interface Participant {
   online: boolean;
   listening: boolean;
   accountId: string | null;
+  roleId: string;
+  allow: Permission[];
+  deny: Permission[];
 }
 
 export interface EventParticipantJoined {
@@ -248,6 +339,11 @@ export interface EventQueueItemsAdded {
   index: number;
 }
 
+export interface EventRolesChanged {
+  kind: "RolesChanged";
+  roles: Role[];
+}
+
 export interface RoomInfo {
   code: string;
   name: string;
@@ -259,6 +355,16 @@ export interface EventRoomUpdated {
   room: RoomInfo;
 }
 
+export interface RoomSettings {
+  defaultGuestRole: string;
+  defaultAccountRole: string;
+}
+
+export interface EventSettingsChanged {
+  kind: "SettingsChanged";
+  settings: RoomSettings;
+}
+
 export interface EventStreamReady {
   kind: "StreamReady";
   itemId: string;
@@ -266,6 +372,7 @@ export interface EventStreamReady {
 }
 
 export type Event =
+  | EventBansChanged
   | EventHistoryAppended
   | EventHistoryItemRemoved
   | EventNotice
@@ -278,7 +385,9 @@ export type Event =
   | EventQueueItemMoved
   | EventQueueItemRemoved
   | EventQueueItemsAdded
+  | EventRolesChanged
   | EventRoomUpdated
+  | EventSettingsChanged
   | EventStreamReady;
 
 export interface ServerMessageEvent {
@@ -293,7 +402,7 @@ export interface ServerMessagePong {
   hostTime: number;
 }
 
-export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "private_room";
+export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "private_room" | "kicked" | "banned";
 
 export interface ServerMessageRejected {
   type: "rejected";
@@ -326,6 +435,9 @@ export interface RoomState {
   nowPlaying: NowPlaying | null;
   playback: PlaybackStatus;
   outputs: OutputInfo[];
+  roles: Role[];
+  settings: RoomSettings;
+  bans: BanInfo[];
 }
 
 export interface ServerMessageSnapshot {
@@ -457,4 +569,9 @@ export interface InviteResponse {
 
 export interface LinkAuthServerRequest {
   url: string | null;
+}
+
+export interface RoleTemplate {
+  roles: Role[];
+  settings: RoomSettings;
 }

@@ -19,6 +19,7 @@ import dev.trashpanda.ytmp.protocol.CreateAccountRequest
 import dev.trashpanda.ytmp.protocol.SetPasswordRequest
 import dev.trashpanda.ytmp.protocol.InviteResponse
 import dev.trashpanda.ytmp.protocol.LinkAuthServerRequest
+import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.ServerMessage
@@ -146,6 +147,7 @@ fun main(args: Array<String>) {
     generator.addRoot(SetPasswordRequest.serializer().descriptor)
     generator.addRoot(InviteResponse.serializer().descriptor)
     generator.addRoot(LinkAuthServerRequest.serializer().descriptor)
+    generator.addRoot(RoleTemplate.serializer().descriptor)
     out.parentFile.mkdirs()
     out.writeText(generator.render())
     println("Wrote ${out.path}")
