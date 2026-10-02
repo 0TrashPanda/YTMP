@@ -12,7 +12,7 @@
 	import type { AlbumRef, ArtistRef, Song } from '../../../lib/protocol.gen';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
-	import { getHost } from '../../../lib/api';
+	import { getHost, prefetch } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
 	import { artistNames } from '../../../lib/format';
 	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
@@ -289,10 +289,10 @@
 							<h1 class="text-xl font-bold break-words sm:text-2xl">{song.title}</h1>
 							<p class="text-muted">
 								{#each song.artists as artist, i (i)}
-									{#if i > 0}, {/if}<button class="hover:text-white hover:underline" onclick={() => openArtist(artist)}>{artist.name}</button>
+									{#if i > 0}{', '}{/if}<button class="hover:text-white hover:underline" onclick={() => openArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}>{artist.name}</button>
 								{/each}
 								{#if song.album}
-									• <button class="hover:text-white hover:underline" onclick={() => openAlbum(song.album!, song.artists[0]?.name)}>{song.album.name}</button>
+									• <button class="hover:text-white hover:underline" onclick={() => openAlbum(song.album!, song.artists[0]?.name)} onpointerenter={() => song.album?.id && prefetch('album', song.album.id)}>{song.album.name}</button>
 								{/if}
 							</p>
 							<p class="mt-1 text-sm text-muted">Added by {room.state.nowPlaying.item.addedByName}</p>

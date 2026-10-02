@@ -87,12 +87,22 @@ sealed interface Command {
     @SerialName("MoveItem")
     data class MoveItem(val itemId: String, val list: ItemList, val toIndex: Int) : Command
 
-    /** Plays [song] now and replaces the queue with a radio from it. */
+    /** Clears the queue, and plays [song] and then its radio (the autoplay queue becomes the radio). */
     @Serializable
     @SerialName("StartRadio")
     data class StartRadio(val song: Song) : Command
 
-    /** Replaces the autoplay queue with a radio from [song], without touching the queue. */
+    /** Empties the upcoming queue. */
+    @Serializable
+    @SerialName("ClearQueue")
+    data object ClearQueue : Command
+
+    /** Empties the autoplay queue; it stays empty until something new is played or started. */
+    @Serializable
+    @SerialName("ClearAutoplay")
+    data object ClearAutoplay : Command
+
+    /** "Autoplay this": replaces the autoplay queue with a radio from [song], without touching the queue. */
     @Serializable
     @SerialName("AutoplayFromHere")
     data class AutoplayFromHere(val song: Song) : Command

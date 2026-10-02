@@ -67,7 +67,7 @@
 			{#if album}
 				<p class="mt-1 text-muted">
 					{#each album.artists as artist, i (i)}
-						{#if i > 0}, {/if}
+						{#if i > 0}{', '}{/if}
 						{#if artist.id}
 							<button class="font-medium text-white hover:underline" onclick={() => onArtist(artist)}>{artist.name}</button>
 						{:else}{artist.name}{/if}

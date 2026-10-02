@@ -94,6 +94,12 @@ Open it with the **⋮** button or by **right-clicking** the song.
   song dragged into the queue becomes yours.
 - **Tapping** a song in *Up next* jumps to it; tapping an **autoplay** song makes it play
   next instead.
+- The **current song** works like the others: dragging it elsewhere (or removing it) lets
+  the next song play.
+- The song in the player bar is centered. **Leave Room** is at the bottom of the room
+  settings sidebar (people icon), like Discord's *Leave Server*.
+- Browsing is cached (in the page and on the host): going back to an artist or album is
+  instant, and album pages start loading when you hover them.
 - Search results end with a link to search the same words **on YouTube Music**.
 - Search, find similar, artist and album pages stack up (a **Back** button goes to the
   previous one). The **YTMP logo** switches between the current song's album art and the

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { prefetch } from '../api';
 	import type { AlbumSummary } from '../protocol.gen';
 
 	let { albums, onOpen }: { albums: AlbumSummary[]; onOpen: (album: AlbumSummary) => void } = $props();
@@ -8,7 +9,12 @@
 
 <div class="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2">
 	{#each albums as album (album.id)}
-		<button class="group flex min-w-0 flex-col gap-2 text-left" onclick={() => onOpen(album)}>
+		<button
+			class="group flex min-w-0 flex-col gap-2 text-left"
+			onclick={() => onOpen(album)}
+			onpointerenter={() => prefetch('album', album.id)}
+			ontouchstart={() => prefetch('album', album.id)}
+		>
 			<div class="aspect-square w-full overflow-hidden rounded-md bg-raised">
 				{#if art(album)}
 					<img src={art(album)} alt="" loading="lazy" class="h-full w-full object-cover transition-transform group-hover:scale-105" />

@@ -50,20 +50,69 @@ class RadioTest {
     }
 
     @Test
-    fun `start radio plays the song and replaces the queue`() = runTest {
+    fun `start radio clears the queue, plays the song once and continues with its radio`() = runTest {
         val room = room()
-        room.run(Command.AddSongs(listOf(song("x")), QueuePosition.END))
+        room.run(Command.AddSongs(listOf(song("x"), song("y")), QueuePosition.END))
         runCurrent()
-        assertTrue(room.state().autoplay.isNotEmpty())
         room.run(Command.StartRadio(song("a")))
         runCurrent()
 
-        val state = room.state()
+        var state = room.state()
         assertEquals("a", state.nowPlaying?.item?.song?.id)
-        assertEquals((1..10).map { "a-$it" }, state.queue.map { it.song.id })
-        assertTrue(state.queue.all { it.origin == QueueItemOrigin.RADIO && it.addedByName == "Me" })
-        // Autoplay from the old queue is gone; the queue is long enough not to need it yet.
-        assertTrue(state.autoplay.isEmpty())
+        assertTrue(state.queue.isEmpty())
+        assertEquals((1..10).map { "a-$it" }, state.autoplay.map { it.song.id }.take(10))
+        assertEquals("a", state.autoplaySeed?.id)
+        assertEquals("Me", state.nowPlaying?.item?.addedByName)
+
+        // The song isn't heard twice: next up is the first radio song.
+        advanceTimeBy(60_001)
+        runCurrent()
+        state = room.state()
+        assertEquals("a-1", state.nowPlaying?.item?.song?.id)
+        assertEquals(listOf("x", "a"), state.history.map { it.song.id })
+    }
+
+    @Test
+    fun `clearing the queues, and a cleared autoplay stays empty until something new plays`() = runTest {
+        val room = room()
+        room.run(Command.AddSongs(listOf(song("a"), song("b"), song("c")), QueuePosition.END))
+        runCurrent()
+        room.run(Command.ClearQueue)
+        runCurrent()
+        assertTrue(room.state().queue.isEmpty())
+        assertTrue(room.state().autoplay.isNotEmpty())
+
+        room.run(Command.ClearAutoplay)
+        runCurrent()
+        assertTrue(room.state().autoplay.isEmpty())
+        advanceTimeBy(60_001) // a ends: nothing more
+        runCurrent()
+        assertNull(room.state().nowPlaying)
+
+        room.run(Command.AddSongs(listOf(song("d")), QueuePosition.END))
+        runCurrent()
+        assertTrue(room.state().autoplay.isNotEmpty(), "adding a song brings autoplay back")
+    }
+
+    @Test
+    fun `the current song can be removed or dragged away like any other`() = runTest {
+        val room = room()
+        room.run(Command.UpdateSettings(autoplay = false))
+        room.run(Command.AddSongs(listOf(song("a"), song("b"), song("c")), QueuePosition.END))
+        runCurrent()
+        // Remove the current song: b plays, and a isn't in the history.
+        room.run(Command.RemoveQueueItem(room.state().nowPlaying!!.item.itemId))
+        runCurrent()
+        var state = room.state()
+        assertEquals("b", state.nowPlaying?.item?.song?.id)
+        assertTrue(state.history.isEmpty())
+
+        // Drag the current song (b) below c: c plays, b is next.
+        room.run(Command.MoveItem(state.nowPlaying!!.item.itemId, ItemList.QUEUE, 1))
+        runCurrent()
+        state = room.state()
+        assertEquals("c", state.nowPlaying?.item?.song?.id)
+        assertEquals(listOf("b"), state.queue.map { it.song.id })
     }
 
     @Test

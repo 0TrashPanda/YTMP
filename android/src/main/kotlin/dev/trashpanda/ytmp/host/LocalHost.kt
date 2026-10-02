@@ -31,11 +31,21 @@ class LocalHost(private val context: Context) {
     val casts = CastOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
     val castFinder = CastFinder(context, casts)
     val authLink = AuthLink(context, PORT)
+
+    /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
+    private val cached = CachedSource(
+        search = { ytm.search(it) },
+        radio = { ytm.radio(it) },
+        catalog = object : CatalogSource {
+            override suspend fun artist(id: String) = ytm.artist(id)
+            override suspend fun album(id: String) = ytm.album(id)
+        },
+    )
     private val plays = PlayReporter(authLink.auth, scope)
     val rooms = RoomManager(
         streams = { ytm.resolveStream(it) }, scope = scope, outputs = casts.devices, store = PhoneRoomStore(context),
         onPlayFinished = plays::report,
-        radio = { ytm.radio(it) },
+        radio = cached,
     )
 
     fun start() {
@@ -45,7 +55,7 @@ class LocalHost(private val context: Context) {
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
             ytmpModule(
                 rooms,
-                search = { ytm.search(it) },
+                search = cached,
                 audio = OnDeviceAudioProxy { songId, fresh -> ytm.stream(songId, fresh) },
                 webApp = webApp,
                 options = HostOptions(
@@ -56,12 +66,8 @@ class LocalHost(private val context: Context) {
                     auth = authLink.auth,
                 ),
                 extraApi = { authLink.routes(this) },
-                similar = { ytm.radio(it) },
-                // Wrapped, so Python still starts on first use rather than at app start.
-                catalog = object : CatalogSource {
-                    override suspend fun artist(id: String) = ytm.artist(id)
-                    override suspend fun album(id: String) = ytm.album(id)
-                },
+                similar = cached,
+                catalog = cached,
             )
         }.start(wait = false)
         Log.i(TAG, "Hosting on port $PORT")

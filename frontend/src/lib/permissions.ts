@@ -23,8 +23,8 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
 			{ id: 'remove_own', name: 'Remove Own Songs', description: 'Allows removing songs they added themselves.' },
 			{ id: 'remove_others', name: "Remove Others' Songs", description: 'Allows removing songs that anyone added.' },
 			{ id: 'reorder', name: 'Reorder Queue', description: 'Allows dragging songs to a different place in the queue.' },
-			{ id: 'start_radio', name: 'Start Radio', description: 'Allows replacing the whole queue with a radio of similar songs.' },
-			{ id: 'autoplay_from_here', name: 'Autoplay From Here', description: 'Allows choosing what plays when the queue runs out (the autoplay queue).' }
+			{ id: 'start_radio', name: 'Start Radio', description: 'Allows clearing the queue and playing a song with a radio of similar songs after it.' },
+			{ id: 'autoplay_from_here', name: 'Autoplay This', description: 'Allows choosing (and clearing) what plays when the queue runs out: the autoplay queue.' }
 		]
 	},
 	{

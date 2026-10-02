@@ -57,8 +57,9 @@
 		}}
 		style="background: linear-gradient(to right, var(--color-accent) {(shown / (duration || 1)) * 100}%, var(--color-line) 0)"
 	/>
-	<div class="flex h-18 items-center gap-2 px-2 sm:gap-4 sm:px-4">
-		<div class="flex items-center">
+	<!-- Controls left, the song in the middle (centered), outputs and "Play here" right. -->
+	<div class="grid h-18 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-2 sm:grid-cols-[1fr_minmax(0,auto)_1fr] sm:gap-4 sm:px-4">
+		<div class="flex items-center justify-self-start">
 			<button class="rounded-full p-2 hover:bg-raised disabled:opacity-40" aria-label="Previous" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Previous' })}>
 				<Icon name="previous" />
 			</button>
@@ -78,7 +79,7 @@
 			</span>
 		</div>
 
-		<div class="flex min-w-0 flex-1 items-center gap-3" role="presentation" oncontextmenu={onSongMenu}>
+		<div class="flex max-w-xl min-w-0 items-center gap-3 justify-self-center" role="presentation" oncontextmenu={onSongMenu}>
 			<Art song={current?.item.song ?? null} size={48} class="h-10 w-10 sm:h-12 sm:w-12" />
 			<div class="min-w-0">
 				<div class="truncate font-medium">{current?.item.song.title ?? 'Nothing playing'}</div>
@@ -102,7 +103,7 @@
 			{/if}
 		</div>
 
-		<div class="flex items-center gap-2">
+		<div class="flex items-center gap-2 justify-self-end">
 			<button
 				class="rounded-full p-2 hover:bg-raised {activeOutputs ? 'text-accent' : ''}"
 				aria-label="Speakers and TVs"

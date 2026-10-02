@@ -38,9 +38,13 @@ queue runs out.
   Turned off, the music stops when the queue ends (and the autoplay queue is cleared).
 - Autoplay and radio songs skip anything from the last 50 songs, the queue and the autoplay
   queue. If a radio only has such songs, a couple of other recent songs are tried as seed.
-- **Start radio** plays the song now and replaces the queue with its radio. The room's own
-  autoplay (not one picked with *Autoplay from here*) is cleared, since it was based on the
-  old queue.
+- **Start radio** clears the queue and puts the song's radio in the autoplay queue, the song
+  itself first; it then plays from there, so the song is heard once and the radio follows.
+- **Autoplay this** (called *Autoplay from here* in older notes) replaces only the autoplay
+  queue.
+- **Clear queue** and **Clear** (autoplay) empty the queue or the autoplay queue. A cleared
+  autoplay queue stays empty until something new is played or started (otherwise it would
+  refill right away).
 - The autoplay queue is visible below the queue. Tapping a song there plays it; the
   autoplay songs before it are dropped.
 

@@ -43,7 +43,7 @@ class CastOutputsTest {
             run(Command.SetOutput("cast:fake", active = true))
 
             // The device starts its media player and loads the song's direct stream URL, playing.
-            eventually { "LOAD" in device.types(CastChannel.NS_MEDIA) }
+            eventually { "QUEUE_LOAD" in device.types(CastChannel.NS_MEDIA) }
             assertEquals("https://stream/ytm:abc", device.contentId)
             assertEquals("PLAYING", device.playerState)
             assertTrue("LAUNCH" in device.types(CastChannel.NS_RECEIVER))
@@ -62,6 +62,47 @@ class CastOutputsTest {
 
             run(Command.SetOutput("cast:fake", active = false))
             eventually { "STOP" in device.types(CastChannel.NS_RECEIVER) }
+        }
+        scope.cancel()
+    }
+
+    @Test
+    fun `next and previous on the device itself move the room along`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        FakeCastDevice().use { device ->
+            val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
+            casts.add(CastDeviceAddress("cast:fake", "Fake TV", "127.0.0.1", device.port))
+            val rooms = RoomManager({ "https://stream/$it" }, scope, outputs = casts.devices)
+            casts.attach(rooms)
+            val room = rooms.create("Party")
+            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { })!!
+            suspend fun run(command: Command) = room.handle(me, ClientMessage.CommandMessage("c", command))
+            val songs = (1..3).map { song.copy(id = "ytm:s$it", title = "Song $it") }
+
+            run(Command.AddSongs(songs, QueuePosition.END))
+            eventually { casts.devices.value.isNotEmpty() && room.view().current != null }
+            run(Command.SetOutput("cast:fake", active = true))
+
+            // The device gets the current song with the next one in its own queue.
+            eventually { device.queueTags.size == 2 }
+            val first = room.view().current!!.itemId
+            assertEquals(first, device.currentTag)
+
+            // Next on the device: the room follows, and the device's queue gets the new neighbors.
+            device.press(forward = true)
+            eventually { room.view().current?.song?.id == "ytm:s2" }
+            val second = room.view().current!!.itemId
+            eventually { device.queueTags == listOf(first, second, room.view().next?.itemId) }
+            // It wasn't loaded again: still one queue load.
+            assertEquals(1, device.types(CastChannel.NS_MEDIA).count { it == "QUEUE_LOAD" })
+
+            // Previous on the device: back to song 1.
+            device.press(forward = false)
+            eventually { room.view().current?.song?.id == "ytm:s1" }
+
+            // A skip in the room (not on the device) still loads the song on the device.
+            run(Command.Skip)
+            eventually { device.currentTag == room.view().current?.itemId && room.view().current?.song?.id == "ytm:s2" }
         }
         scope.cancel()
     }

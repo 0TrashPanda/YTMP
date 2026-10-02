@@ -1,6 +1,7 @@
 <script lang="ts">
 	// Room settings, laid out like Discord's server settings: a sidebar of sections on the
 	// left, the section on the right, ESC to close.
+	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { DEFAULT_ROLE_COLOR, rank } from '../../permissions';
 	import type { Command, Participant, Permission, Role } from '../../protocol.gen';
@@ -100,6 +101,14 @@
 			{/each}
 			<div class="mx-2.5 my-2 h-px bg-d-line"></div>
 			<button class="rounded px-2.5 py-1.5 text-left text-base font-medium text-d-muted hover:bg-d-hover hover:text-d-text" onclick={onClose}>Close</button>
+			<!-- Like Discord's "Leave Server". You can come back with the code, as yourself. -->
+			<button
+				class="flex items-center justify-between rounded px-2.5 py-1.5 text-left text-base font-medium text-[#f23f43] hover:bg-d-red/10"
+				onclick={() => goto('/')}
+			>
+				Leave Room
+				<svg viewBox="0 0 24 24" class="h-4 w-4"><path fill="currentColor" d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3zm6.6 4.4L15.2 8.8 17.4 11H9v2h8.4l-2.2 2.2 1.4 1.4L21.2 12z" /></svg>
+			</button>
 		</div>
 	</nav>
 

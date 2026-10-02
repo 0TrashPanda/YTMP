@@ -1,7 +1,8 @@
 <script lang="ts">
 	// "Up next": played songs, the current one, the queue and the autoplay queue as one list.
-	// Every song except the current one can be dragged anywhere in it (a played song moved
-	// below the current one plays again), removed, and has the song menu (⋮ or right-click).
+	// Every song can be dragged anywhere in it (a played song moved below the current one
+	// plays again; the current one moved away lets the next one play), removed, and has the
+	// song menu (⋮ or right-click).
 	import { tick } from 'svelte';
 	import { artistNames, formatTime } from '../format';
 	import type { ItemList, QueueItem } from '../protocol.gen';
@@ -79,7 +80,7 @@
 		drag = null;
 		if (!d || p === d.from) return;
 		const slot = slots[d.from];
-		if (slot.kind !== 'item') return;
+		if (slot.kind === 'header') return;
 		const target = landing(d.from, p);
 		room.run({ kind: 'MoveItem', itemId: slot.item.itemId, list: target.list, toIndex: target.index });
 	}
@@ -106,7 +107,7 @@
 	// --- actions ---------------------------------------------------------------------------
 
 	function open(slot: Slot) {
-		if (slot.kind !== 'item') return;
+		if (slot.kind !== 'item' || !canOpen(slot)) return;
 		// An autoplay song plays next; others play now (jump), like YTM.
 		if (slot.place === 'autoplay') room.run({ kind: 'MoveItem', itemId: slot.item.itemId, list: 'queue', toIndex: 0 });
 		else room.run({ kind: 'JumpTo', itemId: slot.item.itemId });
@@ -138,7 +139,14 @@
 </script>
 
 <aside class="flex flex-col lg:h-full lg:min-h-0">
-	<h2 class="px-4 pt-4 pb-2 text-sm font-medium tracking-wide text-muted uppercase">Up next</h2>
+	<div class="flex items-center gap-2 px-4 pt-4 pb-2">
+		<h2 class="flex-1 text-sm font-medium tracking-wide text-muted uppercase">Up next</h2>
+		{#if roomState?.queue.length && room.can(roomState.queue.every((i) => i.addedBy === room.participantId) ? 'remove_own' : 'remove_others')}
+			<button class="rounded-full px-2 py-0.5 text-xs text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearQueue' })}>
+				Clear queue
+			</button>
+		{/if}
+	</div>
 	<div bind:this={list} class="relative px-2 pb-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
 		{#each slots as slot, index (slot.key)}
 			{@const dragging = drag?.from === index}
@@ -149,9 +157,14 @@
 					style:transform="translateY({shift(index)}px)"
 				>
 					<h3 class="text-sm font-medium tracking-wide text-muted uppercase">Autoplay</h3>
-					<span class="truncate text-xs text-muted">
+					<span class="min-w-0 flex-1 truncate text-xs text-muted">
 						{roomState?.autoplaySeed ? `Songs like ${roomState.autoplaySeed.title}` : 'Plays when the queue runs out'}
 					</span>
+					{#if room.can('autoplay_from_here')}
+						<button class="shrink-0 rounded-full px-2 py-0.5 text-xs text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearAutoplay' })}>
+							Clear
+						</button>
+					{/if}
 				</div>
 			{:else}
 				{@const place = slot.kind === 'current' ? 'current' : slot.place}
@@ -166,9 +179,10 @@
 					oncontextmenu={(e) => menu(e, slot, true)}
 					role="listitem"
 				>
+					<!-- Not `disabled`: browsers don't send right-clicks to disabled buttons. -->
 					<button
-						class="flex min-w-0 flex-1 items-center gap-3 text-left"
-						disabled={!canOpen(slot)}
+						class="flex min-w-0 flex-1 items-center gap-3 text-left {canOpen(slot) ? '' : 'cursor-default'}"
+						aria-disabled={!canOpen(slot)}
 						onclick={() => open(slot)}
 						title={slot.kind === 'item' && canOpen(slot) ? (slot.place === 'autoplay' ? 'Play next' : 'Jump to this song') : undefined}
 					>
@@ -182,7 +196,7 @@
 					<button class="rounded-full p-1.5 text-muted hover:bg-line hover:text-white" aria-label="More for {slot.item.song.title}" onclick={(e) => menu(e, slot, false)}>
 						<Icon name="more" size={18} />
 					</button>
-					{#if slot.kind === 'item'}
+					{#if slot.kind === 'item' || slot.kind === 'current'}
 						{#if room.can(slot.item.addedBy === room.participantId ? 'remove_own' : 'remove_others')}
 							<button
 								class="rounded-full p-1.5 text-muted hover:bg-line hover:text-white"

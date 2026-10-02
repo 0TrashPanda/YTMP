@@ -35,12 +35,19 @@ data class MediaStatus(
     val contentId: String?,
     /** Why the player is IDLE: FINISHED, CANCELLED, INTERRUPTED or ERROR. */
     val idleReason: String?,
+    /** The device's id of the current item in its queue. */
+    val currentItemId: Int? = null,
+    /** Our [CastQueueItem.tag] of the current item, when the status includes the media. */
+    val tag: String? = null,
     /** When this status was received (System.currentTimeMillis). */
     val receivedAt: Long,
 )
 
 /** Song details shown on the TV or speaker's screen. */
 data class CastMetadata(val title: String, val artist: String, val album: String?, val imageUrl: String?)
+
+/** One song in the device's own queue. [tag] comes back in the status, to tell which one is playing. */
+data class CastQueueItem(val url: String, val contentType: String, val metadata: CastMetadata, val tag: String)
 
 /**
  * Plays audio on a Cast device with Google's Default Media Receiver (the built-in player that
@@ -81,23 +88,82 @@ class CastMediaPlayer(private val channel: CastChannel) {
     }
 
     /** Loads and (optionally) starts a song at [positionMs]. */
-    suspend fun load(url: String, contentType: String, metadata: CastMetadata, positionMs: Long, autoplay: Boolean): MediaStatus {
-        val media = JsonObject(
-            mapOf(
-                "contentId" to JsonPrimitive(url),
-                "contentType" to JsonPrimitive(contentType),
-                "streamType" to JsonPrimitive("BUFFERED"),
-                "metadata" to JsonObject(
-                    buildMap {
-                        put("metadataType", JsonPrimitive(3)) // MUSIC_TRACK
-                        put("title", JsonPrimitive(metadata.title))
-                        put("artist", JsonPrimitive(metadata.artist))
-                        metadata.album?.let { put("albumName", JsonPrimitive(it)) }
-                        metadata.imageUrl?.let { put("images", JsonArray(listOf(JsonObject(mapOf("url" to JsonPrimitive(it)))))) }
-                    },
-                ),
+    suspend fun load(url: String, contentType: String, metadata: CastMetadata, positionMs: Long, autoplay: Boolean): MediaStatus =
+        awaitLoad(
+            payload(
+                "LOAD",
+                "media" to media(CastQueueItem(url, contentType, metadata, tag = "")),
+                "currentTime" to JsonPrimitive(positionMs / 1000.0),
+                "autoplay" to JsonPrimitive(autoplay),
             ),
         )
+
+    /**
+     * Loads [items] as the device's own queue and starts [startIndex] at [positionMs]. With the
+     * songs before and after in its queue, the device's own previous and next buttons (and
+     * Google Home's) work; the status tells which item it moved to.
+     */
+    suspend fun loadQueue(items: List<CastQueueItem>, startIndex: Int, positionMs: Long, autoplay: Boolean): MediaStatus =
+        awaitLoad(
+            payload(
+                "QUEUE_LOAD",
+                "items" to JsonArray(items.map(::queueItem)),
+                "startIndex" to JsonPrimitive(startIndex),
+                "repeatMode" to JsonPrimitive("REPEAT_OFF"),
+                "currentTime" to JsonPrimitive(positionMs / 1000.0),
+                "autoplay" to JsonPrimitive(autoplay),
+            ),
+        )
+
+    /** The device's ids of the items in its queue, in order. */
+    suspend fun queueItemIds(): List<Int> {
+        val reply = mediaRequest(payload("QUEUE_GET_ITEM_IDS", "mediaSessionId" to JsonPrimitive(mediaSessionId ?: return emptyList())))
+        return reply["itemIds"]?.jsonArray?.mapNotNull { it.jsonPrimitive.intOrNull }.orEmpty()
+    }
+
+    suspend fun queueRemove(itemIds: List<Int>) {
+        if (itemIds.isEmpty()) return
+        control("QUEUE_REMOVE", "itemIds" to JsonArray(itemIds.map(::JsonPrimitive)))
+    }
+
+    /** Adds [items] before the item [insertBefore], or at the end. */
+    suspend fun queueInsert(items: List<CastQueueItem>, insertBefore: Int?) {
+        if (items.isEmpty()) return
+        val fields = buildList {
+            add("items" to JsonArray(items.map(::queueItem)))
+            if (insertBefore != null) add("insertBefore" to JsonPrimitive(insertBefore))
+        }
+        control("QUEUE_INSERT", *fields.toTypedArray())
+    }
+
+    private fun media(item: CastQueueItem) = JsonObject(
+        mapOf(
+            "contentId" to JsonPrimitive(item.url),
+            "contentType" to JsonPrimitive(item.contentType),
+            "streamType" to JsonPrimitive("BUFFERED"),
+            "metadata" to JsonObject(
+                buildMap {
+                    put("metadataType", JsonPrimitive(3)) // MUSIC_TRACK
+                    put("title", JsonPrimitive(item.metadata.title))
+                    put("artist", JsonPrimitive(item.metadata.artist))
+                    item.metadata.album?.let { put("albumName", JsonPrimitive(it)) }
+                    item.metadata.imageUrl?.let { put("images", JsonArray(listOf(JsonObject(mapOf("url" to JsonPrimitive(it)))))) }
+                },
+            ),
+            "customData" to JsonObject(mapOf(TAG to JsonPrimitive(item.tag))),
+        ),
+    )
+
+    private fun queueItem(item: CastQueueItem) = JsonObject(
+        mapOf(
+            "media" to media(item),
+            "autoplay" to JsonPrimitive(true),
+            "preloadTime" to JsonPrimitive(PRELOAD_SECONDS),
+            "customData" to JsonObject(mapOf(TAG to JsonPrimitive(item.tag))),
+        ),
+    )
+
+    private suspend fun awaitLoad(request: JsonObject): MediaStatus {
         // The first answer is often just "IDLE"; the real outcome (playing, or failed) follows.
         return coroutineScope {
             val outcome = async(start = CoroutineStart.UNDISPATCHED) {
@@ -105,14 +171,7 @@ class CastMediaPlayer(private val channel: CastChannel) {
                     channel.messages.first { (namespace, json) -> namespace == NS_MEDIA && loadOutcome(json) != null }.second
                 }
             }
-            val reply = mediaRequest(
-                payload(
-                    "LOAD",
-                    "media" to media,
-                    "currentTime" to JsonPrimitive(positionMs / 1000.0),
-                    "autoplay" to JsonPrimitive(autoplay),
-                ),
-            )
+            val reply = mediaRequest(request)
             val result = if (loadOutcome(reply) != null) reply.also { outcome.cancel() } else outcome.await()
             when (loadOutcome(result ?: error("The Cast device didn't start the song in time"))) {
                 true -> parseMedia(result)!!
@@ -191,13 +250,16 @@ class CastMediaPlayer(private val channel: CastChannel) {
         val status = message["status"]?.jsonArray?.firstOrNull()?.jsonObject ?: return null
         val id = status["mediaSessionId"]?.jsonPrimitive?.intOrNull
         if (id != null) mediaSessionId = id
+        val media = status["media"]?.jsonObject
         return MediaStatus(
             mediaSessionId = id,
             playerState = status["playerState"]?.jsonPrimitive?.content ?: "IDLE",
             currentTimeMs = ((status["currentTime"]?.jsonPrimitive?.doubleOrNull ?: 0.0) * 1000).toLong(),
-            contentId = status["media"]?.jsonObject?.get("contentId")?.jsonPrimitive?.content,
+            contentId = media?.get("contentId")?.jsonPrimitive?.content,
             idleReason = status["idleReason"]?.jsonPrimitive?.content,
             receivedAt = System.currentTimeMillis(),
+            currentItemId = status["currentItemId"]?.jsonPrimitive?.intOrNull,
+            tag = media?.get("customData")?.jsonObject?.get(TAG)?.jsonPrimitive?.content,
         )
     }
 
@@ -208,6 +270,10 @@ class CastMediaPlayer(private val channel: CastChannel) {
         /** Google's built-in media player app, available on every Cast device. */
         const val DEFAULT_MEDIA_RECEIVER = "CC1AD845"
         private const val LOAD_TIMEOUT_MS = 20_000L
+        private const val TAG = "ytmpItemId"
+
+        /** Start loading the next song this long before the current one ends. */
+        private const val PRELOAD_SECONDS = 20
         private const val NS_MULTIZONE = "urn:x-cast:com.google.cast.multizone"
     }
 }

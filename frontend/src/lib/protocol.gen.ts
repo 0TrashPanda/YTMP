@@ -53,6 +53,14 @@ export interface CommandBan {
   participantId: string;
 }
 
+export interface CommandClearAutoplay {
+  kind: "ClearAutoplay";
+}
+
+export interface CommandClearQueue {
+  kind: "ClearQueue";
+}
+
 export type Permission = "add_songs" | "play_now" | "remove_own" | "remove_others" | "reorder" | "start_radio" | "autoplay_from_here" | "play_pause" | "skip" | "seek" | "listen_locally" | "change_outputs" | "output_volume" | "kick" | "ban" | "assign_roles" | "edit_roles" | "change_settings";
 
 export interface CommandCreateRole {
@@ -195,6 +203,8 @@ export type Command =
   | CommandAssignRole
   | CommandAutoplayFromHere
   | CommandBan
+  | CommandClearAutoplay
+  | CommandClearQueue
   | CommandCreateRole
   | CommandDeleteRole
   | CommandJumpTo
@@ -623,6 +633,7 @@ export interface LinkAuthServerRequest {
 export interface RoleTemplate {
   roles: Role[];
   settings: RoomSettings;
+  knownPermissions: Permission[] | null;
 }
 
 export interface ListenedWith {

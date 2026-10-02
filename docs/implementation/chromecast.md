@@ -53,3 +53,19 @@ the receiver's media status. It is not sample-accurate with client playback.
 
 - A **custom Cast receiver** (a small web app that runs on the Chromecast) could show the
   [party screen](../features/ui.md#party-screen) on a TV.
+
+## The device's own skip buttons
+
+A Cast device gets a small queue of its own (QUEUE_LOAD): the previous song, the current one
+and the next one, each tagged with our item id in `customData`. Neighbors use the host's
+`/api/audio` URL (their direct URLs aren't resolved yet). So the device's own previous/next
+(its buttons, its app, Google Home, a TV remote) work:
+
+- When a status shows the device on a neighbor, the room follows (`Room.outputSkipped`):
+  next = skip (or "played" within 5 s of the end), previous = jump back. That song isn't
+  loaded again.
+- When the room's previous/next change (songs added, a skip in the room), the device's
+  queue is updated without interrupting the song (QUEUE_GET_ITEM_IDS, QUEUE_REMOVE,
+  QUEUE_INSERT). A change of the current song in the room still loads the queue again.
+
+Tested with the simulated device; not yet on real hardware.

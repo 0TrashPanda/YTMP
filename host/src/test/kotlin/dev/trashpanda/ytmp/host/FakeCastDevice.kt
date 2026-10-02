@@ -6,6 +6,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.DataInputStream
@@ -32,6 +34,40 @@ class FakeCastDevice : AutoCloseable {
 
     /** While playing a URL with this prefix, the player drops to IDLE/ERROR (a lost stream). */
     @Volatile var dropUrlsStartingWith: String? = null
+
+    /** The device's queue: (item id, media). */
+    private val queue = CopyOnWriteArrayList<Pair<Int, JsonObject>>()
+    @Volatile private var currentIndex = 0
+    private var nextItemId = 1
+
+    /** Tags of the queue (what the sender put in customData), in order, and the current one. */
+    val queueTags: List<String?> get() = queue.map { tag(it.second) }
+    val currentTag: String? get() = queue.getOrNull(currentIndex)?.let { tag(it.second) }
+
+    private fun tag(media: JsonObject) = media["customData"]?.jsonObject?.get("ytmpItemId")?.jsonPrimitive?.content
+
+    /** Someone pressed next (or previous) on the device or in Google Home. */
+    fun press(forward: Boolean) {
+        val target = currentIndex + if (forward) 1 else -1
+        if (target !in queue.indices) return
+        currentIndex = target
+        contentId = queue[target].second["contentId"]?.jsonPrimitive?.content
+        currentTime = 0.0
+        playerState = "PLAYING"
+    }
+
+    private fun setQueue(items: List<JsonObject>, start: Int) {
+        queue.clear()
+        for (media in items) queue += nextItemId++ to media
+        currentIndex = start
+        contentId = queue.getOrNull(start)?.second?.get("contentId")?.jsonPrimitive?.content
+    }
+
+    private fun statusJson(id: String?, state: String = playerState, extra: String = ""): String {
+        val current = queue.getOrNull(currentIndex)
+        val media = current?.second?.toString() ?: "null"
+        return """{"type":"MEDIA_STATUS","requestId":$id,"status":[{"mediaSessionId":1,"playerState":"$state","currentTime":$currentTime,"currentItemId":${current?.first},"media":$media$extra}]}"""
+    }
 
     private val server: SSLServerSocket = run {
         val keystore = File.createTempFile("fakecast", ".p12").apply { delete(); deleteOnExit() }
@@ -108,12 +144,30 @@ class FakeCastDevice : AutoCloseable {
             }
             CastChannel.NS_MEDIA -> {
                 when (type) {
-                    "LOAD" -> {
-                        val url = request["media"]!!.jsonObject["contentId"]!!.jsonPrimitive.content
+                    "LOAD", "QUEUE_LOAD" -> {
+                        val items = if (type == "LOAD") listOf(request["media"]!!.jsonObject)
+                        else request["items"]!!.jsonArray.map { it.jsonObject["media"]!!.jsonObject }
+                        val start = request["startIndex"]?.jsonPrimitive?.intOrNull ?: 0
+                        val url = items[start]["contentId"]!!.jsonPrimitive.content
                         if (rejectUrlsStartingWith?.let(url::startsWith) == true) return """{"type":"LOAD_FAILED","requestId":$id}"""
-                        contentId = url
+                        setQueue(items, start)
                         currentTime = request["currentTime"]!!.jsonPrimitive.doubleOrNull ?: 0.0
                         playerState = if (request["autoplay"]?.jsonPrimitive?.booleanOrNull == true) "PLAYING" else "PAUSED"
+                    }
+                    "QUEUE_GET_ITEM_IDS" -> return """{"type":"QUEUE_ITEM_IDS","requestId":$id,"itemIds":${queue.map { it.first }}}"""
+                    "QUEUE_REMOVE" -> {
+                        val ids = request["itemIds"]!!.jsonArray.map { it.jsonPrimitive.intOrNull }
+                        val current = queue[currentIndex].first
+                        queue.removeIf { it.first in ids && it.first != current }
+                        currentIndex = queue.indexOfFirst { it.first == current }
+                    }
+                    "QUEUE_INSERT" -> {
+                        val items = request["items"]!!.jsonArray.map { nextItemId++ to it.jsonObject["media"]!!.jsonObject }
+                        val before = request["insertBefore"]?.jsonPrimitive?.intOrNull
+                        val current = queue[currentIndex].first
+                        val at = before?.let { b -> queue.indexOfFirst { it.first == b } }?.takeIf { it >= 0 } ?: queue.size
+                        queue.addAll(at, items)
+                        currentIndex = queue.indexOfFirst { it.first == current }
                     }
                     "PLAY" -> playerState = "PLAYING"
                     "PAUSE" -> playerState = "PAUSED"
@@ -121,11 +175,7 @@ class FakeCastDevice : AutoCloseable {
                 }
                 // Only later status reports drop the stream, like a device losing it mid-song.
                 val dropped = type == "GET_STATUS" && dropUrlsStartingWith?.let { contentId?.startsWith(it) } == true
-                if (dropped) {
-                    """{"type":"MEDIA_STATUS","requestId":$id,"status":[{"mediaSessionId":1,"playerState":"IDLE","idleReason":"ERROR","currentTime":0}]}"""
-                } else {
-                    """{"type":"MEDIA_STATUS","requestId":$id,"status":[{"mediaSessionId":1,"playerState":"$playerState","currentTime":$currentTime}]}"""
-                }
+                if (dropped) statusJson(id, "IDLE", ""","idleReason":"ERROR"""") else statusJson(id)
             }
             else -> null
         }

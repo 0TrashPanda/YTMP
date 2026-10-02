@@ -108,6 +108,8 @@ class Room(
     private var autoplayJob: Job? = null
     /** The queue ran out while autoplay was still loading: start playing once it's there. */
     private var startWhenAutoplayLoaded = false
+    /** Someone cleared the autoplay queue: don't refill it until something new is played or started. */
+    private var autoplayDismissed = false
 
     /** Ranked, highest first. */
     private val roles = ArrayList<Role>()
@@ -345,7 +347,26 @@ class Room(
             positionMs = position(),
             hostTimeMs = clock(),
             activeOutputs = LinkedHashMap(activeOutputs),
+            previous = history.lastOrNull(),
+            next = queue.firstOrNull() ?: autoplay.firstOrNull(),
         )
+    }
+
+    /**
+     * A speaker skipped by itself (its own buttons, its app, or Google Home): follow it. Only
+     * if [fromItemId] is still the current song, so a skip isn't done twice. A speaker moving
+     * on at the very end of a song counts as the song having played.
+     */
+    suspend fun outputSkipped(fromItemId: String, forward: Boolean) = mutex.withLock {
+        val item = current ?: return@withLock
+        if (item.itemId != fromItemId) return@withLock
+        if (forward) {
+            val ended = item.song.durationMs > 0 && position() >= item.song.durationMs - END_GRACE_MS
+            retireCurrent(if (ended) QueueItemResult.PLAYED else QueueItemResult.SKIPPED)
+            playNextFromQueue()
+        } else {
+            history.lastOrNull()?.let { jumpTo(it.itemId) }
+        }
     }
 
     private fun outputInfos(): List<OutputInfo> = availableOutputs.map {
@@ -360,6 +381,7 @@ class Room(
             is Command.AddSongs -> {
                 need(member, Permission.ADD_SONGS)?.let { return it }
                 if (command.songs.isEmpty()) return invalid("No songs")
+                autoplayDismissed = false
                 val items = command.songs.map { newItem(it, member) }
                 val index = if (command.position == QueuePosition.NEXT) 0 else queue.size
                 queue.addAll(index, items)
@@ -371,12 +393,22 @@ class Room(
             }
             is Command.PlayNow -> {
                 need(member, Permission.PLAY_NOW)?.let { return it }
+                autoplayDismissed = false
                 retireCurrent(QueueItemResult.SKIPPED)
                 wantPlaying = true
                 setCurrent(newItem(command.song, member))
             }
             is Command.RemoveQueueItem -> {
-                // Any item: upcoming, played or autoplay.
+                // The current song: it stops, and doesn't stay in the history.
+                val playing = current
+                if (playing != null && playing.itemId == command.itemId) {
+                    need(member, if (playing.addedBy == member.id) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS)?.let { return it }
+                    retireCurrent(QueueItemResult.SKIPPED)
+                    history.removeLastOrNull()?.let { emit(Event.HistoryItemRemoved(it.itemId)) }
+                    playNextFromQueue()
+                    return null
+                }
+                // Any other item: upcoming, played or autoplay.
                 val (list, item) = find(command.itemId) ?: return notFound()
                 need(member, if (item.addedBy == member.id) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS)?.let { return it }
                 when (list) {
@@ -397,6 +429,18 @@ class Room(
                 }
             }
             is Command.MoveItem -> return moveItem(member, command)
+            Command.ClearQueue -> {
+                if (queue.isEmpty()) return null
+                need(member, if (queue.all { it.addedBy == member.id }) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS)?.let { return it }
+                queue.clear()
+                emit(Event.QueueReplaced(emptyList()))
+                refillAutoplay()
+            }
+            Command.ClearAutoplay -> {
+                need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
+                clearAutoplay()
+                autoplayDismissed = true
+            }
             is Command.MoveQueueItem -> {
                 need(member, Permission.REORDER)?.let { return it }
                 val from = queue.indexOfFirst { it.itemId == command.itemId }
@@ -593,6 +637,7 @@ class Room(
                     settings = updated
                     emit(Event.SettingsChanged(settings))
                     if (autoplayChanged) {
+                        autoplayDismissed = false
                         if (!settings.autoplay) clearAutoplay() else refillAutoplay()
                     }
                 }
@@ -642,6 +687,8 @@ class Room(
     }
 
     private fun moveItem(member: Member, command: Command.MoveItem): ErrorInfo? {
+        val playing = current
+        if (playing != null && playing.itemId == command.itemId) return moveCurrent(member, playing, command)
         val (from, original) = find(command.itemId) ?: return notFound()
         // Taking an autoplay song into the queue (next or last) is like adding it; anything else is reordering.
         val toEnd = command.toIndex >= queue.size
@@ -680,6 +727,24 @@ class Room(
         } else {
             refillAutoplay()
         }
+        return null
+    }
+
+    /** The current song dragged somewhere else: it goes there, and the next song starts. */
+    private fun moveCurrent(member: Member, playing: QueueItem, command: Command.MoveItem): ErrorInfo? {
+        need(member, Permission.REORDER)?.let { return it }
+        val historyOffset = maxOf(0, history.size - SNAPSHOT_HISTORY)
+        current = null
+        val target = listOf(command.list)
+        val item = if (command.list == ItemList.HISTORY) playing.copy(result = QueueItemResult.SKIPPED) else playing.copy(result = null)
+        val to = (command.toIndex + if (command.list == ItemList.HISTORY) historyOffset else 0).coerceIn(0, target.size)
+        target.add(to, item)
+        when (command.list) {
+            ItemList.QUEUE -> emit(Event.QueueReplaced(queue.toList()))
+            ItemList.HISTORY -> emit(Event.HistoryReplaced(history.takeLast(SNAPSHOT_HISTORY)))
+            ItemList.AUTOPLAY -> emitAutoplay()
+        }
+        playNextFromQueue()
         return null
     }
 
@@ -783,7 +848,7 @@ class Room(
 
     // --- radio and autoplay -----------------------------------------------------------
 
-    private fun autoplayActive() = radio != null && (autoplaySeed != null || settings.autoplay)
+    private fun autoplayActive() = radio != null && !autoplayDismissed && (autoplaySeed != null || settings.autoplay)
 
     private fun emitAutoplay() = emit(Event.AutoplayChanged(autoplaySeed, autoplay.toList()))
 
@@ -815,20 +880,23 @@ class Room(
                     emit(Event.Notice("Couldn't start a radio from \"${song.title}\": ${e.message}"))
                     return@withLock
                 }
-                val by = byId to byName
+                // The queue is cleared and the radio goes into autoplay, the song itself first:
+                // it plays from there, so it's heard once, and the radio keeps going after it.
+                autoplayJob?.cancel()
+                autoplayDismissed = false
                 retireCurrent(QueueItemResult.SKIPPED)
-                queue.clear()
-                queue += songs.getOrThrow().filter { it.id != song.id }.distinctBy { it.id }.map { radioItem(it, QueueItemOrigin.RADIO, by) }
-                emit(Event.QueueReplaced(queue.toList()))
-                // The room's own autoplay was based on the old queue; it refills near the end of this one.
-                if (autoplaySeed == null && autoplay.isNotEmpty()) {
-                    autoplayJob?.cancel()
-                    autoplay.clear()
-                    emitAutoplay()
+                if (queue.isNotEmpty()) {
+                    queue.clear()
+                    emit(Event.QueueReplaced(emptyList()))
                 }
+                autoplaySeed = song
+                autoplayBy = byId to byName
+                autoplay.clear()
+                autoplay += (listOf(song) + songs.getOrThrow().filter { it.id != song.id }).distinctBy { it.id }
+                    .map { radioItem(it, QueueItemOrigin.RADIO, autoplayBy) }
+                emitAutoplay()
                 wantPlaying = true
-                setCurrent(radioItem(song, QueueItemOrigin.RADIO, by))
-                refillAutoplay()
+                playNextFromQueue()
             }
         }
     }
@@ -845,6 +913,7 @@ class Room(
                     emit(Event.Notice("Couldn't load songs like \"${song.title}\": ${e.message}"))
                     return@withLock
                 }
+                autoplayDismissed = false
                 autoplaySeed = song
                 autoplayBy = byId to byName
                 val skip = recentSongIds() - autoplay.map { it.song.id }.toSet()
@@ -1003,6 +1072,8 @@ class Room(
         const val PREVIOUS_RESTART_MS = 3_000L
         const val SNAPSHOT_HISTORY = 200
         const val SAVED_HISTORY = 500
+        /** A speaker moving to the next song this close to the end means the song finished. */
+        const val END_GRACE_MS = 5_000L
         /** Fetch more autoplay songs when fewer than this are left. */
         const val AUTOPLAY_LOW = 5
         /** Radio songs don't repeat anything from the last this many songs. */

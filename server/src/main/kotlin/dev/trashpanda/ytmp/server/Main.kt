@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp.server
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
+import dev.trashpanda.ytmp.host.CachedSource
 import dev.trashpanda.ytmp.host.PlayReporter
 import dev.trashpanda.ytmp.host.TrustedAuthServers
 import dev.trashpanda.ytmp.host.fetchAuthServerInfo
@@ -49,6 +50,7 @@ fun main(args: Array<String>) {
         expectSuccess = false
     }
     val ytm = RemoteSourceModule(http, config.ytm.url.trimEnd('/'), config.ytm.key)
+    val cached = CachedSource(ytm, ytm, ytm)
 
     embeddedServer(Netty, port = config.server.port, host = config.server.host) {
         val casts = CastOutputs(this) { localAddress ->
@@ -79,7 +81,7 @@ fun main(args: Array<String>) {
         val rooms = RoomManager(
             ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = casts.devices, store = JdbcRoomStore(db),
             onPlayFinished = plays::report,
-            radio = ytm,
+            radio = cached,
         )
         rooms.startCleanup()
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
@@ -87,13 +89,13 @@ fun main(args: Array<String>) {
 
         ytmpModule(
             rooms,
-            search = ytm,
+            search = cached,
             audio = ytm,
             webApp = File(config.server.frontend),
             HostOptions(kind = HostKind.SERVER, auth = auth),
             extraApi = { service.routes(this) },
-            similar = ytm,
-            catalog = ytm,
+            similar = cached,
+            catalog = cached,
         )
     }.start(wait = true)
 }

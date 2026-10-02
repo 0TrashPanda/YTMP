@@ -87,7 +87,7 @@
 		list.push(null);
 		if (room.can('start_radio')) list.push({ icon: 'radio', label: 'Start radio', run: () => command({ kind: 'StartRadio', song }, `Starting a radio from "${song.title}"`) });
 		if (room.can('autoplay_from_here')) {
-			list.push({ icon: 'autoplay', label: 'Autoplay from here', run: () => command({ kind: 'AutoplayFromHere', song }, `Autoplay: songs like "${song.title}"`) });
+			list.push({ icon: 'autoplay', label: 'Autoplay this', run: () => command({ kind: 'AutoplayFromHere', song }, `Autoplay: songs like "${song.title}"`) });
 		}
 		// Read everything from the target before closing: closing clears it.
 		const current = song;

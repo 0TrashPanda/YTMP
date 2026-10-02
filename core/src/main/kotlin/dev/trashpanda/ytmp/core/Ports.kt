@@ -44,6 +44,9 @@ data class RoomView(
     val hostTimeMs: Long,
     /** Outputs the room plays on, with their wanted volume (null = leave as is). */
     val activeOutputs: Map<String, Double?>,
+    /** The last played song and the song after the current one, so a speaker can skip back and forth itself. */
+    val previous: QueueItem? = null,
+    val next: QueueItem? = null,
 ) {
     fun positionAt(timeMs: Long): Long = if (playing) positionMs + (timeMs - hostTimeMs) else positionMs
 }

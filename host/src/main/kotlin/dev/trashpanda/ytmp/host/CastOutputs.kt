@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp.host
 import dev.trashpanda.ytmp.cast.CastChannel
 import dev.trashpanda.ytmp.cast.CastMediaPlayer
 import dev.trashpanda.ytmp.cast.CastMetadata
+import dev.trashpanda.ytmp.cast.CastQueueItem
 import dev.trashpanda.ytmp.core.OutputDevice
 import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager
@@ -84,7 +85,7 @@ class CastOutputs(
                     val device = known.value[id] ?: continue
                     val session = sessions.getOrPut(id) { CastSession(device) }
                     try {
-                        session.sync(view, volume, report = room::notice) { actual -> room.reportOutputVolume(id, actual) }
+                        session.sync(view, volume, report = room::notice, skipped = room::outputSkipped) { actual -> room.reportOutputVolume(id, actual) }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -113,11 +114,32 @@ class CastOutputs(
         /** The device couldn't play a direct URL, so it gets the host's proxy from now on. */
         private var useProxy = false
 
-        suspend fun sync(view: RoomView, wantedVolume: Double?, report: suspend (String) -> Unit, reportVolume: suspend (Double) -> Unit) {
+        /** The songs before and after the current one in the device's own queue (our item ids). */
+        private var neighbors: Pair<String?, String?> = null to null
+
+        suspend fun sync(
+            view: RoomView,
+            wantedVolume: Double?,
+            report: suspend (String) -> Unit,
+            skipped: suspend (fromItemId: String, forward: Boolean) -> Unit,
+            reportVolume: suspend (Double) -> Unit,
+        ) {
             val player = connect(reportVolume)
             if (wantedVolume != null && wantedVolume != appliedVolume) {
                 player.setVolume(wantedVolume)
                 appliedVolume = wantedVolume
+            }
+
+            // Did the device skip by itself (its buttons, its app, Google Home)? Then the room follows.
+            val loaded = loadedItemId
+            val status = if (loaded != null && !failed) player.status() else null
+            val onDevice = status?.tag?.takeIf { it.isNotEmpty() }
+            if (loaded != null && onDevice != null && onDevice != loaded && (onDevice == neighbors.first || onDevice == neighbors.second)) {
+                log.info("Cast device {} went {}", device.name, if (onDevice == neighbors.second) "to the next song" else "back")
+                loadedItemId = onDevice
+                settledAt = System.currentTimeMillis() + SETTLE_MS
+                skipped(loaded, onDevice == neighbors.second)
+                return
             }
 
             val item = view.current
@@ -131,9 +153,8 @@ class CastOutputs(
                 load(player, item, view, expected, report)
                 return
             }
-            if (failed) return
-
-            val status = player.status() ?: return
+            if (failed || status == null) return
+            updateNeighbors(player, view, status.currentItemId)
             when {
                 view.playing && status.playerState == "PAUSED" -> player.play()
                 !view.playing && status.playerState in setOf("PLAYING", "BUFFERING") -> player.pause()
@@ -157,28 +178,60 @@ class CastOutputs(
             }
         }
 
-        private suspend fun load(player: CastMediaPlayer, item: QueueItem, view: RoomView, positionMs: Long, report: suspend (String) -> Unit) {
-            val metadata = CastMetadata(
+        /** Our songs as items of the device's queue. Neighbors go through the host: their direct URLs aren't resolved yet. */
+        private fun castItem(item: QueueItem, url: String? = null) = CastQueueItem(
+            url = url ?: proxyUrl(item),
+            contentType = "audio/mp4",
+            metadata = CastMetadata(
                 title = item.song.title,
                 artist = item.song.artists.joinToString { it.name },
                 album = item.song.album?.name,
                 imageUrl = item.song.thumbnails.maxByOrNull { it.width }?.url,
-            )
+            ),
+            tag = item.itemId,
+        )
+
+        private fun proxyUrl(item: QueueItem) =
+            audioBaseUrl(channel!!.localAddress) + "/api/audio/" + URLEncoder.encode(item.song.id, Charsets.UTF_8)
+
+        /** Keeps the device's previous and next songs in step with the room, without interrupting the current one. */
+        private suspend fun updateNeighbors(player: CastMediaPlayer, view: RoomView, currentId: Int?) {
+            val wanted = view.previous?.itemId to view.next?.itemId
+            if (wanted == neighbors || currentId == null) return
+            neighbors = wanted
+            try {
+                player.queueRemove(player.queueItemIds() - currentId)
+                view.previous?.let { player.queueInsert(listOf(castItem(it)), insertBefore = currentId) }
+                view.next?.let { player.queueInsert(listOf(castItem(it)), insertBefore = null) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Only the device's own skip buttons depend on it; playback goes on.
+                log.info("Cast device {} didn't take the queue update: {}", device.name, e.message)
+            }
+        }
+
+        private suspend fun load(player: CastMediaPlayer, item: QueueItem, view: RoomView, positionMs: Long, report: suspend (String) -> Unit) {
             loadedItemId = item.itemId
             settledAt = System.currentTimeMillis() + SETTLE_MS
             failed = false
-            val proxyUrl = audioBaseUrl(channel!!.localAddress) + "/api/audio/" + URLEncoder.encode(item.song.id, Charsets.UTF_8)
             val direct = view.streamUrl?.takeIf { !useProxy }
+            // The current song with the ones before and after it, so the device's own buttons can skip.
+            suspend fun loadWith(url: String?) {
+                val items = listOfNotNull(view.previous?.let { castItem(it) }, castItem(item, url), view.next?.let { castItem(it) })
+                player.loadQueue(items, startIndex = if (view.previous != null) 1 else 0, positionMs + LOAD_LEAD_MS, autoplay = view.playing)
+                neighbors = view.previous?.itemId to view.next?.itemId
+            }
             try {
                 try {
                     log.info("Cast device {}: loading {} ({})", device.name, item.song.title, if (direct != null) "direct" else "via host")
-                    player.load(direct ?: proxyUrl, "audio/mp4", metadata, positionMs + LOAD_LEAD_MS, autoplay = view.playing)
+                    loadWith(direct)
                 } catch (e: IllegalStateException) {
                     if (direct == null) throw e
                     // The device can't use the direct URL (e.g. it's tied to the host's IP): use the host.
                     log.info("Cast device {} can't play the direct stream ({}); using the host from now on", device.name, e.message)
                     useProxy = true
-                    player.load(proxyUrl, "audio/mp4", metadata, positionMs + LOAD_LEAD_MS, autoplay = view.playing)
+                    loadWith(null)
                 }
             } catch (e: IllegalStateException) {
                 // Don't keep retrying this song; the next song gets a new try.
