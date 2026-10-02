@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.util.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
+import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.RoomVisibility
@@ -56,6 +57,11 @@ class LocalHost(private val context: Context) {
                 ),
                 extraApi = { authLink.routes(this) },
                 similar = { ytm.radio(it) },
+                // Wrapped, so Python still starts on first use rather than at app start.
+                catalog = object : CatalogSource {
+                    override suspend fun artist(id: String) = ytm.artist(id)
+                    override suspend fun album(id: String) = ytm.album(id)
+                },
             )
         }.start(wait = false)
         Log.i(TAG, "Hosting on port $PORT")

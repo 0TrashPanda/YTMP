@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import type { QueueItem, Song } from '../protocol.gen';
+	import type { AlbumRef, ArtistRef, QueueItem, Song } from '../protocol.gen';
 
 	/** Where a song in a menu comes from. */
 	export type SongPlace = 'search' | 'history' | 'current' | 'queue' | 'autoplay';
@@ -27,9 +27,10 @@
 		onClose: () => void;
 		onToast: (text: string) => void;
 		onFindSimilar: (song: Song) => void;
-		onSearch: (query: string) => void;
+		onArtist: (artist: ArtistRef) => void;
+		onAlbum: (album: AlbumRef, artist: string) => void;
 	}
-	let { room, target, onClose, onToast, onFindSimilar, onSearch }: Props = $props();
+	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum }: Props = $props();
 
 	const song = $derived(target.song);
 	const item = $derived(target.item);
@@ -55,7 +56,7 @@
 	const entries = $derived.by(() => {
 		const list: (Entry | null)[] = [];
 		const fromAutoplay = place === 'autoplay' && item;
-		if (place !== 'current' && room.can('add_songs')) {
+		if (room.can('add_songs')) {
 			list.push({
 				icon: 'playNext',
 				label: 'Play next',
@@ -80,6 +81,9 @@
 				run: () => (item ? command({ kind: 'JumpTo', itemId: item.itemId }) : command({ kind: 'PlayNow', song }))
 			});
 		}
+		if (place === 'current' && room.can('seek')) {
+			list.push({ icon: 'previous', label: 'Play from the start', run: () => command({ kind: 'Seek', positionMs: 0 }) });
+		}
 		list.push(null);
 		if (room.can('start_radio')) list.push({ icon: 'radio', label: 'Start radio', run: () => command({ kind: 'StartRadio', song }, `Starting a radio from "${song.title}"`) });
 		if (room.can('autoplay_from_here')) {
@@ -90,12 +94,12 @@
 		list.push({ icon: 'similar', label: 'Find similar', run: () => (onFindSimilar(current), onClose()) });
 		list.push(null);
 		for (const artist of song.artists.slice(0, 3)) {
-			list.push({ icon: 'person', label: `Go to ${artist.name}`, run: () => (onClose(), onSearch(artist.name)) });
+			list.push({ icon: 'person', label: `Go to ${artist.name}`, run: () => (onArtist(artist), onClose()) });
 		}
 		if (song.album) {
-			const album = song.album.name;
+			const album = song.album;
 			const artist = song.artists[0]?.name ?? '';
-			list.push({ icon: 'album', label: `Go to album ${album}`, run: () => (onClose(), onSearch(`${album} ${artist}`.trim())) });
+			list.push({ icon: 'album', label: `Go to album ${album.name}`, run: () => (onAlbum(album, artist), onClose()) });
 		}
 		if (ytmId) {
 			list.push({ icon: 'open', label: 'Open in YouTube Music', href: `https://music.youtube.com/watch?v=${encodeURIComponent(ytmId)}`, run: onClose });

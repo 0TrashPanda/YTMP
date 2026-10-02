@@ -665,3 +665,31 @@ export interface PlayReport {
   listenedWith: ListenedWith[];
   shared: boolean;
 }
+
+export interface AlbumSummary {
+  id: string;
+  title: string;
+  kind: string;
+  year: string | null;
+  thumbnails: Thumbnail[];
+}
+
+export interface ArtistPage {
+  id: string;
+  name: string;
+  thumbnails: Thumbnail[];
+  description: string | null;
+  songs: Song[];
+  albums: AlbumSummary[];
+  singles: AlbumSummary[];
+}
+
+export interface AlbumPage {
+  id: string;
+  title: string;
+  kind: string;
+  year: string | null;
+  artists: ArtistRef[];
+  thumbnails: Thumbnail[];
+  songs: Song[];
+}

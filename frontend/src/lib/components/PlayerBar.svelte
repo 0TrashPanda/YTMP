@@ -10,8 +10,16 @@
 		room,
 		player,
 		positionMs,
-		onToast
-	}: { room: RoomConnection; player: RoomPlayer; positionMs: number; onToast: (text: string) => void } = $props();
+		onToast,
+		onSongMenu
+	}: {
+		room: RoomConnection;
+		player: RoomPlayer;
+		positionMs: number;
+		onToast: (text: string) => void;
+		/** Right-click or ⋮ on the current song. */
+		onSongMenu: (event: MouseEvent) => void;
+	} = $props();
 
 	let showOutputs = $state(false);
 	const activeOutputs = $derived(room.state?.outputs.filter((o) => o.active).length ?? 0);
@@ -70,7 +78,7 @@
 			</span>
 		</div>
 
-		<div class="flex min-w-0 flex-1 items-center gap-3">
+		<div class="flex min-w-0 flex-1 items-center gap-3" role="presentation" oncontextmenu={onSongMenu}>
 			<Art song={current?.item.song ?? null} size={48} class="h-10 w-10 sm:h-12 sm:w-12" />
 			<div class="min-w-0">
 				<div class="truncate font-medium">{current?.item.song.title ?? 'Nothing playing'}</div>
@@ -80,6 +88,18 @@
 					{/if}
 				</div>
 			</div>
+			{#if current}
+				<button
+					class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white"
+					aria-label="More for {current.item.song.title}"
+					onclick={(e) => {
+						const r = e.currentTarget.getBoundingClientRect();
+						onSongMenu(new MouseEvent('contextmenu', { clientX: r.left, clientY: r.top - 8 }));
+					}}
+				>
+					<Icon name="more" size={20} />
+				</button>
+			{/if}
 		</div>
 
 		<div class="flex items-center gap-2">

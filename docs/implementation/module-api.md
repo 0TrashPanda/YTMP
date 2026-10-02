@@ -151,6 +151,8 @@ So the operations below are the contract for both. HTTP is only the transport on
 |--------|------|-------------|
 | GET | `/radio?seed=&cursor=` | YTM radio from a song, artist, album or playlist ID (`seed`): an endless list via `cursor`. ✅ Songs only, `limit` (default 25) instead of `cursor`; the host keeps it endless by asking again from the last song |
 | GET | `/songs/{id}/related` | Related songs |
+| GET | `/artists/{id}` | ✅ Artist page: name, art, description, top songs, albums, singles |
+| GET | `/albums/{id}` | ✅ Album page: title, kind, year, artists, art, songs |
 
 The host stores every radio/related result as **YTM edges** in the song graph (see
 [storage](storage.md#song-graph)).

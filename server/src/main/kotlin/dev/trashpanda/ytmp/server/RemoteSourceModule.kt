@@ -12,6 +12,9 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import dev.trashpanda.ytmp.core.RadioSource
+import dev.trashpanda.ytmp.core.CatalogSource
+import dev.trashpanda.ytmp.protocol.AlbumPage
+import dev.trashpanda.ytmp.protocol.ArtistPage
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -38,7 +41,7 @@ class RemoteSourceModule(
     private val client: HttpClient,
     private val baseUrl: String,
     private val key: String,
-) : SongSearch, StreamResolver, AudioProxy, RadioSource {
+) : SongSearch, StreamResolver, AudioProxy, RadioSource, CatalogSource {
 
     @Serializable
     private data class SearchResult(val items: List<Song>)
@@ -67,6 +70,12 @@ class RemoteSourceModule(
             parameter("seed", seedSongId)
             parameter("limit", 25)
         }.orThrow().body<SearchResult>().items
+
+    override suspend fun artist(id: String): ArtistPage =
+        client.get("$baseUrl/artists/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
+
+    override suspend fun album(id: String): AlbumPage =
+        client.get("$baseUrl/albums/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
 
     override suspend fun resolveStream(songId: String): String =
         client.get("$baseUrl/songs/${songId.encodeURLPathPart()}/stream") { auth() }

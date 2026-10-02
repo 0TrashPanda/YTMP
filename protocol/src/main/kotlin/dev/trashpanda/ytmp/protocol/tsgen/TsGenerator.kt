@@ -23,6 +23,8 @@ import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.HistoryPage
 import dev.trashpanda.ytmp.protocol.AccountSettings
 import dev.trashpanda.ytmp.protocol.PlayReport
+import dev.trashpanda.ytmp.protocol.ArtistPage
+import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.ServerMessage
@@ -164,6 +166,8 @@ fun main(args: Array<String>) {
     generator.addRoot(HistoryPage.serializer().descriptor)
     generator.addRoot(AccountSettings.serializer().descriptor)
     generator.addRoot(PlayReport.serializer().descriptor)
+    generator.addRoot(ArtistPage.serializer().descriptor)
+    generator.addRoot(AlbumPage.serializer().descriptor)
     out.parentFile.mkdirs()
     out.writeText(generator.render())
     println("Wrote ${out.path}")

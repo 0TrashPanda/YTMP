@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.core.Outbox
 import dev.trashpanda.ytmp.core.RadioSource
+import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.protocol.ApiError
@@ -104,6 +105,8 @@ fun Application.ytmpModule(
     extraApi: Route.() -> Unit = {},
     /** Similar songs (YTM's radio), for Find similar. */
     similar: RadioSource? = null,
+    /** Artist and album pages. */
+    catalog: CatalogSource? = null,
 ) {
     install(ContentNegotiation) { json(ProtocolJson) }
     install(WebSockets) {
@@ -180,6 +183,14 @@ fun Application.ytmpModule(
                 if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
                 val source = similar ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No radio source")
                 call.respond(SearchResponse(source.radio(songId).filter { it.id != songId }))
+            }
+            get("/artists/{id}") {
+                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No artist pages here")
+                call.respond(source.artist(call.parameters["id"]!!))
+            }
+            get("/albums/{id}") {
+                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No album pages here")
+                call.respond(source.album(call.parameters["id"]!!))
             }
             get("/audio/{songId}") {
                 val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")

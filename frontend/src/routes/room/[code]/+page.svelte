@@ -6,8 +6,10 @@
 	import PlayerBar from '../../../lib/components/PlayerBar.svelte';
 	import QueuePanel from '../../../lib/components/QueuePanel.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
+	import ArtistView from '../../../lib/components/ArtistView.svelte';
+	import AlbumView from '../../../lib/components/AlbumView.svelte';
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
-	import type { Song } from '../../../lib/protocol.gen';
+	import type { AlbumRef, ArtistRef, Song } from '../../../lib/protocol.gen';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
 	import { getHost } from '../../../lib/api';
@@ -27,17 +29,61 @@
 	let room = $state<RoomConnection | null>(null);
 	let player = $state<RoomPlayer | null>(null);
 	let query = $state('');
-	/** Search results are shown (the logo goes back to the album art but keeps the text). */
-	let searching = $state(false);
-	/** Showing "Find similar" for this song. */
-	let similarTo = $state<Song | null>(null);
 	let menu = $state<MenuTarget | null>(null);
-	const showResults = $derived(!!similarTo || (searching && !!query.trim()));
 
-	function showSearch(text: string) {
+	// What the main area shows besides the album art: search, find similar, artist and album
+	// pages, as a stack (the back arrow pops it). The logo switches between the album art
+	// and the last one, which stays as it was.
+	type View =
+		| { kind: 'search' }
+		| { kind: 'similar'; song: Song }
+		| { kind: 'artist'; id: string; name: string }
+		| { kind: 'album'; id: string; title: string };
+	let views = $state<View[]>([]);
+	let browsing = $state(false);
+	const view = $derived(browsing ? (views.at(-1) ?? null) : null);
+
+	function show(next: View) {
+		const top = views.at(-1);
+		if (next.kind === 'search' && top?.kind === 'search') {
+			browsing = true;
+			return;
+		}
+		views = [...views, next].slice(-20);
+		browsing = true;
+	}
+
+	function back() {
+		views = views.slice(0, -1);
+		if (views.length === 0) browsing = false;
+	}
+
+	function toggleHome() {
+		if (browsing) browsing = false;
+		else if (views.length) browsing = true;
+	}
+
+	function openArtist(artist: ArtistRef) {
+		if (artist.id) show({ kind: 'artist', id: artist.id, name: artist.name });
+		else searchFor(artist.name);
+	}
+
+	function openAlbum(album: AlbumRef, artist = '') {
+		if (album.id) show({ kind: 'album', id: album.id, title: album.name });
+		else searchFor(`${album.name} ${artist}`.trim());
+	}
+
+	function searchFor(text: string) {
 		query = text;
-		similarTo = null;
-		searching = true;
+		show({ kind: 'search' });
+	}
+
+	/** Right-click (or ⋮) on the current song outside the queue: the album art and the player bar. */
+	function currentMenu(event: MouseEvent) {
+		const item = room?.state?.nowPlaying?.item;
+		if (!item) return;
+		event.preventDefault();
+		menu = { song: item.song, item, place: 'current', x: event.clientX, y: event.clientY };
 	}
 	let toasts = $state<{ id: number; text: string }[]>([]);
 	let now = $state(Date.now());
@@ -155,7 +201,7 @@
 			class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:px-4 lg:translate-y-0
 				{headerHidden ? '-translate-y-full' : ''}"
 		>
-			<button class="text-xl font-black tracking-tight" title="Now playing" onclick={() => ((searching = false), (similarTo = null))}>
+			<button class="text-xl font-black tracking-tight" title={browsing ? 'Now playing' : 'Back to where you were'} onclick={toggleHome}>
 				YT<span class="text-accent">MP</span>
 			</button>
 			<label class="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-raised px-3 py-2 sm:max-w-xl">
@@ -164,11 +210,11 @@
 					class="min-w-0 flex-1 bg-transparent outline-none"
 					placeholder="Search songs"
 					bind:value={query}
-					onfocus={() => ((headerHidden = false), (searching = true))}
-					oninput={() => ((similarTo = null), (searching = true))}
+					onfocus={() => ((headerHidden = false), query.trim() && show({ kind: 'search' }))}
+					oninput={() => show({ kind: 'search' })}
 				/>
 				{#if query}
-					<button aria-label="Clear search" onclick={() => ((query = ''), (similarTo = null))}><Icon name="close" size={20} /></button>
+					<button aria-label="Clear search" onclick={() => (query = '')}><Icon name="close" size={20} /></button>
 				{/if}
 			</label>
 			<div class="ml-auto flex items-center gap-2">
@@ -217,15 +263,38 @@
 
 		<div class="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_420px]">
 			<main class="p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto">
-				{#if showResults}
-					<SearchResults {room} {query} {similarTo} onToast={toast} onMenu={(target) => (menu = target)} />
+				{#if view}
+					{#if views.length > 1}
+						<button class="mb-2 flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted hover:bg-raised hover:text-white" onclick={back}>
+							<svg viewBox="0 0 24 24" class="h-5 w-5"><path fill="currentColor" d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" /></svg>
+							Back
+						</button>
+					{/if}
+					{#if view.kind === 'search'}
+						<SearchResults {room} {query} onToast={toast} onMenu={(target) => (menu = target)} />
+					{:else if view.kind === 'similar'}
+						<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={(target) => (menu = target)} />
+					{:else if view.kind === 'artist'}
+						<ArtistView {room} id={view.id} name={view.name} onToast={toast} onMenu={(target) => (menu = target)} onAlbum={(a) => openAlbum({ id: a.id, name: a.title })} />
+					{:else if view.kind === 'album'}
+						<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
+					{/if}
 				{:else if room.state?.nowPlaying}
 					{@const song = room.state.nowPlaying.item.song}
 					<div class="flex min-w-0 flex-col items-center justify-center gap-4 py-4 text-center sm:gap-6 lg:h-full lg:py-0">
-						<Art {song} size={544} class="aspect-square w-[min(100%,28rem,38vh)] shadow-2xl" />
-						<div class="w-full min-w-0">
+						<div class="contents" role="presentation" oncontextmenu={currentMenu}>
+							<Art {song} size={544} class="aspect-square w-[min(100%,28rem,38vh)] shadow-2xl" />
+						</div>
+						<div class="w-full min-w-0" role="presentation" oncontextmenu={currentMenu}>
 							<h1 class="text-xl font-bold break-words sm:text-2xl">{song.title}</h1>
-							<p class="text-muted">{artistNames(song)}</p>
+							<p class="text-muted">
+								{#each song.artists as artist, i (i)}
+									{#if i > 0}, {/if}<button class="hover:text-white hover:underline" onclick={() => openArtist(artist)}>{artist.name}</button>
+								{/each}
+								{#if song.album}
+									• <button class="hover:text-white hover:underline" onclick={() => openAlbum(song.album!, song.artists[0]?.name)}>{song.album.name}</button>
+								{/if}
+							</p>
 							<p class="mt-1 text-sm text-muted">Added by {room.state.nowPlaying.item.addedByName}</p>
 						</div>
 					</div>
@@ -237,14 +306,14 @@
 				{/if}
 			</main>
 			<!-- On phones the queue makes room for search results, like YTM. -->
-			<div class="border-t border-line lg:min-h-0 lg:border-t-0 lg:border-l {showResults ? 'hidden lg:block' : ''}">
+			<div class="border-t border-line lg:min-h-0 lg:border-t-0 lg:border-l {view ? 'hidden lg:block' : ''}">
 				<QueuePanel {room} onMenu={(target) => (menu = target)} />
 			</div>
 		</div>
 		</div>
 
 		{#if player}
-			<PlayerBar {room} {player} {positionMs} onToast={toast} />
+			<PlayerBar {room} {player} {positionMs} onToast={toast} onSongMenu={currentMenu} />
 		{/if}
 	</div>
 
@@ -254,8 +323,9 @@
 			target={menu}
 			onClose={() => (menu = null)}
 			onToast={toast}
-			onFindSimilar={(song) => ((similarTo = song), (searching = false))}
-			onSearch={showSearch}
+			onFindSimilar={(song) => show({ kind: 'similar', song })}
+			onArtist={openArtist}
+			onAlbum={openAlbum}
 		/>
 	{/if}
 

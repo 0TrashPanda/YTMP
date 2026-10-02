@@ -18,6 +18,7 @@ from ytmusicapi import YTMusic
 MODULE_ID = "ytm"
 _PREFIXES = ("ytm:", "yt:")
 _LARGE_ART = 544
+_ARTIST_SONGS = 20
 # Re-resolve stream URLs this long before YouTube says they expire.
 _EXPIRY_MARGIN_S = 10 * 60
 
@@ -83,6 +84,64 @@ class YtmCore:
             raise NotFound(str(e)) from e
         return [song for t in playlist.get("tracks") or [] if (song := _song_from_watch(t))][:limit]
 
+    def artist(self, artist_id: str) -> dict:
+        """An artist page: their top songs, albums and singles."""
+        try:
+            a = self._ytm.get_artist(artist_id)
+        except Exception as e:
+            raise NotFound(str(e)) from e
+        songs_section = a.get("songs") or {}
+        songs: list[dict] = []
+        # The artist's songs are a playlist; read more of it than the 5 on the page.
+        if songs_section.get("browseId"):
+            try:
+                playlist = self._ytm.get_playlist(songs_section["browseId"], limit=_ARTIST_SONGS)
+                songs = [s for t in playlist.get("tracks") or [] if (s := _song_from_search(t))]
+            except Exception:
+                songs = []
+        if not songs:
+            songs = [s for t in songs_section.get("results") or [] if (s := _song_from_search(t))]
+        return {
+            "id": artist_id,
+            "name": a.get("name") or "",
+            "thumbnails": _thumbnails(a.get("thumbnails") or []),
+            "description": a.get("description"),
+            "songs": songs[:_ARTIST_SONGS],
+            "albums": [_album_summary(x, "Album") for x in (a.get("albums") or {}).get("results") or [] if x.get("browseId")],
+            "singles": [_album_summary(x, "Single") for x in (a.get("singles") or {}).get("results") or [] if x.get("browseId")],
+        }
+
+    def album(self, album_id: str) -> dict:
+        """An album with its songs (they use the album's art)."""
+        try:
+            alb = self._ytm.get_album(album_id)
+        except Exception as e:
+            raise NotFound(str(e)) from e
+        thumbnails = _thumbnails(alb.get("thumbnails") or [])
+        album_ref = {"id": album_id, "name": alb.get("title") or ""}
+        songs = []
+        for t in alb.get("tracks") or []:
+            if not t.get("videoId"):
+                continue
+            songs.append({
+                "id": f"{MODULE_ID}:{t['videoId']}",
+                "title": t.get("title") or "",
+                "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in t.get("artists") or []],
+                "album": album_ref,
+                "durationMs": int((t.get("duration_seconds") or 0) * 1000) or _parse_length(t.get("duration")),
+                "thumbnails": thumbnails,
+                "explicit": bool(t.get("isExplicit")),
+            })
+        return {
+            "id": album_id,
+            "title": alb.get("title") or "",
+            "kind": alb.get("type") or "Album",
+            "year": alb.get("year"),
+            "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in alb.get("artists") or []],
+            "thumbnails": thumbnails,
+            "songs": songs,
+        }
+
     def stream(self, song_id: str, fresh: bool = False) -> StreamInfo:
         """Direct stream URL, resolved on demand and cached until shortly before it expires.
 
@@ -145,6 +204,16 @@ def _song_from_watch(t: dict) -> dict | None:
         "durationMs": _parse_length(t.get("length")),
         "thumbnails": _thumbnails(t.get("thumbnail") or t.get("thumbnails") or []),
         "explicit": bool(t.get("isExplicit")),
+    }
+
+
+def _album_summary(x: dict, kind: str) -> dict:
+    return {
+        "id": x["browseId"],
+        "title": x.get("title") or "",
+        "kind": x.get("type") or kind,
+        "year": x.get("year"),
+        "thumbnails": _thumbnails(x.get("thumbnails") or []),
     }
 
 

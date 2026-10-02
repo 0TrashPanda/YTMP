@@ -269,6 +269,7 @@ class Room(
             bans = bans.map { SavedBan(it.info, it.guestToken) },
             autoplay = autoplay.toList(),
             autoplaySeed = autoplaySeed,
+            knownPermissions = Permission.entries,
         )
     }
 
@@ -276,7 +277,8 @@ class Room(
     private fun restore(saved: SavedRoom) {
         val now = clock()
         if (saved.roles != null && saved.settings != null) {
-            val restored = Permissions.sanitize(RoleTemplate(saved.roles, saved.settings))
+            val upgraded = Permissions.upgrade(saved.roles, saved.knownPermissions?.toSet() ?: Permissions.BEFORE_RADIO)
+            val restored = Permissions.sanitize(RoleTemplate(upgraded, saved.settings))
             roles.clear()
             roles += restored.roles
             settings = restored.settings

@@ -46,6 +46,32 @@ object Permissions {
         )
     }
 
+    /** What rooms and templates saved without a list of known permissions knew: everything before radio. */
+    val BEFORE_RADIO: Set<Permission> = Permission.entries.toSet() - setOf(START_RADIO, AUTOPLAY_FROM_HERE)
+
+    /**
+     * Gives roles the permissions added since they were saved (when only [known] existed):
+     * a role that had every permission (an admin role) gets all new ones, and a default role
+     * nobody changed gets what that default role has now. Other roles stay as they are.
+     */
+    fun upgrade(roles: List<Role>, known: Set<Permission>): List<Role> {
+        val added = Permission.entries.toSet() - known
+        if (added.isEmpty()) return roles
+        val defaults = DefaultRoles.template.roles.associateBy { it.id }
+        return roles.map { role ->
+            val have = role.permissions.toSet()
+            val default = defaults[role.id]?.permissions?.toSet()
+            when {
+                have.containsAll(known) -> role.copy(permissions = role.permissions + added)
+                default != null && have == default intersect known -> role.copy(permissions = role.permissions + (default intersect added))
+                else -> role
+            }
+        }
+    }
+
+    fun upgrade(template: RoleTemplate): RoleTemplate =
+        template.copy(roles = upgrade(template.roles, template.knownPermissions?.toSet() ?: BEFORE_RADIO), knownPermissions = Permission.entries)
+
     fun validColor(color: String): String = color.trim().lowercase().takeIf { COLOR.matches(it) } ?: "#949ba4"
 
     const val MAX_ROLES = 25

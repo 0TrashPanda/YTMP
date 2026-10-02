@@ -180,4 +180,24 @@ class RolesTest {
         assertEquals(state.roles, after.roles)
         assertEquals(listOf(Permission.SKIP), after.participants.first { it.id == guest.id }.allow)
     }
+
+    @Test
+    fun `rooms saved before radio give their admin and default roles the radio permissions`() = runTest {
+        val before = Permissions.BEFORE_RADIO.toList()
+        val oldDj = listOf(Permission.ADD_SONGS, Permission.REMOVE_OWN, Permission.PLAY_PAUSE, Permission.SKIP, Permission.LISTEN_LOCALLY,
+            Permission.PLAY_NOW, Permission.REORDER, Permission.REMOVE_OTHERS, Permission.SEEK, Permission.CHANGE_OUTPUTS, Permission.OUTPUT_VOLUME)
+        val custom = Role("vip", "VIP", "#ffffff", listOf(Permission.ADD_SONGS, Permission.SKIP))
+        val saved = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { "" }, backgroundScope) { 0 }.save().copy(
+            roles = listOf(Role("admin", "Admin", "#f23f43", before), Role("dj", "DJ", "#5865f2", oldDj), custom),
+            knownPermissions = null,
+        )
+        val room = Room.restore(saved, { "" }, backgroundScope) { 0 }
+        val owner = room.connect("Owner", owner = true)
+        val roles = room.state(owner).roles.associateBy { it.id }
+        assertTrue(Permission.START_RADIO in roles.getValue("admin").permissions)
+        assertTrue(Permission.AUTOPLAY_FROM_HERE in roles.getValue("dj").permissions)
+        assertEquals(custom.permissions, roles.getValue("vip").permissions)
+        // Saved again, it knows about radio: nothing is added twice.
+        assertEquals(Permission.entries, room.save().knownPermissions)
+    }
 }

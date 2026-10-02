@@ -43,6 +43,8 @@ data class SavedRoom(
     val bans: List<SavedBan> = emptyList(),
     val autoplay: List<QueueItem> = emptyList(),
     val autoplaySeed: Song? = null,
+    /** The permissions that existed when it was saved (null: before radio), to give roles the newer ones. */
+    val knownPermissions: List<Permission>? = null,
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 

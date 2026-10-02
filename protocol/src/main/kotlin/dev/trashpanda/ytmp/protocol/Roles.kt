@@ -68,6 +68,8 @@ data class RoomSettings(
 data class RoleTemplate(
     val roles: List<Role>,
     val settings: RoomSettings,
+    /** The permissions that existed when it was saved, so newer ones can be added to it (set by the server). */
+    val knownPermissions: List<Permission>? = null,
 )
 
 /** Someone who can't join the room again. */

@@ -61,9 +61,15 @@ have the *Reorder* permission.
 (upcoming), the queue history (played or skipped), playlists, albums, find similar, …
 Open it with the **⋮** button or by **right-clicking** the song.
 
-> Implemented so far: Play next, Add to queue, Play now, Start radio, Autoplay from here,
-> Find similar, Go to artist / album (a search for now), Open in YouTube Music, and
-> Remove (from the queue, the history or the autoplay queue).
+> Implemented so far: Play next, Add to queue, Play now (for the current song: play from
+> the start), Start radio, Autoplay from here, Find similar, Go to artist / album (their
+> pages; a search when the source gives no ID), Open in YouTube Music, and Remove (from the
+> queue, the history or the autoplay queue). The current song has the menu too: right-click
+> the album art or the player bar, or its ⋮.
+>
+> **Artist pages** show the artist's top songs (20), albums and singles, with *Radio* and
+> *Add top songs*. **Album pages** list the songs in order, with *Play*, *Play next* and
+> *Add to queue*. Artist and album names under the current song open them.
 
 | Action | Notes |
 |--------|-------|
@@ -89,8 +95,9 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - **Tapping** a song in *Up next* jumps to it; tapping an **autoplay** song makes it play
   next instead.
 - Search results end with a link to search the same words **on YouTube Music**.
-- The **YTMP logo** in a room goes back to the current song's album art; the search text
-  stays, and clicking the search bar shows the results again.
+- Search, find similar, artist and album pages stack up (a **Back** button goes to the
+  previous one). The **YTMP logo** switches between the current song's album art and the
+  last of those, kept as it was.
 - Actions that need a room permission (for example adding songs) are **disabled** when you
   don't have that permission.
 - The menu is **customisable**: you can change the **order** of the actions and

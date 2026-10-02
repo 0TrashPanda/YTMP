@@ -171,15 +171,16 @@ class AccountApiTest {
             listOf(Role("boss", "Boss", "#ffaa00", Permission.entries), Role("crowd", "Crowd", "#00aaff", listOf(Permission.ADD_SONGS))),
             RoomSettings("crowd", "crowd"),
         )
-        assertEquals(template, client.put("/api/account/role-template") {
+        val saved = client.put("/api/account/role-template") {
             contentType(ContentType.Application.Json)
             bearerAuth(session)
             setBody(template)
-        }.body<RoleTemplate>())
+        }.body<RoleTemplate>()
+        assertEquals(template.roles to template.settings, saved.roles to saved.settings)
 
         val token = client.postJson("/api/account/host-token", HostTokenRequest(origin), session).body<HostTokenResponse>().token
         // What a host on another machine would do with the token:
-        assertEquals(template, client.get("/api/auth/role-template") { bearerAuth(token) }.body<RoleTemplate>())
+        assertEquals(template.roles, client.get("/api/auth/role-template") { bearerAuth(token) }.body<RoleTemplate>().roles)
 
         val created = client.post("/api/rooms") {
             contentType(ContentType.Application.Json)

@@ -51,6 +51,11 @@ role has *Display*, *Permissions* and *Manage Members* tabs, and an unsaved-chan
 | **People** | Kick · Ban / unban · Manage members (give roles, own permissions) · Manage roles |
 | **Room** | Manage room (name, default roles) |
 
+Rooms and role templates remember which permissions existed when they were saved. When
+YTMP gets new permissions, roles that had every permission (Admin) get them all, and
+default roles nobody changed get what that default role has now; other roles are left
+alone.
+
 Default roles: **Admin** (everything), **DJ** (Listener + play now, reorder, remove others'
 songs, seek, speakers and volume, start radio, autoplay from here) and **Listener** (add songs, remove own songs, play/pause,
 skip, play on own device). New guests and account holders get *Listener*.

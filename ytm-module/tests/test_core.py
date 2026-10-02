@@ -90,3 +90,11 @@ def test_parse_length():
     assert core._parse_length("1:02:03") == 3_723_000
     assert core._parse_length(None) == 0
     assert core._parse_length("live") == 0
+
+
+def test_album_summary():
+    x = {"title": "Discovery", "browseId": "MPRE1", "year": "2001", "thumbnails": [{"url": "https://lh3/x=w226-h226-l90-rj", "width": 226, "height": 226}]}
+    summary = core._album_summary(x, "Album")
+    assert summary["id"] == "MPRE1"
+    assert summary["kind"] == "Album"
+    assert summary["year"] == "2001"

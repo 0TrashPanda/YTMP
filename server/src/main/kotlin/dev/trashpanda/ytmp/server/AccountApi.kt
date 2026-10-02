@@ -36,6 +36,7 @@ import dev.trashpanda.ytmp.core.DefaultRoles
 import dev.trashpanda.ytmp.core.Permissions
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.RoleTemplate
+import dev.trashpanda.ytmp.protocol.Permission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -76,7 +77,7 @@ class AccountService(
     fun roleTemplate(account: Accounts.Account): RoleTemplate =
         accounts.data(account.id, "role_template")
             ?.let { runCatching { ProtocolJson.decodeFromString(RoleTemplate.serializer(), it) }.getOrNull() }
-            ?.let(Permissions::sanitize)
+            ?.let { Permissions.sanitize(Permissions.upgrade(it)) }
             ?: DefaultRoles.template
 
     fun settings(account: Accounts.Account): AccountSettings =
@@ -163,7 +164,7 @@ class AccountService(
 
         put("/account/role-template") {
             val account = call.account()
-            val template = Permissions.sanitize(call.receive<RoleTemplate>())
+            val template = Permissions.sanitize(call.receive<RoleTemplate>()).copy(knownPermissions = Permission.entries)
             io { accounts.setData(account.id, "role_template", ProtocolJson.encodeToString(RoleTemplate.serializer(), template)) }
             call.respond(template)
         }

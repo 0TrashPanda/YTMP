@@ -93,6 +93,7 @@ fun main(args: Array<String>) {
             HostOptions(kind = HostKind.SERVER, auth = auth),
             extraApi = { service.routes(this) },
             similar = ytm,
+            catalog = ytm,
         )
     }.start(wait = true)
 }

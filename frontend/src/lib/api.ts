@@ -1,5 +1,7 @@
 import type {
+	AlbumPage,
 	ApiError,
+	ArtistPage,
 	CreateRoomResponse,
 	HostInfo,
 	RoomInfo,
@@ -64,6 +66,14 @@ export async function search(query: string, signal?: AbortSignal): Promise<Song[
 export async function similar(songId: string, signal?: AbortSignal): Promise<Song[]> {
 	const result = await request<SearchResponse>(`/api/similar?id=${encodeURIComponent(songId)}`, { signal });
 	return result.items;
+}
+
+export function getArtist(id: string): Promise<ArtistPage> {
+	return request(`/api/artists/${encodeURIComponent(id)}`);
+}
+
+export function getAlbum(id: string): Promise<AlbumPage> {
+	return request(`/api/albums/${encodeURIComponent(id)}`);
 }
 
 /** Audio streamed through the host, for when the direct stream URL doesn't work. */
