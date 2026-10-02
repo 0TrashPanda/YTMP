@@ -7,7 +7,7 @@ YTMP has two kinds of modules:
 | Kind | Responsibility | Examples |
 |------|----------------|----------|
 | **Source** (input) | Search, metadata, resolving a playable stream | YTM, YT, local files, media servers (Plex, Jellyfin, Subsonic, file servers), Spotify, SoundCloud |
-| **Output** | Playing a stream somewhere | Local audio, Sonos (HTTP), Chromecast, Discord bot (future) |
+| **Output** | Playing a stream somewhere | Local audio, Sonos (HTTP), Chromecast, Snapcast (future), Discord bot (future) |
 
 ## Modules and source instances
 

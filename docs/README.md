@@ -28,7 +28,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [features/sources.md](features/sources.md) | Where music comes from (YTM, YT, local files, …) |
 | [features/playback-and-outputs.md](features/playback-and-outputs.md) | Where music is played (host outputs, client playback) |
 | [features/server-admin.md](features/server-admin.md) | Admin page, automatic yt-dlp updates |
-| [features/future-ideas.md](features/future-ideas.md) | Not-now ideas: Discord bot, videos, native Linux app, upvotes, approval mode, chat, YTMP likes, graph database, … |
+| [features/future-ideas.md](features/future-ideas.md) | Not-now ideas: Snapcast output, mic sync, Discord bot, videos, native Linux app, upvotes, approval mode, chat, YTMP likes, graph database, … |
 
 ## Implementation
 

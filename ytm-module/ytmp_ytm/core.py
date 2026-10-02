@@ -75,11 +75,15 @@ class YtmCore:
         # ytmusicapi treats limit as a minimum, so cut the list ourselves.
         return [song for r in results if (song := _song_from_search(r))][:limit]
 
-    def stream(self, song_id: str) -> StreamInfo:
-        """Direct stream URL, resolved on demand and cached until shortly before it expires."""
+    def stream(self, song_id: str, fresh: bool = False) -> StreamInfo:
+        """Direct stream URL, resolved on demand and cached until shortly before it expires.
+
+        [fresh] skips the cache, for when a cached URL stopped working before its expiry
+        (YouTube sometimes revokes them early).
+        """
         vid = video_id(song_id)
         with self._lock:
-            cached = self._streams.get(vid)
+            cached = None if fresh else self._streams.get(vid)
         if cached and cached.expires_at - _EXPIRY_MARGIN_S > time.time():
             return cached
 

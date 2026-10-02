@@ -3,6 +3,7 @@ import { artUrl, artistNames } from './format';
 import { nativeBridge, type NativeBridge } from './native';
 import type { RoomConnection } from './room.svelte';
 import { saved } from './storage';
+import { correction, targetPosition } from './sync';
 
 /** Plays the room's audio on this device. */
 export interface RoomPlayer {
@@ -10,11 +11,14 @@ export interface RoomPlayer {
 	readonly volume: number;
 	readonly buffering: boolean;
 	readonly error: string | null;
+	/** Sync adjustment for this device in ms; positive plays earlier (for speaker/Bluetooth delay). */
+	readonly syncOffsetMs: number;
 	/** True when playback can start without a click (the Android app). */
 	readonly canStartWithoutGesture: boolean;
 	enable(): Promise<void>;
 	disable(): void;
 	setVolume(value: number): void;
+	setSyncOffset(ms: number): void;
 	/** Call whenever the room state changes. */
 	sync(): void;
 	destroy(): void;
@@ -23,10 +27,6 @@ export interface RoomPlayer {
 export function createPlayer(room: RoomConnection): RoomPlayer {
 	return nativeBridge ? new NativePlayer(room, nativeBridge) : new WebPlayer(room);
 }
-
-/** Above this drift we jump; below it we nudge the playback speed. */
-const SEEK_THRESHOLD_MS = 1500;
-const NUDGE_THRESHOLD_MS = 120;
 
 /**
  * Plays the room's audio in the browser, in sync with the host.
@@ -38,6 +38,7 @@ class WebPlayer implements RoomPlayer {
 	readonly canStartWithoutGesture = false;
 	enabled = $state(false);
 	volume = $state(saved.volume);
+	syncOffsetMs = $state(saved.syncOffsetMs);
 	buffering = $state(false);
 	error = $state<string | null>(null);
 
@@ -62,8 +63,9 @@ class WebPlayer implements RoomPlayer {
 		this.error = null;
 		// Unlock audio right away, inside the gesture.
 		this.audio.play().catch(() => {});
+		this.setMediaKeys(true);
 		this.sync();
-		this.timer = setInterval(() => this.sync(), 1000);
+		this.timer = setInterval(() => this.sync(), 500);
 		await this.room.run({ kind: 'SetListening', on: true });
 	}
 
@@ -72,6 +74,7 @@ class WebPlayer implements RoomPlayer {
 		saved.listening = false;
 		clearInterval(this.timer);
 		this.audio.pause();
+		this.setMediaKeys(false);
 		this.room.run({ kind: 'SetListening', on: false });
 	}
 
@@ -81,8 +84,15 @@ class WebPlayer implements RoomPlayer {
 		saved.volume = value;
 	}
 
+	setSyncOffset(ms: number): void {
+		this.syncOffsetMs = ms;
+		saved.syncOffsetMs = ms;
+		this.sync();
+	}
+
 	destroy(): void {
 		clearInterval(this.timer);
+		this.setMediaKeys(false);
 		this.audio.pause();
 		this.audio.removeAttribute('src');
 		this.audio.load();
@@ -99,8 +109,10 @@ class WebPlayer implements RoomPlayer {
 			return;
 		}
 
+		if (navigator.mediaSession) navigator.mediaSession.playbackState = state.playback.playing ? 'playing' : 'paused';
 		if (this.loadedItemId !== now.item.itemId) {
 			this.loadedItemId = now.item.itemId;
+			this.showMetadata();
 			this.audio.src = this.useProxy ? proxiedAudioUrl(now.item.song.id) : now.streamUrl;
 			this.audio.playbackRate = 1;
 			return; // 'canplay' calls sync again.
@@ -108,9 +120,7 @@ class WebPlayer implements RoomPlayer {
 		if (this.audio.readyState < HTMLMediaElement.HAVE_METADATA) return;
 
 		const playback = state.playback;
-		const expectedMs = playback.playing
-			? playback.positionMs + (this.room.hostNow() - playback.hostTimeMs)
-			: playback.positionMs;
+		const expectedMs = targetPosition(playback, this.room.hostNow(), this.syncOffsetMs);
 
 		if (!playback.playing) {
 			if (!this.audio.paused) this.audio.pause();
@@ -118,20 +128,53 @@ class WebPlayer implements RoomPlayer {
 			return;
 		}
 
-		const drift = this.audio.currentTime * 1000 - expectedMs;
-		if (Math.abs(drift) > SEEK_THRESHOLD_MS) {
-			this.audio.currentTime = Math.max(0, expectedMs / 1000);
-			this.audio.playbackRate = 1;
-		} else if (Math.abs(drift) > NUDGE_THRESHOLD_MS) {
-			this.audio.playbackRate = drift > 0 ? 0.97 : 1.03;
-		} else {
-			this.audio.playbackRate = 1;
-		}
+		const fix = correction(this.audio.currentTime * 1000 - expectedMs, this.audio.playbackRate);
+		if (fix.seek) this.audio.currentTime = expectedMs / 1000;
+		if (this.audio.playbackRate !== fix.rate) this.audio.playbackRate = fix.rate;
 		if (this.audio.paused) {
 			this.audio.play().catch(() => {
 				this.error = 'Tap "Play here" again to allow audio.';
 			});
 		}
+	}
+
+	/**
+	 * Media keys (keyboard, headphones, the OS media overlay) would otherwise pause only the
+	 * local audio, which the sync loop then undoes. Make them room commands instead.
+	 */
+	private setMediaKeys(on: boolean): void {
+		const session = navigator.mediaSession;
+		if (!session) return;
+		const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
+			['play', () => this.room.run({ kind: 'Play' })],
+			['pause', () => this.room.run({ kind: 'Pause' })],
+			['nexttrack', () => this.room.run({ kind: 'Skip' })],
+			['previoustrack', () => this.room.run({ kind: 'Previous' })],
+			['seekto', (details) => details.seekTime != null && this.room.run({ kind: 'Seek', positionMs: Math.round(details.seekTime * 1000) })]
+		];
+		for (const [action, handler] of handlers) {
+			try {
+				session.setActionHandler(action, on ? handler : null);
+			} catch {
+				// Not every browser supports every action.
+			}
+		}
+		if (!on) {
+			session.metadata = null;
+			session.playbackState = 'none';
+		}
+	}
+
+	private showMetadata(): void {
+		const song = this.room.state?.nowPlaying?.item.song;
+		if (!navigator.mediaSession || !song) return;
+		const art = artUrl(song, 544);
+		navigator.mediaSession.metadata = new MediaMetadata({
+			title: song.title,
+			artist: artistNames(song),
+			album: song.album?.name ?? '',
+			artwork: art ? [{ src: art, sizes: '544x544' }] : []
+		});
 	}
 
 	private onError(): void {
@@ -164,6 +207,7 @@ class NativePlayer implements RoomPlayer {
 	readonly canStartWithoutGesture = true;
 	enabled = $state(false);
 	volume = $state(saved.volume);
+	syncOffsetMs = $state(saved.syncOffsetMs);
 	buffering = $state(false);
 	error = $state<string | null>(null);
 
@@ -202,6 +246,12 @@ class NativePlayer implements RoomPlayer {
 		this.sync();
 	}
 
+	setSyncOffset(ms: number): void {
+		this.syncOffsetMs = ms;
+		saved.syncOffsetMs = ms;
+		this.sync();
+	}
+
 	sync(): void {
 		const state = this.room.state;
 		const now = state?.nowPlaying ?? null;
@@ -226,6 +276,7 @@ class NativePlayer implements RoomPlayer {
 				positionMs: state?.playback.positionMs ?? 0,
 				hostTimeMs: state?.playback.hostTimeMs ?? 0,
 				clockOffset: this.room.clockOffset,
+				syncOffsetMs: this.syncOffsetMs,
 				volume: this.volume
 			})
 		);

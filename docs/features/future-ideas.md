@@ -92,11 +92,13 @@ delay, which the app can't see. A phone could fix this itself:
 This covers the delay of every speaker in the room, including other people's Bluetooth
 speakers. Needs microphone permission, and in a browser only works over HTTPS.
 
-## Precise sync mode (like Snapcast)
+## Snapcast output
 
-For sub-millisecond sync between devices: the host decodes the audio and sends small chunks
-with the exact time each one must be played, and every device plays each chunk at that
-moment, taking its own output delay into account. This is how multi-room audio systems work
-(for example Snapcast). It replaces streaming the song URL to each client, so it is a large
-change and uses more host bandwidth.
+For perfectly synced multi-room audio, add **[Snapcast](https://github.com/badaix/snapcast)** as an
+[output module](playback-and-outputs.md#host-outputs) instead of building that kind of sync
+into YTMP:
 
+- The host sends the room's audio to a **Snapcast server** (snapserver).
+- Speakers and devices run a **Snapcast client** (snapclient), and Snapcast keeps them in sync
+  to within about a millisecond, including each device's own output delay.
+- YTMP keeps doing what it's good at (the shared queue); Snapcast does the precise playback.

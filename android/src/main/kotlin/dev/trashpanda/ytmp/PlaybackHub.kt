@@ -18,6 +18,8 @@ data class PlaybackTarget(
     val hostTimeMs: Long,
     /** Host clock minus device clock, in ms. */
     val clockOffset: Double,
+    /** This device's sync adjustment; positive plays earlier (for speaker/Bluetooth delay). */
+    val syncOffsetMs: Long = 0,
     val volume: Float,
 )
 

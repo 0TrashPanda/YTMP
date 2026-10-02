@@ -15,6 +15,13 @@
 	// While dragging the progress bar, show the drag position instead of the live one.
 	let seeking = $state<number | null>(null);
 	const shown = $derived(seeking ?? Math.min(positionMs, duration));
+
+	let showSync = $state(false);
+	const SYNC_RANGE_MS = 500;
+
+	function nudgeSync(deltaMs: number) {
+		player.setSyncOffset(Math.max(-SYNC_RANGE_MS, Math.min(SYNC_RANGE_MS, player.syncOffsetMs + deltaMs)));
+	}
 </script>
 
 <footer class="border-t border-line bg-surface">
@@ -67,6 +74,14 @@
 
 		<div class="flex items-center gap-2">
 			{#if player.enabled}
+				<button
+					class="rounded-full p-2 hover:bg-raised {showSync ? 'bg-raised' : ''}"
+					aria-label="Sync adjustment"
+					title="Sync adjustment"
+					onclick={() => (showSync = !showSync)}
+				>
+					<Icon name="tune" size={20} />
+				</button>
 				<input
 					type="range"
 					class="hidden w-24 accent-white sm:block"
@@ -89,6 +104,36 @@
 			</button>
 		</div>
 	</div>
+	{#if player.enabled && showSync}
+		<div class="flex flex-col gap-2 border-t border-line px-4 py-3 text-sm">
+			<div class="flex items-center justify-between">
+				<span class="font-medium">Sync adjustment</span>
+				<span class="text-muted tabular-nums">
+					{player.syncOffsetMs === 0 ? 'none' : `${Math.abs(player.syncOffsetMs)} ms ${player.syncOffsetMs > 0 ? 'earlier' : 'later'}`}
+				</span>
+			</div>
+			<div class="flex items-center gap-2">
+				<button class="rounded-full bg-raised px-3 py-1 hover:bg-line" onclick={() => nudgeSync(-10)}>Later</button>
+				<input
+					type="range"
+					class="flex-1 accent-white"
+					min={-SYNC_RANGE_MS}
+					max={SYNC_RANGE_MS}
+					step="10"
+					value={player.syncOffsetMs}
+					aria-label="Sync adjustment in milliseconds"
+					oninput={(e) => player.setSyncOffset(Number(e.currentTarget.value))}
+				/>
+				<button class="rounded-full bg-raised px-3 py-1 hover:bg-line" onclick={() => nudgeSync(10)}>Earlier</button>
+			</div>
+			<p class="text-xs text-muted">
+				Is this device behind the others (for example on Bluetooth)? Move it to <em>earlier</em>. Saved on this device.
+				{#if player.syncOffsetMs !== 0}
+					<button class="underline" onclick={() => player.setSyncOffset(0)}>Reset</button>
+				{/if}
+			</p>
+		</div>
+	{/if}
 	{#if player.error}
 		<p class="px-4 pb-2 text-sm text-accent">{player.error}</p>
 	{/if}

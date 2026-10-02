@@ -22,6 +22,7 @@ The host can also send audio to **output modules**. Outputs are **modular**.
 | Local device | The host's own speakers (mainly relevant for a phone or home server host) |
 | Sonos | Streams to Sonos speakers over HTTP |
 | Chromecast | Casts to Chromecast / Google Cast devices: TVs, Nest speakers, speaker groups |
+| Snapcast | Future idea: precise multi-room sync through a Snapcast server (see [future ideas](future-ideas.md#snapcast-output)) |
 | Discord bot | Future idea: plays into a Discord voice channel (see [future ideas](future-ideas.md#discord-bot-output)) |
 | … | Future output modules |
 

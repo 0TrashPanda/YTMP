@@ -36,3 +36,21 @@ def test_results_without_video_are_skipped():
 
 def test_clean_error():
     assert core._clean_error("ERROR: [youtube] abc: Video unavailable") == "Video unavailable"
+
+
+def test_fresh_stream_skips_the_cache(monkeypatch):
+    ytm = core.YtmCore.__new__(core.YtmCore)
+    ytm._lock = core.threading.Lock()
+    ytm._streams = {"abc": core.StreamInfo("https://old", core.time.time() + 3600, "audio/mp4", None)}
+    ytm._ydl_opts = {}
+
+    class FakeYdl:
+        def __init__(self, _opts): pass
+        def __enter__(self): return self
+        def __exit__(self, *_): return False
+        def extract_info(self, _url, download): return {"url": "https://new?expire=9999999999", "ext": "m4a"}
+
+    monkeypatch.setattr(core.yt_dlp, "YoutubeDL", FakeYdl)
+    assert ytm.stream("ytm:abc").url == "https://old"
+    assert ytm.stream("ytm:abc", fresh=True).url == "https://new?expire=9999999999"
+    assert ytm.stream("ytm:abc").url == "https://new?expire=9999999999"

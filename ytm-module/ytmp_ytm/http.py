@@ -70,11 +70,19 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
 
     @app.get("/songs/{song_id}/audio", dependencies=[Depends(check_key)])
     async def audio(song_id: str, range: str | None = Header(default=None)):
+        async def fetch(info: core.StreamInfo) -> httpx.Response:
+            headers = dict(info.http_headers)
+            if range:
+                headers["Range"] = range
+            return await http.send(http.build_request("GET", info.url, headers=headers), stream=True)
+
         info = await run_in_threadpool(ytm.stream, song_id)
-        headers = dict(info.http_headers)
-        if range:
-            headers["Range"] = range
-        upstream = await http.send(http.build_request("GET", info.url, headers=headers), stream=True)
+        upstream = await fetch(info)
+        if upstream.status_code == 403:
+            # The cached URL went bad before its expiry; get a fresh one and try once more.
+            await upstream.aclose()
+            info = await run_in_threadpool(ytm.stream, song_id, True)
+            upstream = await fetch(info)
         if upstream.status_code >= 400:
             await upstream.aclose()
             raise _ApiError(502, "upstream_error", f"YouTube answered {upstream.status_code}")

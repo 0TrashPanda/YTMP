@@ -54,5 +54,20 @@ Where small desyncs between devices come from, and what addresses them:
 | Drift tolerance: each device only corrects above a threshold | up to 2× the threshold between two devices | Small threshold with gentle, proportional speed changes |
 | Clock offset estimate | ~10–30 ms on Wi-Fi | Best-of-N ping samples (already done) |
 
-For sub-millisecond sync, see [precise sync mode](../features/future-ideas.md#precise-sync-mode-like-snapcast).
+Implemented (A + B), and tested on a Pixel 7:
+
+- **Android (ExoPlayer):** constant speed, drift fixed with a **seek**. Every speed change
+  makes ExoPlayer's reported position jump ~200 ms (audio already buffered at the old
+  speed), so speed-based correction swung back and forth. The position readings also
+  jitter ±120 ms, so decisions use the **median of 8 readings** (2 s). Seeks go slightly
+  ahead of the target by a learned lead (playback resumes a moment after a seek). Result:
+  within about ±50 ms of the room after a few seconds, with a seek about once a minute.
+  See `android/.../SyncCorrection.kt`.
+- **Browser:** plays 3% faster or slower (pitch kept) when more than 40 ms off, back to normal
+  below 10 ms, seeks above 400 ms. See `frontend/src/lib/sync.ts`.
+- **Both:** add the device's **sync adjustment** (per device, ±500 ms) for speaker and
+  Bluetooth delay, which no player can see.
+
+For sub-millisecond multi-room sync, the plan is a [Snapcast output](../features/future-ideas.md#snapcast-output)
+rather than building it into YTMP.
 

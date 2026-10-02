@@ -3,6 +3,8 @@ package dev.trashpanda.ytmp
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -37,6 +39,9 @@ class PlaybackService : MediaSessionService() {
     private lateinit var exo: ExoPlayer
     private lateinit var session: MediaSession
 
+    private val sync = SyncCorrection()
+    private var settledAt = 0L
+
     private var loadedItemId: String? = null
     private var loadedUrl: String? = null
     private var useProxy = false
@@ -65,7 +70,7 @@ class PlaybackService : MediaSessionService() {
         // Drift correction: the host's clock keeps moving, so check regularly.
         scope.launch {
             while (isActive) {
-                delay(SYNC_INTERVAL_MS)
+                delay(SyncCorrection.SAMPLE_INTERVAL_MS)
                 PlaybackHub.target.value?.let { correct(it) }
             }
         }
@@ -86,7 +91,17 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
+    private var lastTarget: PlaybackTarget? = null
+
     private fun apply(target: PlaybackTarget?) {
+        lastTarget?.let { old ->
+            if (target != null && (old.clockOffset != target.clockOffset || old.hostTimeMs != target.hostTimeMs)) {
+                val now = System.currentTimeMillis()
+                Log.d(TAG, "target moved ${SyncCorrection.targetPosition(target, now) - SyncCorrection.targetPosition(old, now)} ms " +
+                    "(clock offset ${old.clockOffset.toLong()} -> ${target.clockOffset.toLong()})")
+            }
+        }
+        lastTarget = target
         val item = target?.item
         val url = target?.let { if (useProxy) it.proxyUrl else it.streamUrl }
         if (target == null || !target.enabled || item == null || url == null) {
@@ -111,9 +126,11 @@ class PlaybackService : MediaSessionService() {
                             .build(),
                     )
                     .build(),
-                expectedPosition(target),
+                expectedPosition(target) + sync.seekLeadMs,
             )
             exo.prepare()
+            sync.onLoaded()
+            settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
         }
         exo.volume = target.volume
         correct(target)
@@ -123,31 +140,33 @@ class PlaybackService : MediaSessionService() {
     private fun correct(target: PlaybackTarget) {
         if (!target.enabled || target.item?.itemId != loadedItemId) return
         val expected = expectedPosition(target)
-        val drift = exo.currentPosition - expected
+        val reading = exo.currentPosition - expected
 
         if (!target.playing) {
             exo.playWhenReady = false
-            if (abs(drift) > PAUSED_TOLERANCE_MS) exo.seekTo(expected)
+            if (abs(reading) > PAUSED_TOLERANCE_MS) exo.seekTo(expected)
             return
         }
-        if (exo.playbackState == Player.STATE_READY) {
-            when {
-                abs(drift) > SEEK_THRESHOLD_MS -> {
-                    exo.seekTo(expected)
-                    exo.setPlaybackSpeed(1f)
-                }
-                abs(drift) > NUDGE_THRESHOLD_MS -> exo.setPlaybackSpeed(if (drift > 0) 0.97f else 1.03f)
-                else -> exo.setPlaybackSpeed(1f)
-            }
-        }
         exo.playWhenReady = true
+        // Only measure while actually playing, and not right after a seek: the position needs a moment to settle.
+        if (!exo.isPlaying) {
+            settledAt = maxOf(settledAt, SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS)
+        }
+        if (SystemClock.elapsedRealtime() < settledAt) {
+            sync.resetSamples()
+            return
+        }
+        val drift = sync.addSample(reading) ?: return
+
+        val seekTo = sync.onSettledDrift(drift, expected) ?: return
+        Log.d(TAG, "drift $drift ms -> seek (lead ${sync.seekLeadMs} ms)")
+        exo.seekTo(seekTo)
+        settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
     }
 
-    private fun expectedPosition(target: PlaybackTarget): Long {
-        val hostNow = System.currentTimeMillis() + target.clockOffset.toLong()
-        val position = if (target.playing) target.positionMs + (hostNow - target.hostTimeMs) else target.positionMs
-        return position.coerceIn(0, maxOf(0, target.item?.durationMs ?: 0))
-    }
+    private fun expectedPosition(target: PlaybackTarget): Long =
+        SyncCorrection.targetPosition(target, System.currentTimeMillis())
+            .coerceAtMost(maxOf(0, target.item?.durationMs ?: 0))
 
     private fun unload() {
         if (loadedItemId == null) return
@@ -219,9 +238,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
-        private const val SYNC_INTERVAL_MS = 500L
-        private const val SEEK_THRESHOLD_MS = 1500L
-        private const val NUDGE_THRESHOLD_MS = 120L
+        private const val TAG = "YtmpSync"
         private const val PAUSED_TOLERANCE_MS = 250L
     }
 }

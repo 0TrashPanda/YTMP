@@ -36,6 +36,14 @@ export const saved = {
 	set listening(on: boolean) {
 		write('ytmp.listening', on ? '1' : '0');
 	},
+	/** Sync adjustment for this device, in ms (positive = play earlier). */
+	get syncOffsetMs() {
+		const value = Number(read('ytmp.syncOffset'));
+		return Number.isFinite(value) ? value : 0;
+	},
+	set syncOffsetMs(value: number) {
+		write('ytmp.syncOffset', String(value));
+	},
 	get volume() {
 		const value = Number(read('ytmp.volume'));
 		return Number.isFinite(value) && read('ytmp.volume') !== null ? value : 0.8;
