@@ -53,6 +53,8 @@ class RoomManager(
     private val storeContext: CoroutineContext = Dispatchers.IO.limitedParallelism(1),
     /** Songs that finished playing, for the listening history. Must not block. */
     private val onPlayFinished: (FinishedPlay) -> Unit = {},
+    /** YTM's radio, for Start radio and autoplay. */
+    private val radio: RadioSource? = null,
 ) {
     private val rooms = ConcurrentHashMap<String, Room>()
     private val random = SecureRandom()
@@ -72,7 +74,7 @@ class RoomManager(
         val store = store
         if (store != null) {
             val saved = runCatching { store.loadAll() }.onFailure { log.error("Couldn't load saved rooms", it) }.getOrDefault(emptyList())
-            for (s in saved) add(Room.restore(s, streams, scope, onInfoChanged = { roomChanged(s.code) }, clock = clock))
+            for (s in saved) add(Room.restore(s, streams, scope, onInfoChanged = { roomChanged(s.code) }, clock = clock, radio = radio))
             if (saved.isNotEmpty()) log.info("Restored {} room(s)", saved.size)
             refreshList()
             scope.launch(storeContext) { saveLoop(store) }
@@ -90,7 +92,7 @@ class RoomManager(
         while (true) {
             val code = newCode()
             val room = Room(
-                code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template,
+                code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radio,
                 onInfoChanged = { roomChanged(code) }, clock = clock,
             )
             if (add(room)) {

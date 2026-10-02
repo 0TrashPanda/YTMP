@@ -78,8 +78,8 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `RemoveQueueItem` ✅ | `itemId` | Remove own / others' songs |
 | `MoveQueueItem` ✅ | `itemId`, `toIndex` | Reorder |
 | `ShuffleQueue` | – | Reorder |
-| `StartRadio` | `seedId` (song, artist, album or playlist) | Start radio |
-| `AutoplayFromHere` | `seedId` (song, artist, album or playlist) | Autoplay from here |
+| `StartRadio` ✅ (song only so far) | `song`; later `seedId` (song, artist, album or playlist) | Start radio |
+| `AutoplayFromHere` ✅ (song only so far) | `song`; later `seedId` (song, artist, album or playlist) | Autoplay from here |
 | `LoadHistory` | `beforeItemId`, `limit` | – |
 
 ### Playback
@@ -135,8 +135,8 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 | `QueueItemsAdded` ✅ | `items`, `index` | everyone |
 | `QueueItemRemoved` ✅ | `itemId` | everyone |
 | `QueueItemMoved` ✅ | `itemId`, `toIndex` | everyone |
-| `QueueReplaced` | `items` (Start radio, Shuffle, fair-ordering re-sort) | everyone |
-| `AutoplayReplaced` / `AutoplayExtended` | `seed?`, `items` | everyone |
+| `QueueReplaced` ✅ | `items` (Start radio; later Shuffle, fair-ordering re-sort) | everyone |
+| `AutoplayChanged` ✅ (instead of `AutoplayReplaced` / `AutoplayExtended`) | `seed?`, `items` (the whole autoplay queue) | everyone |
 | `NowPlayingChanged` ✅ | `item` (or null) | everyone |
 | `StreamReady` ✅ | `itemId`, `streamUrl` (direct URL, once the host has resolved it) | everyone |
 | `HistoryAppended` ✅ | `item` (with `result: played/skipped`) | everyone |

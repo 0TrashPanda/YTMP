@@ -101,6 +101,10 @@ of **song connections**:
 
 ## Radio / Mix
 
+> Implemented: *Start radio* and *Autoplay from here* with **YouTube Music's radio** (and the
+> autoplay room setting, see [queue](queue.md#autoplay-queue)). The song graph comes next and
+> will be mixed in.
+
 A radio is an endless list of songs similar to a starting point. There are two ways to use
 it from the [song menu](ui.md#song-menu):
 

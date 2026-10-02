@@ -13,6 +13,7 @@ import dev.trashpanda.ytmp.protocol.Participant
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.PlaybackStatus
 import dev.trashpanda.ytmp.protocol.QueueItem
+import dev.trashpanda.ytmp.protocol.QueueItemOrigin
 import dev.trashpanda.ytmp.protocol.QueueItemResult
 import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.RejectReason
@@ -51,6 +52,8 @@ class Room(
     val ownerAccount: String? = null,
     /** The roles the room starts with (the creator's template, or the defaults). */
     template: RoleTemplate = DefaultRoles.template,
+    /** Similar songs, for Start radio and the autoplay queue. Null: no radio. */
+    private val radio: RadioSource? = null,
     /** Called when the room's [info] changes, e.g. it was made public. */
     private val onInfoChanged: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
@@ -94,6 +97,16 @@ class Room(
     private val queue = ArrayList<QueueItem>()
     private val history = ArrayList<QueueItem>()
     private var seq = 0L
+
+    /** Plays when the queue runs out. Refilled with a radio from its last song, so it never runs dry. */
+    private val autoplay = ArrayList<QueueItem>()
+    /** Set by Autoplay from here: the autoplay queue keeps going even with the autoplay setting off. */
+    private var autoplaySeed: Song? = null
+    /** Who chose Autoplay from here (the autoplay songs are theirs), or null for the room's own autoplay. */
+    private var autoplayBy: Pair<String, String>? = null
+    private var autoplayJob: Job? = null
+    /** The queue ran out while autoplay was still loading: start playing once it's there. */
+    private var startWhenAutoplayLoaded = false
 
     /** Ranked, highest first. */
     private val roles = ArrayList<Role>()
@@ -253,6 +266,8 @@ class Room(
             roles = roles.toList(),
             settings = settings,
             bans = bans.map { SavedBan(it.info, it.guestToken) },
+            autoplay = autoplay.toList(),
+            autoplaySeed = autoplaySeed,
         )
     }
 
@@ -266,6 +281,8 @@ class Room(
             settings = restored.settings
         }
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
+        autoplay += saved.autoplay
+        autoplaySeed = saved.autoplaySeed
         val roleIds = roles.map { it.id }.toSet()
         for (m in saved.members) {
             val roleId = m.roleId?.takeIf { it in roleIds }
@@ -286,6 +303,7 @@ class Room(
     }
 
     fun close() {
+        autoplayJob?.cancel()
         resolveJob?.cancel()
         endJob?.cancel()
         changeListeners.clear()
@@ -372,6 +390,14 @@ class Room(
             is Command.JumpTo -> {
                 need(member, Permission.PLAY_NOW)?.let { return it }
                 return jumpTo(command.itemId)
+            }
+            is Command.StartRadio -> {
+                need(member, Permission.START_RADIO)?.let { return it }
+                startRadio(command.song, member.id, member.name)
+            }
+            is Command.AutoplayFromHere -> {
+                need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
+                autoplayFromHere(command.song, member.id, member.name)
             }
             Command.Play -> {
                 need(member, Permission.PLAY_PAUSE)?.let { return it }
@@ -538,10 +564,18 @@ class Room(
                     emit(Event.RoomUpdated(info))
                     onInfoChanged()
                 }
-                val updated = RoomSettings(command.defaultGuestRole ?: settings.defaultGuestRole, command.defaultAccountRole ?: settings.defaultAccountRole)
+                val updated = RoomSettings(
+                    command.defaultGuestRole ?: settings.defaultGuestRole,
+                    command.defaultAccountRole ?: settings.defaultAccountRole,
+                    command.autoplay ?: settings.autoplay,
+                )
                 if (updated != settings) {
+                    val autoplayChanged = updated.autoplay != settings.autoplay
                     settings = updated
                     emit(Event.SettingsChanged(settings))
+                    if (autoplayChanged) {
+                        if (!settings.autoplay) clearAutoplay() else refillAutoplay()
+                    }
                 }
             }
             else -> Unit
@@ -577,6 +611,18 @@ class Room(
     private fun banInfos() = bans.map { it.info }
 
     private fun jumpTo(itemId: String): ErrorInfo? {
+        val autoplayIndex = autoplay.indexOfFirst { it.itemId == itemId }
+        if (autoplayIndex >= 0) {
+            // Like YTM: the autoplay songs before it are dropped (they never played).
+            retireCurrent(QueueItemResult.SKIPPED)
+            val item = autoplay[autoplayIndex]
+            autoplay.subList(0, autoplayIndex + 1).clear()
+            emitAutoplay()
+            wantPlaying = true
+            setCurrent(item)
+            refillAutoplay()
+            return null
+        }
         val queueIndex = queue.indexOfFirst { it.itemId == itemId }
         if (queueIndex >= 0) {
             // Songs before the target are skipped, like jumping ahead in YTM.
@@ -654,9 +700,131 @@ class Room(
     }
 
     private fun playNextFromQueue() {
-        val next = queue.removeFirstOrNull()
-        if (next != null) emit(Event.QueueItemRemoved(next.itemId))
+        val next = queue.removeFirstOrNull()?.also { emit(Event.QueueItemRemoved(it.itemId)) }
+            ?: autoplay.removeFirstOrNull()?.also { emitAutoplay() }
+        // Out of songs, but autoplay is still loading: it starts when it's there.
+        startWhenAutoplayLoaded = next == null && wantPlaying && autoplayActive()
         setCurrent(next)
+        refillAutoplay()
+    }
+
+    // --- radio and autoplay -----------------------------------------------------------
+
+    private fun autoplayActive() = radio != null && (autoplaySeed != null || settings.autoplay)
+
+    private fun emitAutoplay() = emit(Event.AutoplayChanged(autoplaySeed, autoplay.toList()))
+
+    private fun clearAutoplay() {
+        autoplayJob?.cancel()
+        startWhenAutoplayLoaded = false
+        if (autoplay.isEmpty() && autoplaySeed == null) return
+        autoplay.clear()
+        autoplaySeed = null
+        autoplayBy = null
+        emitAutoplay()
+    }
+
+    /** Songs that shouldn't come up again soon. */
+    private fun recentSongIds(): Set<String> =
+        (history.takeLast(RECENT_SONGS) + queue + autoplay + listOfNotNull(current)).map { it.song.id }.toSet()
+
+    private fun radioItem(song: Song, origin: QueueItemOrigin, by: Pair<String, String>?) =
+        QueueItem(Ids.short(), song, by?.first ?: "autoplay", by?.second ?: "Autoplay", clock(), result = null, origin = origin)
+
+    /** Start radio: plays [song] now, and the queue becomes a radio from it. */
+    private fun startRadio(song: Song, byId: String, byName: String) {
+        val source = radio ?: return
+        scope.launch {
+            val songs = runCatching { source.radio(song.id) }
+            mutex.withLock {
+                songs.onFailure { e ->
+                    if (e is CancellationException) throw e
+                    emit(Event.Notice("Couldn't start a radio from \"${song.title}\": ${e.message}"))
+                    return@withLock
+                }
+                val by = byId to byName
+                retireCurrent(QueueItemResult.SKIPPED)
+                queue.clear()
+                queue += songs.getOrThrow().filter { it.id != song.id }.distinctBy { it.id }.map { radioItem(it, QueueItemOrigin.RADIO, by) }
+                emit(Event.QueueReplaced(queue.toList()))
+                // The room's own autoplay was based on the old queue; it refills near the end of this one.
+                if (autoplaySeed == null && autoplay.isNotEmpty()) {
+                    autoplayJob?.cancel()
+                    autoplay.clear()
+                    emitAutoplay()
+                }
+                wantPlaying = true
+                setCurrent(radioItem(song, QueueItemOrigin.RADIO, by))
+                refillAutoplay()
+            }
+        }
+    }
+
+    /** Autoplay from here: the autoplay queue becomes a radio from [song]; the queue stays. */
+    private fun autoplayFromHere(song: Song, byId: String, byName: String) {
+        val source = radio ?: return
+        autoplayJob?.cancel()
+        autoplayJob = scope.launch {
+            val songs = runCatching { source.radio(song.id) }
+            mutex.withLock {
+                songs.onFailure { e ->
+                    if (e is CancellationException) throw e
+                    emit(Event.Notice("Couldn't load songs like \"${song.title}\": ${e.message}"))
+                    return@withLock
+                }
+                autoplaySeed = song
+                autoplayBy = byId to byName
+                val skip = recentSongIds() - autoplay.map { it.song.id }.toSet()
+                autoplay.clear()
+                autoplay += songs.getOrThrow().filter { it.id != song.id && it.id !in skip }.distinctBy { it.id }
+                    .map { radioItem(it, QueueItemOrigin.AUTOPLAY, autoplayBy) }
+                emitAutoplay()
+                if (current == null && queue.isEmpty()) {
+                    wantPlaying = true
+                    playNextFromQueue()
+                }
+            }
+        }
+    }
+
+    /**
+     * Keeps the autoplay queue topped up while the queue is (nearly) empty: a radio from the
+     * last song that will play. Called with [mutex] held.
+     */
+    private fun refillAutoplay() {
+        val source = radio ?: return
+        if (!autoplayActive() || autoplay.size >= AUTOPLAY_LOW || queue.size > 1 || autoplayJob?.isActive == true) return
+        val first = (autoplay.lastOrNull() ?: queue.lastOrNull() ?: current ?: history.lastOrNull())?.song ?: return
+        // If a radio only has songs we just heard, try one from a few other recent songs.
+        val seeds = (listOf(first) + history.takeLast(RECENT_SONGS).map { it.song }.shuffled().take(2)).distinctBy { it.id }
+        autoplayJob = scope.launch {
+            var songs: Result<List<Song>> = Result.success(emptyList())
+            for (seed in seeds) {
+                songs = runCatching { source.radio(seed.id) }
+                val skip = mutex.withLock { recentSongIds() }
+                if (songs.isFailure || songs.getOrThrow().any { it.id !in skip }) break
+            }
+            mutex.withLock {
+                val start = startWhenAutoplayLoaded
+                startWhenAutoplayLoaded = false
+                songs.onFailure { e ->
+                    if (e is CancellationException) throw e
+                    // Only worth a message when the music stops because of it.
+                    if (start) emit(Event.Notice("Autoplay couldn't find more songs: ${e.message}"))
+                    return@withLock
+                }
+                if (!autoplayActive()) return@withLock
+                val skip = recentSongIds()
+                val fresh = songs.getOrThrow().filter { it.id !in skip }.distinctBy { it.id }
+                if (fresh.isEmpty()) return@withLock
+                autoplay += fresh.map { radioItem(it, QueueItemOrigin.AUTOPLAY, autoplayBy) }
+                emitAutoplay()
+                if (start && current == null) {
+                    wantPlaying = true
+                    playNextFromQueue()
+                }
+            }
+        }
     }
 
     /** Makes [item] the current song and starts resolving its stream. */
@@ -739,6 +907,8 @@ class Room(
         roles = roles.toList(),
         settings = settings,
         bans = banInfos(),
+        autoplay = autoplay.toList(),
+        autoplaySeed = autoplaySeed,
     )
 
     private fun newItem(song: Song, member: Member) =
@@ -760,6 +930,10 @@ class Room(
         const val PREVIOUS_RESTART_MS = 3_000L
         const val SNAPSHOT_HISTORY = 200
         const val SAVED_HISTORY = 500
+        /** Fetch more autoplay songs when fewer than this are left. */
+        const val AUTOPLAY_LOW = 5
+        /** Radio songs don't repeat anything from the last this many songs. */
+        const val RECENT_SONGS = 50
 
         /** Brings back a room saved with [save]. */
         fun restore(
@@ -767,8 +941,9 @@ class Room(
             streams: StreamResolver,
             scope: CoroutineScope,
             onInfoChanged: () -> Unit = {},
+            radio: RadioSource? = null,
             clock: () -> Long = System::currentTimeMillis,
-        ) = Room(saved.code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, onInfoChanged = onInfoChanged, clock = clock)
+        ) = Room(saved.code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, radio = radio, onInfoChanged = onInfoChanged, clock = clock)
             .apply { restore(saved) }
     }
 }

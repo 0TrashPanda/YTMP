@@ -32,7 +32,17 @@ queue runs out.
 - The autoplay queue is filled with **Autoplay from here** from the [song menu](ui.md#song-menu). This
   **replaces** the current autoplay queue with songs similar to that song (see [radio](history-and-recommendations.md#radio--mix)).
   It keeps generating, so it never runs empty.
-- The autoplay queue is visible below the queue.
+- **Autoplay room setting** (on by default, in the room's Overview and in role templates):
+  without an explicit *Autoplay from here*, the room fills the autoplay queue itself with a
+  radio from the last song, like YouTube Music, as soon as the queue is down to one song.
+  Turned off, the music stops when the queue ends (and the autoplay queue is cleared).
+- Autoplay and radio songs skip anything from the last 50 songs, the queue and the autoplay
+  queue. If a radio only has such songs, a couple of other recent songs are tried as seed.
+- **Start radio** plays the song now and replaces the queue with its radio. The room's own
+  autoplay (not one picked with *Autoplay from here*) is cleared, since it was based on the
+  old queue.
+- The autoplay queue is visible below the queue. Tapping a song there plays it; the
+  autoplay songs before it are dropped.
 
 ## Queue history
 

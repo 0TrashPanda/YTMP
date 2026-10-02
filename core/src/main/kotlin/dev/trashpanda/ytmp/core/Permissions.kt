@@ -9,7 +9,7 @@ import dev.trashpanda.ytmp.protocol.RoomSettings
 /** Roles a room starts with when its creator has no template. See docs/features/room-management.md. */
 object DefaultRoles {
     private val listener = listOf(ADD_SONGS, REMOVE_OWN, PLAY_PAUSE, SKIP, LISTEN_LOCALLY)
-    private val dj = listener + listOf(PLAY_NOW, REORDER, REMOVE_OTHERS, SEEK, CHANGE_OUTPUTS, OUTPUT_VOLUME)
+    private val dj = listener + listOf(PLAY_NOW, REORDER, REMOVE_OTHERS, SEEK, CHANGE_OUTPUTS, OUTPUT_VOLUME, START_RADIO, AUTOPLAY_FROM_HERE)
 
     val template = RoleTemplate(
         roles = listOf(
@@ -41,6 +41,7 @@ object Permissions {
             RoomSettings(
                 defaultGuestRole = template.settings.defaultGuestRole.takeIf { it in ids } ?: fallback,
                 defaultAccountRole = template.settings.defaultAccountRole.takeIf { it in ids } ?: fallback,
+                autoplay = template.settings.autoplay,
             ),
         )
     }

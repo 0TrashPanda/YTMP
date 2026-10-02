@@ -79,6 +79,7 @@ fun main(args: Array<String>) {
         val rooms = RoomManager(
             ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = casts.devices, store = JdbcRoomStore(db),
             onPlayFinished = plays::report,
+            radio = ytm,
         )
         rooms.startCleanup()
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }

@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp
 
 import android.content.Context
 import com.chaquo.python.PyException
+import dev.trashpanda.ytmp.core.RadioSource
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
@@ -18,7 +19,7 @@ import kotlinx.serialization.builtins.ListSerializer
  * The YTM source module running on the phone: the Python code from ytm-module/ (ytmusicapi +
  * yt-dlp), called directly through Chaquopy instead of over HTTP.
  */
-class OnDeviceYtm(context: Context, language: String = "en", location: String = "BE") : SongSearch, StreamResolver {
+class OnDeviceYtm(context: Context, language: String = "en", location: String = "BE") : SongSearch, StreamResolver, RadioSource {
     /** A resolved stream: the URL plus the headers YouTube expects when fetching it. */
     class Stream(val url: String, val headers: Map<String, String>)
 
@@ -34,6 +35,11 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
 
     override suspend fun search(query: String): List<Song> = python {
         val results = core.callAttr("search", query, 20)
+        ProtocolJson.decodeFromString(ListSerializer(Song.serializer()), json.callAttr("dumps", results).toString())
+    }
+
+    override suspend fun radio(seedSongId: String): List<Song> = python {
+        val results = core.callAttr("radio", seedSongId, 25)
         ProtocolJson.decodeFromString(ListSerializer(Song.serializer()), json.callAttr("dumps", results).toString())
     }
 

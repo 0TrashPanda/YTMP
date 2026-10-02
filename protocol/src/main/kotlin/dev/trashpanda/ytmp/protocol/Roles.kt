@@ -15,6 +15,8 @@ enum class Permission {
     @SerialName("remove_own") REMOVE_OWN,
     @SerialName("remove_others") REMOVE_OTHERS,
     @SerialName("reorder") REORDER,
+    @SerialName("start_radio") START_RADIO,
+    @SerialName("autoplay_from_here") AUTOPLAY_FROM_HERE,
 
     // Playback
     @SerialName("play_pause") PLAY_PAUSE,
@@ -56,6 +58,8 @@ data class RoomSettings(
     val defaultGuestRole: String,
     /** Role for account holders when they join. */
     val defaultAccountRole: String,
+    /** When the queue runs out, keep playing a radio from the last song (like YTM). */
+    val autoplay: Boolean = true,
 )
 
 /** The roles a room starts with. Saved to an account, so every room you create gets yours. */

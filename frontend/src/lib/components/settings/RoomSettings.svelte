@@ -8,6 +8,7 @@
 	import MemberPermissions from './MemberPermissions.svelte';
 	import RoleEditor from './RoleEditor.svelte';
 	import SaveBar from './SaveBar.svelte';
+	import Switch from './Switch.svelte';
 
 	type Section = 'overview' | 'roles' | 'members' | 'bans';
 	let { room, start = 'members', onClose }: { room: RoomConnection; start?: Section; onClose: () => void } = $props();
@@ -56,17 +57,21 @@
 	let name = $state('');
 	let guestRole = $state('');
 	let accountRole = $state('');
+	let autoplay = $state(true);
 	let overviewBusy = $state(false);
 	function resetOverview() {
 		name = rs.room.name;
 		guestRole = rs.settings.defaultGuestRole;
 		accountRole = rs.settings.defaultAccountRole;
+		autoplay = rs.settings.autoplay;
 	}
 	resetOverview();
-	const overviewDirty = $derived(name.trim() !== rs.room.name || guestRole !== rs.settings.defaultGuestRole || accountRole !== rs.settings.defaultAccountRole);
+	const overviewDirty = $derived(
+		name.trim() !== rs.room.name || guestRole !== rs.settings.defaultGuestRole || accountRole !== rs.settings.defaultAccountRole || autoplay !== rs.settings.autoplay
+	);
 	async function saveOverview() {
 		overviewBusy = true;
-		await run({ kind: 'UpdateSettings', name: name.trim(), defaultGuestRole: guestRole, defaultAccountRole: accountRole });
+		await run({ kind: 'UpdateSettings', name: name.trim(), defaultGuestRole: guestRole, defaultAccountRole: accountRole, autoplay });
 		overviewBusy = false;
 	}
 
@@ -129,6 +134,14 @@
 							{#each roles as role (role.id)}<option value={role.id}>{role.name}</option>{/each}
 						</select>
 					</label>
+					<div class="mb-6 h-px bg-d-line"></div>
+					<div class="flex items-center gap-4">
+						<div class="min-w-0 flex-1">
+							<h3 class="text-base font-semibold text-d-head">Autoplay</h3>
+							<p class="text-sm text-d-muted">When the queue runs out, keep playing songs like the last one, as YouTube Music does.</p>
+						</div>
+						<Switch checked={autoplay} label="Autoplay" onchange={(on) => (autoplay = on)} />
+					</div>
 				</div>
 				{#if overviewDirty}
 					<div class="pb-4"><SaveBar busy={overviewBusy} onReset={resetOverview} onSave={saveOverview} /></div>

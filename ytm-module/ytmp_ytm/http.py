@@ -55,12 +55,16 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
             "name": "YouTube Music",
             "version": VERSION,
             "apiVersion": API_VERSION,
-            "capabilities": ["search", "stream", "audio"],
+            "capabilities": ["search", "stream", "audio", "radio"],
         }
 
     @app.get("/search", dependencies=[Depends(check_key)])
     def search(q: str, limit: int = 20):
         return {"items": ytm.search(q, limit=min(max(limit, 1), 50)), "next": None}
+
+    @app.get("/radio", dependencies=[Depends(check_key)])
+    def radio(seed: str, limit: int = 25):
+        return {"items": ytm.radio(seed, limit=min(max(limit, 1), 50)), "next": None}
 
     @app.get("/songs/{song_id}/stream", dependencies=[Depends(check_key)])
     def stream(song_id: str):

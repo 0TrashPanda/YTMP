@@ -48,6 +48,12 @@
 		onToast(error ? error.message : position === 'next' ? `Playing "${song.title}" next` : `Added "${song.title}" to the queue`);
 	}
 
+	async function radio(song: Song, kind: 'StartRadio' | 'AutoplayFromHere') {
+		menuFor = null;
+		const error = await room.run({ kind, song });
+		onToast(error ? error.message : kind === 'StartRadio' ? `Starting a radio from "${song.title}"` : `Autoplay: songs like "${song.title}"`);
+	}
+
 	async function playNow(song: Song) {
 		menuFor = null;
 		const error = await room.run({ kind: 'PlayNow', song });
@@ -105,6 +111,16 @@
 					{#if room.can('play_now')}
 						<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => playNow(song)}>
 							<Icon name="play" size={20} /> Play now
+						</button>
+					{/if}
+					{#if room.can('start_radio')}
+						<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => radio(song, 'StartRadio')}>
+							<Icon name="radio" size={20} /> Start radio
+						</button>
+					{/if}
+					{#if room.can('autoplay_from_here')}
+						<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => radio(song, 'AutoplayFromHere')}>
+							<Icon name="autoplay" size={20} /> Autoplay from here
 						</button>
 					{/if}
 				</div>

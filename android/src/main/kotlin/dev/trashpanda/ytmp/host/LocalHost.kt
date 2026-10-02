@@ -34,6 +34,7 @@ class LocalHost(private val context: Context) {
     val rooms = RoomManager(
         streams = { ytm.resolveStream(it) }, scope = scope, outputs = casts.devices, store = PhoneRoomStore(context),
         onPlayFinished = plays::report,
+        radio = { ytm.radio(it) },
     )
 
     fun start() {

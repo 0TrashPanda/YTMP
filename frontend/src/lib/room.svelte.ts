@@ -233,6 +233,13 @@ export class RoomConnection {
 			case 'RoomUpdated':
 				s.room = e.room;
 				break;
+			case 'QueueReplaced':
+				s.queue = e.items;
+				break;
+			case 'AutoplayChanged':
+				s.autoplay = e.items;
+				s.autoplaySeed = e.seed;
+				break;
 			case 'RolesChanged':
 				s.roles = e.roles;
 				break;

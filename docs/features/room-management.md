@@ -44,7 +44,7 @@ role has *Display*, *Permissions* and *Manage Members* tabs, and an unsaved-chan
 
 | Group | Permissions |
 |-------|-------------|
-| **Queue** | Add songs · Play now (also jumping in the queue/history) · Remove own songs · Remove others' songs · Reorder |
+| **Queue** | Add songs · Play now (also jumping in the queue/history) · Remove own songs · Remove others' songs · Reorder · Start radio · Autoplay from here |
 | **Playback** | Play/pause · Skip (and previous) · Seek |
 | **Listening** | Play audio on own device |
 | **Speakers** | Change speakers · Speaker volume |
@@ -52,7 +52,7 @@ role has *Display*, *Permissions* and *Manage Members* tabs, and an unsaved-chan
 | **Room** | Manage room (name, default roles) |
 
 Default roles: **Admin** (everything), **DJ** (Listener + play now, reorder, remove others'
-songs, seek, speakers and volume) and **Listener** (add songs, remove own songs, play/pause,
+songs, seek, speakers and volume, start radio, autoplay from here) and **Listener** (add songs, remove own songs, play/pause,
 skip, play on own device). New guests and account holders get *Listener*.
 
 ### All planned permissions

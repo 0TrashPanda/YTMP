@@ -69,7 +69,17 @@ sealed interface Command {
     @SerialName("MoveQueueItem")
     data class MoveQueueItem(val itemId: String, val toIndex: Int) : Command
 
-    /** Jump to an item in the queue or the history. */
+    /** Plays [song] now and replaces the queue with a radio from it. */
+    @Serializable
+    @SerialName("StartRadio")
+    data class StartRadio(val song: Song) : Command
+
+    /** Replaces the autoplay queue with a radio from [song], without touching the queue. */
+    @Serializable
+    @SerialName("AutoplayFromHere")
+    data class AutoplayFromHere(val song: Song) : Command
+
+    /** Jump to an item in the queue, the autoplay queue or the history. */
     @Serializable
     @SerialName("JumpTo")
     data class JumpTo(val itemId: String) : Command
@@ -164,6 +174,7 @@ sealed interface Command {
         val name: String? = null,
         val defaultGuestRole: String? = null,
         val defaultAccountRole: String? = null,
+        val autoplay: Boolean? = null,
     ) : Command
 }
 
@@ -305,6 +316,15 @@ sealed interface Event {
     data class RoomUpdated(val room: RoomInfo) : Event
 
     /** Roles were created, changed, deleted or reordered: the whole list. */
+    /** The whole upcoming queue changed at once (Start radio). */
+    @Serializable
+    @SerialName("QueueReplaced")
+    data class QueueReplaced(val items: List<QueueItem>) : Event
+
+    @Serializable
+    @SerialName("AutoplayChanged")
+    data class AutoplayChanged(val seed: Song?, val items: List<QueueItem>) : Event
+
     @Serializable
     @SerialName("RolesChanged")
     data class RolesChanged(val roles: List<Role>) : Event

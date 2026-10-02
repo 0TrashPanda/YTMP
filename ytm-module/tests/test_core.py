@@ -68,3 +68,25 @@ def test_parse_range():
     assert core.total_size("bytes 0-1023/5000") == 5000
     assert core.total_size(None) is None
 
+
+
+def test_song_from_watch_track():
+    track = {
+        "videoId": "abc",
+        "title": "Digital Love",
+        "length": "4:58",
+        "artists": [{"id": "UC1", "name": "Daft Punk"}],
+        "album": {"id": "MPRE1", "name": "Discovery"},
+        "thumbnail": [{"url": "https://lh3/x=w60-h60-l90-rj", "width": 60, "height": 60}],
+    }
+    song = core._song_from_watch(track)
+    assert song["id"] == "ytm:abc"
+    assert song["durationMs"] == 298_000
+    assert song["album"] == {"id": "MPRE1", "name": "Discovery"}
+    assert song["thumbnails"][-1]["width"] == 544
+
+
+def test_parse_length():
+    assert core._parse_length("1:02:03") == 3_723_000
+    assert core._parse_length(None) == 0
+    assert core._parse_length("live") == 0

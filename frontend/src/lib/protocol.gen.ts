@@ -43,12 +43,17 @@ export interface CommandAssignRole {
   roleId: string;
 }
 
+export interface CommandAutoplayFromHere {
+  kind: "AutoplayFromHere";
+  song: Song;
+}
+
 export interface CommandBan {
   kind: "Ban";
   participantId: string;
 }
 
-export type Permission = "add_songs" | "play_now" | "remove_own" | "remove_others" | "reorder" | "play_pause" | "skip" | "seek" | "listen_locally" | "change_outputs" | "output_volume" | "kick" | "ban" | "assign_roles" | "edit_roles" | "change_settings";
+export type Permission = "add_songs" | "play_now" | "remove_own" | "remove_others" | "reorder" | "start_radio" | "autoplay_from_here" | "play_pause" | "skip" | "seek" | "listen_locally" | "change_outputs" | "output_volume" | "kick" | "ban" | "assign_roles" | "edit_roles" | "change_settings";
 
 export interface CommandCreateRole {
   kind: "CreateRole";
@@ -146,6 +151,11 @@ export interface CommandSkip {
   kind: "Skip";
 }
 
+export interface CommandStartRadio {
+  kind: "StartRadio";
+  song: Song;
+}
+
 export interface CommandUnban {
   kind: "Unban";
   banId: string;
@@ -168,11 +178,13 @@ export interface CommandUpdateSettings {
   name: string | null;
   defaultGuestRole: string | null;
   defaultAccountRole: string | null;
+  autoplay: boolean | null;
 }
 
 export type Command =
   | CommandAddSongs
   | CommandAssignRole
+  | CommandAutoplayFromHere
   | CommandBan
   | CommandCreateRole
   | CommandDeleteRole
@@ -192,6 +204,7 @@ export type Command =
   | CommandSetParticipantPermissions
   | CommandSetVisibility
   | CommandSkip
+  | CommandStartRadio
   | CommandUnban
   | CommandUpdateRole
   | CommandUpdateSettings;
@@ -228,6 +241,26 @@ export type ClientMessage =
   | ClientMessagePing
   | ClientMessageRequestSnapshot;
 
+export type QueueItemResult = "played" | "skipped";
+
+export type QueueItemOrigin = "manual" | "radio" | "autoplay";
+
+export interface QueueItem {
+  itemId: string;
+  song: Song;
+  addedBy: string;
+  addedByName: string;
+  addedAt: number;
+  result: QueueItemResult | null;
+  origin: QueueItemOrigin;
+}
+
+export interface EventAutoplayChanged {
+  kind: "AutoplayChanged";
+  seed: Song | null;
+  items: QueueItem[];
+}
+
 export interface BanInfo {
   id: string;
   name: string;
@@ -237,17 +270,6 @@ export interface BanInfo {
 export interface EventBansChanged {
   kind: "BansChanged";
   bans: BanInfo[];
-}
-
-export type QueueItemResult = "played" | "skipped";
-
-export interface QueueItem {
-  itemId: string;
-  song: Song;
-  addedBy: string;
-  addedByName: string;
-  addedAt: number;
-  result: QueueItemResult | null;
 }
 
 export interface EventHistoryAppended {
@@ -340,6 +362,11 @@ export interface EventQueueItemsAdded {
   index: number;
 }
 
+export interface EventQueueReplaced {
+  kind: "QueueReplaced";
+  items: QueueItem[];
+}
+
 export interface EventRolesChanged {
   kind: "RolesChanged";
   roles: Role[];
@@ -359,6 +386,7 @@ export interface EventRoomUpdated {
 export interface RoomSettings {
   defaultGuestRole: string;
   defaultAccountRole: string;
+  autoplay: boolean;
 }
 
 export interface EventSettingsChanged {
@@ -373,6 +401,7 @@ export interface EventStreamReady {
 }
 
 export type Event =
+  | EventAutoplayChanged
   | EventBansChanged
   | EventHistoryAppended
   | EventHistoryItemRemoved
@@ -386,6 +415,7 @@ export type Event =
   | EventQueueItemMoved
   | EventQueueItemRemoved
   | EventQueueItemsAdded
+  | EventQueueReplaced
   | EventRolesChanged
   | EventRoomUpdated
   | EventSettingsChanged
@@ -439,6 +469,8 @@ export interface RoomState {
   roles: Role[];
   settings: RoomSettings;
   bans: BanInfo[];
+  autoplay: QueueItem[];
+  autoplaySeed: Song | null;
 }
 
 export interface ServerMessageSnapshot {

@@ -75,6 +75,14 @@ class YtmCore:
         # ytmusicapi treats limit as a minimum, so cut the list ourselves.
         return [song for r in results if (song := _song_from_search(r))][:limit]
 
+    def radio(self, seed_id: str, limit: int = 25) -> list[dict]:
+        """YTM's radio for a song: similar songs, usually starting with the song itself."""
+        try:
+            playlist = self._ytm.get_watch_playlist(videoId=video_id(seed_id), radio=True, limit=limit)
+        except Exception as e:  # ytmusicapi raises plain exceptions for unknown IDs
+            raise NotFound(str(e)) from e
+        return [song for t in playlist.get("tracks") or [] if (song := _song_from_watch(t))][:limit]
+
     def stream(self, song_id: str, fresh: bool = False) -> StreamInfo:
         """Direct stream URL, resolved on demand and cached until shortly before it expires.
 
@@ -121,6 +129,36 @@ def _song_from_search(r: dict) -> dict | None:
         "thumbnails": _thumbnails(r.get("thumbnails") or []),
         "explicit": bool(r.get("isExplicit")),
     }
+
+
+def _song_from_watch(t: dict) -> dict | None:
+    """A track of a watch playlist (radio) has slightly different fields than a search result."""
+    vid = t.get("videoId")
+    if not vid:
+        return None
+    album = t.get("album")
+    return {
+        "id": f"{MODULE_ID}:{vid}",
+        "title": t.get("title") or "",
+        "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in t.get("artists") or []],
+        "album": {"id": album.get("id"), "name": album.get("name", "")} if album else None,
+        "durationMs": _parse_length(t.get("length")),
+        "thumbnails": _thumbnails(t.get("thumbnail") or t.get("thumbnails") or []),
+        "explicit": bool(t.get("isExplicit")),
+    }
+
+
+def _parse_length(length: str | None) -> int:
+    """'4:21' or '1:02:03' -> milliseconds; 0 if unknown."""
+    if not length:
+        return 0
+    try:
+        seconds = 0
+        for part in length.split(":"):
+            seconds = seconds * 60 + int(part)
+        return seconds * 1000
+    except ValueError:
+        return 0
 
 
 def _thumbnails(thumbs: list[dict]) -> list[dict]:

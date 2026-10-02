@@ -11,6 +11,7 @@ import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import dev.trashpanda.ytmp.core.RadioSource
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -37,7 +38,7 @@ class RemoteSourceModule(
     private val client: HttpClient,
     private val baseUrl: String,
     private val key: String,
-) : SongSearch, StreamResolver, AudioProxy {
+) : SongSearch, StreamResolver, AudioProxy, RadioSource {
 
     @Serializable
     private data class SearchResult(val items: List<Song>)
@@ -58,6 +59,13 @@ class RemoteSourceModule(
             auth()
             parameter("q", query)
             parameter("limit", 20)
+        }.orThrow().body<SearchResult>().items
+
+    override suspend fun radio(seedSongId: String): List<Song> =
+        client.get("$baseUrl/radio") {
+            auth()
+            parameter("seed", seedSongId)
+            parameter("limit", 25)
         }.orThrow().body<SearchResult>().items
 
     override suspend fun resolveStream(songId: String): String =

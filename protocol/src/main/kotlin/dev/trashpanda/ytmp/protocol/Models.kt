@@ -48,6 +48,19 @@ enum class QueueItemResult {
     @SerialName("skipped") SKIPPED,
 }
 
+/** Where a queue item came from. */
+@Serializable
+@SerialName("QueueItemOrigin")
+enum class QueueItemOrigin {
+    @SerialName("manual") MANUAL,
+
+    /** Start radio */
+    @SerialName("radio") RADIO,
+
+    /** The autoplay queue */
+    @SerialName("autoplay") AUTOPLAY,
+}
+
 /** One entry in the queue, the history or "now playing". */
 @Serializable
 @SerialName("QueueItem")
@@ -58,6 +71,7 @@ data class QueueItem(
     val addedByName: String,
     val addedAt: Long,
     val result: QueueItemResult? = null,
+    val origin: QueueItemOrigin = QueueItemOrigin.MANUAL,
 )
 
 @Serializable
@@ -145,4 +159,8 @@ data class RoomState(
     val roles: List<Role> = emptyList(),
     val settings: RoomSettings = RoomSettings("", ""),
     val bans: List<BanInfo> = emptyList(),
+    /** Plays when the queue runs out; refilled endlessly. */
+    val autoplay: List<QueueItem> = emptyList(),
+    /** The song the autoplay queue is a radio of, or null. */
+    val autoplaySeed: Song? = null,
 )

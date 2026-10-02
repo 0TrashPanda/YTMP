@@ -16,6 +16,11 @@ fun interface SongSearch {
     suspend fun search(query: String): List<Song>
 }
 
+/** Songs similar to a seed song (YTM's radio), for Start radio and the autoplay queue. */
+fun interface RadioSource {
+    suspend fun radio(seedSongId: String): List<Song>
+}
+
 /** A speaker or TV the host found, that rooms can play on. */
 data class OutputDevice(val id: String, val name: String, val kind: OutputKind)
 

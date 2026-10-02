@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.Role
 import dev.trashpanda.ytmp.protocol.RoomSettings
+import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.QueueItem
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import kotlinx.serialization.Serializable
@@ -40,6 +41,8 @@ data class SavedRoom(
     val roles: List<Role>? = null,
     val settings: RoomSettings? = null,
     val bans: List<SavedBan> = emptyList(),
+    val autoplay: List<QueueItem> = emptyList(),
+    val autoplaySeed: Song? = null,
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 
