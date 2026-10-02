@@ -30,6 +30,13 @@ export const saved = {
 	setGuestToken: (roomCode: string, token: string) => write(`ytmp.guest.${code(roomCode)}`, token),
 	ownerToken: (roomCode: string) => read(`ytmp.owner.${code(roomCode)}`),
 	setOwnerToken: (roomCode: string, token: string) => write(`ytmp.owner.${code(roomCode)}`, token),
+	/** Keep me out of other people's listening history (sent when joining a room). */
+	get hideFromHistory() {
+		return read('ytmp.hideFromHistory') === '1';
+	},
+	set hideFromHistory(on: boolean) {
+		write('ytmp.hideFromHistory', on ? '1' : '0');
+	},
 	get listening() {
 		return read('ytmp.listening') === '1';
 	},

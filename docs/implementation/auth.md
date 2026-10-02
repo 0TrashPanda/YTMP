@@ -86,3 +86,18 @@ An account's role template (roles + default roles) is stored on its auth server
 room is created with a host token, the host asks the account's auth server for it
 (`GET /api/auth/role-template`, `Authorization: Bearer <host token>`; a server reads its own
 accounts' templates directly). If that fails, the room gets the default roles.
+
+### Listening history
+
+When a song finishes (played to the end, or skipped after it started), the room tells the
+host's `PlayReporter`, which sends a `PlayReport` to the auth server of **every account
+holder online in the room** (`POST /api/auth/plays` with that person's host token; a server
+stores its own accounts' plays directly). The auth server keeps it only if that account has
+tracking on (`accounts.tracking_default` in `ytmp.toml` sets it for new accounts; default
+off). "Listened with" leaves out people who opted out: accounts by their setting (carried
+in their host token as `hide`, so it applies from their next login on a host), guests by a
+checkbox (`hello.hideFromHistory`).
+
+Known limits: a host holding your token could add made-up plays to your history; and if the
+auth server can't be reached when a song ends (a phone without internet), that play is lost
+(no retry queue yet).

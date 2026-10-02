@@ -8,6 +8,8 @@
 import { ApiRequestError } from './api';
 import type {
 	AccountInfo,
+	AccountSettings,
+	HistoryPage,
 	AccountListResponse,
 	ApiError,
 	AuthServerInfo,
@@ -47,7 +49,7 @@ export const session = {
 	}
 };
 
-async function call<T>(path: string, body?: unknown, method = body === undefined ? 'GET' : 'POST'): Promise<T> {
+async function call<T>(path: string, body?: unknown, method: string = body === undefined ? 'GET' : 'POST'): Promise<T> {
 	const headers: Record<string, string> = {};
 	if (body !== undefined) headers['Content-Type'] = 'application/json';
 	const token = session.current?.sessionToken;
@@ -93,6 +95,34 @@ export const authServer = {
 
 	roleTemplate: () => call<RoleTemplate>('/api/account/role-template'),
 	saveRoleTemplate: (template: RoleTemplate) => call<RoleTemplate>('/api/account/role-template', template, 'PUT'),
+
+	settings: () => call<AccountSettings>('/api/account/settings'),
+	saveSettings: (settings: AccountSettings) => call<AccountSettings>('/api/account/settings', settings, 'PUT'),
+	history: (before: number | null, query: string) => {
+		const params = new URLSearchParams({ limit: '50' });
+		if (before !== null) params.set('before', String(before));
+		if (query.trim()) params.set('q', query.trim());
+		return call<HistoryPage>(`/api/account/history?${params}`);
+	},
+	deletePlay: (id: string) => call<null>(`/api/account/history/${encodeURIComponent(id)}`, undefined, 'DELETE'),
+	/** Deletes plays from [from] up to [to] (ms); both null deletes everything. */
+	deleteHistory: (from: number | null, to: number | null) => {
+		const params = new URLSearchParams();
+		if (from !== null) params.set('from', String(from));
+		if (to !== null) params.set('to', String(to));
+		if (from === null && to === null) params.set('all', 'true');
+		return call<null>(`/api/account/history?${params}`, undefined, 'DELETE');
+	},
+	/** Downloads the whole history as a JSON file. */
+	async exportHistory(username: string) {
+		const response = await fetch('/api/account/history/export', { headers: { Authorization: `Bearer ${session.current?.sessionToken}` } });
+		if (!response.ok) throw new ApiRequestError(`Export failed (${response.status})`);
+		const link = document.createElement('a');
+		link.href = URL.createObjectURL(await response.blob());
+		link.download = `ytmp-history-${username}.json`;
+		link.click();
+		URL.revokeObjectURL(link.href);
+	},
 
 	listAccounts: async () => (await call<AccountListResponse>('/api/admin/accounts')).accounts,
 	createAccount: (username: string, password: string, displayName: string) =>

@@ -5,7 +5,8 @@
 	import { authServer, session } from '../../lib/account';
 	import LoginForm from '../../lib/components/LoginForm.svelte';
 	import TemplateSettings from '../../lib/components/settings/TemplateSettings.svelte';
-	import type { AccountInfo, AuthServerInfo } from '../../lib/protocol.gen';
+	import Switch from '../../lib/components/settings/Switch.svelte';
+	import type { AccountInfo, AccountSettings, AuthServerInfo } from '../../lib/protocol.gen';
 
 	const invite = page.url.searchParams.get('invite');
 
@@ -17,6 +18,7 @@
 	let busy = $state(false);
 
 	let editingRoles = $state(false);
+	let settings = $state<AccountSettings | null>(null);
 	let currentPassword = $state('');
 	let newPassword = $state('');
 
@@ -41,8 +43,14 @@
 	});
 
 	async function loadAdmin() {
+		if (account) settings = await authServer.settings().catch(() => null);
 		if (account?.isAdmin) accounts = await authServer.listAccounts();
 	}
+
+	const saveSettings = (next: AccountSettings) =>
+		attempt(async () => {
+			settings = await authServer.saveSettings(next);
+		});
 
 	async function loggedIn() {
 		account = session.current?.account ?? null;
@@ -130,6 +138,30 @@
 				<button class="rounded-full bg-raised px-4 py-2 text-sm hover:bg-line" onclick={logout}>Log out</button>
 			</div>
 		</section>
+
+		{#if settings}
+			{@const s = settings}
+			<section class={card}>
+				<div class="flex items-center justify-between">
+					<h2 class="font-bold">Listening history</h2>
+					<a href="/account/history" class="text-sm text-muted underline">View</a>
+				</div>
+				<div class="flex items-center gap-4">
+					<div class="min-w-0 flex-1">
+						<p class="font-medium">Keep my history</p>
+						<p class="text-sm text-muted">Every song you hear in a room, for recaps and radio. Turn it off to pause.</p>
+					</div>
+					<Switch checked={s.tracking} label="Keep my history" disabled={busy} onchange={(on) => saveSettings({ ...s, tracking: on })} />
+				</div>
+				<div class="flex items-center gap-4">
+					<div class="min-w-0 flex-1">
+						<p class="font-medium">Keep me out of others' history</p>
+						<p class="text-sm text-muted">Others won't see that they listened with you. Applies to rooms you join after changing it.</p>
+					</div>
+					<Switch checked={s.hideFromOthers} label="Keep me out of others' history" disabled={busy} onchange={(on) => saveSettings({ ...s, hideFromOthers: on })} />
+				</div>
+			</section>
+		{/if}
 
 		<section class={card}>
 			<h2 class="font-bold">Your roles</h2>

@@ -30,7 +30,11 @@ class LocalHost(private val context: Context) {
     val casts = CastOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
     val castFinder = CastFinder(context, casts)
     val authLink = AuthLink(context, PORT)
-    val rooms = RoomManager(streams = { ytm.resolveStream(it) }, scope = scope, outputs = casts.devices, store = PhoneRoomStore(context))
+    private val plays = PlayReporter(authLink.auth, scope)
+    val rooms = RoomManager(
+        streams = { ytm.resolveStream(it) }, scope = scope, outputs = casts.devices, store = PhoneRoomStore(context),
+        onPlayFinished = plays::report,
+    )
 
     fun start() {
         val webApp = installWebApp()

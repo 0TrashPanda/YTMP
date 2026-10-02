@@ -4,6 +4,7 @@ import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.protocol.AuthServerInfo
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.RoleTemplate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,6 +26,9 @@ interface HostAuth {
 
     /** The role template of the account in [token] (already verified), from its auth server. Null: use the defaults. */
     suspend fun roleTemplate(token: String): RoleTemplate? = null
+
+    /** Sends a finished song to the listening history of the account in [token]. */
+    suspend fun reportPlay(token: String, report: PlayReport) {}
 }
 
 /** Guests only. */
@@ -44,6 +48,8 @@ class TrustedAuthServers(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Templates of this server's own accounts (by username), read without HTTP. */
     private val ownTemplates: ((username: String) -> RoleTemplate?)? = null,
+    /** Stores plays of this server's own accounts (by username), without HTTP. */
+    private val ownPlays: ((username: String, report: PlayReport) -> Unit)? = null,
 ) : HostAuth {
     private class Trusted(val ref: AuthServerRef, val key: PublicKey)
 
@@ -60,7 +66,17 @@ class TrustedAuthServers(
     override fun verify(token: String): AccountIdentity? {
         val claims = AccountTokens.verify(token, { trusted[it]?.key }, clock() / 1000) ?: return null
         if (!isOwnOrigin(normalizeOrigin(claims.aud) ?: return null)) return null
-        return AccountIdentity(claims.accountId, claims.name)
+        return AccountIdentity(claims.accountId, claims.name, hideFromHistory = claims.hide)
+    }
+
+    override suspend fun reportPlay(token: String, report: PlayReport) = withContext(Dispatchers.IO) {
+        val claims = AccountTokens.verify(token, { trusted[it]?.key }, clock() / 1000) ?: return@withContext
+        val server = trusted[claims.iss]?.ref ?: return@withContext
+        runCatching {
+            val url = server.url
+            if (url == null) ownPlays?.invoke(claims.sub, report) else postPlay(url, token, report)
+        }.onFailure { log.warn("Couldn't add a play to the history of {}: {}", claims.accountId, it.message) }
+        Unit
     }
 
     override suspend fun roleTemplate(token: String): RoleTemplate? = withContext(Dispatchers.IO) {
@@ -74,6 +90,23 @@ class TrustedAuthServers(
 
     private companion object {
         val log = LoggerFactory.getLogger(TrustedAuthServers::class.java)
+    }
+}
+
+/** Sends a play to an account's auth server, with a host token of that account. Blocking. */
+private fun postPlay(url: String, token: String, report: PlayReport) {
+    val connection = URI("${url.trimEnd('/')}/api/auth/plays").toURL().openConnection() as HttpURLConnection
+    connection.connectTimeout = 10_000
+    connection.readTimeout = 10_000
+    connection.requestMethod = "POST"
+    connection.doOutput = true
+    connection.setRequestProperty("Authorization", "Bearer $token")
+    connection.setRequestProperty("Content-Type", "application/json")
+    try {
+        connection.outputStream.use { it.write(ProtocolJson.encodeToString(PlayReport.serializer(), report).toByteArray()) }
+        if (connection.responseCode !in 200..299) throw SourceException("$url answered ${connection.responseCode}")
+    } finally {
+        connection.disconnect()
     }
 }
 

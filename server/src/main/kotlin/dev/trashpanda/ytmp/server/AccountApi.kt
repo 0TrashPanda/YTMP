@@ -26,6 +26,12 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
+import io.ktor.server.routing.delete
+import io.ktor.server.response.header
+import io.ktor.http.HttpHeaders
+import dev.trashpanda.ytmp.protocol.AccountSettings
+import dev.trashpanda.ytmp.protocol.HistoryPage
+import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.core.DefaultRoles
 import dev.trashpanda.ytmp.core.Permissions
 import dev.trashpanda.ytmp.protocol.ProtocolJson
@@ -48,6 +54,9 @@ class AccountService(
     val issuer: String,
     private val key: KeyPair,
     private val signup: SignupMode,
+    private val history: History,
+    /** Whether new accounts keep a listening history until they change it. */
+    private val trackingDefault: Boolean = false,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val throttle = LoginThrottle(clock)
@@ -59,7 +68,7 @@ class AccountService(
     fun hostToken(account: Accounts.Account, origin: String): HostTokenResponse {
         val now = clock() / 1000
         val exp = now + HOST_TOKEN_LIFETIME.inWholeSeconds
-        val claims = AccountTokens.Claims(issuer, account.username, account.displayName, origin, now, exp)
+        val claims = AccountTokens.Claims(issuer, account.username, account.displayName, origin, now, exp, hide = settings(account).hideFromOthers)
         return HostTokenResponse(AccountTokens.sign(claims, key.private), exp * 1000, toInfo(account))
     }
 
@@ -70,6 +79,17 @@ class AccountService(
             ?.let(Permissions::sanitize)
             ?: DefaultRoles.template
 
+    fun settings(account: Accounts.Account): AccountSettings =
+        accounts.data(account.id, "settings")
+            ?.let { runCatching { ProtocolJson.decodeFromString(AccountSettings.serializer(), it) }.getOrNull() }
+            ?: AccountSettings(tracking = trackingDefault, hideFromOthers = false)
+
+    /** A host reports a song [username] heard; kept only if they track their history. */
+    fun recordPlay(username: String, report: PlayReport) {
+        val account = accounts.find(username) ?: return
+        if (settings(account).tracking) history.add(account.id, report)
+    }
+
     /** For a host checking a token of ours: the template of [username]. */
     fun roleTemplate(username: String): RoleTemplate? = accounts.find(username)?.let(::roleTemplate)
 
@@ -79,9 +99,61 @@ class AccountService(
         // A host creating a room for an account asks for the account's roles, with the
         // host token the account gave it (it doesn't have to be for this server's origin).
         get("/auth/role-template") {
-            val token = call.bearerToken() ?: throw notLoggedIn()
-            val claims = AccountTokens.verify(token, { if (it == issuer) key.public else null }, clock() / 1000) ?: throw notLoggedIn()
+            val claims = call.ownToken() ?: throw notLoggedIn()
             call.respond(io { roleTemplate(claims.sub) } ?: throw notLoggedIn())
+        }
+
+        // A host sends a song the account heard, with the host token the account gave it.
+        post("/auth/plays") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            val report = call.receive<PlayReport>()
+            io { recordPlay(claims.sub, report) }
+            call.respond(HttpStatusCode.NoContent)
+        }
+
+        get("/account/settings") {
+            val account = call.account()
+            call.respond(io { settings(account) })
+        }
+
+        put("/account/settings") {
+            val account = call.account()
+            val settings = call.receive<AccountSettings>()
+            io { accounts.setData(account.id, "settings", ProtocolJson.encodeToString(AccountSettings.serializer(), settings)) }
+            call.respond(settings)
+        }
+
+        get("/account/history") {
+            val account = call.account()
+            val params = call.request.queryParameters
+            val limit = (params["limit"]?.toIntOrNull() ?: 50).coerceIn(1, 200)
+            val (plays, more) = io { history.page(account.id, params["before"]?.toLongOrNull(), limit, params["q"]) }
+            call.respond(HistoryPage(plays, more))
+        }
+
+        get("/account/history/export") {
+            val account = call.account()
+            val plays = io { history.all(account.id) }
+            call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=\"ytmp-history-${account.username}.json\"")
+            call.respond(plays)
+        }
+
+        delete("/account/history/{id}") {
+            val account = call.account()
+            if (!io { history.delete(account.id, call.parameters["id"]!!) }) throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Not in your history")
+            call.respond(HttpStatusCode.NoContent)
+        }
+
+        // ?from=&to= (ms) deletes a time range; ?all=true deletes everything.
+        delete("/account/history") {
+            val account = call.account()
+            val params = call.request.queryParameters
+            val from = params["from"]?.toLongOrNull()
+            val to = params["to"]?.toLongOrNull()
+            if (from == null && to == null && params["all"] != "true") throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Say what to delete")
+            val count = io { history.deleteRange(account.id, from, to) }
+            log.info("{} deleted {} plays from their history", account.username, count)
+            call.respond(HttpStatusCode.NoContent)
         }
 
         get("/account/role-template") {
@@ -179,6 +251,10 @@ class AccountService(
         val token = bearerToken() ?: throw notLoggedIn()
         return io { accounts.sessionAccount(token) } ?: throw notLoggedIn()
     }
+
+    /** A host token signed by us (made for any host), from `Authorization: Bearer`. */
+    private fun ApplicationCall.ownToken(): AccountTokens.Claims? =
+        bearerToken()?.let { AccountTokens.verify(it, { iss -> if (iss == issuer) key.public else null }, clock() / 1000) }
 
     private suspend fun ApplicationCall.admin(): Accounts.Account =
         account().takeIf { it.isAdmin } ?: throw forbidden("Only the server admin can do this")

@@ -112,6 +112,12 @@
 				placeholder="Your name"
 				autocomplete="nickname"
 			/>
+			{#if host?.authServers.length}
+				<label class="flex items-center gap-2 text-sm text-muted">
+					<input type="checkbox" class="accent-accent" checked={saved.hideFromHistory} onchange={(e) => (saved.hideFromHistory = e.currentTarget.checked)} />
+					Keep me out of others' listening history
+				</label>
+			{/if}
 			<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={!name.trim()}>
 				Join
 			</button>

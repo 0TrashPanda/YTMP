@@ -21,6 +21,10 @@
 	let me = $state<Identity | null>(null);
 	let authUrl = $state('');
 	let editingAuth = $state(false);
+	let hideFromHistory = $state(saved.hideFromHistory);
+	$effect(() => {
+		saved.hideFromHistory = hideFromHistory;
+	});
 
 	const validName = $derived(!!me || (name.trim().length > 0 && name.trim().length <= 32));
 	/** The page is shown by the phone that hosts it: it can host rooms itself. */
@@ -134,6 +138,12 @@
 				Or log in with your account on {server.issuer}
 			</a>
 		{/each}
+		{#if host?.authServers.length}
+			<label class="-mt-3 flex items-center justify-center gap-2 text-sm text-muted">
+				<input type="checkbox" class="accent-accent" bind:checked={hideFromHistory} />
+				Keep me out of others' listening history
+			</label>
+		{/if}
 	{/if}
 
 	{#if onThisPhone}

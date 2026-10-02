@@ -28,6 +28,8 @@ path = "/var/lib/ytmp/ytmp.db"     # sqlite
 | `sessions` | Logins on the server's own pages: SHA-256 of the token, account, created / last used |
 | `invites` | SHA-256 of the invite code, who made it, expiry, who used it |
 | `settings` | Server values: the token signing key, the issuer name |
+| `account_data` | Per account, as JSON: role template, settings (tracking, hide from others) |
+| `plays` | Listening history: one row per song heard (song as JSON plus title/artists for search, when, heard ms, skipped, room, added by me, listened with as JSON, shared), indexed by account + time |
 
 On **Android**, the app has its own local **SQLite** database for its rooms (solo rooms
 survive restarts), the local copy of joined rooms (for cloning), downloads and settings.

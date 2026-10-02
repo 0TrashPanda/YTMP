@@ -29,6 +29,8 @@ name = ""
 signup = "invite"
 # Other YTMP servers whose accounts may join rooms here.
 trusted = []
+# Whether new accounts keep a listening history until they turn it off.
+tracking_default = false
 
 [rooms]
 # letters | digits | alnum

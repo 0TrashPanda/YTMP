@@ -77,6 +77,27 @@ class Database private constructor(private val url: String, private val user: St
             ),
             // 3: things saved to an account (role template, later preferences, …), as JSON
             listOf("CREATE TABLE account_data (account_id VARCHAR(32) NOT NULL, name VARCHAR(64) NOT NULL, value TEXT NOT NULL, PRIMARY KEY (account_id, name))"),
+            // 4: listening history
+            listOf(
+                """CREATE TABLE plays (
+                    id VARCHAR(32) PRIMARY KEY,
+                    account_id VARCHAR(32) NOT NULL,
+                    played_at BIGINT NOT NULL,
+                    song_id VARCHAR(256) NOT NULL,
+                    title VARCHAR(512) NOT NULL,
+                    artists VARCHAR(512) NOT NULL,
+                    song TEXT NOT NULL,
+                    heard_ms BIGINT NOT NULL,
+                    skipped BOOLEAN NOT NULL,
+                    room_code VARCHAR(16) NOT NULL,
+                    room_name VARCHAR(128) NOT NULL,
+                    added_by_me BOOLEAN NOT NULL,
+                    added_by_name VARCHAR(128) NOT NULL,
+                    listened_with TEXT NOT NULL,
+                    shared BOOLEAN NOT NULL
+                )""",
+                "CREATE INDEX plays_account_time ON plays (account_id, played_at)",
+            ),
         )
 
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {

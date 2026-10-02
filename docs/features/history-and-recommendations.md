@@ -7,6 +7,11 @@ account's **auth server**.
 
 ## Listening history
 
+> Implemented: tracking on/off (pause), "keep me out of others' history" (account setting,
+> or a checkbox for guests), recording every song heard with the fields below, and a
+> history page with search, delete (one entry, a range of days, everything) and export
+> (JSON). Recap, the song graph and radio are next.
+
 When tracking is on, YTMP keeps a **full history of every song played** for the account,
 **in order**.
 

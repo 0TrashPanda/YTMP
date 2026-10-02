@@ -106,6 +106,9 @@ data class AccountsConfig(
     val signup: String = "invite",
     /** Other YTMP servers (URLs) whose accounts may join rooms here. */
     val trusted: List<String> = emptyList(),
+    /** Whether new accounts keep a listening history until they turn it off. */
+    @SerialName("tracking_default")
+    val trackingDefault: Boolean = false,
 ) {
     fun signupMode(): SignupMode = SignupMode.valueOf(signup.uppercase())
 }

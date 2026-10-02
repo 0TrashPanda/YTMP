@@ -18,6 +18,14 @@ import dev.trashpanda.ytmp.protocol.HostTokenResponse
 import dev.trashpanda.ytmp.protocol.InviteResponse
 import dev.trashpanda.ytmp.protocol.LoginRequest
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
+import dev.trashpanda.ytmp.protocol.AccountSettings
+import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.Command
+import dev.trashpanda.ytmp.protocol.HistoryPage
+import dev.trashpanda.ytmp.protocol.QueuePosition
+import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.host.PlayReporter
+import kotlinx.coroutines.launch
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.Role
 import dev.trashpanda.ytmp.protocol.RoleTemplate
@@ -36,6 +44,7 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
+import io.ktor.client.request.delete
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
@@ -63,10 +72,11 @@ class AccountApiTest {
         val db = Database.open(DatabaseConfig(path = Files.createTempDirectory("ytmp").resolve("ytmp.db").toString()))
         val accounts = Accounts(db)
         val key = accounts.signingKey()
-        val service = AccountService(accounts, "test.example", key, signup)
-        val auth = TrustedAuthServers(isOwnOrigin = { it == origin }, ownTemplates = service::roleTemplate).apply { trust(AuthServerRef(null, "test.example"), key.public) }
+        val service = AccountService(accounts, "test.example", key, signup, History(db), trackingDefault = true)
+        val auth = TrustedAuthServers(isOwnOrigin = { it == origin }, ownTemplates = service::roleTemplate, ownPlays = service::recordPlay).apply { trust(AuthServerRef(null, "test.example"), key.public) }
         application {
-            val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
+            val scope = CoroutineScope(SupervisorJob())
+            val rooms = RoomManager({ id -> "https://stream/$id" }, scope, onPlayFinished = PlayReporter(auth, scope)::report)
             ytmpModule(rooms, { emptyList() }, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = { service.routes(this) })
         }
         return service
@@ -181,6 +191,70 @@ class AccountApiTest {
             val welcome = assertIs<ServerMessage.Welcome>(ProtocolJson.decodeFromString(ServerMessage.serializer(), (incoming.receive() as Frame.Text).readText()))
             assertEquals(template.roles, welcome.state.roles)
             assertEquals("crowd", welcome.state.participants.single().roleId)
+        }
+    }
+
+    @Test
+    fun `plays go to the history of everyone tracking, without people who opted out`() = testApplication {
+        setup(SignupMode.OPEN)
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>().sessionToken
+        val bob = client.postJson("/api/account/signup", SignupRequest("bob", "password123", "Bob")).body<SessionResponse>().sessionToken
+        // Bob keeps no history and doesn't want to show up in others'.
+        client.put("/api/account/settings") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(bob)
+            setBody(AccountSettings(tracking = false, hideFromOthers = true))
+        }
+        val annaToken = client.postJson("/api/account/host-token", HostTokenRequest(origin), anna).body<HostTokenResponse>().token
+        val bobToken = client.postJson("/api/account/host-token", HostTokenRequest(origin), bob).body<HostTokenResponse>().token
+
+        val created = client.post("/api/rooms") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(annaToken)
+            setBody(CreateRoomRequest("Party"))
+        }.body<CreateRoomResponse>()
+
+        suspend fun io.ktor.client.plugins.websocket.DefaultClientWebSocketSession.hello(name: String, token: String?) {
+            send(Frame.Text(ProtocolJson.encodeToString(ClientMessage.serializer(), ClientMessage.Hello(PROTOCOL_VERSION, created.code, name, null, null, accountToken = token))))
+            incoming.receive()
+        }
+        val song = Song("ytm:1", "One More Time", listOf(ArtistRef(null, "Daft Punk")), null, 320_000, emptyList())
+        // Anna (the owner) plays a song with Bob and Carl (a guest) in the room, and skips it.
+        client.webSocket("/ws") {
+            hello("Anna", annaToken)
+            val others = listOf(
+                launchJoin(client, created.code, "Bob", bobToken),
+                launchJoin(client, created.code, "Carl", null),
+            )
+            kotlinx.coroutines.delay(300)
+            send(Frame.Text(ProtocolJson.encodeToString(ClientMessage.serializer(), ClientMessage.CommandMessage("1", Command.AddSongs(listOf(song), QueuePosition.END)))))
+            kotlinx.coroutines.delay(300)
+            send(Frame.Text(ProtocolJson.encodeToString(ClientMessage.serializer(), ClientMessage.CommandMessage("2", Command.Skip))))
+            kotlinx.coroutines.delay(500)
+            others.forEach { it.cancel() }
+        }
+
+        val history = client.get("/api/account/history") { bearerAuth(anna) }.body<HistoryPage>()
+        val play = history.plays.single()
+        assertEquals("One More Time", play.song.title)
+        assertTrue(play.skipped)
+        assertTrue(play.shared)
+        assertTrue(play.addedByMe)
+        assertEquals(listOf("Carl"), play.listenedWith.map { it.name }) // Bob opted out
+        assertTrue(client.get("/api/account/history") { bearerAuth(bob) }.body<HistoryPage>().plays.isEmpty())
+
+        assertEquals(1, client.get("/api/account/history?q=daft") { bearerAuth(anna) }.body<HistoryPage>().plays.size)
+        assertEquals(0, client.get("/api/account/history?q=abba") { bearerAuth(anna) }.body<HistoryPage>().plays.size)
+        assertEquals(HttpStatusCode.BadRequest, client.delete("/api/account/history") { bearerAuth(anna) }.status)
+        assertEquals(HttpStatusCode.NoContent, client.delete("/api/account/history/${play.id}") { bearerAuth(anna) }.status)
+        assertTrue(client.get("/api/account/history") { bearerAuth(anna) }.body<HistoryPage>().plays.isEmpty())
+    }
+
+    private fun kotlinx.coroutines.CoroutineScope.launchJoin(client: HttpClient, code: String, name: String, token: String?) = launch {
+        client.webSocket("/ws") {
+            send(Frame.Text(ProtocolJson.encodeToString(ClientMessage.serializer(), ClientMessage.Hello(PROTOCOL_VERSION, code, name, null, null, accountToken = token))))
+            for (frame in incoming) Unit
         }
     }
 

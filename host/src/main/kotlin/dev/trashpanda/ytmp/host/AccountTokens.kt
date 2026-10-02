@@ -33,6 +33,8 @@ object AccountTokens {
         /** Seconds since the epoch. */
         val iat: Long,
         val exp: Long,
+        /** The account doesn't want to be named in other people's listening history. */
+        val hide: Boolean = false,
     ) {
         val accountId get() = "$sub@$iss"
     }

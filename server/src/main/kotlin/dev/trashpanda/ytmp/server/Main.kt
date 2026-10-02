@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp.server
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
+import dev.trashpanda.ytmp.host.PlayReporter
 import dev.trashpanda.ytmp.host.TrustedAuthServers
 import dev.trashpanda.ytmp.host.fetchAuthServerInfo
 import dev.trashpanda.ytmp.host.localOrigins
@@ -57,23 +58,31 @@ fun main(args: Array<String>) {
         if (config.cast.discovery) casts.discover()
 
         val db = Database.open(config.database)
-        val rooms = RoomManager(ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = casts.devices, store = JdbcRoomStore(db))
-        rooms.startCleanup()
-        monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
-        casts.attach(rooms)
-
         val accounts = Accounts(db)
         val ownUrl = normalizeOrigin(config.accounts.url)
         val issuer = config.accounts.name.ifBlank {
             accounts.setting("issuer") ?: (ownUrl?.let { URI(it).host } ?: hostName()).also { accounts.setSetting("issuer", it) }
         }
         val key = accounts.signingKey()
-        val service = AccountService(accounts, issuer, key, config.accounts.signupMode())
-        val auth = TrustedAuthServers(isOwnOrigin = { it == ownUrl || it in localOrigins(config.server.port) }, ownTemplates = service::roleTemplate)
+        val service = AccountService(accounts, issuer, key, config.accounts.signupMode(), History(db), config.accounts.trackingDefault)
+        val auth = TrustedAuthServers(
+            isOwnOrigin = { it == ownUrl || it in localOrigins(config.server.port) },
+            ownTemplates = service::roleTemplate,
+            ownPlays = service::recordPlay,
+        )
         auth.trust(AuthServerRef(url = null, issuer = issuer), key.public)
         trustServers(auth, config.accounts.trusted, ownIssuer = issuer)
         if (ownUrl == null) log.warn("accounts.url (YTMP_URL) is not set: account logins only work on this machine's own addresses")
         log.info("Accounts: {} (sign-up: {})", issuer, config.accounts.signup)
+
+        val plays = PlayReporter(auth, this)
+        val rooms = RoomManager(
+            ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = casts.devices, store = JdbcRoomStore(db),
+            onPlayFinished = plays::report,
+        )
+        rooms.startCleanup()
+        monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
+        casts.attach(rooms)
 
         ytmpModule(
             rooms,

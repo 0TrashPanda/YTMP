@@ -94,7 +94,8 @@ export class RoomConnection {
 				guestName: this.name,
 				guestToken: saved.guestToken(this.roomCode),
 				ownerToken: saved.ownerToken(this.roomCode),
-				accountToken
+				accountToken,
+				hideFromHistory: saved.hideFromHistory
 			});
 		};
 		socket.onmessage = (event) => this.receive(JSON.parse(event.data) as ServerMessage);

@@ -23,6 +23,8 @@ sealed interface ClientMessage {
         val ownerToken: String?,
         /** Joins with an account: a host token from the account's auth server. */
         val accountToken: String? = null,
+        /** Don't name me in other people's listening history. */
+        val hideFromHistory: Boolean = false,
     ) : ClientMessage
 
     @Serializable

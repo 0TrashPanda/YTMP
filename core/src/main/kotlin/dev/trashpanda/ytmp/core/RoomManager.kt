@@ -51,6 +51,8 @@ class RoomManager(
     private val store: RoomStore? = null,
     /** Store calls run here, one at a time and in order. */
     private val storeContext: CoroutineContext = Dispatchers.IO.limitedParallelism(1),
+    /** Songs that finished playing, for the listening history. Must not block. */
+    private val onPlayFinished: (FinishedPlay) -> Unit = {},
 ) {
     private val rooms = ConcurrentHashMap<String, Room>()
     private val random = SecureRandom()
@@ -101,6 +103,7 @@ class RoomManager(
     private fun add(room: Room): Boolean {
         if (rooms.putIfAbsent(room.code, room) != null) return false
         room.addChangeListener { roomChanged(room.code) }
+        room.onPlayFinished = onPlayFinished
         scope.launch { room.setAvailableOutputs(outputs.value) }
         return true
     }

@@ -77,6 +77,8 @@ class Room(
         var offlineSince: Long? = null,
         var allow: Set<Permission> = emptySet(),
         var deny: Set<Permission> = emptySet(),
+        var accountToken: String? = null,
+        var hideFromHistory: Boolean = false,
     ) {
         fun toParticipant() = Participant(
             id, name, isOwner, online = outbox != null, listening = listening, accountId = accountId,
@@ -106,6 +108,7 @@ class Room(
 
     private var current: QueueItem? = null
     private var streamUrl: String? = null
+    private var currentStartedAt = 0L
 
     /** The user wants music to play. It actually plays once the stream is resolved. */
     private var wantPlaying = false
@@ -119,6 +122,10 @@ class Room(
 
     private var resolveJob: Job? = null
     private var endJob: Job? = null
+
+    /** Called (with the room locked, so it must not block) when a song finished playing. */
+    @Volatile
+    var onPlayFinished: ((FinishedPlay) -> Unit)? = null
 
     /** Last time someone was connected. Used to delete empty rooms. */
     @Volatile
@@ -175,6 +182,8 @@ class Room(
         member.outbox = outbox
         member.name = account?.displayName ?: name
         member.accountId = account?.id
+        member.accountToken = hello.accountToken.takeIf { account != null }
+        member.hideFromHistory = hello.hideFromHistory || account?.hideFromHistory == true
         // Logging in later (same guest token, now with the owner's account) makes you the owner.
         member.isOwner = member.isOwner || isOwner
         member.offlineSince = null
@@ -270,6 +279,7 @@ class Room(
         history += saved.history
         // The stream URL has probably expired; it is resolved again when someone presses play.
         current = saved.current
+        currentStartedAt = now
         positionAtAnchor = saved.positionMs
         anchorTime = now
         lastActive = saved.lastActive
@@ -625,6 +635,14 @@ class Room(
 
     private fun retireCurrent(result: QueueItemResult) {
         val item = current ?: return
+        // Only songs that actually played count for the listening history.
+        if (streamUrl != null) {
+            val heard = if (result == QueueItemResult.PLAYED) item.song.durationMs else position()
+            val listeners = members.values.filter { it.outbox != null }.map {
+                FinishedPlay.Listener(it.id, it.name, it.accountId, it.accountToken, it.hideFromHistory)
+            }
+            onPlayFinished?.invoke(FinishedPlay(item, currentStartedAt, heard, result == QueueItemResult.SKIPPED, code, name, listeners))
+        }
         current = null
         appendHistory(item, result)
     }
@@ -646,6 +664,7 @@ class Room(
         resolveJob?.cancel()
         current = item
         streamUrl = null
+        currentStartedAt = clock()
         positionAtAnchor = 0
         anchorTime = clock()
         if (item == null) wantPlaying = false

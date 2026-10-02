@@ -210,6 +210,7 @@ export interface ClientMessageHello {
   guestToken: string | null;
   ownerToken: string | null;
   accountToken: string | null;
+  hideFromHistory: boolean;
 }
 
 export interface ClientMessagePing {
@@ -574,4 +575,45 @@ export interface LinkAuthServerRequest {
 export interface RoleTemplate {
   roles: Role[];
   settings: RoomSettings;
+}
+
+export interface ListenedWith {
+  accountId: string | null;
+  name: string;
+}
+
+export interface HistoryEntry {
+  id: string;
+  song: Song;
+  playedAt: number;
+  heardMs: number;
+  skipped: boolean;
+  roomName: string;
+  addedByMe: boolean;
+  addedByName: string;
+  listenedWith: ListenedWith[];
+  shared: boolean;
+}
+
+export interface HistoryPage {
+  plays: HistoryEntry[];
+  more: boolean;
+}
+
+export interface AccountSettings {
+  tracking: boolean;
+  hideFromOthers: boolean;
+}
+
+export interface PlayReport {
+  song: Song;
+  playedAt: number;
+  heardMs: number;
+  skipped: boolean;
+  roomCode: string;
+  roomName: string;
+  addedByMe: boolean;
+  addedByName: string;
+  listenedWith: ListenedWith[];
+  shared: boolean;
 }

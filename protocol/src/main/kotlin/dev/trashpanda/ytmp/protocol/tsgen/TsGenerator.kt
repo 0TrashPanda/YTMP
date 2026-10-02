@@ -20,6 +20,9 @@ import dev.trashpanda.ytmp.protocol.SetPasswordRequest
 import dev.trashpanda.ytmp.protocol.InviteResponse
 import dev.trashpanda.ytmp.protocol.LinkAuthServerRequest
 import dev.trashpanda.ytmp.protocol.RoleTemplate
+import dev.trashpanda.ytmp.protocol.HistoryPage
+import dev.trashpanda.ytmp.protocol.AccountSettings
+import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.ServerMessage
@@ -44,6 +47,15 @@ class TsGenerator {
     private val names = HashMap<String, String>()
     private val owners = HashMap<String, String>()
 
+    /** Shape per serial name: two different classes with the same @SerialName would be mixed up. */
+    private val shapes = HashMap<String, String>()
+
+    private fun checkUnique(d: SerialDescriptor) {
+        val shape = "${d.kind}(${(0 until d.elementsCount).joinToString { d.getElementName(it) }})"
+        val previous = shapes.putIfAbsent(d.serialName, shape)
+        check(previous == null || previous == shape) { "Two different classes are both named '${d.serialName}' ($previous and $shape); give one another @SerialName" }
+    }
+
     fun addRoot(descriptor: SerialDescriptor) {
         typeOf(descriptor)
     }
@@ -67,6 +79,7 @@ class TsGenerator {
             StructureKind.LIST -> "${parenthesize(typeOf(d.getElementDescriptor(0)))}[]"
             StructureKind.MAP -> "Record<${typeOf(d.getElementDescriptor(0))}, ${typeOf(d.getElementDescriptor(1))}>"
             SerialKind.ENUM, StructureKind.CLASS, StructureKind.OBJECT, PolymorphicKind.SEALED -> {
+                checkUnique(d)
                 declare(d)
                 nameOf(d)
             }
@@ -148,6 +161,9 @@ fun main(args: Array<String>) {
     generator.addRoot(InviteResponse.serializer().descriptor)
     generator.addRoot(LinkAuthServerRequest.serializer().descriptor)
     generator.addRoot(RoleTemplate.serializer().descriptor)
+    generator.addRoot(HistoryPage.serializer().descriptor)
+    generator.addRoot(AccountSettings.serializer().descriptor)
+    generator.addRoot(PlayReport.serializer().descriptor)
     out.parentFile.mkdirs()
     out.writeText(generator.render())
     println("Wrote ${out.path}")

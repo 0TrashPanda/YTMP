@@ -57,4 +57,27 @@ data class AccountIdentity(
     /** `username@issuer` */
     val id: String,
     val displayName: String,
+    /** The account doesn't want to be named in other people's listening history. */
+    val hideFromHistory: Boolean = false,
 )
+
+/** A song that finished (played to the end or skipped), and who was in the room. Feeds the listening history. */
+data class FinishedPlay(
+    val item: QueueItem,
+    val startedAt: Long,
+    val heardMs: Long,
+    val skipped: Boolean,
+    val roomCode: String,
+    val roomName: String,
+    /** Everyone online when it finished. */
+    val listeners: List<Listener>,
+) {
+    data class Listener(
+        val participantId: String,
+        val name: String,
+        val accountId: String?,
+        /** The host token they joined with: the host reports the play to their auth server with it. */
+        val accountToken: String?,
+        val hideFromHistory: Boolean,
+    )
+}
