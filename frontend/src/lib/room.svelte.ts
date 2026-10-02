@@ -236,6 +236,9 @@ export class RoomConnection {
 			case 'QueueReplaced':
 				s.queue = e.items;
 				break;
+			case 'HistoryReplaced':
+				s.history = e.items;
+				break;
 			case 'AutoplayChanged':
 				s.autoplay = e.items;
 				s.autoplaySeed = e.seed;
@@ -252,6 +255,11 @@ export class RoomConnection {
 			case 'Notice':
 				this.addNotice(e.message);
 				break;
+			default: {
+				// A new event kind that isn't handled here is a type error.
+				const unhandled: never = e;
+				void unhandled;
+			}
 		}
 	}
 

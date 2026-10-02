@@ -75,8 +75,9 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `AddSongs` ✅ | `songs` (full song objects from search), `position: "next" \| "end"` | Add songs |
 | `PlayNow` ✅ | `song` | Play now |
 | `JumpTo` ✅ | `itemId` (a queue or history item) | Play now |
-| `RemoveQueueItem` ✅ | `itemId` | Remove own / others' songs |
+| `RemoveQueueItem` ✅ | `itemId` (queue, history or autoplay) | Remove own / others' songs |
 | `MoveQueueItem` ✅ | `itemId`, `toIndex` | Reorder |
+| `MoveItem` ✅ | `itemId`, `list: "history" \| "queue" \| "autoplay"`, `toIndex` | Reorder (autoplay → queue next/last: Add songs) |
 | `ShuffleQueue` | – | Reorder |
 | `StartRadio` ✅ (song only so far) | `song`; later `seedId` (song, artist, album or playlist) | Start radio |
 | `AutoplayFromHere` ✅ (song only so far) | `song`; later `seedId` (song, artist, album or playlist) | Autoplay from here |
@@ -141,6 +142,7 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 | `StreamReady` ✅ | `itemId`, `streamUrl` (direct URL, once the host has resolved it) | everyone |
 | `HistoryAppended` ✅ | `item` (with `result: played/skipped`) | everyone |
 | `HistoryItemRemoved` ✅ | `itemId` (when jumping back) | everyone |
+| `HistoryReplaced` ✅ | `items` (a song moved in or out of the history) | everyone |
 | `PlaybackChanged` ✅ | `playback: { playing, positionMs, hostTimeMs }` (on every change) | everyone |
 | `Notice` ✅ | `message` (for example a song that can't be played) | everyone |
 | `RepeatChanged` | `mode` | everyone |

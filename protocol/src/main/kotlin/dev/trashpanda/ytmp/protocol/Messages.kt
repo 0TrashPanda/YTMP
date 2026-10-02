@@ -43,6 +43,15 @@ sealed interface ClientMessage {
     data object RequestSnapshot : ClientMessage
 }
 
+/** The lists a room's items live in. */
+@Serializable
+@SerialName("ItemList")
+enum class ItemList {
+    @SerialName("history") HISTORY,
+    @SerialName("queue") QUEUE,
+    @SerialName("autoplay") AUTOPLAY,
+}
+
 @Serializable
 @SerialName("QueuePosition")
 enum class QueuePosition {
@@ -68,6 +77,15 @@ sealed interface Command {
     @Serializable
     @SerialName("MoveQueueItem")
     data class MoveQueueItem(val itemId: String, val toIndex: Int) : Command
+
+    /**
+     * Moves any item (history, queue or autoplay) to a place in any of those lists. A played
+     * song moved into the queue plays again; an autoplay song moved into the queue becomes
+     * yours. History indexes count from the oldest song in the snapshot.
+     */
+    @Serializable
+    @SerialName("MoveItem")
+    data class MoveItem(val itemId: String, val list: ItemList, val toIndex: Int) : Command
 
     /** Plays [song] now and replaces the queue with a radio from it. */
     @Serializable
@@ -316,6 +334,11 @@ sealed interface Event {
     data class RoomUpdated(val room: RoomInfo) : Event
 
     /** Roles were created, changed, deleted or reordered: the whole list. */
+    /** The (visible part of the) history changed at once, e.g. a song was moved in or out of it. */
+    @Serializable
+    @SerialName("HistoryReplaced")
+    data class HistoryReplaced(val items: List<QueueItem>) : Event
+
     /** The whole upcoming queue changed at once (Start radio). */
     @Serializable
     @SerialName("QueueReplaced")

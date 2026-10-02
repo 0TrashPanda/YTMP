@@ -55,6 +55,7 @@ class LocalHost(private val context: Context) {
                     auth = authLink.auth,
                 ),
                 extraApi = { authLink.routes(this) },
+                similar = { ytm.radio(it) },
             )
         }.start(wait = false)
         Log.i(TAG, "Hosting on port $PORT")

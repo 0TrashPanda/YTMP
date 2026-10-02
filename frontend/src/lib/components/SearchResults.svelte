@@ -1,82 +1,88 @@
 <script lang="ts">
-	import { search } from '../api';
+	// Search results, or "Find similar" for a song. Tap = play next; ⋮ or right-click = song menu.
+	import { search, similar } from '../api';
 	import { artistNames, formatTime } from '../format';
-	import type { QueuePosition, Song } from '../protocol.gen';
+	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
+	import type { MenuTarget } from './SongMenu.svelte';
 
 	let {
 		room,
 		query,
-		onToast
-	}: { room: RoomConnection; query: string; onToast: (text: string) => void } = $props();
+		similarTo = null,
+		onToast,
+		onMenu
+	}: {
+		room: RoomConnection;
+		query: string;
+		/** Show songs similar to this one instead of searching. */
+		similarTo?: Song | null;
+		onToast: (text: string) => void;
+		onMenu: (target: MenuTarget) => void;
+	} = $props();
 
 	let results = $state<Song[]>([]);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
-	let menuFor = $state<string | null>(null);
 
 	// Search shortly after typing stops; cancel searches that are no longer needed.
 	$effect(() => {
 		const q = query.trim();
-		if (!q) {
+		const seed = similarTo;
+		if (!q && !seed) {
 			results = [];
 			return;
 		}
 		const controller = new AbortController();
-		const timer = setTimeout(async () => {
-			loading = true;
-			error = null;
-			try {
-				results = await search(q, controller.signal);
-			} catch (e) {
-				if (!controller.signal.aborted) error = e instanceof Error ? e.message : 'Search failed';
-			} finally {
-				if (!controller.signal.aborted) loading = false;
-			}
-		}, 300);
+		const timer = setTimeout(
+			async () => {
+				loading = true;
+				error = null;
+				try {
+					results = seed ? await similar(seed.id, controller.signal) : await search(q, controller.signal);
+				} catch (e) {
+					if (!controller.signal.aborted) error = e instanceof Error ? e.message : 'Search failed';
+				} finally {
+					if (!controller.signal.aborted) loading = false;
+				}
+			},
+			seed ? 0 : 300
+		);
 		return () => {
 			clearTimeout(timer);
 			controller.abort();
 		};
 	});
 
-	async function add(song: Song, position: QueuePosition) {
-		menuFor = null;
-		const error = await room.run({ kind: 'AddSongs', songs: [song], position });
-		onToast(error ? error.message : position === 'next' ? `Playing "${song.title}" next` : `Added "${song.title}" to the queue`);
+	async function playNext(song: Song) {
+		const error = await room.run({ kind: 'AddSongs', songs: [song], position: 'next' });
+		onToast(error ? error.message : `Playing "${song.title}" next`);
 	}
 
-	async function radio(song: Song, kind: 'StartRadio' | 'AutoplayFromHere') {
-		menuFor = null;
-		const error = await room.run({ kind, song });
-		onToast(error ? error.message : kind === 'StartRadio' ? `Starting a radio from "${song.title}"` : `Autoplay: songs like "${song.title}"`);
-	}
-
-	async function playNow(song: Song) {
-		menuFor = null;
-		const error = await room.run({ kind: 'PlayNow', song });
-		if (error) onToast(error.message);
+	function menu(event: MouseEvent, song: Song, atPointer: boolean) {
+		event.preventDefault();
+		event.stopPropagation();
+		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		onMenu({ song, place: 'search', x: atPointer ? event.clientX : rect.right - 256, y: atPointer ? event.clientY : rect.bottom });
 	}
 </script>
 
-<svelte:window onclick={() => (menuFor = null)} />
-
 <section class="flex flex-col gap-1">
-	<h2 class="px-2 pb-2 text-xl font-bold">Songs</h2>
+	<h2 class="truncate px-2 pb-2 text-xl font-bold">{similarTo ? `Similar to ${similarTo.title}` : 'Songs'}</h2>
 	{#if error}
 		<p class="px-2 text-muted">{error}</p>
 	{:else if loading && results.length === 0}
-		<p class="px-2 text-muted">Searching…</p>
+		<p class="px-2 text-muted">{similarTo ? 'Finding similar songs…' : 'Searching…'}</p>
 	{:else if results.length === 0}
 		<p class="px-2 text-muted">No results.</p>
 	{/if}
 
 	{#each results as song (song.id)}
-		<div class="group relative flex items-center gap-3 rounded-md px-2 py-2 hover:bg-raised">
+		<div class="group relative flex items-center gap-3 rounded-md px-2 py-2 hover:bg-raised" role="listitem" oncontextmenu={(e) => menu(e, song, true)}>
 			<!-- Tap = play next (docs/features/ui.md#gestures). -->
-			<button class="flex min-w-0 flex-1 items-center gap-3 text-left" onclick={() => add(song, 'next')} title="Play next">
+			<button class="flex min-w-0 flex-1 items-center gap-3 text-left" onclick={() => playNext(song)} title="Play next">
 				<Art {song} size={48} class="h-12 w-12" />
 				<div class="min-w-0 flex-1">
 					<div class="truncate font-medium">{song.title}</div>
@@ -86,45 +92,20 @@
 				</div>
 				<span class="text-sm text-muted tabular-nums">{formatTime(song.durationMs)}</span>
 			</button>
-			<button
-				class="rounded-full p-2 text-muted hover:bg-line hover:text-white"
-				aria-label="More actions"
-				onclick={(e) => {
-					e.stopPropagation();
-					menuFor = menuFor === song.id ? null : song.id;
-				}}
-			>
+			<button class="rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="More for {song.title}" onclick={(e) => menu(e, song, false)}>
 				<Icon name="more" />
 			</button>
-
-			{#if menuFor === song.id}
-				<div
-					class="absolute top-12 right-2 z-20 w-48 overflow-hidden rounded-lg bg-raised py-2 shadow-xl ring-1 ring-line"
-					role="menu"
-				>
-					<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => add(song, 'next')}>
-						<Icon name="playNext" size={20} /> Play next
-					</button>
-					<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => add(song, 'end')}>
-						<Icon name="playlistAdd" size={20} /> Add to queue
-					</button>
-					{#if room.can('play_now')}
-						<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => playNow(song)}>
-							<Icon name="play" size={20} /> Play now
-						</button>
-					{/if}
-					{#if room.can('start_radio')}
-						<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => radio(song, 'StartRadio')}>
-							<Icon name="radio" size={20} /> Start radio
-						</button>
-					{/if}
-					{#if room.can('autoplay_from_here')}
-						<button class="flex w-full items-center gap-3 px-4 py-2 hover:bg-line" onclick={() => radio(song, 'AutoplayFromHere')}>
-							<Icon name="autoplay" size={20} /> Autoplay from here
-						</button>
-					{/if}
-				</div>
-			{/if}
 		</div>
 	{/each}
+
+	{#if !similarTo && query.trim()}
+		<a
+			class="mt-2 flex items-center gap-2 self-start rounded-full px-3 py-2 text-sm text-muted hover:bg-raised hover:text-white"
+			href="https://music.youtube.com/search?q={encodeURIComponent(query.trim())}"
+			target="_blank"
+			rel="noopener"
+		>
+			<Icon name="open" size={18} /> Search "{query.trim()}" on YouTube Music
+		</a>
+	{/if}
 </section>

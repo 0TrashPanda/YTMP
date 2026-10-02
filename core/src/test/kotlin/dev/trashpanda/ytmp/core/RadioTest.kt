@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp.core
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
+import dev.trashpanda.ytmp.protocol.ItemList
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.QueueItemOrigin
 import dev.trashpanda.ytmp.protocol.QueuePosition
@@ -136,5 +137,39 @@ class RadioTest {
         val state = room.state()
         assertEquals(target.song.id, state.nowPlaying?.item?.song?.id)
         assertEquals("a-5", state.autoplay.first().song.id)
+    }
+
+    @Test
+    fun `items move between history, queue and autoplay`() = runTest {
+        val room = room()
+        room.run(Command.AddSongs(listOf(song("a"), song("b"), song("c")), QueuePosition.END))
+        runCurrent()
+        advanceTimeBy(60_001) // a played; b is playing; c queued
+        runCurrent()
+        var state = room.state()
+        assertEquals(listOf("a"), state.history.map { it.song.id })
+
+        // A played song dragged below the current one plays again, after c.
+        room.run(Command.MoveItem(state.history.single().itemId, ItemList.QUEUE, 1))
+        state = room.state()
+        assertEquals(listOf("c", "a"), state.queue.map { it.song.id })
+        assertTrue(state.history.isEmpty())
+        assertNull(state.queue[1].result)
+
+        // Down to one queued song: autoplay lines up. Taking an autoplay song into the queue (play next) makes it mine.
+        room.run(Command.RemoveQueueItem(state.queue.last().itemId))
+        runCurrent()
+        val first = room.state().autoplay.first()
+        room.run(Command.MoveItem(first.itemId, ItemList.QUEUE, 0))
+        state = room.state()
+        assertEquals(first.song.id, state.queue.first().song.id)
+        assertEquals(QueueItemOrigin.MANUAL, state.queue.first().origin)
+        assertEquals("Me", state.queue.first().addedByName)
+        assertTrue(state.autoplay.none { it.itemId == first.itemId })
+
+        // Reordering autoplay.
+        val ap = room.state().autoplay
+        room.run(Command.MoveItem(ap[2].itemId, ItemList.AUTOPLAY, 0))
+        assertEquals(ap[2].itemId, room.state().autoplay.first().itemId)
     }
 }

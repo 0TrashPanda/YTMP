@@ -59,12 +59,17 @@ have the *Reorder* permission.
 
 **Every song** has the same menu, wherever it appears: search results, the queue
 (upcoming), the queue history (played or skipped), playlists, albums, find similar, …
+Open it with the **⋮** button or by **right-clicking** the song.
+
+> Implemented so far: Play next, Add to queue, Play now, Start radio, Autoplay from here,
+> Find similar, Go to artist / album (a search for now), Open in YouTube Music, and
+> Remove (from the queue, the history or the autoplay queue).
 
 | Action | Notes |
 |--------|-------|
 | Play next | Plays next |
 | Add to queue | |
-| Remove from queue | Only for songs in the queue. Needs *Remove own/others' songs*. |
+| Remove | From the queue, the queue history or the autoplay queue. Needs *Remove own/others' songs*. |
 | Start radio | Replace the queue with a [radio](history-and-recommendations.md#radio--mix) from this song |
 | Autoplay from here | Replace the [autoplay queue](queue.md#autoplay-queue) with a radio from this song, without touching the queue |
 | Find similar | Open [find similar](history-and-recommendations.md#find-similar) from this song |
@@ -75,8 +80,17 @@ have the *Reorder* permission.
 | Go to album | |
 | Download | Save the song as a plain file on the device. YTMP can play it as a local file. |
 | Share | A YTM link or a YTMP link (you choose) |
+| Open in YouTube Music | For YTM songs |
 
-- There is no *Move* action: songs are moved by **dragging** them in the queue.
+- There is no *Move* action: songs are moved by **dragging** them in *Up next*. Played
+  songs, upcoming songs and autoplay songs are one list: any of them can be dragged
+  anywhere in it. A played song dragged below the current one plays again; an autoplay
+  song dragged into the queue becomes yours.
+- **Tapping** a song in *Up next* jumps to it; tapping an **autoplay** song makes it play
+  next instead.
+- Search results end with a link to search the same words **on YouTube Music**.
+- The **YTMP logo** in a room goes back to the current song's album art; the search text
+  stays, and clicking the search bar shows the results again.
 - Actions that need a room permission (for example adding songs) are **disabled** when you
   don't have that permission.
 - The menu is **customisable**: you can change the **order** of the actions and

@@ -6,6 +6,8 @@
 	import PlayerBar from '../../../lib/components/PlayerBar.svelte';
 	import QueuePanel from '../../../lib/components/QueuePanel.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
+	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
+	import type { Song } from '../../../lib/protocol.gen';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
 	import { getHost } from '../../../lib/api';
@@ -25,6 +27,18 @@
 	let room = $state<RoomConnection | null>(null);
 	let player = $state<RoomPlayer | null>(null);
 	let query = $state('');
+	/** Search results are shown (the logo goes back to the album art but keeps the text). */
+	let searching = $state(false);
+	/** Showing "Find similar" for this song. */
+	let similarTo = $state<Song | null>(null);
+	let menu = $state<MenuTarget | null>(null);
+	const showResults = $derived(!!similarTo || (searching && !!query.trim()));
+
+	function showSearch(text: string) {
+		query = text;
+		similarTo = null;
+		searching = true;
+	}
 	let toasts = $state<{ id: number; text: string }[]>([]);
 	let now = $state(Date.now());
 	let toastId = 0;
@@ -141,17 +155,20 @@
 			class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:px-4 lg:translate-y-0
 				{headerHidden ? '-translate-y-full' : ''}"
 		>
-			<a href="/" class="text-xl font-black tracking-tight">YT<span class="text-accent">MP</span></a>
+			<button class="text-xl font-black tracking-tight" title="Now playing" onclick={() => ((searching = false), (similarTo = null))}>
+				YT<span class="text-accent">MP</span>
+			</button>
 			<label class="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-raised px-3 py-2 sm:max-w-xl">
 				<Icon name="search" size={20} class="shrink-0 text-muted" />
 				<input
 					class="min-w-0 flex-1 bg-transparent outline-none"
 					placeholder="Search songs"
 					bind:value={query}
-					onfocus={() => (headerHidden = false)}
+					onfocus={() => ((headerHidden = false), (searching = true))}
+					oninput={() => ((similarTo = null), (searching = true))}
 				/>
 				{#if query}
-					<button aria-label="Clear search" onclick={() => (query = '')}><Icon name="close" size={20} /></button>
+					<button aria-label="Clear search" onclick={() => ((query = ''), (similarTo = null))}><Icon name="close" size={20} /></button>
 				{/if}
 			</label>
 			<div class="ml-auto flex items-center gap-2">
@@ -200,8 +217,8 @@
 
 		<div class="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_420px]">
 			<main class="p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto">
-				{#if query.trim()}
-					<SearchResults {room} {query} onToast={toast} />
+				{#if showResults}
+					<SearchResults {room} {query} {similarTo} onToast={toast} onMenu={(target) => (menu = target)} />
 				{:else if room.state?.nowPlaying}
 					{@const song = room.state.nowPlaying.item.song}
 					<div class="flex min-w-0 flex-col items-center justify-center gap-4 py-4 text-center sm:gap-6 lg:h-full lg:py-0">
@@ -220,8 +237,8 @@
 				{/if}
 			</main>
 			<!-- On phones the queue makes room for search results, like YTM. -->
-			<div class="border-t border-line lg:min-h-0 lg:border-t-0 lg:border-l {query.trim() ? 'hidden lg:block' : ''}">
-				<QueuePanel {room} />
+			<div class="border-t border-line lg:min-h-0 lg:border-t-0 lg:border-l {showResults ? 'hidden lg:block' : ''}">
+				<QueuePanel {room} onMenu={(target) => (menu = target)} />
 			</div>
 		</div>
 		</div>
@@ -230,6 +247,17 @@
 			<PlayerBar {room} {player} {positionMs} onToast={toast} />
 		{/if}
 	</div>
+
+	{#if menu}
+		<SongMenu
+			{room}
+			target={menu}
+			onClose={() => (menu = null)}
+			onToast={toast}
+			onFindSimilar={(song) => ((similarTo = song), (searching = false))}
+			onSearch={showSearch}
+		/>
+	{/if}
 
 	{#if settings && room.state}
 		<RoomSettings {room} start={settings} onClose={() => (settings = null)} />

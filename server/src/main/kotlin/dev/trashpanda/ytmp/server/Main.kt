@@ -92,6 +92,7 @@ fun main(args: Array<String>) {
             webApp = File(config.server.frontend),
             HostOptions(kind = HostKind.SERVER, auth = auth),
             extraApi = { service.routes(this) },
+            similar = ytm,
         )
     }.start(wait = true)
 }

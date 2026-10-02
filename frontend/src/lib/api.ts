@@ -60,6 +60,12 @@ export async function search(query: string, signal?: AbortSignal): Promise<Song[
 	return result.items;
 }
 
+/** Songs similar to a song (YTM's radio), for Find similar. */
+export async function similar(songId: string, signal?: AbortSignal): Promise<Song[]> {
+	const result = await request<SearchResponse>(`/api/similar?id=${encodeURIComponent(songId)}`, { signal });
+	return result.items;
+}
+
 /** Audio streamed through the host, for when the direct stream URL doesn't work. */
 export function proxiedAudioUrl(songId: string): string {
 	return `/api/audio/${encodeURIComponent(songId)}`;

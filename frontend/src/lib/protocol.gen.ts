@@ -77,6 +77,15 @@ export interface CommandKick {
   participantId: string;
 }
 
+export type ItemList = "history" | "queue" | "autoplay";
+
+export interface CommandMoveItem {
+  kind: "MoveItem";
+  itemId: string;
+  list: ItemList;
+  toIndex: number;
+}
+
 export interface CommandMoveQueueItem {
   kind: "MoveQueueItem";
   itemId: string;
@@ -190,6 +199,7 @@ export type Command =
   | CommandDeleteRole
   | CommandJumpTo
   | CommandKick
+  | CommandMoveItem
   | CommandMoveQueueItem
   | CommandMoveRole
   | CommandPause
@@ -280,6 +290,11 @@ export interface EventHistoryAppended {
 export interface EventHistoryItemRemoved {
   kind: "HistoryItemRemoved";
   itemId: string;
+}
+
+export interface EventHistoryReplaced {
+  kind: "HistoryReplaced";
+  items: QueueItem[];
 }
 
 export interface EventNotice {
@@ -405,6 +420,7 @@ export type Event =
   | EventBansChanged
   | EventHistoryAppended
   | EventHistoryItemRemoved
+  | EventHistoryReplaced
   | EventNotice
   | EventNowPlayingChanged
   | EventOutputsChanged

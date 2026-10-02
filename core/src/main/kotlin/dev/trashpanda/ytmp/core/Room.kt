@@ -6,6 +6,7 @@ import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
 import dev.trashpanda.ytmp.protocol.Event
+import dev.trashpanda.ytmp.protocol.ItemList
 import dev.trashpanda.ytmp.protocol.NowPlaying
 import dev.trashpanda.ytmp.protocol.OutputInfo
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
@@ -373,11 +374,27 @@ class Room(
                 setCurrent(newItem(command.song, member))
             }
             is Command.RemoveQueueItem -> {
-                val item = queue.firstOrNull { it.itemId == command.itemId } ?: return notFound()
+                // Any item: upcoming, played or autoplay.
+                val (list, item) = find(command.itemId) ?: return notFound()
                 need(member, if (item.addedBy == member.id) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS)?.let { return it }
-                queue.remove(item)
-                emit(Event.QueueItemRemoved(command.itemId))
+                when (list) {
+                    ItemList.QUEUE -> {
+                        queue.remove(item)
+                        emit(Event.QueueItemRemoved(command.itemId))
+                        refillAutoplay()
+                    }
+                    ItemList.HISTORY -> {
+                        history.remove(item)
+                        emit(Event.HistoryItemRemoved(command.itemId))
+                    }
+                    ItemList.AUTOPLAY -> {
+                        autoplay.remove(item)
+                        emitAutoplay()
+                        refillAutoplay()
+                    }
+                }
             }
+            is Command.MoveItem -> return moveItem(member, command)
             is Command.MoveQueueItem -> {
                 need(member, Permission.REORDER)?.let { return it }
                 val from = queue.indexOfFirst { it.itemId == command.itemId }
@@ -609,6 +626,60 @@ class Room(
     private fun notFoundRole() = ErrorInfo(ErrorCode.NOT_FOUND, "No such role")
 
     private fun banInfos() = bans.map { it.info }
+
+    /** The list an item is in (not the current song). */
+    private fun find(itemId: String): Pair<ItemList, QueueItem>? =
+        queue.firstOrNull { it.itemId == itemId }?.let { ItemList.QUEUE to it }
+            ?: history.firstOrNull { it.itemId == itemId }?.let { ItemList.HISTORY to it }
+            ?: autoplay.firstOrNull { it.itemId == itemId }?.let { ItemList.AUTOPLAY to it }
+
+    private fun listOf(list: ItemList): MutableList<QueueItem> = when (list) {
+        ItemList.HISTORY -> history
+        ItemList.QUEUE -> queue
+        ItemList.AUTOPLAY -> autoplay
+    }
+
+    private fun moveItem(member: Member, command: Command.MoveItem): ErrorInfo? {
+        val (from, original) = find(command.itemId) ?: return notFound()
+        // Taking an autoplay song into the queue (next or last) is like adding it; anything else is reordering.
+        val toEnd = command.toIndex >= queue.size
+        val adding = from == ItemList.AUTOPLAY && command.list == ItemList.QUEUE && (command.toIndex == 0 || toEnd)
+        need(member, if (adding) Permission.ADD_SONGS else Permission.REORDER)?.let { return it }
+
+        // History indexes count from the first song clients see (the snapshot only has the last ones).
+        val historyOffset = maxOf(0, history.size - SNAPSHOT_HISTORY)
+        val source = listOf(from)
+        val fromIndex = source.indexOf(original)
+        source.removeAt(fromIndex)
+        val item = when {
+            command.list == ItemList.HISTORY -> original
+            from == ItemList.AUTOPLAY && command.list == ItemList.QUEUE ->
+                original.copy(addedBy = member.id, addedByName = member.name, addedAt = clock(), origin = QueueItemOrigin.MANUAL)
+            else -> original.copy(result = null)
+        }
+        val target = listOf(command.list)
+        // The client saw history from historyOffset on, without the moved item: count from there.
+        val to = (command.toIndex + if (command.list == ItemList.HISTORY) historyOffset else 0).coerceIn(0, target.size)
+        target.add(to, item)
+
+        if (from == ItemList.QUEUE && command.list == ItemList.QUEUE) {
+            emit(Event.QueueItemMoved(item.itemId, to))
+        } else {
+            for (list in setOf(from, command.list)) when (list) {
+                ItemList.QUEUE -> emit(Event.QueueReplaced(queue.toList()))
+                ItemList.HISTORY -> emit(Event.HistoryReplaced(history.takeLast(SNAPSHOT_HISTORY)))
+                ItemList.AUTOPLAY -> emitAutoplay()
+            }
+        }
+        // Nothing playing and a song lands in the queue: start it, as adding would.
+        if (current == null && queue.isNotEmpty() && command.list == ItemList.QUEUE) {
+            wantPlaying = true
+            playNextFromQueue()
+        } else {
+            refillAutoplay()
+        }
+        return null
+    }
 
     private fun jumpTo(itemId: String): ErrorInfo? {
         val autoplayIndex = autoplay.indexOfFirst { it.itemId == itemId }
