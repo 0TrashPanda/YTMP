@@ -29,7 +29,7 @@ Music, without Premium, and not tied to a single music service.
 | Platform | Status |
 |----------|--------|
 | Linux server (Docker) | ✅ Milestone 1: hosts rooms and serves the web app |
-| Android 13+ | Planned: host and join, works without a server |
+| Android 13+ | ✅ Milestone 2: join a room with native playback and lock screen controls. Hosting is next. |
 | Web browser | ✅ Milestone 1: join, or host through a server |
 | iOS | Not supported (the web app may work, but background playback won't) |
 
@@ -53,6 +53,7 @@ Open `http://<server>:8080`. For HTTPS, put a reverse proxy such as Caddy in fro
 | YTM module (Python 3.12+) | `ytm-module/` | `python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'`, then `YTMP_MODULE_KEY=dev YTMP_YTM_JS_RUNTIME=node .venv/bin/ytmp-ytm` |
 | Server (Kotlin, JDK 21 is downloaded by Gradle) | `server/`, `core/`, `protocol/` | `YTMP_MODULE_KEY=dev ./gradlew :server:run` |
 | Web app (Svelte, pnpm) | `frontend/` | `pnpm install && pnpm dev`, then open http://localhost:5173 |
+| Android app | `android/` | `./gradlew :android:installDebug`, then for the emulator: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080` |
 
 - Tests: `./gradlew test` and `cd ytm-module && .venv/bin/pytest`.
 - After changing anything in `protocol/`, run `./gradlew :protocol:generateTs` to update the

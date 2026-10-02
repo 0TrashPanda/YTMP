@@ -101,6 +101,25 @@ class ApplicationTest {
     }
 
     @Test
+    fun `web app falls back to index html but missing files are 404`() = testApplication {
+        val dir = kotlin.io.path.createTempDirectory("web").toFile().apply {
+            resolve("index.html").writeText("<html>app</html>")
+            resolve("_app/immutable").mkdirs()
+            resolve("_app/immutable/app.abc.js").writeText("js")
+            deleteOnExit()
+        }
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, search, ytm = null, frontendDir = dir)
+        }
+        val page = client.get("/room/ABCD")
+        assertEquals(HttpStatusCode.OK, page.status)
+        assertEquals("no-cache", page.headers[io.ktor.http.HttpHeaders.CacheControl])
+        assertEquals(HttpStatusCode.NotFound, client.get("/_app/immutable/old.js").status)
+        assertEquals(HttpStatusCode.OK, client.get("/_app/immutable/app.abc.js").status)
+    }
+
+    @Test
     fun `search goes to the sources`() = testApplication {
         setup()
         val result = jsonClient().get("/api/search?q=daft").body<SearchResponse>()

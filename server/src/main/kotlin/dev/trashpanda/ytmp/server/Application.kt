@@ -16,6 +16,7 @@ import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.CacheControl
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
@@ -34,8 +35,11 @@ import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.header
 import io.ktor.server.request.path
 import io.ktor.server.request.receive
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondFile
 import io.ktor.server.routing.get
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
@@ -147,10 +151,32 @@ fun Application.ytmpModule(
         }
 
         if (frontendDir != null && frontendDir.isDirectory) {
-            // The frontend is a single-page app: unknown paths get index.html.
-            staticFiles("/", frontendDir) { default("index.html") }
+            webApp(frontendDir)
         } else {
             log.warn("No frontend found at {}; only the API is served", frontendDir)
+        }
+    }
+}
+
+/**
+ * Serves the built web app. It is a single-page app, so unknown page paths get index.html;
+ * missing files (scripts, images) get a real 404 instead, so a stale page fails visibly.
+ */
+private fun Route.webApp(dir: File) {
+    val index = File(dir, "index.html")
+    staticFiles("/", dir) {
+        cacheControl { file ->
+            // Hashed build files never change; everything else must be revalidated.
+            if ("/_app/immutable/" in file.invariantSeparatorsPath) listOf(CacheControl.MaxAge(maxAgeSeconds = 31_536_000, visibility = CacheControl.Visibility.Public))
+            else listOf(CacheControl.NoCache(null))
+        }
+        fallback { requestedPath, call ->
+            if (requestedPath.startsWith("_app/") || '.' in requestedPath.substringAfterLast('/')) {
+                call.respond(HttpStatusCode.NotFound)
+            } else {
+                call.response.header(HttpHeaders.CacheControl, "no-cache")
+                call.respondFile(index)
+            }
         }
     }
 }

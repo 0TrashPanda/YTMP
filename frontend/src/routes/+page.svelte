@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { createRoom, getRoom } from '../lib/api';
+	import { nativeBridge } from '../lib/native';
 	import { saved } from '../lib/storage';
 
 	let name = $state(saved.displayName);
@@ -91,5 +92,12 @@
 
 	{#if error}
 		<p class="text-center text-accent">{error}</p>
+	{/if}
+
+	{#if nativeBridge}
+		<p class="text-center text-sm text-muted">
+			Server: {location.host} ·
+			<button class="underline" onclick={() => nativeBridge?.changeServer()}>Change</button>
+		</p>
 	{/if}
 </main>

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { artistNames, formatTime } from '../format';
-	import type { Player } from '../player.svelte';
+	import type { RoomPlayer } from '../player.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
 
-	let { room, player, positionMs }: { room: RoomConnection; player: Player; positionMs: number } = $props();
+	let { room, player, positionMs }: { room: RoomConnection; player: RoomPlayer; positionMs: number } = $props();
 
 	const current = $derived(room.state?.nowPlaying ?? null);
 	const playback = $derived(room.state?.playback);

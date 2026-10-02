@@ -7,7 +7,7 @@
 	import QueuePanel from '../../../lib/components/QueuePanel.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
 	import { artistNames } from '../../../lib/format';
-	import { Player } from '../../../lib/player.svelte';
+	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
 	import { saved } from '../../../lib/storage';
 	import type { Participant } from '../../../lib/protocol.gen';
@@ -16,7 +16,7 @@
 
 	let name = $state(saved.displayName);
 	let room = $state<RoomConnection | null>(null);
-	let player = $state<Player | null>(null);
+	let player = $state<RoomPlayer | null>(null);
 	let query = $state('');
 	let toasts = $state<{ id: number; text: string }[]>([]);
 	let now = $state(Date.now());
@@ -25,7 +25,7 @@
 	function start() {
 		saved.displayName = name.trim();
 		room = new RoomConnection(code, name.trim());
-		player = new Player(room);
+		player = createPlayer(room);
 		room.connect();
 	}
 	if (saved.displayName.trim()) start();
@@ -42,7 +42,15 @@
 	$effect(() => {
 		const s = room?.state;
 		void [s?.nowPlaying?.item.itemId, s?.nowPlaying?.streamUrl, s?.playback.playing, s?.playback.positionMs, s?.playback.hostTimeMs];
+		void room?.clockOffset;
 		untrack(() => player?.sync());
+	});
+
+	// In the app, "Play here" stays on between visits (a browser needs a click first).
+	$effect(() => {
+		if (room?.status === 'connected' && player?.canStartWithoutGesture && saved.listening) {
+			untrack(() => !player!.enabled && player!.enable());
+		}
 	});
 
 	const positionMs = $derived.by(() => {
@@ -80,7 +88,7 @@
 			class="flex flex-col gap-3"
 			onsubmit={(e) => {
 				e.preventDefault();
-				if (saved.displayName.trim()) start();
+				if (name.trim()) start();
 			}}
 		>
 			<input
@@ -137,16 +145,16 @@
 			</div>
 		{/if}
 
-		<div class="grid min-h-0 flex-1 grid-rows-[1fr_minmax(0,40%)] lg:grid-cols-[1fr_420px] lg:grid-rows-1">
+		<div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,40%)] lg:grid-cols-[minmax(0,1fr)_420px] lg:grid-rows-[minmax(0,1fr)]">
 			<main class="min-h-0 overflow-y-auto p-3 sm:p-6">
 				{#if query.trim()}
 					<SearchResults {room} {query} onToast={toast} />
 				{:else if room.state?.nowPlaying}
 					{@const song = room.state.nowPlaying.item.song}
-					<div class="flex h-full flex-col items-center justify-center gap-6 text-center">
-						<Art {song} size={544} class="aspect-square w-full max-w-sm shadow-2xl lg:max-w-md" />
-						<div>
-							<h1 class="text-2xl font-bold">{song.title}</h1>
+					<div class="flex h-full min-w-0 flex-col items-center justify-center gap-4 text-center sm:gap-6">
+						<Art {song} size={544} class="aspect-square w-[min(100%,28rem,38vh)] shadow-2xl" />
+						<div class="w-full min-w-0">
+							<h1 class="text-xl font-bold break-words sm:text-2xl">{song.title}</h1>
 							<p class="text-muted">{artistNames(song)}</p>
 							<p class="mt-1 text-sm text-muted">Added by {room.state.nowPlaying.item.addedByName}</p>
 						</div>

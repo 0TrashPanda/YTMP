@@ -1,5 +1,28 @@
 # Android App
 
+## Client mode (milestone 2) ✅
+
+- The WebView loads the **web app straight from the server** (`http(s)://server/`), so the app
+  and the server's UI can never get out of sync, and there is no CORS. A small bundled page
+  (`assets/setup.html`) asks for the server address the first time.
+- The web app detects the app through the `YtmpNative` JS bridge and then uses a
+  `NativePlayer`: instead of playing audio itself, it sends the playback target (song,
+  stream URL, proxy URL, position, host time, clock offset, volume) to the app on every change.
+- `PlaybackService` (Media3) plays it and does the drift correction. Media buttons (lock
+  screen, notification, headphones, Bluetooth) are turned into **room commands**
+  (`window.__ytmpNative.onCommand`), so they control the room, not just this phone.
+- Losing audio focus or unplugging headphones stops playback **on this phone only**.
+- The page keeps running in the background (renderer priority *important*), so it
+  follows the room with the screen off. Tested on the emulator: other people's skips
+  arrive with the screen off, and media keys work with the app in the background.
+- Known limitation: swiping the app away from recents stops playback, because the room
+  connection lives in the page.
+- Debug builds enable WebView debugging (`chrome://inspect`) and log the page's console to
+  logcat (tag `YtmpWeb`).
+
+For hosting on the phone (milestone 3), the APK will bundle the web app and the phone's own
+server will serve it.
+
 ## Structure
 
 - **Kotlin app** that contains the host core (when hosting), the on-device YTM module
