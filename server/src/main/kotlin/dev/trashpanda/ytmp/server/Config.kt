@@ -13,6 +13,7 @@ data class Config(
     val server: ServerConfig = ServerConfig(),
     val ytm: YtmConfig = YtmConfig(),
     val rooms: RoomsConfig = RoomsConfig(),
+    val cast: CastConfig = CastConfig(),
 ) {
     companion object {
         private val toml = Toml(TomlInputConfig(ignoreUnknownNames = true))
@@ -48,6 +49,21 @@ data class YtmConfig(
     val url: String = "http://127.0.0.1:8401",
     /** Shared key, must match YTMP_MODULE_KEY of the module. */
     val key: String = "",
+)
+
+@Serializable
+data class CastConfig(
+    /** Find Chromecasts on the network with mDNS. Inside Docker this needs `network_mode: host`. */
+    val discovery: Boolean = true,
+    /** Cast devices to always offer, as "host" or "Name=host", e.g. "Living room=10.0.0.109". */
+    val devices: List<String> = emptyList(),
+    /**
+     * Where Cast devices fetch the audio, e.g. "http://10.0.0.5:8080". Default: this server's
+     * address on the device's network, with the server port. Set it when that address isn't
+     * reachable (Docker without host networking, a reverse proxy, …).
+     */
+    @SerialName("audio_base_url")
+    val audioBaseUrl: String = "",
 )
 
 @Serializable

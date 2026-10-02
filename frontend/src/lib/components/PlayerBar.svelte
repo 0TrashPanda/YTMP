@@ -4,8 +4,17 @@
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
+	import OutputsSheet from './OutputsSheet.svelte';
 
-	let { room, player, positionMs }: { room: RoomConnection; player: RoomPlayer; positionMs: number } = $props();
+	let {
+		room,
+		player,
+		positionMs,
+		onToast
+	}: { room: RoomConnection; player: RoomPlayer; positionMs: number; onToast: (text: string) => void } = $props();
+
+	let showOutputs = $state(false);
+	const activeOutputs = $derived(room.state?.outputs.filter((o) => o.active).length ?? 0);
 
 	const current = $derived(room.state?.nowPlaying ?? null);
 	const playback = $derived(room.state?.playback);
@@ -73,6 +82,14 @@
 		</div>
 
 		<div class="flex items-center gap-2">
+			<button
+				class="rounded-full p-2 hover:bg-raised {activeOutputs ? 'text-accent' : ''}"
+				aria-label="Speakers and TVs"
+				title={activeOutputs ? `Playing on ${activeOutputs} speaker(s)` : 'Play on a speaker or TV'}
+				onclick={() => (showOutputs = true)}
+			>
+				<Icon name="cast" size={20} />
+			</button>
 			{#if player.enabled}
 				<button
 					class="rounded-full p-2 hover:bg-raised {showSync ? 'bg-raised' : ''}"
@@ -133,6 +150,9 @@
 				{/if}
 			</p>
 		</div>
+	{/if}
+	{#if showOutputs}
+		<OutputsSheet {room} onClose={() => (showOutputs = false)} {onToast} />
 	{/if}
 	{#if player.error}
 		<p class="px-4 pb-2 text-sm text-accent">{player.error}</p>

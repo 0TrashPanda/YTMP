@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktoml.core)
+    implementation(libs.jmdns)
     implementation(libs.logback.classic)
 
     testImplementation(kotlin("test"))

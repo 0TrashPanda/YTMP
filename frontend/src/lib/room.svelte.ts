@@ -199,6 +199,9 @@ export class RoomConnection {
 			case 'PlaybackChanged':
 				s.playback = e.playback;
 				break;
+			case 'OutputsChanged':
+				s.outputs = e.outputs;
+				break;
 			case 'RoomUpdated':
 				s.room = e.room;
 				break;

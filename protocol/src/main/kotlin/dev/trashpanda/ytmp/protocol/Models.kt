@@ -105,6 +105,25 @@ data class RoomInfo(
     val visibility: RoomVisibility,
 )
 
+@Serializable
+@SerialName("OutputKind")
+enum class OutputKind {
+    @SerialName("chromecast") CHROMECAST,
+}
+
+/** A speaker or TV the host can play the room on. */
+@Serializable
+@SerialName("OutputInfo")
+data class OutputInfo(
+    val id: String,
+    val name: String,
+    val kind: OutputKind,
+    /** The room is playing on it. */
+    val active: Boolean,
+    /** 0.0–1.0, or null if unknown (not active). */
+    val volume: Double?,
+)
+
 /** Full room state, sent on connect and on [ClientMessage.RequestSnapshot]. */
 @Serializable
 @SerialName("RoomState")
@@ -115,4 +134,5 @@ data class RoomState(
     val history: List<QueueItem>,
     val nowPlaying: NowPlaying?,
     val playback: PlaybackStatus,
+    val outputs: List<OutputInfo>,
 )

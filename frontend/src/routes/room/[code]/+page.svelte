@@ -201,7 +201,7 @@
 		</div>
 
 		{#if player}
-			<PlayerBar {room} {player} {positionMs} />
+			<PlayerBar {room} {player} {positionMs} onToast={toast} />
 		{/if}
 	</div>
 

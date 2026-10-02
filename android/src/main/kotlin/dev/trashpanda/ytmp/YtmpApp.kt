@@ -27,7 +27,10 @@ class YtmpApp : Application() {
                 nearby.announce(rooms)
                 if (rooms.isEmpty()) {
                     HostService.stop(this@YtmpApp)
+                    host.castFinder.stop()
                 } else {
+                    // Look for Chromecasts only while hosting, to save battery.
+                    host.castFinder.start()
                     val text = rooms.singleOrNull()?.let { "Hosting ${it.name} (${it.code})" } ?: "Hosting ${rooms.size} rooms"
                     runCatching { HostService.update(this@YtmpApp, text) }
                 }

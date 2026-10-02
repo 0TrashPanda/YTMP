@@ -14,3 +14,12 @@ key = ""
 # letters | digits | alnum
 code_style = "letters"
 code_length = 4
+
+[cast]
+# Find Chromecasts on the network (mDNS). In Docker this needs network_mode: host.
+discovery = true
+# Cast devices to always offer, as "host" or "Name=host".
+devices = []
+# Where Cast devices fetch the audio. Empty = this server's address + port.
+audio_base_url = ""
+

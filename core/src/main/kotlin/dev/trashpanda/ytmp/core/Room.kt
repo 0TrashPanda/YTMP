@@ -6,6 +6,7 @@ import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.NowPlaying
+import dev.trashpanda.ytmp.protocol.OutputInfo
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.Participant
 import dev.trashpanda.ytmp.protocol.PlaybackStatus
@@ -25,6 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * One room: participants, the queue, the history and the playback clock.
@@ -75,6 +77,11 @@ class Room(
     private var wantPlaying = false
     private var positionAtAnchor = 0L
     private var anchorTime = 0L
+
+    /** Outputs the host found, and the ones this room plays on (with their wanted volume). */
+    private var availableOutputs: List<OutputDevice> = emptyList()
+    private val activeOutputs = LinkedHashMap<String, Double?>()
+    private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
 
     private var resolveJob: Job? = null
     private var endJob: Job? = null
@@ -164,6 +171,43 @@ class Room(
     fun close() {
         resolveJob?.cancel()
         endJob?.cancel()
+        changeListeners.clear()
+    }
+
+    // --- outputs ----------------------------------------------------------------------
+
+    /** Called by the host when it finds or loses speakers. */
+    suspend fun setAvailableOutputs(devices: List<OutputDevice>) = mutex.withLock {
+        availableOutputs = devices
+        activeOutputs.keys.retainAll(devices.map { it.id }.toSet())
+        emit(Event.OutputsChanged(outputInfos()))
+    }
+
+    /** Called by an output driver with the volume the device actually has. */
+    suspend fun reportOutputVolume(outputId: String, volume: Double) = mutex.withLock {
+        if (outputId in activeOutputs && activeOutputs[outputId] != volume) {
+            activeOutputs[outputId] = volume
+            emit(Event.OutputsChanged(outputInfos()))
+        }
+    }
+
+    /** [listener] is called (on any thread, without waiting) after every change. Read [view] to see what changed. */
+    fun addChangeListener(listener: () -> Unit) {
+        changeListeners += listener
+    }
+
+    suspend fun view(): RoomView = mutex.withLock {
+        RoomView(
+            current = current.takeIf { streamUrl != null },
+            playing = wantPlaying && streamUrl != null,
+            positionMs = position(),
+            hostTimeMs = clock(),
+            activeOutputs = LinkedHashMap(activeOutputs),
+        )
+    }
+
+    private fun outputInfos(): List<OutputInfo> = availableOutputs.map {
+        OutputInfo(it.id, it.name, it.kind, active = it.id in activeOutputs, volume = activeOutputs[it.id])
     }
 
     // --- commands ---------------------------------------------------------------------
@@ -233,6 +277,16 @@ class Room(
             is Command.SetListening -> {
                 member.listening = command.on
                 emit(Event.ParticipantUpdated(member.toParticipant()))
+            }
+            is Command.SetOutput -> {
+                if (availableOutputs.none { it.id == command.outputId }) return ErrorInfo(ErrorCode.NOT_FOUND, "That speaker isn't available")
+                if (command.active) activeOutputs.putIfAbsent(command.outputId, null) else activeOutputs.remove(command.outputId)
+                emit(Event.OutputsChanged(outputInfos()))
+            }
+            is Command.SetOutputVolume -> {
+                if (command.outputId !in activeOutputs) return ErrorInfo(ErrorCode.NOT_FOUND, "Not playing on that speaker")
+                activeOutputs[command.outputId] = command.volume.coerceIn(0.0, 1.0)
+                emit(Event.OutputsChanged(outputInfos()))
             }
             is Command.SetVisibility -> {
                 if (!member.isOwner) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "Only the owner can change this")
@@ -384,6 +438,7 @@ class Room(
         history = history.takeLast(SNAPSHOT_HISTORY),
         nowPlaying = current?.let { NowPlaying(it, streamUrl) },
         playback = playbackStatus(),
+        outputs = outputInfos(),
     )
 
     private fun newItem(song: Song, member: Member) =
@@ -392,6 +447,7 @@ class Room(
     private fun emit(event: Event) {
         val message = ServerMessage.EventMessage(++seq, event)
         for (member in members.values) member.outbox?.send(message)
+        for (listener in changeListeners) listener()
     }
 
     private fun invalid(message: String) = ErrorInfo(ErrorCode.INVALID, message)

@@ -32,6 +32,7 @@ require them.
 protocol/       Kotlin: shared message types (+ generated protocol.d.ts)
 core/           Kotlin: host core (rooms, queue, permissions, sync), used by server and Android
 host/           Kotlin (Ktor): HTTP API, room WebSocket and web app hosting, shared by server and Android
+cast/           Kotlin: Google Cast client (Cast v2 protocol), shared by server and Android
 server/         Kotlin (Ktor): Linux server, web UI hosting, auth server, admin page
 android/        Kotlin: Android app (WebView, Media3, Chaquopy, Ktor host)
 frontend/       Svelte 5 + SvelteKit (static) + Tailwind + TypeScript
@@ -83,6 +84,6 @@ deploy/         docker-compose.yml, example ytmp.toml, Caddyfile
 2. **Android app as a client**: join a room, native playback (Media3), lock screen and
    Bluetooth controls.
 3. **Android host**: hosting on the phone, solo rooms, LAN discovery and QR, on-device YTM.
-4. **Sonos** output.
+4. **Chromecast** output (chosen instead of Sonos, which moves to *everything else*).
 5. **Everything else**: accounts, permissions and roles, history, song graph, radio, party
-   screen, Chromecast, …
+   screen, Sonos, …

@@ -91,8 +91,8 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `Seek` ✅ | `positionMs` | Seek |
 | `SetRepeat` | `mode: "off" \| "queue" \| "one"` | Repeat |
 | `VoteSkip` / `UnvoteSkip` | – | Vote to skip |
-| `SetOutputs` | `outputIds` | Change host outputs |
-| `SetOutputVolume` | `outputId`, `volume` | Host output volume |
+| `SetOutput` ✅ | `outputId`, `active` | Change host outputs |
+| `SetOutputVolume` ✅ | `outputId`, `volume` (0–1) | Host output volume |
 
 ### Client playback
 
@@ -145,7 +145,7 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 | `Notice` ✅ | `message` (for example a song that can't be played) | everyone |
 | `RepeatChanged` | `mode` | everyone |
 | `SkipVotesChanged` | `votes`, `needed` | everyone |
-| `OutputsChanged` | `outputs` | everyone |
+| `OutputsChanged` ✅ | `outputs` (id, name, kind, active, volume) | everyone |
 | `RoomSettingsChanged` | `settings` | everyone |
 | `RolesChanged` | `roles` | everyone |
 | `OwnerChanged` | `participantId` | everyone |

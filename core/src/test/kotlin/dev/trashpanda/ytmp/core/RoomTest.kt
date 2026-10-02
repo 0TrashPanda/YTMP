@@ -234,4 +234,31 @@ class RoomTest {
         val result = guest.messages.filterIsInstance<ServerMessage.Result>().single()
         assertEquals(dev.trashpanda.ytmp.protocol.ErrorCode.PERMISSION_DENIED, result.error?.code)
     }
+
+    @Test
+    fun `outputs can be switched on, get a volume, and disappear with their device`() = runTest {
+        val room = newRoom()
+        val client = room.connect()
+        var changes = 0
+        room.addChangeListener { changes++ }
+        val bose = OutputDevice("cast:bose", "Bose", dev.trashpanda.ytmp.protocol.OutputKind.CHROMECAST)
+
+        room.setAvailableOutputs(listOf(bose))
+        room.run(client, Command.SetOutput("cast:bose", active = true))
+        room.run(client, Command.SetOutputVolume("cast:bose", 0.4))
+        assertEquals(mapOf("cast:bose" to 0.4), room.view().activeOutputs)
+        assertEquals(true, client.events.filterIsInstance<Event.OutputsChanged>().last().outputs.single().active)
+
+        room.setAvailableOutputs(emptyList())
+        assertEquals(emptyMap(), room.view().activeOutputs)
+        assertTrue(changes >= 4)
+    }
+
+    @Test
+    fun `an unknown output can't be switched on`() = runTest {
+        val room = newRoom()
+        val client = room.connect()
+        room.run(client, Command.SetOutput("cast:nope", active = true))
+        assertEquals(dev.trashpanda.ytmp.protocol.ErrorCode.NOT_FOUND, client.messages.filterIsInstance<ServerMessage.Result>().last().error?.code)
+    }
 }

@@ -13,12 +13,24 @@ Because the Chromecast fetches the audio itself, the URL must be one it can reac
 play. That means the host's **proxied audio URL** (see [playback-sync](playback-sync.md)),
 not a direct YouTube URL, because those are tied to the host's IP address.
 
-## Per platform
+## Implementation ✅ (milestone 4)
 
-| Host | How |
-|------|-----|
-| Android | Official **Google Cast SDK** (needs Google Play Services) |
-| Linux server | No official SDK. Use an open-source Cast protocol library for the JVM, or talk the Cast protocol directly (TLS + protobuf on port 8009) |
+**Our own Cast client**, no Google Cast SDK: the `cast/` module (Kotlin, shared by the Linux
+server and the Android app) speaks the Cast v2 protocol directly: TLS to port 8009, protobuf
+`CastMessage` frames with JSON payloads, heartbeats, and the Default Media Receiver
+(`CC1AD845`) for playback. Tested read-only against real devices, and end-to-end against a
+simulated device (`host/src/test/.../FakeCastDevice.kt`).
+
+- **Discovery:** mDNS `_googlecast._tcp` (TXT `fn` = name, `id`). Server: JmDNS, plus fixed
+  devices in `ytmp.toml` (`[cast] devices = ["Bose=10.0.0.109"]`), because mDNS doesn't work
+  inside Docker without `network_mode: host`. Phone: Android's NsdManager, only while hosting.
+- **Driver** (`host/.../CastOutputs.kt`): one per room. For every Cast device the room plays
+  on it launches the media player, loads the current song from the host's `/api/audio/…`
+  (a little ahead of the room's position, since devices start late), follows play/pause,
+  applies volume, and seeks when more than 2 s off. Switching an output off stops the player.
+- **Audio URL:** the host's address on the device's network (our side of the Cast connection)
+  plus its port. Override on the server with `[cast] audio_base_url` (e.g. behind Docker
+  without host networking).
 
 ## Sync
 

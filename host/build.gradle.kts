@@ -11,6 +11,7 @@ kotlin {
 // (Netty) and the Android app (CIO). No engine here: each side picks its own.
 dependencies {
     api(project(":core"))
+    api(project(":cast"))
     api(libs.ktor.server.core)
     api(libs.ktor.server.websockets)
     implementation(libs.ktor.server.content.negotiation)

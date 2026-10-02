@@ -36,8 +36,16 @@ class RoomManager(
     private val codeLength: Int = 4,
     private val timeouts: RoomTimeouts = RoomTimeouts(),
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Speakers and TVs the host found; every room can play on them. */
+    private val outputs: StateFlow<List<OutputDevice>> = MutableStateFlow(emptyList()),
 ) {
     private val rooms = ConcurrentHashMap<String, Room>()
+
+    init {
+        scope.launch {
+            outputs.collect { devices -> for (room in rooms.values) room.setAvailableOutputs(devices) }
+        }
+    }
     private val random = SecureRandom()
     private val _list = MutableStateFlow<List<RoomInfo>>(emptyList())
 
@@ -49,6 +57,7 @@ class RoomManager(
             val code = newCode()
             val room = Room(code, name, Ids.token(), visibility, streams, scope, onInfoChanged = ::refreshList, clock = clock)
             if (rooms.putIfAbsent(code, room) == null) {
+                scope.launch { room.setAvailableOutputs(outputs.value) }
                 refreshList()
                 return room
             }
@@ -56,6 +65,9 @@ class RoomManager(
     }
 
     operator fun get(code: String): Room? = rooms[normalize(code)]
+
+    /** All rooms right now. */
+    fun all(): List<Room> = rooms.values.toList()
 
     val count: Int get() = rooms.size
 

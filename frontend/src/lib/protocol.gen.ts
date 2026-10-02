@@ -80,6 +80,18 @@ export interface CommandSetListening {
   on: boolean;
 }
 
+export interface CommandSetOutput {
+  kind: "SetOutput";
+  outputId: string;
+  active: boolean;
+}
+
+export interface CommandSetOutputVolume {
+  kind: "SetOutputVolume";
+  outputId: string;
+  volume: number;
+}
+
 export type RoomVisibility = "public" | "private";
 
 export interface CommandSetVisibility {
@@ -102,6 +114,8 @@ export type Command =
   | CommandRemoveQueueItem
   | CommandSeek
   | CommandSetListening
+  | CommandSetOutput
+  | CommandSetOutputVolume
   | CommandSetVisibility
   | CommandSkip;
 
@@ -164,6 +178,21 @@ export interface EventNotice {
 export interface EventNowPlayingChanged {
   kind: "NowPlayingChanged";
   item: QueueItem | null;
+}
+
+export type OutputKind = "chromecast";
+
+export interface OutputInfo {
+  id: string;
+  name: string;
+  kind: OutputKind;
+  active: boolean;
+  volume: number | null;
+}
+
+export interface EventOutputsChanged {
+  kind: "OutputsChanged";
+  outputs: OutputInfo[];
 }
 
 export interface Participant {
@@ -239,6 +268,7 @@ export type Event =
   | EventHistoryItemRemoved
   | EventNotice
   | EventNowPlayingChanged
+  | EventOutputsChanged
   | EventParticipantJoined
   | EventParticipantLeft
   | EventParticipantUpdated
@@ -293,6 +323,7 @@ export interface RoomState {
   history: QueueItem[];
   nowPlaying: NowPlaying | null;
   playback: PlaybackStatus;
+  outputs: OutputInfo[];
 }
 
 export interface ServerMessageSnapshot {

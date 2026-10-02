@@ -20,6 +20,10 @@ class ConfigTest {
                 [rooms]
                 code_style = "digits"
                 code_length = 6
+
+                [cast]
+                discovery = false
+                devices = ["Bose=10.0.0.109", "10.0.0.101"]
                 """.trimIndent(),
             )
             deleteOnExit()
@@ -31,6 +35,8 @@ class ConfigTest {
         assertEquals("http://module:8401", config.ytm.url)
         assertEquals("from-env", config.ytm.key)
         assertEquals(6, config.rooms.codeLength)
+        assertEquals(false, config.cast.discovery)
+        assertEquals(listOf("Bose=10.0.0.109", "10.0.0.101"), config.cast.devices)
     }
 
     @Test

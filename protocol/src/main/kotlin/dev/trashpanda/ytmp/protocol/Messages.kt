@@ -94,6 +94,15 @@ sealed interface Command {
     @SerialName("SetListening")
     data class SetListening(val on: Boolean) : Command
 
+    /** Plays the room on a speaker or TV, or stops playing on it. */
+    @Serializable
+    @SerialName("SetOutput")
+    data class SetOutput(val outputId: String, val active: Boolean) : Command
+
+    @Serializable
+    @SerialName("SetOutputVolume")
+    data class SetOutputVolume(val outputId: String, val volume: Double) : Command
+
     /** Owner only. Makes a solo room public, or a public room solo again. */
     @Serializable
     @SerialName("SetVisibility")
@@ -219,6 +228,11 @@ sealed interface Event {
     @Serializable
     @SerialName("PlaybackChanged")
     data class PlaybackChanged(val playback: PlaybackStatus) : Event
+
+    /** Outputs appeared, disappeared, were switched on or off, or changed volume. */
+    @Serializable
+    @SerialName("OutputsChanged")
+    data class OutputsChanged(val outputs: List<OutputInfo>) : Event
 
     /** The room's name or visibility changed. */
     @Serializable

@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.ytmpModule
 import dev.trashpanda.ytmp.protocol.HostKind
@@ -31,8 +32,15 @@ fun main(args: Array<String>) {
     val ytm = RemoteSourceModule(http, config.ytm.url.trimEnd('/'), config.ytm.key)
 
     embeddedServer(Netty, port = config.server.port, host = config.server.host) {
-        val rooms = RoomManager(ytm, this, config.rooms.style(), config.rooms.codeLength)
+        val casts = CastOutputs(this) { localAddress ->
+            config.cast.audioBaseUrl.trimEnd('/').ifEmpty { "http://${localAddress.hostAddress}:${config.server.port}" }
+        }
+        casts.addConfigured(config.cast.devices)
+        if (config.cast.discovery) casts.discover()
+
+        val rooms = RoomManager(ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = casts.devices)
         rooms.startCleanup()
+        casts.attach(rooms)
         ytmpModule(rooms, search = ytm, audio = ytm, webApp = File(config.server.frontend), HostOptions(kind = HostKind.SERVER))
     }.start(wait = true)
 }

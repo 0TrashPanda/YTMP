@@ -23,11 +23,16 @@ import java.net.Inet4Address
 class LocalHost(private val context: Context) {
     val ytm by lazy { OnDeviceYtm(context) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val rooms = RoomManager(streams = { ytm.resolveStream(it) }, scope = scope)
+
+    /** Chromecasts on the network; they fetch the audio from this phone. */
+    val casts = CastOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
+    val castFinder = CastFinder(context, casts)
+    val rooms = RoomManager(streams = { ytm.resolveStream(it) }, scope = scope, outputs = casts.devices)
 
     fun start() {
         val webApp = installWebApp()
         rooms.startCleanup()
+        casts.attach(rooms)
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
             ytmpModule(
                 rooms,
