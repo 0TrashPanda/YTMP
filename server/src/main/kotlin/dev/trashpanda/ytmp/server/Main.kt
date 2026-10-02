@@ -3,6 +3,10 @@ package dev.trashpanda.ytmp.server
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
+import dev.trashpanda.ytmp.host.SonosOutputs
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import dev.trashpanda.ytmp.host.CachedSource
 import dev.trashpanda.ytmp.host.PlayReporter
 import dev.trashpanda.ytmp.host.TrustedAuthServers
@@ -58,6 +62,12 @@ fun main(args: Array<String>) {
         }
         casts.addConfigured(config.cast.devices)
         if (config.cast.discovery) casts.discover()
+        val sonos = SonosOutputs(this) { localAddress ->
+            config.cast.audioBaseUrl.trimEnd('/').ifEmpty { "http://${localAddress.hostAddress}:${config.server.port}" }
+        }
+        config.sonos.devices.forEach(sonos::addHost)
+        if (config.sonos.discovery) sonos.discover()
+        val outputs = combine(casts.devices, sonos.devices) { a, b -> a + b }.stateIn(this, SharingStarted.Eagerly, emptyList())
 
         val db = Database.open(config.database)
         val accounts = Accounts(db)
@@ -79,13 +89,14 @@ fun main(args: Array<String>) {
 
         val plays = PlayReporter(auth, this)
         val rooms = RoomManager(
-            ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = casts.devices, store = JdbcRoomStore(db),
+            ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = outputs, store = JdbcRoomStore(db),
             onPlayFinished = plays::report,
             radio = cached,
         )
         rooms.startCleanup()
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
         casts.attach(rooms)
+        sonos.attach(rooms)
 
         ytmpModule(
             rooms,

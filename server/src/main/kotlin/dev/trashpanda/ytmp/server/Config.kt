@@ -15,6 +15,7 @@ data class Config(
     val ytm: YtmConfig = YtmConfig(),
     val rooms: RoomsConfig = RoomsConfig(),
     val cast: CastConfig = CastConfig(),
+    val sonos: SonosConfig = SonosConfig(),
     val database: DatabaseConfig = DatabaseConfig(),
     val accounts: AccountsConfig = AccountsConfig(),
 ) {
@@ -75,6 +76,14 @@ data class CastConfig(
      */
     @SerialName("audio_base_url")
     val audioBaseUrl: String = "",
+)
+
+@Serializable
+data class SonosConfig(
+    /** Find Sonos speakers with SSDP. Needs UDP multicast replies to reach the server (firewall, Docker host networking). */
+    val discovery: Boolean = true,
+    /** Sonos speakers to always offer, by IP address, e.g. "192.168.68.100". They're named after their room. */
+    val devices: List<String> = emptyList(),
 )
 
 /** See docs/implementation/storage.md. */

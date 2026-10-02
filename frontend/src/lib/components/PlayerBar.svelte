@@ -57,8 +57,53 @@
 		}}
 		style="background: linear-gradient(to right, var(--color-accent) {(shown / (duration || 1)) * 100}%, var(--color-line) 0)"
 	/>
-	<!-- Controls left, the song in the middle (centered), outputs and "Play here" right. -->
-	<div class="grid h-18 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-2 sm:grid-cols-[1fr_minmax(0,auto)_1fr] sm:gap-4 sm:px-4">
+	<!-- Phones: like YTM's mini player. The song first, then play/pause, next, Play here, speakers. -->
+	<div class="flex h-16 items-center gap-1 pr-1 pl-2 sm:hidden">
+		<div class="flex min-w-0 flex-1 items-center gap-2.5" role="presentation" oncontextmenu={onSongMenu}>
+			<Art song={current?.item.song ?? null} size={48} class="h-10 w-10 shrink-0" />
+			<div class="min-w-0 flex-1">
+				<div class="truncate text-sm font-medium">{current?.item.song.title ?? 'Nothing playing'}</div>
+				<div class="truncate text-xs text-muted">
+					{#if current}
+						{artistNames(current.item.song)}{loading ? ' • loading…' : player.buffering ? ' • buffering…' : ''}
+					{/if}
+				</div>
+			</div>
+		</div>
+		<button
+			class="shrink-0 rounded-full p-1.5 disabled:opacity-40"
+			disabled={!room.can('play_pause')}
+			aria-label={playback?.playing ? 'Pause' : 'Play'}
+			onclick={() => room.run({ kind: playback?.playing ? 'Pause' : 'Play' })}
+		>
+			<Icon name={playback?.playing ? 'pause' : 'play'} size={32} />
+		</button>
+		<button class="shrink-0 rounded-full p-1.5 disabled:opacity-40" aria-label="Next" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Skip' })}>
+			<Icon name="next" size={26} />
+		</button>
+		<button
+			class="shrink-0 rounded-full p-2 {player.enabled ? 'bg-white text-black' : ''}"
+			aria-label={player.enabled ? 'Playing here (tap to stop)' : 'Play here'}
+			onclick={() => (player.enabled ? player.disable() : player.enable())}
+		>
+			<Icon name="headphones" size={20} />
+		</button>
+		<button
+			class="shrink-0 rounded-full p-2 {activeOutputs ? 'text-accent' : ''}"
+			aria-label="Speakers and TVs"
+			onclick={() => (showOutputs = true)}
+		>
+			<Icon name="cast" size={20} />
+		</button>
+		{#if player.enabled}
+			<button class="shrink-0 rounded-full p-2 {showSync ? 'bg-raised' : ''}" aria-label="Sync adjustment" onclick={() => (showSync = !showSync)}>
+				<Icon name="tune" size={18} />
+			</button>
+		{/if}
+	</div>
+
+	<!-- Larger screens: controls left, the song in the middle (centered), outputs and "Play here" right. -->
+	<div class="hidden h-18 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-4 px-4 sm:grid">
 		<div class="flex items-center justify-self-start">
 			<button class="rounded-full p-2 hover:bg-raised disabled:opacity-40" aria-label="Previous" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Previous' })}>
 				<Icon name="previous" />

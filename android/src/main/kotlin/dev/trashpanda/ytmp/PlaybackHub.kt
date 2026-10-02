@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp
 
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
 
@@ -20,6 +21,8 @@ data class PlaybackTarget(
     val clockOffset: Double,
     /** This device's sync adjustment; positive plays earlier (for speaker/Bluetooth delay). */
     val syncOffsetMs: Long = 0,
+    /** Nobody else plays along: only fix big drift (see [SyncCorrection.ALONE_TOLERANCE_MS]). */
+    val alone: Boolean = false,
     val volume: Float,
 )
 
@@ -49,7 +52,10 @@ object PlaybackHub {
     var statusSink: ((String) -> Unit)? = null
 
     fun command(json: String) {
-        commandSink?.invoke(json)
+        val sink = commandSink
+        if (sink == null) Log.w("YtmpPlayback", "Media control $json, but the app's page isn't there to run it")
+        else Log.d("YtmpPlayback", "Media control $json")
+        sink?.invoke(json)
     }
 
     fun status(status: String) {

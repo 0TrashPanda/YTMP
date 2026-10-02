@@ -18,6 +18,12 @@ path = "ytmp.db"
 # PostgreSQL, e.g. "postgresql://ytmp:secret@localhost/ytmp"
 url = ""
 
+[sonos]
+# Find Sonos speakers (SSDP). Needs UDP multicast replies to reach the server.
+discovery = true
+# Sonos speakers to always offer, by IP address. They're named after their Sonos room.
+devices = []
+
 [accounts]
 # This server's public address. Logins on pages served from there work; without it only
 # this machine's own IP addresses do. YTMP_URL overrides it.

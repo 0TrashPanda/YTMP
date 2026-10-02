@@ -128,7 +128,7 @@ class WebPlayer implements RoomPlayer {
 			return;
 		}
 
-		const fix = correction(this.audio.currentTime * 1000 - expectedMs, this.audio.playbackRate);
+		const fix = correction(this.audio.currentTime * 1000 - expectedMs, this.audio.playbackRate, this.room.listeningAlone);
 		if (fix.seek) this.audio.currentTime = expectedMs / 1000;
 		if (this.audio.playbackRate !== fix.rate) this.audio.playbackRate = fix.rate;
 		if (this.audio.paused) {
@@ -277,6 +277,7 @@ class NativePlayer implements RoomPlayer {
 				hostTimeMs: state?.playback.hostTimeMs ?? 0,
 				clockOffset: this.room.clockOffset,
 				syncOffsetMs: this.syncOffsetMs,
+				alone: this.room.listeningAlone,
 				volume: this.volume
 			})
 		);

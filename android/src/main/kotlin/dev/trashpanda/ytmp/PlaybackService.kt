@@ -158,7 +158,7 @@ class PlaybackService : MediaSessionService() {
         }
         val drift = sync.addSample(reading) ?: return
 
-        val seekTo = sync.onSettledDrift(drift, expected) ?: return
+        val seekTo = sync.onSettledDrift(drift, expected, target.alone) ?: return
         Log.d(TAG, "drift $drift ms -> seek (lead ${sync.seekLeadMs} ms)")
         exo.seekTo(seekTo)
         settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
@@ -220,13 +220,22 @@ class PlaybackService : MediaSessionService() {
 
         override fun isCommandAvailable(command: Int): Boolean = command in roomCommands || super.isCommandAvailable(command)
 
-        override fun play() = PlaybackHub.command("""{"kind":"Play"}""")
+        override fun play() {
+            Log.d(TAG, "media session: play")
+            PlaybackHub.command("""{"kind":"Play"}""")
+        }
 
-        override fun pause() = PlaybackHub.command("""{"kind":"Pause"}""")
+        override fun pause() {
+            Log.d(TAG, "media session: pause")
+            PlaybackHub.command("""{"kind":"Pause"}""")
+        }
 
         override fun setPlayWhenReady(playWhenReady: Boolean) = if (playWhenReady) play() else pause()
 
-        override fun seekToNext() = PlaybackHub.command("""{"kind":"Skip"}""")
+        override fun seekToNext() {
+            Log.d(TAG, "media session: next")
+            PlaybackHub.command("""{"kind":"Skip"}""")
+        }
 
         override fun seekToNextMediaItem() = seekToNext()
 

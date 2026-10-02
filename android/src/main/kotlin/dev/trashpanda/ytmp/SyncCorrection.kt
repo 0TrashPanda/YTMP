@@ -43,7 +43,9 @@ class SyncCorrection {
      * Called with the drift (positive = ahead) once playback has settled after the last seek.
      * Returns the position to seek to, or null if no correction is needed.
      */
-    fun onSettledDrift(driftMs: Long, targetMs: Long): Long? {
+    fun onSettledDrift(driftMs: Long, targetMs: Long, alone: Boolean = false): Long? {
+        // Nobody to stay in sync with: only fix what's clearly wrong (a seek, a long stall).
+        if (alone) return if (abs(driftMs) > ALONE_TOLERANCE_MS) targetMs + seekLeadMs else null
         if (checkLeadAfterSeek) {
             // After our last seek we ended up [driftMs] off: adjust the lead for next time,
             // by half the error, so one unlucky seek doesn't make it swing back and forth.
@@ -63,6 +65,9 @@ class SyncCorrection {
     companion object {
         /** Closer than this counts as in sync. The median of readings still varies ±40 ms. */
         const val TOLERANCE_MS = 80L
+
+        /** Listening alone: only drift bigger than this is fixed. */
+        const val ALONE_TOLERANCE_MS = 1500L
 
         /** Wait this long after a seek or load before measuring again. */
         const val SETTLE_MS = 1500L

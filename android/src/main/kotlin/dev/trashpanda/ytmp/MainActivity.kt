@@ -90,8 +90,8 @@ class MainActivity : ComponentActivity() {
             WindowInsetsCompat.CONSUMED
         }
 
-        PlaybackHub.commandSink = { command -> js("window.__ytmpNative && window.__ytmpNative.onCommand($command)") }
-        PlaybackHub.statusSink = { status -> js("window.__ytmpNative && window.__ytmpNative.onStatus(${JSONObject.quote(status)})") }
+        PlaybackHub.commandSink = commandSink
+        PlaybackHub.statusSink = statusSink
 
         // For development: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080`
         intent.getStringExtra("server")?.let { server = normalize(it) }
@@ -134,9 +134,14 @@ class MainActivity : ComponentActivity() {
         webView.saveState(outState)
     }
 
+    // This screen's own hooks: when Android replaces the screen, the old one's onDestroy can
+    // come after the new one's onCreate, and must not unhook the new one.
+    private val commandSink: (String) -> Unit = { command -> js("window.__ytmpNative && window.__ytmpNative.onCommand($command)") }
+    private val statusSink: (String) -> Unit = { status -> js("window.__ytmpNative && window.__ytmpNative.onStatus(${JSONObject.quote(status)})") }
+
     override fun onDestroy() {
-        PlaybackHub.commandSink = null
-        PlaybackHub.statusSink = null
+        if (PlaybackHub.commandSink === commandSink) PlaybackHub.commandSink = null
+        if (PlaybackHub.statusSink === statusSink) PlaybackHub.statusSink = null
         if (isFinishing) PlaybackHub.target.value = null
         webView.destroy()
         super.onDestroy()

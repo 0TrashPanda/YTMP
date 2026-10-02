@@ -44,4 +44,12 @@ class SyncCorrectionTest {
         )
         assertEquals(10_000 + 500 + 200, SyncCorrection.targetPosition(target, nowMs = 1_500))
     }
+
+    @Test
+    fun `listening alone, small drift is left alone and only big drift is fixed`() {
+        val sync = SyncCorrection()
+        assertNull(sync.onSettledDrift(300, 10_000, alone = true))
+        assertNull(sync.onSettledDrift(-1_200, 10_000, alone = true))
+        assertEquals(10_000 + sync.seekLeadMs, sync.onSettledDrift(4_000, 10_000, alone = true))
+    }
 }

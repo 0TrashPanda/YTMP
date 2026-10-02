@@ -11,6 +11,11 @@ export const START_CORRECTING_MS = 40;
 export const STOP_CORRECTING_MS = 10;
 /** Speed change while correcting: 3% faster or slower. Pitch is kept. */
 export const CORRECTION_RATE = 0.03;
+/**
+ * Listening alone (nobody else plays along): only fix drift bigger than this, by jumping.
+ * Smaller corrections would only be audible for no reason.
+ */
+export const ALONE_TOLERANCE_MS = 1500;
 
 export interface Correction {
 	seek: boolean;
@@ -22,8 +27,9 @@ export interface Correction {
  * we are playing at now. The speed only changes when starting or stopping a correction,
  * because every speed change makes the player's position briefly unreliable.
  */
-export function correction(driftMs: number, currentRate: number): Correction {
+export function correction(driftMs: number, currentRate: number, alone = false): Correction {
 	const size = Math.abs(driftMs);
+	if (alone) return { seek: size > ALONE_TOLERANCE_MS, rate: 1 };
 	if (size > SEEK_THRESHOLD_MS) return { seek: true, rate: 1 };
 	const correctingRate = driftMs > 0 ? 1 - CORRECTION_RATE : 1 + CORRECTION_RATE;
 	const correcting = currentRate !== 1;

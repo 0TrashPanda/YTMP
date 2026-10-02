@@ -33,7 +33,7 @@
 		{#each outputs as output (output.id)}
 			<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">
 				<label class="flex items-center gap-3">
-					<Icon name="cast" size={20} class={output.active ? 'text-accent' : 'text-muted'} />
+					<Icon name={output.kind === 'sonos' ? 'speaker' : 'cast'} size={20} class={output.active ? 'text-accent' : 'text-muted'} />
 					<span class="min-w-0 flex-1 truncate">{output.name}</span>
 					<input
 						type="checkbox"
@@ -59,7 +59,7 @@
 			</div>
 		{:else}
 			<p class="text-sm text-muted">
-				No speakers or TVs found. Chromecasts (and speakers with Chromecast built in) on the host's network show up here.
+				No speakers or TVs found. Chromecasts (and speakers with Chromecast built in) and Sonos speakers on the host's network show up here.
 			</p>
 		{/each}
 		<p class="text-xs text-muted">The room plays on these for everyone, in addition to whoever has "Play here" on.</p>

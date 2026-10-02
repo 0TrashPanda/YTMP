@@ -15,6 +15,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import java.io.File
 import java.net.Inet4Address
 
@@ -30,6 +33,11 @@ class LocalHost(private val context: Context) {
     /** Chromecasts on the network; they fetch the audio from this phone. */
     val casts = CastOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
     val castFinder = CastFinder(context, casts)
+
+    /** Sonos speakers on the network; they fetch the audio from this phone too. */
+    val sonos = SonosOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
+    val sonosFinder = SonosFinder(context, sonos)
+    private val outputs = combine(casts.devices, sonos.devices) { a, b -> a + b }.stateIn(scope, SharingStarted.Eagerly, emptyList())
     val authLink = AuthLink(context, PORT)
 
     /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
@@ -43,7 +51,7 @@ class LocalHost(private val context: Context) {
     )
     private val plays = PlayReporter(authLink.auth, scope)
     val rooms = RoomManager(
-        streams = { ytm.resolveStream(it) }, scope = scope, outputs = casts.devices, store = PhoneRoomStore(context),
+        streams = { ytm.resolveStream(it) }, scope = scope, outputs = outputs, store = PhoneRoomStore(context),
         onPlayFinished = plays::report,
         radio = cached,
     )
@@ -52,6 +60,7 @@ class LocalHost(private val context: Context) {
         val webApp = installWebApp()
         rooms.startCleanup()
         casts.attach(rooms)
+        sonos.attach(rooms)
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
             ytmpModule(
                 rooms,

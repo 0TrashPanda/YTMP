@@ -110,6 +110,7 @@
 		const s = room?.state;
 		void [s?.nowPlaying?.item.itemId, s?.nowPlaying?.streamUrl, s?.playback.playing, s?.playback.positionMs, s?.playback.hostTimeMs];
 		void room?.clockOffset;
+		void room?.listeningAlone;
 		untrack(() => player?.sync());
 	});
 

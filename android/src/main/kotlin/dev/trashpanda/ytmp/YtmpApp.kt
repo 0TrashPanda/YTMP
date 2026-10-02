@@ -39,11 +39,19 @@ class YtmpApp : Application() {
                 }
             }
         }
-        // Look for Chromecasts only while they can be picked or are in use, to save battery.
+        // Look for Chromecasts and Sonos only while they can be picked or are in use, to save battery.
         scope.launch {
             combine(visible, host.rooms.hosting) { shown, hosting -> shown || hosting.isNotEmpty() }
                 .distinctUntilChanged()
-                .collect { if (it) host.castFinder.start() else host.castFinder.stop() }
+                .collect {
+                    if (it) {
+                        host.castFinder.start()
+                        host.sonosFinder.start()
+                    } else {
+                        host.castFinder.stop()
+                        host.sonosFinder.stop()
+                    }
+                }
         }
     }
 }

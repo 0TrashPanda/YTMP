@@ -63,6 +63,16 @@ export class RoomConnection {
 		return this.state?.participants.find((p) => p.id === this.participantId) ?? null;
 	}
 
+	/**
+	 * Nobody else plays along: no other device has "Play here" on and no speaker is on. Then
+	 * there's nothing to stay in sync with, and small corrections would only be audible jumps.
+	 */
+	get listeningAlone(): boolean {
+		const s = this.state;
+		if (!s) return true;
+		return !s.participants.some((p) => p.id !== this.participantId && p.online && p.listening) && !s.outputs.some((o) => o.active);
+	}
+
 	/** What I may do here (see permissions.ts). */
 	get permissions(): Set<Permission> {
 		return effectivePermissions(this.me, this.state?.roles ?? []);

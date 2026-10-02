@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
@@ -51,11 +52,11 @@ class CastOutputs(
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     fun add(device: CastDeviceAddress) {
-        known.value = known.value + (device.id to device)
+        known.update { it + (device.id to device) }
     }
 
     fun remove(id: String) {
-        known.value = known.value - id
+        known.update { it - id }
     }
 
     /** Starts a driver for every room, now and as rooms are created. */

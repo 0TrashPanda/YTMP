@@ -129,6 +129,7 @@ data class RoomInfo(
 @SerialName("OutputKind")
 enum class OutputKind {
     @SerialName("chromecast") CHROMECAST,
+    @SerialName("sonos") SONOS,
 }
 
 /** A speaker or TV the host can play the room on. */

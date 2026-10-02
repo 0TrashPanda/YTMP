@@ -317,7 +317,7 @@ export interface EventNowPlayingChanged {
   item: QueueItem | null;
 }
 
-export type OutputKind = "chromecast";
+export type OutputKind = "chromecast" | "sonos";
 
 export interface OutputInfo {
   id: string;

@@ -85,5 +85,5 @@ deploy/         docker-compose.yml, example ytmp.toml, Caddyfile
    Bluetooth controls.
 3. **Android host**: hosting on the phone, solo rooms, LAN discovery and QR, on-device YTM.
 4. **Chromecast** output (chosen instead of Sonos, which moves to *everything else*).
-5. **Everything else**: accounts, permissions and roles, history, song graph, radio, party
-   screen, Sonos, …
+5. **Everything else**: accounts ✅, permissions and roles ✅, history ✅, radio ✅, Sonos ✅,
+   song graph, recap, party screen, …
