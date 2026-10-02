@@ -48,6 +48,21 @@ class FakeCastDevice : AutoCloseable {
 
     val port: Int get() = server.localPort
 
+    private val connections = CopyOnWriteArrayList<java.io.OutputStream>()
+
+    /** Someone changed the volume on the device itself: tell connected senders, like a real device. */
+    fun changeVolumeExternally(level: Double) {
+        volume = level
+        val apps = if (appRunning) """[{"appId":"CC1AD845","transportId":"web-1","sessionId":"s-1"}]""" else "[]"
+        val status = """{"type":"RECEIVER_STATUS","requestId":0,"status":{"volume":{"level":$level,"muted":false},"applications":$apps}}"""
+        for (output in connections) {
+            synchronized(output) {
+                output.write(CastMessage("receiver-0", "*", CastChannel.NS_RECEIVER, status).encode())
+                output.flush()
+            }
+        }
+    }
+
     init {
         thread(isDaemon = true) {
             while (!server.isClosed) {
@@ -55,6 +70,7 @@ class FakeCastDevice : AutoCloseable {
                 thread(isDaemon = true) {
                     val input = DataInputStream(socket.inputStream)
                     val output = socket.outputStream
+                    connections += output
                     runCatching {
                         while (true) {
                             val message = CastMessage.read(input)
@@ -103,7 +119,8 @@ class FakeCastDevice : AutoCloseable {
                     "PAUSE" -> playerState = "PAUSED"
                     "SEEK" -> currentTime = request["currentTime"]!!.jsonPrimitive.doubleOrNull ?: 0.0
                 }
-                val dropped = dropUrlsStartingWith?.let { contentId?.startsWith(it) } == true
+                // Only later status reports drop the stream, like a device losing it mid-song.
+                val dropped = type == "GET_STATUS" && dropUrlsStartingWith?.let { contentId?.startsWith(it) } == true
                 if (dropped) {
                     """{"type":"MEDIA_STATUS","requestId":$id,"status":[{"mediaSessionId":1,"playerState":"IDLE","idleReason":"ERROR","currentTime":0}]}"""
                 } else {

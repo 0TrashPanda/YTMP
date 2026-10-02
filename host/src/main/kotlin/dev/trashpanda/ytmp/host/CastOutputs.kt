@@ -108,6 +108,8 @@ class CastOutputs(
         private var appliedVolume: Double? = null
         private var failed = false
 
+        private var volumeWatcher: Job? = null
+
         /** The device couldn't play a direct URL, so it gets the host's proxy from now on. */
         private var useProxy = false
 
@@ -191,10 +193,19 @@ class CastOutputs(
             close()
             val channel = CastChannel.open(device.host, device.port).also { channel = it }
             val player = CastMediaPlayer(channel).also { player = it }
+            // Follow volume changes made elsewhere (the device's buttons or app), so the room's
+            // slider shows the real volume.
+            volumeWatcher = scope.launch {
+                player.volumeChanges.collect { volume ->
+                    appliedVolume = volume
+                    reportVolume(volume)
+                }
+            }
             player.launch()
             player.receiverStatus().volume?.let { volume ->
-                appliedVolume = volume
-                reportVolume(volume)
+                val rounded = Math.round(volume * 100) / 100.0
+                appliedVolume = rounded
+                reportVolume(rounded)
             }
             loadedItemId = null
             log.info("Playing on Cast device {} ({})", device.name, device.host)
@@ -207,6 +218,8 @@ class CastOutputs(
         }
 
         fun close() {
+            volumeWatcher?.cancel()
+            volumeWatcher = null
             channel?.close()
             channel = null
             player = null

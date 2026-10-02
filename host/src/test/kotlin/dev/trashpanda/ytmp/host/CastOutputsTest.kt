@@ -56,6 +56,10 @@ class CastOutputsTest {
             run(Command.SetOutputVolume("cast:fake", 0.3))
             eventually { device.volume == 0.3 }
 
+            // Turned up on the device itself: the room's slider follows.
+            device.changeVolumeExternally(0.65000000596)
+            eventually { room.view().activeOutputs["cast:fake"] == 0.65 }
+
             run(Command.SetOutput("cast:fake", active = false))
             eventually { "STOP" in device.types(CastChannel.NS_RECEIVER) }
         }

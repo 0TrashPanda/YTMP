@@ -6,7 +6,11 @@ import dev.trashpanda.ytmp.cast.CastChannel.Companion.RECEIVER
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -48,6 +52,21 @@ class CastMediaPlayer(private val channel: CastChannel) {
 
     suspend fun receiverStatus(): ReceiverStatus =
         parseReceiver(channel.request(NS_RECEIVER, RECEIVER, payload("GET_STATUS")))
+
+    /**
+     * The device's volume whenever it changes, including changes made elsewhere (the device's
+     * own buttons, its app, Google Home), rounded to 1%.
+     */
+    val volumeChanges: Flow<Double> = channel.messages
+        .mapNotNull { (namespace, json) ->
+            when (namespace) {
+                NS_RECEIVER -> json["status"]?.jsonObject?.get("volume")?.jsonObject
+                NS_MULTIZONE -> json["device"]?.jsonObject?.get("volume")?.jsonObject
+                else -> null
+            }?.get("level")?.jsonPrimitive?.doubleOrNull
+        }
+        .map { Math.round(it * 100) / 100.0 }
+        .distinctUntilChanged()
 
     /** Starts the media player app on the device (or reuses it if it is already running). */
     suspend fun launch() {
@@ -189,5 +208,6 @@ class CastMediaPlayer(private val channel: CastChannel) {
         /** Google's built-in media player app, available on every Cast device. */
         const val DEFAULT_MEDIA_RECEIVER = "CC1AD845"
         private const val LOAD_TIMEOUT_MS = 20_000L
+        private const val NS_MULTIZONE = "urn:x-cast:com.google.cast.multizone"
     }
 }

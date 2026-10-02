@@ -36,6 +36,8 @@ simulated device (`host/src/test/.../FakeCastDevice.kt`).
 - **Proxy URL:** the host's address on the device's network (our side of the Cast connection)
   plus its port. Override on the server with `[cast] audio_base_url` (e.g. behind Docker
   without host networking).
+- **Volume** follows the device: changes made elsewhere (its buttons, its app, Google Home)
+  arrive as status messages and update the room's slider (rounded to 1%).
 - The **song info** (title, artist, album art) is sent with the load command, so TVs and
   displays show it whether the audio is direct or proxied.
 - Both proxies fetch YouTube in 1 MB ranged pieces: Cast devices ask without a range, and
