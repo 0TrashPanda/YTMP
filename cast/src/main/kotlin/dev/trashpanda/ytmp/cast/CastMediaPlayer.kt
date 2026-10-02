@@ -29,6 +29,8 @@ data class MediaStatus(
     val playerState: String,
     val currentTimeMs: Long,
     val contentId: String?,
+    /** Why the player is IDLE: FINISHED, CANCELLED, INTERRUPTED or ERROR. */
+    val idleReason: String?,
     /** When this status was received (System.currentTimeMillis). */
     val receivedAt: Long,
 )
@@ -175,6 +177,7 @@ class CastMediaPlayer(private val channel: CastChannel) {
             playerState = status["playerState"]?.jsonPrimitive?.content ?: "IDLE",
             currentTimeMs = ((status["currentTime"]?.jsonPrimitive?.doubleOrNull ?: 0.0) * 1000).toLong(),
             contentId = status["media"]?.jsonObject?.get("contentId")?.jsonPrimitive?.content,
+            idleReason = status["idleReason"]?.jsonPrimitive?.content,
             receivedAt = System.currentTimeMillis(),
         )
     }

@@ -10,8 +10,7 @@ Feature: [host outputs](../features/playback-and-outputs.md#host-outputs).
 3. The Chromecast fetches the audio **from that URL itself**.
 
 Because the Chromecast fetches the audio itself, the URL must be one it can reach and
-play. That means the host's **proxied audio URL** (see [playback-sync](playback-sync.md)),
-not a direct YouTube URL, because those are tied to the host's IP address.
+play: the direct YouTube URL when possible, otherwise the host's proxy (see below).
 
 ## Implementation ✅ (milestone 4)
 
@@ -28,9 +27,19 @@ simulated device (`host/src/test/.../FakeCastDevice.kt`).
   on it launches the media player, loads the current song from the host's `/api/audio/…`
   (a little ahead of the room's position, since devices start late), follows play/pause,
   applies volume, and seeks when more than 2 s off. Switching an output off stops the player.
-- **Audio URL:** the host's address on the device's network (our side of the Cast connection)
+- **Audio: hybrid**, like phones. A device first gets the song's **direct stream URL** (saves
+  the host the traffic). If it can't load that (`LOAD_FAILED`), or drops to `IDLE`/`ERROR`
+  mid-song, it gets the host's `/api/audio/…` proxy for the rest of the session, continuing
+  from the same position. Tested at home: the Bose ("Cast Lite") and a TV both play direct
+  links. The proxy is still needed when the host's stream URLs are tied to another public IP
+  (a server in a datacenter), when a URL goes bad early, and for local files and media servers.
+- **Proxy URL:** the host's address on the device's network (our side of the Cast connection)
   plus its port. Override on the server with `[cast] audio_base_url` (e.g. behind Docker
   without host networking).
+- The **song info** (title, artist, album art) is sent with the load command, so TVs and
+  displays show it whether the audio is direct or proxied.
+- Both proxies fetch YouTube in 1 MB ranged pieces: Cast devices ask without a range, and
+  YouTube throttles un-ranged requests.
 
 ## Sync
 

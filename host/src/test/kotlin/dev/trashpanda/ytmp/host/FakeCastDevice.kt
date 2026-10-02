@@ -25,6 +25,13 @@ class FakeCastDevice : AutoCloseable {
     @Volatile var currentTime = 0.0
     @Volatile var volume = 0.5
     @Volatile private var appRunning = false
+    @Volatile var contentId: String? = null
+
+    /** URLs with this prefix fail to load (like a link the device can't use). */
+    @Volatile var rejectUrlsStartingWith: String? = null
+
+    /** While playing a URL with this prefix, the player drops to IDLE/ERROR (a lost stream). */
+    @Volatile var dropUrlsStartingWith: String? = null
 
     private val server: SSLServerSocket = run {
         val keystore = File.createTempFile("fakecast", ".p12").apply { delete(); deleteOnExit() }
@@ -86,6 +93,9 @@ class FakeCastDevice : AutoCloseable {
             CastChannel.NS_MEDIA -> {
                 when (type) {
                     "LOAD" -> {
+                        val url = request["media"]!!.jsonObject["contentId"]!!.jsonPrimitive.content
+                        if (rejectUrlsStartingWith?.let(url::startsWith) == true) return """{"type":"LOAD_FAILED","requestId":$id}"""
+                        contentId = url
                         currentTime = request["currentTime"]!!.jsonPrimitive.doubleOrNull ?: 0.0
                         playerState = if (request["autoplay"]?.jsonPrimitive?.booleanOrNull == true) "PLAYING" else "PAUSED"
                     }
@@ -93,7 +103,12 @@ class FakeCastDevice : AutoCloseable {
                     "PAUSE" -> playerState = "PAUSED"
                     "SEEK" -> currentTime = request["currentTime"]!!.jsonPrimitive.doubleOrNull ?: 0.0
                 }
-                """{"type":"MEDIA_STATUS","requestId":$id,"status":[{"mediaSessionId":1,"playerState":"$playerState","currentTime":$currentTime}]}"""
+                val dropped = dropUrlsStartingWith?.let { contentId?.startsWith(it) } == true
+                if (dropped) {
+                    """{"type":"MEDIA_STATUS","requestId":$id,"status":[{"mediaSessionId":1,"playerState":"IDLE","idleReason":"ERROR","currentTime":0}]}"""
+                } else {
+                    """{"type":"MEDIA_STATUS","requestId":$id,"status":[{"mediaSessionId":1,"playerState":"$playerState","currentTime":$currentTime}]}"""
+                }
             }
             else -> null
         }

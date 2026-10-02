@@ -18,7 +18,7 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     environment("CAST_HOST", System.getenv("CAST_HOST") ?: "")
-    environment("CAST_URL", System.getenv("CAST_URL") ?: "")
+    for (name in listOf("CAST_URL", "CAST_TITLE", "CAST_ARTIST", "CAST_IMAGE")) environment(name, System.getenv(name) ?: "")
     testLogging { showStandardStreams = true }
     // Real-device runs depend on the network, so never take them from the cache.
     outputs.upToDateWhen { System.getenv("CAST_HOST").isNullOrEmpty() }

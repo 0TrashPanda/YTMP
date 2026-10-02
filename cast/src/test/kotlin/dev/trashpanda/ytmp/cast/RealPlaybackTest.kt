@@ -22,7 +22,13 @@ class RealPlaybackTest {
                 player.launch()
                 println("launched; local address ${channel.localAddress}")
                 player.setVolume(0.15)
-                println("load -> " + player.load(url, "audio/mp4", CastMetadata("YTMP test", "YTMP", null, null), 0, autoplay = true))
+                val metadata = CastMetadata(
+                    title = System.getenv("CAST_TITLE") ?: "YTMP test",
+                    artist = System.getenv("CAST_ARTIST") ?: "YTMP",
+                    album = null,
+                    imageUrl = System.getenv("CAST_IMAGE")?.takeIf { it.isNotEmpty() },
+                )
+                println("load -> " + runCatching { player.load(url, "audio/mp4", metadata, 0, autoplay = true) }.getOrElse { "FAILED: ${it.message}" })
                 repeat(5) {
                     delay(3000)
                     println("status -> " + player.status())

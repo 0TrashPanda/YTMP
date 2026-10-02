@@ -202,6 +202,7 @@ class Room(
     suspend fun view(): RoomView = mutex.withLock {
         RoomView(
             current = current.takeIf { streamUrl != null },
+            streamUrl = streamUrl,
             playing = wantPlaying && streamUrl != null,
             positionMs = position(),
             hostTimeMs = clock(),

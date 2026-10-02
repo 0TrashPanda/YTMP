@@ -22,6 +22,8 @@ data class OutputDevice(val id: String, val name: String, val kind: OutputKind)
 /** What an output driver needs to follow a room. */
 data class RoomView(
     val current: QueueItem?,
+    /** Direct stream URL of [current] (set whenever [current] is). */
+    val streamUrl: String?,
     val playing: Boolean,
     /** Position at [hostTimeMs]; while playing it moves on from there. */
     val positionMs: Long,

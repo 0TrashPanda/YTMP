@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.RoomView
 import dev.trashpanda.ytmp.protocol.OutputKind
+import dev.trashpanda.ytmp.protocol.QueueItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -31,8 +32,9 @@ data class CastDeviceAddress(val id: String, val name: String, val host: String,
  * Chromecast outputs: the Cast devices the host knows about, and one driver per room that
  * keeps every Cast device the room plays on in step with the room.
  *
- * Cast devices fetch the audio themselves, from the host's `/api/audio/…` (the host proxies
- * it), so [audioBaseUrl] must be an address the device can reach.
+ * Cast devices fetch the audio themselves: first the direct stream URL (saves the host the
+ * traffic), and if a device can't play that, from the host's `/api/audio/…` proxy for the rest
+ * of the session. So [audioBaseUrl] must be an address the device can reach.
  */
 class CastOutputs(
     private val scope: CoroutineScope,
@@ -106,6 +108,9 @@ class CastOutputs(
         private var appliedVolume: Double? = null
         private var failed = false
 
+        /** The device couldn't play a direct URL, so it gets the host's proxy from now on. */
+        private var useProxy = false
+
         suspend fun sync(view: RoomView, wantedVolume: Double?, report: suspend (String) -> Unit, reportVolume: suspend (Double) -> Unit) {
             val player = connect(reportVolume)
             if (wantedVolume != null && wantedVolume != appliedVolume) {
@@ -121,25 +126,7 @@ class CastOutputs(
             val now = System.currentTimeMillis()
             val expected = view.positionAt(now)
             if (item.itemId != loadedItemId) {
-                val url = audioBaseUrl(channel!!.localAddress) + "/api/audio/" + URLEncoder.encode(item.song.id, Charsets.UTF_8)
-                val metadata = CastMetadata(
-                    title = item.song.title,
-                    artist = item.song.artists.joinToString { it.name },
-                    album = item.song.album?.name,
-                    imageUrl = item.song.thumbnails.maxByOrNull { it.width }?.url,
-                )
-                log.info("Cast device {}: loading {} from {}", device.name, item.song.title, url)
-                loadedItemId = item.itemId
-                settledAt = now + SETTLE_MS
-                failed = false
-                try {
-                    player.load(url, "audio/mp4", metadata, expected + LOAD_LEAD_MS, autoplay = view.playing)
-                } catch (e: IllegalStateException) {
-                    // Don't keep retrying this song; the next song gets a new try.
-                    failed = true
-                    log.warn("Cast device {} couldn't play {}: {}", device.name, item.song.title, e.message)
-                    report("${device.name} couldn't play \"${item.song.title}\"")
-                }
+                load(player, item, view, expected, report)
                 return
             }
             if (failed) return
@@ -151,7 +138,12 @@ class CastOutputs(
             }
             if (now < settledAt) return
             if (view.playing && status.playerState == "IDLE") {
-                // The device stopped (e.g. a network hiccup): load the song again.
+                // The device stopped: a network hiccup, or it lost the direct URL. Load the song
+                // again, through the host if the direct URL failed.
+                if (status.idleReason == "ERROR" && !useProxy) {
+                    useProxy = true
+                    log.info("Cast device {} lost the direct stream; using the host from now on", device.name)
+                }
                 loadedItemId = null
             } else if (view.playing && status.playerState == "PLAYING") {
                 // A Cast device can't be synced closely; only fix clearly audible drift.
@@ -160,6 +152,37 @@ class CastOutputs(
                     player.seek(expected + LOAD_LEAD_MS)
                     settledAt = now + SETTLE_MS
                 }
+            }
+        }
+
+        private suspend fun load(player: CastMediaPlayer, item: QueueItem, view: RoomView, positionMs: Long, report: suspend (String) -> Unit) {
+            val metadata = CastMetadata(
+                title = item.song.title,
+                artist = item.song.artists.joinToString { it.name },
+                album = item.song.album?.name,
+                imageUrl = item.song.thumbnails.maxByOrNull { it.width }?.url,
+            )
+            loadedItemId = item.itemId
+            settledAt = System.currentTimeMillis() + SETTLE_MS
+            failed = false
+            val proxyUrl = audioBaseUrl(channel!!.localAddress) + "/api/audio/" + URLEncoder.encode(item.song.id, Charsets.UTF_8)
+            val direct = view.streamUrl?.takeIf { !useProxy }
+            try {
+                try {
+                    log.info("Cast device {}: loading {} ({})", device.name, item.song.title, if (direct != null) "direct" else "via host")
+                    player.load(direct ?: proxyUrl, "audio/mp4", metadata, positionMs + LOAD_LEAD_MS, autoplay = view.playing)
+                } catch (e: IllegalStateException) {
+                    if (direct == null) throw e
+                    // The device can't use the direct URL (e.g. it's tied to the host's IP): use the host.
+                    log.info("Cast device {} can't play the direct stream ({}); using the host from now on", device.name, e.message)
+                    useProxy = true
+                    player.load(proxyUrl, "audio/mp4", metadata, positionMs + LOAD_LEAD_MS, autoplay = view.playing)
+                }
+            } catch (e: IllegalStateException) {
+                // Don't keep retrying this song; the next song gets a new try.
+                failed = true
+                log.warn("Cast device {} couldn't play {}: {}", device.name, item.song.title, e.message)
+                report("${device.name} couldn't play \"${item.song.title}\"")
             }
         }
 
