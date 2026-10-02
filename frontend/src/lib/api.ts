@@ -1,7 +1,10 @@
 import type {
 	ApiError,
 	CreateRoomResponse,
+	HostInfo,
 	RoomInfo,
+	RoomListResponse,
+	RoomVisibility,
 	SearchResponse,
 	Song
 } from './protocol.gen';
@@ -17,12 +20,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	return response.json() as Promise<T>;
 }
 
-export function createRoom(name: string): Promise<CreateRoomResponse> {
+export function createRoom(name: string, visibility: RoomVisibility = 'public'): Promise<CreateRoomResponse> {
 	return request('/api/rooms', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ name })
+		body: JSON.stringify({ name, visibility })
 	});
+}
+
+/** What kind of host served this page (a server, or a phone). */
+export function getHost(): Promise<HostInfo> {
+	return request('/api/host');
+}
+
+/** The rooms on this phone (only works on the phone itself). */
+export async function listRooms(): Promise<RoomInfo[]> {
+	return (await request<RoomListResponse>('/api/rooms')).rooms;
+}
+
+export async function closeRoom(code: string): Promise<void> {
+	const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, { method: 'DELETE' });
+	if (!response.ok) throw new ApiRequestError(`Couldn't close the room (${response.status})`);
 }
 
 export function getRoom(code: string): Promise<RoomInfo> {

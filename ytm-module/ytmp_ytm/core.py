@@ -133,4 +133,7 @@ def _thumbnails(thumbs: list[dict]) -> list[dict]:
 
 
 def _clean_error(message: str) -> str:
+    if "confirm you" in message and "not a bot" in message:
+        # YouTube's bot check: it blocks this network for a while after many requests.
+        return "YouTube is blocking requests from this network for now (bot check). Try again later."
     return re.sub(r"^ERROR: (\[[^\]]+\] )?([\w-]+: )?", "", message).strip()

@@ -1,4 +1,4 @@
-package dev.trashpanda.ytmp.server
+package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.core.Outbox
 import dev.trashpanda.ytmp.core.RoomManager
@@ -9,28 +9,25 @@ import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
+import dev.trashpanda.ytmp.protocol.HostInfo
+import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.RejectReason
-import dev.trashpanda.ytmp.protocol.RoomInfo
+import dev.trashpanda.ytmp.protocol.RoomListResponse
+import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.ServerMessage
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.CacheControl
-import io.ktor.http.ContentType
-import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.OutgoingContent
-import io.ktor.http.contentLength
-import io.ktor.http.contentType
-import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.install
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.header
 import io.ktor.server.request.path
@@ -38,8 +35,9 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondFile
-import io.ktor.server.routing.get
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
+import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
@@ -47,7 +45,6 @@ import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.pingPeriod
 import io.ktor.server.websocket.timeout
 import io.ktor.server.websocket.webSocket
-import io.ktor.utils.io.ByteReadChannel
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
@@ -66,11 +63,40 @@ private const val OUTBOX_CAPACITY = 1024
 
 class ApiException(val status: HttpStatusCode, val code: ErrorCode, message: String) : Exception(message)
 
+/** Thrown by a source when it can't do what was asked (e.g. YouTube refused). */
+open class SourceException(message: String) : Exception(message)
+
+/** Streams a song's audio through the host, for clients whose direct stream URL doesn't work. */
+fun interface AudioProxy {
+    suspend fun respond(call: ApplicationCall, songId: String, range: String?)
+}
+
+/** How this host behaves. The Linux server and a phone differ. */
+data class HostOptions(
+    val kind: HostKind,
+    /** Base URL other devices can use to reach this host, or null if the page's own address works. */
+    val shareUrl: () -> String? = { null },
+    /**
+     * Only the hosting device itself may create, list and close rooms (a phone: friends on
+     * the Wi-Fi can join, but not start rooms on someone else's phone).
+     */
+    val localOnlyRoomManagement: Boolean = false,
+    val supportsPrivateRooms: Boolean = false,
+    /** Whether a request comes from the hosting device itself. Overridable for tests. */
+    val isLocal: (ApplicationCall) -> Boolean = ::isLoopback,
+)
+
+fun isLoopback(call: ApplicationCall): Boolean {
+    val address = call.request.origin.remoteAddress
+    return address == "localhost" || address.startsWith("127.") || address == "::1" || address == "0:0:0:0:0:0:0:1"
+}
+
 fun Application.ytmpModule(
     rooms: RoomManager,
     search: SongSearch,
-    ytm: RemoteSourceModule?,
-    frontendDir: File?,
+    audio: AudioProxy?,
+    webApp: File?,
+    options: HostOptions,
 ) {
     install(ContentNegotiation) { json(ProtocolJson) }
     install(WebSockets) {
@@ -83,23 +109,54 @@ fun Application.ytmpModule(
     }
     install(StatusPages) {
         exception<ApiException> { call, e -> call.respond(e.status, ApiError(ErrorInfo(e.code, e.message ?: ""))) }
-        exception<RemoteSourceModule.ModuleException> { call, e ->
-            call.respond(HttpStatusCode.BadGateway, ApiError(ErrorInfo(ErrorCode.INVALID, e.message ?: "Module error")))
+        exception<SourceException> { call, e ->
+            call.respond(HttpStatusCode.BadGateway, ApiError(ErrorInfo(ErrorCode.INVALID, e.message ?: "Source error")))
         }
     }
 
+    fun ApplicationCall.mayManageRooms() = !options.localOnlyRoomManagement || options.isLocal(this)
+
     routing {
         route("/api") {
+            get("/host") {
+                call.respond(
+                    HostInfo(
+                        kind = options.kind,
+                        shareUrl = options.shareUrl(),
+                        canCreateRooms = call.mayManageRooms(),
+                        supportsPrivateRooms = options.supportsPrivateRooms,
+                    ),
+                )
+            }
+            get("/rooms") {
+                // Only the hosting phone may see its rooms; a server never lists them.
+                if (!options.localOnlyRoomManagement || !options.isLocal(call)) throw forbidden()
+                call.respond(RoomListResponse(rooms.list.value))
+            }
             post("/rooms") {
-                val name = call.receive<CreateRoomRequest>().name.trim()
+                if (!call.mayManageRooms()) throw forbidden()
+                val request = call.receive<CreateRoomRequest>()
+                val name = request.name.trim()
                 if (name.isEmpty() || name.length > 64) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Room name must be 1-64 characters")
-                val room = rooms.create(name)
-                log.info("Created room {} ({})", room.code, room.name)
+                if (request.visibility == RoomVisibility.PRIVATE && !options.supportsPrivateRooms) {
+                    throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Solo rooms aren't supported here")
+                }
+                val room = rooms.create(name, request.visibility)
+                log.info("Created room {} ({}, {})", room.code, room.name, room.visibility)
                 call.respond(CreateRoomResponse(room.code, room.ownerToken))
             }
             get("/rooms/{code}") {
-                val room = rooms[call.parameters["code"]!!] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
-                call.respond(RoomInfo(room.code, room.name))
+                val room = rooms[call.parameters["code"]!!]
+                // A private room doesn't exist for anyone but the hosting device.
+                if (room == null || (room.visibility == RoomVisibility.PRIVATE && !options.isLocal(call))) {
+                    throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
+                }
+                call.respond(room.info)
+            }
+            delete("/rooms/{code}") {
+                if (!options.localOnlyRoomManagement || !options.isLocal(call)) throw forbidden()
+                rooms.close(call.parameters["code"]!!)
+                call.respond(HttpStatusCode.NoContent)
             }
             get("/search") {
                 val query = call.request.queryParameters["q"]?.trim().orEmpty()
@@ -107,10 +164,8 @@ fun Application.ytmpModule(
                 call.respond(SearchResponse(search.search(query)))
             }
             get("/audio/{songId}") {
-                val module = ytm ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")
-                module.audio(call.parameters["songId"]!!, call.request.header(HttpHeaders.Range)) { response ->
-                    call.respond(ProxiedAudio(response, response.bodyAsChannel()))
-                }
+                val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")
+                proxy.respond(call, call.parameters["songId"]!!, call.request.header(HttpHeaders.Range))
             }
         }
 
@@ -133,7 +188,7 @@ fun Application.ytmpModule(
                 sender.join()
                 return@webSocket
             }
-            val participantId = room.join(hello, outbox)
+            val participantId = room.join(hello, outbox, local = options.isLocal(call))
             if (participantId == null) {
                 outgoing.close()
                 sender.join()
@@ -150,13 +205,15 @@ fun Application.ytmpModule(
             }
         }
 
-        if (frontendDir != null && frontendDir.isDirectory) {
-            webApp(frontendDir)
+        if (webApp != null && webApp.isDirectory) {
+            webApp(webApp)
         } else {
-            log.warn("No frontend found at {}; only the API is served", frontendDir)
+            log.warn("No web app found at {}; only the API is served", webApp)
         }
     }
 }
+
+private fun forbidden() = ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Only the hosting device can do this")
 
 /**
  * Serves the built web app. It is a single-page app, so unknown page paths get index.html;
@@ -185,18 +242,3 @@ private fun decode(frame: Frame.Text): ClientMessage? =
     runCatching { ProtocolJson.decodeFromString(ClientMessage.serializer(), frame.readText()) }
         .onFailure { log.debug("Ignoring bad message: {}", it.message) }
         .getOrNull()
-
-/** Passes the module's audio response (status, range headers, body) straight through. */
-private class ProxiedAudio(response: HttpResponse, private val body: ByteReadChannel) : OutgoingContent.ReadChannelContent() {
-    override val status = response.status
-    override val contentType: ContentType? = response.contentType()
-    override val contentLength: Long? = response.contentLength()
-    override val headers: Headers = headersOf(
-        *listOfNotNull(
-            HttpHeaders.AcceptRanges to listOf("bytes"),
-            response.headers[HttpHeaders.ContentRange]?.let { HttpHeaders.ContentRange to listOf(it) },
-        ).toTypedArray(),
-    )
-
-    override fun readFrom(): ByteReadChannel = body
-}

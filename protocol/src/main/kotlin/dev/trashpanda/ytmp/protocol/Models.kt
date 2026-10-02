@@ -88,10 +88,21 @@ data class NowPlaying(
 )
 
 @Serializable
+@SerialName("RoomVisibility")
+enum class RoomVisibility {
+    /** Anyone who can reach the host and has the code can join. */
+    @SerialName("public") PUBLIC,
+
+    /** A solo room: only the device that hosts it can join. */
+    @SerialName("private") PRIVATE,
+}
+
+@Serializable
 @SerialName("RoomInfo")
 data class RoomInfo(
     val code: String,
     val name: String,
+    val visibility: RoomVisibility,
 )
 
 /** Full room state, sent on connect and on [ClientMessage.RequestSnapshot]. */

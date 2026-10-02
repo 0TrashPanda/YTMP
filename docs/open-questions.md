@@ -18,3 +18,7 @@ _None open right now._
 - **Loudness for local files / media servers**: YouTube gives a loudness value, but local
   files don't always have one. Use ReplayGain tags when present, otherwise measure the
   loudness on the host (for example with ffmpeg on the server)? How on a phone host?
+- **YouTube bot check**: after many requests, YouTube answers "Sign in to confirm you're not a
+  bot" for the whole network (seen during testing on 2026-10-02, from both the server and the
+  phone). Options: send the linked YouTube account's cookies with yt-dlp requests, a PO token
+  provider plugin, and caching more aggressively so fewer requests are made.

@@ -10,13 +10,17 @@ import {
 } from './protocol.gen';
 import { saved } from './storage';
 
+/** How long a host notice (e.g. "Couldn't play …") stays on screen. */
+const NOTICE_MS = 8000;
+
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'rejected';
 
 const REJECT_MESSAGES: Record<RejectReason, string> = {
 	room_not_found: "This room doesn't exist (anymore).",
 	version_mismatch: 'This app and the host are different versions. Reload the page.',
 	invalid_name: 'Pick a name of 1–32 characters.',
-	replaced: 'You opened this room somewhere else.'
+	replaced: 'You opened this room somewhere else.',
+	private_room: 'This is a solo room; only the phone that hosts it can join.'
 };
 
 /**
@@ -195,9 +199,15 @@ export class RoomConnection {
 			case 'PlaybackChanged':
 				s.playback = e.playback;
 				break;
-			case 'Notice':
-				this.notices.push({ id: ++this.noticeId, text: e.message });
+			case 'RoomUpdated':
+				s.room = e.room;
 				break;
+			case 'Notice': {
+				const id = ++this.noticeId;
+				this.notices.push({ id, text: e.message });
+				setTimeout(() => this.dismissNotice(id), NOTICE_MS);
+				break;
+			}
 		}
 	}
 

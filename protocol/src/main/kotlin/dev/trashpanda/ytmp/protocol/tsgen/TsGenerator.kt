@@ -4,6 +4,8 @@ import dev.trashpanda.ytmp.protocol.ApiError
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
+import dev.trashpanda.ytmp.protocol.HostInfo
+import dev.trashpanda.ytmp.protocol.RoomListResponse
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.ServerMessage
@@ -116,6 +118,8 @@ fun main(args: Array<String>) {
     generator.addRoot(CreateRoomResponse.serializer().descriptor)
     generator.addRoot(SearchResponse.serializer().descriptor)
     generator.addRoot(ApiError.serializer().descriptor)
+    generator.addRoot(HostInfo.serializer().descriptor)
+    generator.addRoot(RoomListResponse.serializer().descriptor)
     out.parentFile.mkdirs()
     out.writeText(generator.render())
     println("Wrote ${out.path}")

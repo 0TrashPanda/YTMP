@@ -93,6 +93,11 @@ sealed interface Command {
     @Serializable
     @SerialName("SetListening")
     data class SetListening(val on: Boolean) : Command
+
+    /** Owner only. Makes a solo room public, or a public room solo again. */
+    @Serializable
+    @SerialName("SetVisibility")
+    data class SetVisibility(val visibility: RoomVisibility) : Command
 }
 
 /** Host → client. */
@@ -146,6 +151,9 @@ enum class RejectReason {
 
     /** The same participant connected again from somewhere else. */
     @SerialName("replaced") REPLACED,
+
+    /** A solo room; only the hosting device can join it. */
+    @SerialName("private_room") PRIVATE_ROOM,
 }
 
 @Serializable
@@ -211,6 +219,11 @@ sealed interface Event {
     @Serializable
     @SerialName("PlaybackChanged")
     data class PlaybackChanged(val playback: PlaybackStatus) : Event
+
+    /** The room's name or visibility changed. */
+    @Serializable
+    @SerialName("RoomUpdated")
+    data class RoomUpdated(val room: RoomInfo) : Event
 
     /** Something went wrong that everyone should know about, e.g. a song that can't be played. */
     @Serializable

@@ -20,8 +20,27 @@
 - Debug builds enable WebView debugging (`chrome://inspect`) and log the page's console to
   logcat (tag `YtmpWeb`).
 
-For hosting on the phone (milestone 3), the APK will bundle the web app and the phone's own
-server will serve it.
+## Host mode (milestone 3)
+
+- The app runs its **own host** (`LocalHost`): the shared `host/` module on Ktor CIO, port
+  **8765**, with the web app bundled in the APK (copied to app storage on first start). The
+  app's WebView opens it at `http://127.0.0.1:8765/`, which is the app's home screen.
+- **YouTube Music on the phone** (`OnDeviceYtm`): the Python code from `ytm-module/` run with
+  **Chaquopy** (Python 3.14, ytmusicapi + yt-dlp). Measured on a Pixel 7: Python starts in
+  0.4 s, a search takes ~1.5 s, resolving a stream ~1.5 s. No JavaScript runtime was needed.
+  Chaquopy 17 supports AGP up to 9.2, so the project uses AGP 9.2.1.
+- **Who can do what:** only the phone itself (loopback) can create, list and close rooms, and
+  join **solo** (private) rooms. Friends on the same Wi-Fi can join **public** rooms at
+  `http://<phone-ip>:8765/room/CODE` (QR code in the share sheet).
+- **`HostService`**: a foreground service (type *connected device*) while the phone has rooms,
+  with a "Hosting …" notification and *Stop hosting*, plus Wi-Fi and wake locks so friends'
+  devices keep getting answers with the screen off.
+- **Discovery** (`Nearby`): public rooms are announced with mDNS (`_ytmp._tcp`, TXT
+  `code`/`name`/`v`), and the start page lists rooms found on the network. Not yet verified
+  between two phones: the dev PC's firewall blocks mDNS on Wi-Fi.
+- Rooms live in memory: they are gone when the app process stops (persistence is a later step).
+- Android's asset packer skips folders starting with `_` by default, which dropped the web
+  app's `_app/`; `ignoreAssetsPattern` is overridden for that.
 
 ## Structure
 

@@ -8,7 +8,10 @@ import kotlinx.serialization.Serializable
 /** `POST /api/rooms` */
 @Serializable
 @SerialName("CreateRoomRequest")
-data class CreateRoomRequest(val name: String)
+data class CreateRoomRequest(
+    val name: String,
+    val visibility: RoomVisibility = RoomVisibility.PUBLIC,
+)
 
 @Serializable
 @SerialName("CreateRoomResponse")
@@ -23,3 +26,28 @@ data class SearchResponse(val items: List<Song>)
 @Serializable
 @SerialName("ApiError")
 data class ApiError(val error: ErrorInfo)
+
+@Serializable
+@SerialName("HostKind")
+enum class HostKind {
+    @SerialName("server") SERVER,
+    @SerialName("phone") PHONE,
+}
+
+/** `GET /api/host`: what kind of host served this page. */
+@Serializable
+@SerialName("HostInfo")
+data class HostInfo(
+    val kind: HostKind,
+    /** Base URL other devices can use to reach this host, or null if this page's own address works. */
+    val shareUrl: String?,
+    /** Whether the caller may create rooms and list this host's rooms. */
+    val canCreateRooms: Boolean,
+    /** Whether solo (private) rooms can be created here. */
+    val supportsPrivateRooms: Boolean,
+)
+
+/** `GET /api/rooms`: the rooms on this host (only for the hosting device). */
+@Serializable
+@SerialName("RoomListResponse")
+data class RoomListResponse(val rooms: List<RoomInfo>)

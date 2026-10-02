@@ -1,7 +1,11 @@
 package dev.trashpanda.ytmp.core
 
 import kotlinx.coroutines.CoroutineScope
+import dev.trashpanda.ytmp.protocol.RoomInfo
+import dev.trashpanda.ytmp.protocol.RoomVisibility
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.security.SecureRandom
@@ -35,18 +39,35 @@ class RoomManager(
 ) {
     private val rooms = ConcurrentHashMap<String, Room>()
     private val random = SecureRandom()
+    private val _list = MutableStateFlow<List<RoomInfo>>(emptyList())
 
-    fun create(name: String): Room {
+    /** All rooms, updated when rooms are created, deleted or change visibility. */
+    val list: StateFlow<List<RoomInfo>> = _list
+
+    fun create(name: String, visibility: RoomVisibility = RoomVisibility.PUBLIC): Room {
         while (true) {
             val code = newCode()
-            val room = Room(code, name, Ids.token(), streams, scope, clock)
-            if (rooms.putIfAbsent(code, room) == null) return room
+            val room = Room(code, name, Ids.token(), visibility, streams, scope, onInfoChanged = ::refreshList, clock = clock)
+            if (rooms.putIfAbsent(code, room) == null) {
+                refreshList()
+                return room
+            }
         }
     }
 
     operator fun get(code: String): Room? = rooms[normalize(code)]
 
     val count: Int get() = rooms.size
+
+    /** Closes and removes a room right away. */
+    fun close(code: String) {
+        rooms.remove(normalize(code))?.close()
+        refreshList()
+    }
+
+    private fun refreshList() {
+        _list.value = rooms.values.map { it.info }.sortedBy { it.name }
+    }
 
     /** Periodically drops offline participants and deletes rooms that have been empty too long. */
     fun startCleanup() = scope.launch {
@@ -57,6 +78,7 @@ class RoomManager(
                 if (nobodyOnline && clock() - room.lastActive > timeouts.emptyRoom.inWholeMilliseconds) {
                     rooms.remove(room.code, room)
                     room.close()
+                    refreshList()
                 }
             }
         }

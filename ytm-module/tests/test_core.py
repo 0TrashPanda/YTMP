@@ -54,3 +54,8 @@ def test_fresh_stream_skips_the_cache(monkeypatch):
     assert ytm.stream("ytm:abc").url == "https://old"
     assert ytm.stream("ytm:abc", fresh=True).url == "https://new?expire=9999999999"
     assert ytm.stream("ytm:abc").url == "https://new?expire=9999999999"
+
+
+def test_bot_check_gets_a_clear_message():
+    message = "ERROR: [youtube] abc: Sign in to confirm you\u2019re not a bot. Use --cookies-from-browser or --cookies"
+    assert "bot check" in core._clean_error(message)

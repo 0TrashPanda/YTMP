@@ -29,7 +29,7 @@ Music, without Premium, and not tied to a single music service.
 | Platform | Status |
 |----------|--------|
 | Linux server (Docker) | ✅ Milestone 1: hosts rooms and serves the web app |
-| Android 13+ | ✅ Milestone 2: join a room with native playback and lock screen controls. Hosting is next. |
+| Android 13+ | ✅ Join rooms with native playback and lock screen controls; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed) |
 | Web browser | ✅ Milestone 1: join, or host through a server |
 | iOS | Not supported (the web app may work, but background playback won't) |
 

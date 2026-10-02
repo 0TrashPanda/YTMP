@@ -12,7 +12,7 @@ plugins {
 
 rootProject.name = "ytmp"
 
-include(":protocol", ":core", ":server", ":android")
+include(":protocol", ":core", ":host", ":server", ":android")
 
 dependencyResolutionManagement {
     repositories {

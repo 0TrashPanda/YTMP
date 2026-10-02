@@ -15,6 +15,7 @@ import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.RejectReason
 import dev.trashpanda.ytmp.protocol.RoomInfo
 import dev.trashpanda.ytmp.protocol.RoomState
+import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.CancellationException
@@ -36,10 +37,19 @@ class Room(
     val code: String,
     val name: String,
     val ownerToken: String,
+    visibility: RoomVisibility,
     private val streams: StreamResolver,
     private val scope: CoroutineScope,
+    /** Called when the room's [info] changes, e.g. it was made public. */
+    private val onInfoChanged: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
+    @Volatile
+    var visibility: RoomVisibility = visibility
+        private set
+
+    val info: RoomInfo get() = RoomInfo(code, name, visibility)
+
     private class Member(
         val id: String,
         val token: String,
@@ -74,7 +84,15 @@ class Room(
     var lastActive: Long = clock()
         private set
 
-    suspend fun join(hello: ClientMessage.Hello, outbox: Outbox): String? = mutex.withLock {
+    /**
+     * Adds a participant. [local] means the connection comes from the hosting device itself;
+     * only local connections may join a private (solo) room.
+     */
+    suspend fun join(hello: ClientMessage.Hello, outbox: Outbox, local: Boolean = true): String? = mutex.withLock {
+        if (visibility == RoomVisibility.PRIVATE && !local) {
+            outbox.send(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM))
+            return null
+        }
         if (hello.protocolVersion != PROTOCOL_VERSION) {
             outbox.send(ServerMessage.Rejected(RejectReason.VERSION_MISMATCH))
             return null
@@ -216,6 +234,14 @@ class Room(
                 member.listening = command.on
                 emit(Event.ParticipantUpdated(member.toParticipant()))
             }
+            is Command.SetVisibility -> {
+                if (!member.isOwner) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "Only the owner can change this")
+                if (visibility != command.visibility) {
+                    visibility = command.visibility
+                    emit(Event.RoomUpdated(info))
+                    onInfoChanged()
+                }
+            }
         }
         return null
     }
@@ -352,7 +378,7 @@ class Room(
     )
 
     private fun snapshot() = RoomState(
-        room = RoomInfo(code, name),
+        room = info,
         participants = members.values.map { it.toParticipant() },
         queue = queue.toList(),
         history = history.takeLast(SNAPSHOT_HISTORY),

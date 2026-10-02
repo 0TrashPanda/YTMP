@@ -2,6 +2,8 @@ package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.core.StreamResolver
+import dev.trashpanda.ytmp.host.AudioProxy
+import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.Song
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -12,9 +14,19 @@ import io.ktor.client.request.parameter
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.content.OutgoingContent
+import io.ktor.http.contentLength
+import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
+import io.ktor.http.headersOf
 import io.ktor.http.isSuccess
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.response.respond
+import io.ktor.utils.io.ByteReadChannel
 import kotlinx.serialization.Serializable
 
 /**
@@ -25,7 +37,7 @@ class RemoteSourceModule(
     private val client: HttpClient,
     private val baseUrl: String,
     private val key: String,
-) : SongSearch, StreamResolver {
+) : SongSearch, StreamResolver, AudioProxy {
 
     @Serializable
     private data class SearchResult(val items: List<Song>)
@@ -39,7 +51,7 @@ class RemoteSourceModule(
         data class Detail(val code: String, val message: String)
     }
 
-    class ModuleException(val code: String, message: String) : Exception(message)
+    class ModuleException(val code: String, message: String) : SourceException(message)
 
     override suspend fun search(query: String): List<Song> =
         client.get("$baseUrl/search") {
@@ -52,12 +64,27 @@ class RemoteSourceModule(
         client.get("$baseUrl/songs/${songId.encodeURLPathPart()}/stream") { auth() }
             .orThrow().body<StreamResult>().url
 
-    /** Streams the audio through the host. [block] gets the module's response while it is open. */
-    suspend fun <T> audio(songId: String, range: String?, block: suspend (HttpResponse) -> T): T =
+    /** Streams the module's audio (status, range headers, body) straight through to the caller. */
+    override suspend fun respond(call: ApplicationCall, songId: String, range: String?) {
         client.prepareGet("$baseUrl/songs/${songId.encodeURLPathPart()}/audio") {
             auth()
             if (range != null) header(HttpHeaders.Range, range)
-        }.execute { block(it) }
+        }.execute { response -> call.respond(ProxiedAudio(response, response.bodyAsChannel())) }
+    }
+
+    private class ProxiedAudio(response: HttpResponse, private val body: ByteReadChannel) : OutgoingContent.ReadChannelContent() {
+        override val status = response.status
+        override val contentType: ContentType? = response.contentType()
+        override val contentLength: Long? = response.contentLength()
+        override val headers: Headers = headersOf(
+            *listOfNotNull(
+                HttpHeaders.AcceptRanges to listOf("bytes"),
+                response.headers[HttpHeaders.ContentRange]?.let { HttpHeaders.ContentRange to listOf(it) },
+            ).toTypedArray(),
+        )
+
+        override fun readFrom(): ByteReadChannel = body
+    }
 
     private fun HttpRequestBuilder.auth() {
         if (key.isNotEmpty()) header(HttpHeaders.Authorization, "Bearer $key")

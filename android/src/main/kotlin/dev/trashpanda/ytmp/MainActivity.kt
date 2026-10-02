@@ -26,7 +26,13 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.webkit.WebViewAssetLoader
+import androidx.lifecycle.lifecycleScope
 import com.google.common.util.concurrent.ListenableFuture
+import dev.trashpanda.ytmp.host.LocalHost
+import dev.trashpanda.ytmp.host.NearbyRoom
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
 
@@ -38,6 +44,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private var controller: ListenableFuture<MediaController>? = null
     private var askedForNotifications = false
+    private var nearbyUpdates: Job? = null
+    private val app get() = application as YtmpApp
 
     private val prefs by lazy { getSharedPreferences("ytmp", MODE_PRIVATE) }
     private val json = Json { ignoreUnknownKeys = true }
@@ -87,7 +95,11 @@ class MainActivity : ComponentActivity() {
 
         // For development: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080`
         intent.getStringExtra("server")?.let { server = normalize(it) }
-        if (savedInstanceState == null) openServer() else webView.restoreState(savedInstanceState)
+        when {
+            savedInstanceState != null -> webView.restoreState(savedInstanceState)
+            intent.hasExtra("server") -> openServer()
+            else -> openHome()
+        }
 
         onBackPressedDispatcher.addCallback(this) {
             if (webView.canGoBack()) webView.goBack() else finish()
@@ -96,11 +108,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        app.nearby.startDiscovery()
+        nearbyUpdates = lifecycleScope.launch {
+            app.nearby.rooms.collect { rooms ->
+                val list = json.encodeToString(ListSerializer(NearbyRoom.serializer()), rooms)
+                js("window.__ytmpNative && window.__ytmpNative.onNearbyRooms && window.__ytmpNative.onNearbyRooms($list)")
+            }
+        }
         // Binding a controller starts the playback service, so it can go to the foreground when playing.
         controller = MediaController.Builder(this, SessionToken(this, ComponentName(this, PlaybackService::class.java))).buildAsync()
     }
 
     override fun onStop() {
+        nearbyUpdates?.cancel()
+        app.nearby.stopDiscovery()
         controller?.let(MediaController::releaseFuture)
         controller = null
         super.onStop()
@@ -118,6 +139,9 @@ class MainActivity : ComponentActivity() {
         webView.destroy()
         super.onDestroy()
     }
+
+    /** The app's home: the web app served by this phone's own host. */
+    private fun openHome() = webView.loadUrl(LocalHost.LOCAL_URL)
 
     private fun openServer(error: String? = null) {
         val url = server
@@ -139,6 +163,17 @@ class MainActivity : ComponentActivity() {
         return uri.host == server.host && uri.port == server.port
     }
 
+    private fun isLocalHost(uri: Uri) = uri.host == "127.0.0.1" && uri.port == LocalHost.PORT
+
+    /** Pages the app shows itself: its own host, the configured server, and hosts on the local network. */
+    private fun isAppPage(uri: Uri): Boolean =
+        isLocalHost(uri) || isServerUrl(uri) || uri.host == WebViewAssetLoader.DEFAULT_DOMAIN || isPrivateAddress(uri.host)
+
+    private fun isPrivateAddress(host: String?): Boolean {
+        val parts = host?.split('.')?.mapNotNull(String::toIntOrNull)?.takeIf { it.size == 4 } ?: return false
+        return parts[0] == 10 || (parts[0] == 172 && parts[1] in 16..31) || (parts[0] == 192 && parts[1] == 168)
+    }
+
     private fun normalize(input: String): String {
         val trimmed = input.trim().trimEnd('/')
         return if ("://" in trimmed) trimmed else "http://$trimmed"
@@ -150,15 +185,18 @@ class MainActivity : ComponentActivity() {
 
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val uri = request.url
-            if (isServerUrl(uri) || uri.host == WebViewAssetLoader.DEFAULT_DOMAIN) return false
+            if (isAppPage(uri)) return false
             // Links to other sites open in the browser.
             startActivity(Intent(Intent.ACTION_VIEW, uri))
             return true
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-            if (request.isForMainFrame && isServerUrl(request.url)) {
-                openServer(error = "Can't reach ${request.url.host}: ${error.description}")
+            if (!request.isForMainFrame) return
+            when {
+                // The phone's own host may still be starting.
+                isLocalHost(request.url) -> view.postDelayed({ view.reload() }, 500)
+                isServerUrl(request.url) -> openServer(error = "Can't reach ${request.url.host}: ${error.description}")
             }
         }
     }
@@ -179,6 +217,18 @@ class MainActivity : ComponentActivity() {
 
         @JavascriptInterface
         fun changeServer() = runOnUiThread { openServer(error = "") }
+
+        /** Opens the configured server, or asks for one. */
+        @JavascriptInterface
+        fun openServer() = runOnUiThread { openServer(error = if (server == null) "" else null) }
+
+        /** Back to the rooms on this phone. */
+        @JavascriptInterface
+        fun openHome() = runOnUiThread { this@MainActivity.openHome() }
+
+        /** JSON list of rooms found on the local network (see [Nearby]). */
+        @JavascriptInterface
+        fun nearbyRooms(): String = json.encodeToString(ListSerializer(NearbyRoom.serializer()), app.nearby.rooms.value)
 
         @JavascriptInterface
         fun playback(targetJson: String) {

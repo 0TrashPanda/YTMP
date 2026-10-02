@@ -80,6 +80,13 @@ export interface CommandSetListening {
   on: boolean;
 }
 
+export type RoomVisibility = "public" | "private";
+
+export interface CommandSetVisibility {
+  kind: "SetVisibility";
+  visibility: RoomVisibility;
+}
+
 export interface CommandSkip {
   kind: "Skip";
 }
@@ -95,6 +102,7 @@ export type Command =
   | CommandRemoveQueueItem
   | CommandSeek
   | CommandSetListening
+  | CommandSetVisibility
   | CommandSkip;
 
 export interface ClientMessageCommand {
@@ -209,6 +217,17 @@ export interface EventQueueItemsAdded {
   index: number;
 }
 
+export interface RoomInfo {
+  code: string;
+  name: string;
+  visibility: RoomVisibility;
+}
+
+export interface EventRoomUpdated {
+  kind: "RoomUpdated";
+  room: RoomInfo;
+}
+
 export interface EventStreamReady {
   kind: "StreamReady";
   itemId: string;
@@ -227,6 +246,7 @@ export type Event =
   | EventQueueItemMoved
   | EventQueueItemRemoved
   | EventQueueItemsAdded
+  | EventRoomUpdated
   | EventStreamReady;
 
 export interface ServerMessageEvent {
@@ -241,7 +261,7 @@ export interface ServerMessagePong {
   hostTime: number;
 }
 
-export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced";
+export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "private_room";
 
 export interface ServerMessageRejected {
   type: "rejected";
@@ -259,11 +279,6 @@ export interface ServerMessageResult {
   type: "result";
   id: string;
   error: ErrorInfo | null;
-}
-
-export interface RoomInfo {
-  code: string;
-  name: string;
 }
 
 export interface NowPlaying {
@@ -304,6 +319,7 @@ export type ServerMessage =
 
 export interface CreateRoomRequest {
   name: string;
+  visibility: RoomVisibility;
 }
 
 export interface CreateRoomResponse {
@@ -317,4 +333,17 @@ export interface SearchResponse {
 
 export interface ApiError {
   error: ErrorInfo;
+}
+
+export type HostKind = "server" | "phone";
+
+export interface HostInfo {
+  kind: HostKind;
+  shareUrl: string | null;
+  canCreateRooms: boolean;
+  supportsPrivateRooms: boolean;
+}
+
+export interface RoomListResponse {
+  rooms: RoomInfo[];
 }

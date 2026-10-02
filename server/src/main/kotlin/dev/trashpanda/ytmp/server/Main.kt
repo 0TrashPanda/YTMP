@@ -1,6 +1,9 @@
 package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.host.HostOptions
+import dev.trashpanda.ytmp.host.ytmpModule
+import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -30,6 +33,6 @@ fun main(args: Array<String>) {
     embeddedServer(Netty, port = config.server.port, host = config.server.host) {
         val rooms = RoomManager(ytm, this, config.rooms.style(), config.rooms.codeLength)
         rooms.startCleanup()
-        ytmpModule(rooms, ytm, ytm, File(config.server.frontend))
+        ytmpModule(rooms, search = ytm, audio = ytm, webApp = File(config.server.frontend), HostOptions(kind = HostKind.SERVER))
     }.start(wait = true)
 }

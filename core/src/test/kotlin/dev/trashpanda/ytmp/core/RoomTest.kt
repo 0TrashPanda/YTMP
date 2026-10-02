@@ -7,7 +7,9 @@ import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.QueueItemResult
 import dev.trashpanda.ytmp.protocol.QueuePosition
+import dev.trashpanda.ytmp.protocol.RejectReason
 import dev.trashpanda.ytmp.protocol.RoomState
+import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,6 +19,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -61,7 +64,7 @@ class RoomTest {
     }
 
     private fun TestScope.newRoom(): Room =
-        Room("ABCD", "Test", "owner-token", { id -> "https://stream/$id" }, backgroundScope) { testScheduler.currentTime }
+        Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> "https://stream/$id" }, backgroundScope) { testScheduler.currentTime }
 
     private suspend fun Room.connect(name: String = "Anna"): FakeClient {
         val client = FakeClient()
@@ -194,7 +197,7 @@ class RoomTest {
 
     @Test
     fun `a song that can't be resolved is skipped`() = runTest {
-        val room = Room("ABCD", "Test", "t", { id -> if (id == "ytm:song1") error("blocked") else "https://stream/$id" }, backgroundScope) {
+        val room = Room("ABCD", "Test", "t", RoomVisibility.PUBLIC, { id -> if (id == "ytm:song1") error("blocked") else "https://stream/$id" }, backgroundScope) {
             testScheduler.currentTime
         }
         val client = room.connect()
@@ -204,5 +207,31 @@ class RoomTest {
         assertEquals("ytm:song2", client.state.nowPlaying?.item?.song?.id)
         assertTrue(client.events.any { it is Event.Notice })
         assertNull(client.state.queue.firstOrNull())
+    }
+
+    @Test
+    fun `only the hosting device can join a private room until it is made public`() = runTest {
+        val room = Room("ABCD", "Solo", "owner-token", RoomVisibility.PRIVATE, { "x" }, backgroundScope) { testScheduler.currentTime }
+        val owner = FakeClient()
+        room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Me", null, "owner-token"), owner, local = true)
+
+        val friend = FakeClient()
+        room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Friend", null, null), friend, local = false)
+        assertEquals(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM), friend.messages.single())
+
+        room.run(owner, Command.SetVisibility(RoomVisibility.PUBLIC))
+        val again = FakeClient()
+        room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Friend", null, null), again, local = false)
+        assertIs<ServerMessage.Welcome>(again.messages.first())
+        assertEquals(RoomVisibility.PUBLIC, owner.events.filterIsInstance<Event.RoomUpdated>().single().room.visibility)
+    }
+
+    @Test
+    fun `only the owner can change visibility`() = runTest {
+        val room = newRoom()
+        val guest = room.connect("Guest")
+        room.run(guest, Command.SetVisibility(RoomVisibility.PRIVATE))
+        val result = guest.messages.filterIsInstance<ServerMessage.Result>().single()
+        assertEquals(dev.trashpanda.ytmp.protocol.ErrorCode.PERMISSION_DENIED, result.error?.code)
     }
 }

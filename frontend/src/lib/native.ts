@@ -5,6 +5,12 @@ export interface NativeBridge {
 	bridgeVersion(): number;
 	serverUrl(): string;
 	changeServer(): void;
+	/** Opens the configured server (or asks for one). */
+	openServer(): void;
+	/** Back to the rooms on this phone. */
+	openHome(): void;
+	/** JSON list of NearbyRoom. */
+	nearbyRooms(): string;
 	/** JSON of PlaybackTarget (android/.../PlaybackHub.kt). */
 	playback(targetJson: string): void;
 }
@@ -15,6 +21,15 @@ export interface NativeCallbacks {
 	onCommand(command: Command): void;
 	/** "buffering" | "ready" | "stopped" | "error" */
 	onStatus(status: string): void;
+	/** The list of rooms found on the local network changed. */
+	onNearbyRooms?(rooms: NearbyRoom[]): void;
+}
+
+/** A room another phone on the same network is hosting (android/.../Nearby.kt). */
+export interface NearbyRoom {
+	name: string;
+	code: string;
+	url: string;
 }
 
 declare global {

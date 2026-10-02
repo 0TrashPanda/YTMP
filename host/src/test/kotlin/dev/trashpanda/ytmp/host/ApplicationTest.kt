@@ -1,4 +1,4 @@
-package dev.trashpanda.ytmp.server
+package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.SongSearch
@@ -8,6 +8,10 @@ import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.protocol.Event
+import dev.trashpanda.ytmp.protocol.HostInfo
+import dev.trashpanda.ytmp.protocol.HostKind
+import dev.trashpanda.ytmp.protocol.RoomListResponse
+import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.QueuePosition
@@ -20,7 +24,9 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -44,7 +50,7 @@ class ApplicationTest {
     private fun ApplicationTestBuilder.setup() {
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, search, ytm = null, frontendDir = null)
+            ytmpModule(rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER))
         }
     }
 
@@ -110,7 +116,7 @@ class ApplicationTest {
         }
         application {
             val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, search, ytm = null, frontendDir = dir)
+            ytmpModule(rooms, search, audio = null, webApp = dir, HostOptions(kind = HostKind.SERVER))
         }
         val page = client.get("/room/ABCD")
         assertEquals(HttpStatusCode.OK, page.status)
@@ -125,5 +131,80 @@ class ApplicationTest {
         val result = jsonClient().get("/api/search?q=daft").body<SearchResponse>()
         assertEquals(listOf(song), result.items)
         assertEquals(HttpStatusCode.BadRequest, jsonClient().get("/api/search?q=").status)
+    }
+
+    /** Phone mode. Requests with the "X-Remote" header count as coming from another device. */
+    private fun ApplicationTestBuilder.setupPhone() {
+        application {
+            val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(
+                rooms, search, audio = null, webApp = null,
+                HostOptions(
+                    kind = HostKind.PHONE,
+                    shareUrl = { "http://192.168.1.23:8765" },
+                    localOnlyRoomManagement = true,
+                    supportsPrivateRooms = true,
+                    isLocal = { it.request.headers["X-Remote"] == null },
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `on a phone only the phone itself can create, list and close rooms`() = testApplication {
+        setupPhone()
+        val client = jsonClient()
+
+        val local = client.get("/api/host").body<HostInfo>()
+        assertEquals(true, local.canCreateRooms)
+        assertEquals("http://192.168.1.23:8765", local.shareUrl)
+        assertEquals(false, client.get("/api/host") { header("X-Remote", "1") }.body<HostInfo>().canCreateRooms)
+
+        val remoteCreate = client.post("/api/rooms") {
+            header("X-Remote", "1")
+            contentType(ContentType.Application.Json)
+            setBody(CreateRoomRequest("Nope"))
+        }
+        assertEquals(HttpStatusCode.Forbidden, remoteCreate.status)
+
+        val room = client.post("/api/rooms") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateRoomRequest("Party"))
+        }.body<CreateRoomResponse>()
+        assertEquals(listOf(room.code), client.get("/api/rooms").body<RoomListResponse>().rooms.map { it.code })
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/rooms") { header("X-Remote", "1") }.status)
+
+        assertEquals(HttpStatusCode.Forbidden, client.delete("/api/rooms/${room.code}") { header("X-Remote", "1") }.status)
+        assertEquals(HttpStatusCode.NoContent, client.delete("/api/rooms/${room.code}").status)
+        assertEquals(emptyList(), client.get("/api/rooms").body<RoomListResponse>().rooms)
+    }
+
+    @Test
+    fun `a private room is invisible to other devices`() = testApplication {
+        setupPhone()
+        val client = jsonClient()
+        val room = client.post("/api/rooms") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateRoomRequest("Solo", RoomVisibility.PRIVATE))
+        }.body<CreateRoomResponse>()
+
+        assertEquals(HttpStatusCode.OK, client.get("/api/rooms/${room.code}").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/rooms/${room.code}") { header("X-Remote", "1") }.status)
+        client.webSocket("/ws", request = { header("X-Remote", "1") }) {
+            sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Friend", null, null))
+            assertEquals(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM), receiveMessage())
+        }
+    }
+
+    @Test
+    fun `a server has no solo rooms and never lists rooms`() = testApplication {
+        setup()
+        val client = jsonClient()
+        val solo = client.post("/api/rooms") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateRoomRequest("Solo", RoomVisibility.PRIVATE))
+        }
+        assertEquals(HttpStatusCode.BadRequest, solo.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/rooms").status)
     }
 }

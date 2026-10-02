@@ -31,6 +31,7 @@ require them.
 ```
 protocol/       Kotlin: shared message types (+ generated protocol.d.ts)
 core/           Kotlin: host core (rooms, queue, permissions, sync), used by server and Android
+host/           Kotlin (Ktor): HTTP API, room WebSocket and web app hosting, shared by server and Android
 server/         Kotlin (Ktor): Linux server, web UI hosting, auth server, admin page
 android/        Kotlin: Android app (WebView, Media3, Chaquopy, Ktor host)
 frontend/       Svelte 5 + SvelteKit (static) + Tailwind + TypeScript

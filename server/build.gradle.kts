@@ -14,13 +14,8 @@ application {
 }
 
 dependencies {
-    implementation(project(":core"))
-    implementation(libs.ktor.server.core)
+    implementation(project(":host"))
     implementation(libs.ktor.server.netty)
-    implementation(libs.ktor.server.websockets)
-    implementation(libs.ktor.server.content.negotiation)
-    implementation(libs.ktor.server.call.logging)
-    implementation(libs.ktor.server.status.pages)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)

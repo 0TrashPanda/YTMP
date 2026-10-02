@@ -6,6 +6,9 @@
 	import PlayerBar from '../../../lib/components/PlayerBar.svelte';
 	import QueuePanel from '../../../lib/components/QueuePanel.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
+	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
+	import { getHost } from '../../../lib/api';
+	import type { HostInfo } from '../../../lib/protocol.gen';
 	import { artistNames } from '../../../lib/format';
 	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
@@ -78,14 +81,9 @@
 		setTimeout(() => (toasts = toasts.filter((t) => t.id !== id)), 3000);
 	}
 
-	async function copyCode() {
-		try {
-			await navigator.clipboard.writeText(code);
-			toast('Room code copied');
-		} catch {
-			toast(`Room code: ${code}`);
-		}
-	}
+	let sharing = $state(false);
+	let host = $state<HostInfo | null>(null);
+	getHost().then((h) => (host = h)).catch(() => {});
 </script>
 
 <svelte:head>
@@ -149,11 +147,14 @@
 				<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
 				<button
 					class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line"
-					onclick={copyCode}
-					title="Copy room code"
+					onclick={() => (sharing = true)}
+					title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
 				>
+					{#if room.state?.room.visibility === 'private'}
+						<Icon name="headphones" size={16} class="text-muted" />
+					{/if}
 					{code}
-					<Icon name="copy" size={16} class="text-muted" />
+					<Icon name="share" size={16} class="text-muted" />
 				</button>
 				<span
 					class="hidden items-center gap-1 text-sm text-muted sm:flex"
@@ -204,7 +205,11 @@
 		{/if}
 	</div>
 
-	<div class="pointer-events-none fixed inset-x-0 bottom-28 z-30 flex flex-col items-center gap-2 px-4">
+	{#if sharing}
+		<ShareSheet {room} {host} onClose={() => (sharing = false)} onToast={toast} />
+	{/if}
+
+	<div class="pointer-events-none fixed inset-x-0 bottom-28 z-50 flex flex-col items-center gap-2 px-4">
 		{#each [...room.notices, ...toasts] as message (message.id + message.text)}
 			<button
 				class="pointer-events-auto rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg"

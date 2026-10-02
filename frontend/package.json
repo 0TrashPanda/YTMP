@@ -27,5 +27,8 @@
 		"#lib": "./src/lib/index.js",
 		"#lib/*": "./src/lib/*"
 	},
-	"packageManager": "pnpm@10.24.0"
+	"packageManager": "pnpm@10.24.0",
+	"dependencies": {
+		"uqr": "^0.1.3"
+	}
 }
