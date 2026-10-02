@@ -78,3 +78,25 @@ Spotify account (library, likes), and **importing Spotify playlists**.
 ## Party screen on a TV via Chromecast
 
 A custom Cast receiver that shows the [party screen](ui.md#party-screen) on a TV.
+
+## Automatic sync with the microphone
+
+Devices in the same room can drift apart audibly, mostly because of speaker and Bluetooth
+delay, which the app can't see. A phone could fix this itself:
+
+1. It records a few seconds of what is playing in the room with its microphone.
+2. It compares the recording with the song it is playing (it has the same audio), and
+   finds how far apart they are (cross-correlation).
+3. It sets its own **sync adjustment** to that difference.
+
+This covers the delay of every speaker in the room, including other people's Bluetooth
+speakers. Needs microphone permission, and in a browser only works over HTTPS.
+
+## Precise sync mode (like Snapcast)
+
+For sub-millisecond sync between devices: the host decodes the audio and sends small chunks
+with the exact time each one must be played, and every device plays each chunk at that
+moment, taking its own output delay into account. This is how multi-room audio systems work
+(for example Snapcast). It replaces streaming the song URL to each client, so it is a large
+change and uses more host bandwidth.
+

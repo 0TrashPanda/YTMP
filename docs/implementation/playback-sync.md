@@ -43,3 +43,16 @@ network uses it. Options:
    every song.
 
 Local files, media server songs and cached songs are always served by the host.
+
+## Sync accuracy
+
+Where small desyncs between devices come from, and what addresses them:
+
+| Cause | Size | Fix |
+|-------|------|-----|
+| Output delay (speakers, and especially Bluetooth) is invisible to the player | 20–300 ms | Per-device **sync adjustment** (manual), later set automatically by [mic sync](../features/future-ideas.md#automatic-sync-with-the-microphone) |
+| Drift tolerance: each device only corrects above a threshold | up to 2× the threshold between two devices | Small threshold with gentle, proportional speed changes |
+| Clock offset estimate | ~10–30 ms on Wi-Fi | Best-of-N ping samples (already done) |
+
+For sub-millisecond sync, see [precise sync mode](../features/future-ideas.md#precise-sync-mode-like-snapcast).
+
