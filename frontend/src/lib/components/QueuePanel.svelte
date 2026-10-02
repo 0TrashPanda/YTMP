@@ -19,10 +19,16 @@
 		drag && roomState ? Math.max(0, Math.min(roomState.queue.length - 1, drag.from + Math.round(drag.offset / ROW_HEIGHT))) : -1
 	);
 
-	// Keep the current song in view, with the history above it (like YTM).
+	// Keep the current song in view, with the history above it (like YTM). Only where the
+	// queue scrolls on its own (desktop); on phones it is part of the page and must not
+	// pull the page along.
 	$effect(() => {
 		roomState?.nowPlaying?.item.itemId;
-		tick().then(() => list?.querySelector('[data-current]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+		tick().then(() => {
+			if (!list || list.scrollHeight <= list.clientHeight) return;
+			const current = list.querySelector<HTMLElement>('[data-current]');
+			if (current) list.scrollTo({ top: current.offsetTop - list.clientHeight / 2, behavior: 'smooth' });
+		});
 	});
 
 	function startDrag(event: PointerEvent, item: QueueItem, index: number) {
@@ -96,9 +102,9 @@
 	</div>
 {/snippet}
 
-<aside class="flex min-h-0 flex-col">
+<aside class="flex flex-col lg:h-full lg:min-h-0">
 	<h2 class="px-4 pt-4 pb-2 text-sm font-medium tracking-wide text-muted uppercase">Up next</h2>
-	<div bind:this={list} class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+	<div bind:this={list} class="relative px-2 pb-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
 		{#if roomState}
 			{#each roomState.history as item, i (item.itemId)}
 				{@render row(item, 'history', i)}

@@ -60,6 +60,17 @@
 		return playback.playing ? playback.positionMs + (room.hostNow() - playback.hostTimeMs) : playback.positionMs;
 	});
 
+	// Phones: hide the header while scrolling down, show it again on any scroll up.
+	let scroller = $state<HTMLElement>();
+	let headerHidden = $state(false);
+	let lastScrollTop = 0;
+	function onScroll() {
+		const top = scroller?.scrollTop ?? 0;
+		if (top < lastScrollTop || top < 64) headerHidden = false;
+		else if (top > lastScrollTop + 4) headerHidden = true;
+		lastScrollTop = top;
+	}
+
 	function toast(text: string) {
 		// Negative, so they never clash with the host's notice IDs.
 		const id = -++toastId;
@@ -110,11 +121,26 @@
 	</main>
 {:else}
 	<div class="flex h-full flex-col">
-		<header class="flex items-center gap-3 border-b border-line px-3 py-2 sm:px-4">
+		<!-- Phones: one scrolling page whose header slides away while scrolling down.
+		     Desktop: header on top, song and queue scroll separately. -->
+		<div
+			bind:this={scroller}
+			onscroll={onScroll}
+			class="min-h-0 flex-1 overflow-y-auto lg:flex lg:flex-col lg:overflow-hidden"
+		>
+		<header
+			class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:px-4 lg:translate-y-0
+				{headerHidden ? '-translate-y-full' : ''}"
+		>
 			<a href="/" class="text-xl font-black tracking-tight">YT<span class="text-accent">MP</span></a>
 			<label class="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-raised px-3 py-2 sm:max-w-xl">
 				<Icon name="search" size={20} class="shrink-0 text-muted" />
-				<input class="min-w-0 flex-1 bg-transparent outline-none" placeholder="Search songs" bind:value={query} />
+				<input
+					class="min-w-0 flex-1 bg-transparent outline-none"
+					placeholder="Search songs"
+					bind:value={query}
+					onfocus={() => (headerHidden = false)}
+				/>
 				{#if query}
 					<button aria-label="Clear search" onclick={() => (query = '')}><Icon name="close" size={20} /></button>
 				{/if}
@@ -145,13 +171,13 @@
 			</div>
 		{/if}
 
-		<div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,40%)] lg:grid-cols-[minmax(0,1fr)_420px] lg:grid-rows-[minmax(0,1fr)]">
-			<main class="min-h-0 overflow-y-auto p-3 sm:p-6">
+		<div class="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_420px]">
+			<main class="p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto">
 				{#if query.trim()}
 					<SearchResults {room} {query} onToast={toast} />
 				{:else if room.state?.nowPlaying}
 					{@const song = room.state.nowPlaying.item.song}
-					<div class="flex h-full min-w-0 flex-col items-center justify-center gap-4 text-center sm:gap-6">
+					<div class="flex min-w-0 flex-col items-center justify-center gap-4 py-4 text-center sm:gap-6 lg:h-full lg:py-0">
 						<Art {song} size={544} class="aspect-square w-[min(100%,28rem,38vh)] shadow-2xl" />
 						<div class="w-full min-w-0">
 							<h1 class="text-xl font-bold break-words sm:text-2xl">{song.title}</h1>
@@ -160,15 +186,17 @@
 						</div>
 					</div>
 				{:else}
-					<div class="flex h-full flex-col items-center justify-center gap-2 text-center text-muted">
+					<div class="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted lg:h-full lg:py-0">
 						<Icon name="search" size={48} />
 						<p>Search for a song to start the music.</p>
 					</div>
 				{/if}
 			</main>
-			<div class="min-h-0 border-t border-line lg:border-t-0 lg:border-l">
+			<!-- On phones the queue makes room for search results, like YTM. -->
+			<div class="border-t border-line lg:min-h-0 lg:border-t-0 lg:border-l {query.trim() ? 'hidden lg:block' : ''}">
 				<QueuePanel {room} />
 			</div>
+		</div>
 		</div>
 
 		{#if player}
