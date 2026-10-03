@@ -78,6 +78,25 @@ deploy/         docker-compose.yml, example ytmp.toml, Caddyfile
 | Phone hosting | A foreground service with a "YTMP is hosting" notification, so Android doesn't kill the host |
 | Logging | Plain logs, no external crash reporting |
 
+## Releases
+
+The Android app is released through GitHub Actions (`.github/workflows/release.yml`):
+
+- **Push a tag** `vX.Y.Z` (e.g. `git tag v0.2.0 && git push origin v0.2.0`). The workflow
+  builds the web app and the release APK, version `X.Y.Z` (version code `X*10000+Y*100+Z`,
+  so it must go up every release), and publishes a GitHub release with `ytmp-X.Y.Z.apk`
+  and notes generated from the commits. `0.x` versions are marked as pre-releases.
+- **Run it by hand** (Actions → Release → Run workflow) for a test APK, kept as an artifact
+  of the run, without a release.
+- **Signing:** every release is signed with the same release key, or phones can't update.
+  It lives outside the repo (the maintainer keeps the keystore and its password backed up)
+  and reaches the workflow as the repository secrets `YTMP_KEYSTORE_BASE64` and
+  `YTMP_KEYSTORE_PASSWORD` (key alias `ytmp`). Locally, `./gradlew :android:assembleRelease`
+  signs when `YTMP_KEYSTORE`, `YTMP_KEYSTORE_PASSWORD`, `YTMP_KEY_ALIAS` and
+  `YTMP_KEY_PASSWORD` are set; `YTMP_VERSION` sets the version.
+- Debug builds (`installDebug`) are signed with the local debug key, so a phone with a debug
+  build has to uninstall it before installing a release (and the other way round).
+
 ## Milestones
 
 1. **Server + browser**: YTM search, one room, shared queue, playback in the browser.

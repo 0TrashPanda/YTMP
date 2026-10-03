@@ -80,6 +80,12 @@ Music, without Premium, and not tied to a single music service.
 | Web browser | ✅ Join rooms, or host through a server |
 | iOS | Not supported (the web app may work, but background playback won't) |
 
+## Download
+
+**Android:** get the APK from the [latest release](https://github.com/0TrashPanda/YTMP/releases)
+and open it on your phone (allow installing apps from your browser or file manager when
+asked). New releases install over the old one and keep your rooms and sign-ins.
+
 ## Running a server
 
 Needs Docker with Compose.
@@ -105,6 +111,9 @@ Open `http://<server>:8080`. For HTTPS, put a reverse proxy such as Caddy in fro
 - Tests: `./gradlew test` and `cd ytm-module && .venv/bin/pytest`.
 - After changing anything in `protocol/`, run `./gradlew :protocol:generateTs` to update the
   web app's types (`frontend/src/lib/protocol.gen.ts`).
+- Releases: push a tag like `v0.2.0` and GitHub Actions builds the signed APK and publishes
+  the release (`.github/workflows/release.yml`). See
+  [dev setup](docs/implementation/dev-setup.md#releases).
 - yt-dlp needs a JavaScript runtime for YouTube: Deno by default, or set
   `YTMP_YTM_JS_RUNTIME=node` to use Node.
 

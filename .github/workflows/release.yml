@@ -1,0 +1,99 @@
+# Builds the Android app and publishes it as a GitHub release.
+#
+# - Push a tag like v0.2.0: builds YTMP 0.2.0 and makes a release with the APK.
+# - Run it by hand (Actions → Release → Run workflow): builds a test APK, kept as an
+#   artifact of the run, no release.
+#
+# Needs the repository secrets YTMP_KEYSTORE_BASE64 (the release keystore, base64) and
+# YTMP_KEYSTORE_PASSWORD. Every release must be signed with the same key, or phones
+# can't update to it.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # Chaquopy builds the on-device Python (ytmusicapi, yt-dlp) with the same version.
+      - uses: actions/setup-python@v6
+        id: python
+        with:
+          python-version: '3.14'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="0.0.0-test.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Web app
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: APK
+        env:
+          YTMP_VERSION: ${{ steps.version.outputs.version }}
+          YTMP_BUILD_PYTHON: ${{ steps.python.outputs.python-path }}
+          YTMP_KEYSTORE_BASE64: ${{ secrets.YTMP_KEYSTORE_BASE64 }}
+          YTMP_KEYSTORE_PASSWORD: ${{ secrets.YTMP_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$YTMP_KEYSTORE_BASE64" ]; then
+            echo "::error::The YTMP_KEYSTORE_BASE64 secret is missing"
+            exit 1
+          fi
+          echo "$YTMP_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          export YTMP_KEYSTORE="$RUNNER_TEMP/release.jks" YTMP_KEY_ALIAS=ytmp YTMP_KEY_PASSWORD="$YTMP_KEYSTORE_PASSWORD"
+          ./gradlew :android:assembleRelease
+          mv android/build/outputs/apk/release/android-release.apk "ytmp-$YTMP_VERSION.apk"
+          rm "$RUNNER_TEMP/release.jks"
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "ytmp-$VERSION.apk" \
+            --title "YTMP $VERSION" \
+            --generate-notes \
+            $([[ "$VERSION" == 0.* ]] && echo --prerelease)
+
+      - name: Test APK
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: ytmp-${{ steps.version.outputs.version }}
+          path: ytmp-*.apk

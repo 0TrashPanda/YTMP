@@ -4,6 +4,11 @@ plugins {
     alias(libs.plugins.chaquopy)
 }
 
+// Releases (.github/workflows/release.yml) set the version from the git tag and sign with
+// the release key. Without these, it builds as 0.1.0 and a release build is unsigned.
+val versionNameFromEnv: String? = providers.environmentVariable("YTMP_VERSION").orNull
+val releaseKeystore: String? = providers.environmentVariable("YTMP_KEYSTORE").orNull
+
 android {
     namespace = "dev.trashpanda.ytmp"
     compileSdk = 36
@@ -12,8 +17,12 @@ android {
         applicationId = "dev.trashpanda.ytmp"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionName = versionNameFromEnv ?: "0.1.0"
+        // 1.2.3 -> 10203, so every release counts higher than the one before.
+        versionCode = versionName!!.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+            .let { (it + listOf(0, 0, 0)).take(3) }
+            .let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
+            .coerceAtLeast(1)
 
         ndk {
             // Real phones, and the x86_64 emulator.
@@ -21,9 +30,21 @@ android {
         }
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = providers.environmentVariable("YTMP_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("YTMP_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("YTMP_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -63,7 +84,8 @@ val copyWebApp by tasks.registering(Sync::class) {
     into(webAppAssets.map { it.dir("web") })
 }
 android.sourceSets.getByName("main").assets.directories.add(webAppAssets.get().asFile.path)
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+// Release builds also lint the assets.
+tasks.matching { (it.name.startsWith("merge") && it.name.endsWith("Assets")) || it.name.contains("lint", ignoreCase = true) }.configureEach {
     dependsOn(copyWebApp)
 }
 
