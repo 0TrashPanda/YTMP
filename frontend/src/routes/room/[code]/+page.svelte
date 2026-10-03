@@ -8,6 +8,7 @@
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
 	import YoutubeSheet from '../../../lib/components/YoutubeSheet.svelte';
+	import SaveSheet from '../../../lib/components/SaveSheet.svelte';
 	import { youtube } from '../../../lib/youtube.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
 	import ArtistView from '../../../lib/components/ArtistView.svelte';
@@ -77,6 +78,8 @@
 	// Home and Library (the bottom bar, in the app with YouTube Music sign-in), under the pages above.
 	let section = $state<'home' | 'library'>('home');
 	let accountOpen = $state(false);
+	/** Saving this song to one of your YouTube Music playlists. */
+	let saving = $state<Song | null>(null);
 
 	function pickSection(next: 'home' | 'library') {
 		section = next;
@@ -157,12 +160,39 @@
 		untrack(() => player?.sync());
 	});
 
-	// In the app, "Play here" stays on between visits (a browser needs a click first).
+	// Solo rooms play on this device by default (unless you turned it off in that room); in
+	// other rooms "Play here" stays as you left it. The app can start right away; a browser
+	// only allows audio after a tap or key press, so it starts at the first one.
+	// Only once, when the room opens: after that, on or off is up to you (or another app taking the audio).
+	let autoStarted = false;
 	$effect(() => {
-		if (room?.status === 'connected' && player?.canStartWithoutGesture && saved.listening) {
-			untrack(() => !player!.enabled && player!.enable());
-		}
+		const visibility = room?.state?.room.visibility;
+		if (room?.status !== 'connected' || !player || !visibility || autoStarted) return;
+		autoStarted = true;
+		const wanted = visibility === 'private' ? !saved.soloOff(code) : player.canStartWithoutGesture && saved.listening;
+		if (!wanted) return;
+		untrack(() => {
+			if (player!.enabled) return;
+			if (player!.canStartWithoutGesture) player!.enable();
+			else startOnFirstGesture();
+		});
 	});
+
+	let waitingForGesture = false;
+	function startOnFirstGesture() {
+		if (waitingForGesture) return;
+		waitingForGesture = true;
+		const start = (event: Event) => {
+			// A tap on the on/off switch itself decides for itself.
+			if ((event.target as HTMLElement | null)?.closest('[data-listen-toggle]')) return;
+			window.removeEventListener('pointerup', start, true);
+			window.removeEventListener('keydown', start, true);
+			waitingForGesture = false;
+			if (player && !player.enabled && !saved.soloOff(code)) player.enable();
+		};
+		window.addEventListener('pointerup', start, true);
+		window.addEventListener('keydown', start, true);
+	}
 
 	const positionMs = $derived.by(() => {
 		const playback = room?.state?.playback;
@@ -365,6 +395,7 @@
 					onToast={toast}
 					onMenu={(target) => (menu = target)}
 					onSongMenu={currentMenu}
+					onSave={(song) => (saving = song)}
 					onArtist={openArtist}
 					onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
 					onPodcast={openPodcast}
@@ -399,7 +430,12 @@
 			onArtist={openArtist}
 			onAlbum={openAlbum}
 			onPodcast={openPodcast}
+			onSave={youtube.account ? (song) => (saving = song) : undefined}
 		/>
+	{/if}
+
+	{#if saving}
+		<SaveSheet song={saving} onClose={() => (saving = null)} onToast={toast} />
 	{/if}
 
 	{#if settings && room.state}

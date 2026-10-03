@@ -6,6 +6,7 @@ import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
+import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.QueueItem
 import dev.trashpanda.ytmp.protocol.SearchPage
@@ -66,6 +67,19 @@ interface PersonalCatalog {
     suspend fun library(): HomePage
 
     suspend fun playlist(id: String): PlaylistPage
+
+    /** Thumbs up. */
+    suspend fun liked(songId: String): Boolean
+
+    suspend fun setLiked(songId: String, liked: Boolean)
+
+    /** Your own playlists, to save songs to. */
+    suspend fun ownPlaylists(): List<PlaylistSummary>
+
+    suspend fun addToPlaylist(playlistId: String, songIds: List<String>)
+
+    /** A new private playlist; returns its ID. */
+    suspend fun createPlaylist(title: String, songIds: List<String>): String
 
     suspend fun signOut()
 }

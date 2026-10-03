@@ -176,3 +176,32 @@ data class YoutubeAccountStatus(
     val available: Boolean,
     val account: YoutubeAccount?,
 )
+
+/** `GET`/`PUT /api/me/likes/{songId}`: whether you like a song (thumbs up) in YouTube Music. */
+@Serializable
+@SerialName("LikeStatus")
+data class LikeStatus(val liked: Boolean)
+
+/** One of your own playlists, to save songs to. */
+@Serializable
+@SerialName("PlaylistSummary")
+data class PlaylistSummary(val id: String, val title: String, val thumbnails: List<Thumbnail>)
+
+/** `GET /api/me/playlists`: your own playlists (not Liked music). */
+@Serializable
+@SerialName("MyPlaylists")
+data class MyPlaylists(val playlists: List<PlaylistSummary>)
+
+/** `POST /api/me/playlists/{id}/songs`: save songs to one of your playlists. */
+@Serializable
+@SerialName("SaveSongsRequest")
+data class SaveSongsRequest(val songIds: List<String>)
+
+/** `POST /api/me/playlists`: a new private playlist with these songs. */
+@Serializable
+@SerialName("CreatePlaylistRequest")
+data class CreatePlaylistRequest(val title: String, val songIds: List<String>)
+
+@Serializable
+@SerialName("CreatePlaylistResponse")
+data class CreatePlaylistResponse(val id: String)

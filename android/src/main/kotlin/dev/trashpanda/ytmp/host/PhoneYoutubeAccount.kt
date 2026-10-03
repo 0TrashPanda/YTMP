@@ -10,6 +10,7 @@ import dev.trashpanda.ytmp.OnDeviceYtm
 import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -67,6 +68,35 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
 
     override suspend fun playlist(id: String): PlaylistPage = playlists.get(id) { requireSignedIn(); ytm().personalPlaylist(id) }
 
+    // Likes are looked up per song (the one playing) and remembered; changing one updates it.
+    private val likes = TtlCache<String, Boolean>(500, 30.minutes, System::currentTimeMillis)
+    private val likesChanged = mutableMapOf<String, Boolean>()
+
+    override suspend fun liked(songId: String): Boolean {
+        synchronized(likesChanged) { likesChanged[songId] }?.let { return it }
+        return likes.get(songId) { requireSignedIn(); ytm().liked(songId) }
+    }
+
+    override suspend fun setLiked(songId: String, liked: Boolean) {
+        requireSignedIn()
+        ytm().setLiked(songId, liked)
+        synchronized(likesChanged) { likesChanged[songId] = liked }
+        playlists.clear() // Liked music changed
+    }
+
+    override suspend fun ownPlaylists(): List<PlaylistSummary> { requireSignedIn(); return ytm().ownPlaylists() }
+
+    override suspend fun addToPlaylist(playlistId: String, songIds: List<String>) {
+        requireSignedIn()
+        ytm().addToPlaylist(playlistId, songIds)
+        playlists.clear()
+    }
+
+    override suspend fun createPlaylist(title: String, songIds: List<String>): String {
+        requireSignedIn()
+        return ytm().createPlaylist(title, songIds).also { libraries.clear() }
+    }
+
     private suspend fun requireSignedIn() {
         lock.withLock { ensureSignedIn() } ?: throw SourceException("Not signed in to YouTube Music")
     }
@@ -90,6 +120,8 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
     }
 
     private fun forget() {
+        likes.clear()
+        synchronized(likesChanged) { likesChanged.clear() }
         homes.clear()
         libraries.clear()
         playlists.clear()

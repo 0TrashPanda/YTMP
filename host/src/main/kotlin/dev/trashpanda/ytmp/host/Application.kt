@@ -5,6 +5,11 @@ import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
+import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
+import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
+import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.MyPlaylists
+import dev.trashpanda.ytmp.protocol.SaveSongsRequest
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
@@ -47,6 +52,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
@@ -234,7 +240,26 @@ fun Application.ytmpModule(
                     call.respond(HttpStatusCode.NoContent)
                 }
                 get("/library") { call.respond(call.owner().library()) }
+                get("/playlists") { call.respond(MyPlaylists(call.owner().ownPlaylists())) }
+                post("/playlists") {
+                    val owner = call.owner()
+                    val request = call.receive<CreatePlaylistRequest>()
+                    val title = request.title.trim()
+                    if (title.isEmpty() || title.length > 150) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Playlist name must be 1-150 characters")
+                    call.respond(CreatePlaylistResponse(owner.createPlaylist(title, request.songIds)))
+                }
                 get("/playlists/{id}") { call.respond(call.owner().playlist(call.parameters["id"]!!)) }
+                post("/playlists/{id}/songs") {
+                    val owner = call.owner()
+                    owner.addToPlaylist(call.parameters["id"]!!, call.receive<SaveSongsRequest>().songIds)
+                    call.respond(HttpStatusCode.NoContent)
+                }
+                get("/likes/{songId}") { call.respond(LikeStatus(call.owner().liked(call.parameters["songId"]!!))) }
+                put("/likes/{songId}") {
+                    val owner = call.owner()
+                    owner.setLiked(call.parameters["songId"]!!, call.receive<LikeStatus>().liked)
+                    call.respond(HttpStatusCode.NoContent)
+                }
             }
             get("/audio/{songId}") {
                 val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")

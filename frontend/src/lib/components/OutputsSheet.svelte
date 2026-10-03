@@ -47,7 +47,7 @@
 		</div>
 
 		<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">
-			<label class="flex items-center gap-3">
+			<label class="flex items-center gap-3" data-listen-toggle>
 				<Icon name="headphones" size={20} class={player.enabled ? 'text-accent' : 'text-muted'} />
 				<span class="min-w-0 flex-1 truncate">{phone.current ? 'This phone' : 'This device'}</span>
 				<input

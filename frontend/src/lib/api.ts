@@ -2,7 +2,13 @@ import type {
 	AlbumPage,
 	ApiError,
 	ArtistPage,
+	CreatePlaylistRequest,
+	CreatePlaylistResponse,
 	CreateRoomResponse,
+	LikeStatus,
+	MyPlaylists,
+	PlaylistSummary,
+	SaveSongsRequest,
 	HomePage,
 	HostInfo,
 	PlaylistPage,
@@ -151,6 +157,45 @@ export async function signOutOfYoutube(): Promise<void> {
 /** Your playlists (Liked music first) and podcasts in YouTube Music. */
 export function getLibrary(): Promise<HomePage> {
 	return cached('me:library', () => request('/api/me/library'));
+}
+
+/** Whether you like a song (thumbs up) in YouTube Music. */
+export async function getLiked(songId: string): Promise<boolean> {
+	return (await request<LikeStatus>(`/api/me/likes/${encodeURIComponent(songId)}`)).liked;
+}
+
+export async function setLiked(songId: string, liked: boolean): Promise<void> {
+	await request<null>(`/api/me/likes/${encodeURIComponent(songId)}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ liked } satisfies LikeStatus)
+	});
+	cache.delete('me:playlist:LM');
+}
+
+/** Your own playlists, to save songs to. */
+export async function getMyPlaylists(): Promise<PlaylistSummary[]> {
+	return (await request<MyPlaylists>('/api/me/playlists')).playlists;
+}
+
+export async function saveToPlaylist(playlistId: string, songIds: string[]): Promise<void> {
+	await request<null>(`/api/me/playlists/${encodeURIComponent(playlistId)}/songs`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ songIds } satisfies SaveSongsRequest)
+	});
+	cache.delete(`me:playlist:${playlistId}`);
+}
+
+/** A new private playlist with these songs; returns its ID. */
+export async function createPlaylist(title: string, songIds: string[]): Promise<string> {
+	const response = await request<CreatePlaylistResponse>('/api/me/playlists', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ title, songIds } satisfies CreatePlaylistRequest)
+	});
+	cache.delete('me:library');
+	return response.id;
 }
 
 /** After signing in or out: the home page and your library change. */

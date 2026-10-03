@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 import requests
 import yt_dlp
-from ytmusicapi import YTMusic
+from ytmusicapi import LikeStatus, YTMusic
 from ytmusicapi.helpers import initialize_headers
 
 MODULE_ID = "ytm"
@@ -286,6 +286,36 @@ class YtmCore:
                 if (song := _episode_song(e, ref))
             ],
         }
+
+    def liked(self, song_id: str) -> bool:
+        """Whether the signed-in account likes this song (thumbs up)."""
+        vid = video_id(song_id)
+        tracks = self._signed_in().get_watch_playlist(videoId=vid, limit=1).get("tracks") or []
+        return any(t.get("videoId") == vid and t.get("likeStatus") == "LIKE" for t in tracks[:1])
+
+    def set_liked(self, song_id: str, liked: bool) -> None:
+        self._signed_in().rate_song(video_id(song_id), LikeStatus.LIKE if liked else LikeStatus.INDIFFERENT)
+
+    def own_playlists(self) -> list[dict]:
+        """The signed-in account's own playlists (the ones songs can be saved to): {id, title, thumbnails}."""
+        return [
+            {"id": p["playlistId"], "title": p.get("title") or "", "thumbnails": _thumbnails(p.get("thumbnails") or [])}
+            for p in self._signed_in().get_library_playlists(limit=_LIBRARY_ITEMS)
+            if p.get("owned") and p.get("playlistId") not in ("LM", "SE")
+        ]
+
+    def add_to_playlist(self, playlist_id: str, song_ids: list[str]) -> None:
+        result = self._signed_in().add_playlist_items(playlist_id, [video_id(s) for s in song_ids])
+        if not isinstance(result, dict) or result.get("status") != "STATUS_SUCCEEDED":
+            # YouTube asks to confirm duplicates instead of adding them.
+            raise Unavailable("Already in this playlist" if "duplicate" in str(result).lower() else "Couldn't add it to the playlist")
+
+    def create_playlist(self, title: str, song_ids: list[str]) -> str:
+        """A new private playlist with these songs; returns its ID."""
+        result = self._signed_in().create_playlist(title.replace("<", "").replace(">", ""), "", video_ids=[video_id(s) for s in song_ids])
+        if not isinstance(result, str):
+            raise Unavailable("Couldn't make the playlist")
+        return result
 
     def home(self, personal: bool = False) -> dict:
         """YTM's home page: quick picks, new releases, mixes and playlists.

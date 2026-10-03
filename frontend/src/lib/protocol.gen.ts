@@ -818,6 +818,33 @@ export interface YoutubeAccountStatus {
   account: YoutubeAccount | null;
 }
 
+export interface LikeStatus {
+  liked: boolean;
+}
+
+export interface PlaylistSummary {
+  id: string;
+  title: string;
+  thumbnails: Thumbnail[];
+}
+
+export interface MyPlaylists {
+  playlists: PlaylistSummary[];
+}
+
+export interface SaveSongsRequest {
+  songIds: string[];
+}
+
+export interface CreatePlaylistRequest {
+  title: string;
+  songIds: string[];
+}
+
+export interface CreatePlaylistResponse {
+  id: string;
+}
+
 export interface SuggestionsResponse {
   items: string[];
 }

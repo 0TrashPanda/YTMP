@@ -58,10 +58,12 @@ phone's owner:
   (including New episodes); they open like other playlist and podcast pages.
 - **Guests** in a room on your phone never see any of it: they get the general Home, and
   your library isn't reachable from other devices.
+- **Like** ✅ (👍 next to the song in the full player; filled when you like it) and **Save to
+  playlist** ✅ (also in the song menu): your own playlists, or a new private one.
 - Playing songs doesn't use the sign-in (YouTube may flag accounts used for downloading).
 - Signing out also forgets the sign-in page's session, so you can pick another account.
 
-Later: liking songs and editing playlists; using your sign-in in rooms on someone else's
+Later: removing songs from your playlists, dislike; using your sign-in in rooms on someone else's
 phone or a server, by loading your library from your own device or YTMP server so the room
 host never gets your sign-in.
 

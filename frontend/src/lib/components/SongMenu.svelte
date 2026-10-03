@@ -30,8 +30,10 @@
 		onArtist: (artist: ArtistRef) => void;
 		onAlbum: (album: AlbumRef, artist: string) => void;
 		onPodcast: (podcast: PodcastRef) => void;
+		/** Save to one of your YouTube Music playlists; only when signed in. */
+		onSave?: (song: Song) => void;
 	}
-	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast }: Props = $props();
+	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave }: Props = $props();
 
 	const song = $derived(target.song);
 	const item = $derived(target.item);
@@ -95,6 +97,11 @@
 			// Read everything from the target before closing: closing clears it.
 			const current = song;
 			list.push({ icon: 'similar', label: 'Find similar', run: () => (onFindSimilar(current), onClose()) });
+			list.push(null);
+		}
+		if (onSave) {
+			const current = song;
+			list.push({ icon: 'save', label: 'Save to playlist', run: () => (onSave(current), onClose()) });
 			list.push(null);
 		}
 		if (song.podcast) {

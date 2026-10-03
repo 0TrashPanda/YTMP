@@ -12,6 +12,11 @@ permissions say otherwise (permission: *Play audio locally*).
   remote machine without speakers.
 - Each client can turn local playback on or off at any time, and controls its own
   local volume.
+- **Solo rooms play on your device by default** ✅ when you open them (in a browser, from
+  your first tap or key press, since browsers only allow audio after one). Switching
+  *this device* off in a solo room is remembered for that room. Another app taking the
+  audio, or unplugging headphones, stops it for now but doesn't count as switching off.
+- Other rooms remember your last choice in the app.
 
 ## Host outputs
 

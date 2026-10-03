@@ -9,6 +9,7 @@ import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
+import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
@@ -101,6 +102,22 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
 
     suspend fun personalPlaylist(id: String): PlaylistPage = python {
         ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id, true)).toString())
+    }
+
+    suspend fun liked(songId: String): Boolean = python { core.callAttr("liked", songId).toBoolean() }
+
+    suspend fun setLiked(songId: String, liked: Boolean) = python { core.callAttr("set_liked", songId, liked); Unit }
+
+    suspend fun ownPlaylists(): List<PlaylistSummary> = python {
+        ProtocolJson.decodeFromString(ListSerializer(PlaylistSummary.serializer()), json.callAttr("dumps", core.callAttr("own_playlists")).toString())
+    }
+
+    suspend fun addToPlaylist(playlistId: String, songIds: List<String>) = python {
+        core.callAttr("add_to_playlist", playlistId, python.builtins.callAttr("list", songIds.toTypedArray())); Unit
+    }
+
+    suspend fun createPlaylist(title: String, songIds: List<String>): String = python {
+        core.callAttr("create_playlist", title, python.builtins.callAttr("list", songIds.toTypedArray())).toString()
     }
 
     private fun account(value: PyObject?): YoutubeAccount? =

@@ -16,7 +16,8 @@ export interface RoomPlayer {
 	/** True when playback can start without a click (the Android app). */
 	readonly canStartWithoutGesture: boolean;
 	enable(): Promise<void>;
-	disable(): void;
+	/** [chosen]: you switched it off (not another app taking the audio), so a solo room remembers it. */
+	disable(chosen?: boolean): void;
 	setVolume(value: number): void;
 	setSyncOffset(ms: number): void;
 	/** Call whenever the room state changes. */
@@ -60,6 +61,7 @@ class WebPlayer implements RoomPlayer {
 	async enable(): Promise<void> {
 		this.enabled = true;
 		saved.listening = true;
+		saved.setSoloOff(this.room.roomCode, false);
 		this.error = null;
 		// Unlock audio right away, inside the gesture.
 		this.audio.play().catch(() => {});
@@ -69,9 +71,10 @@ class WebPlayer implements RoomPlayer {
 		await this.room.run({ kind: 'SetListening', on: true });
 	}
 
-	disable(): void {
+	disable(chosen = true): void {
 		this.enabled = false;
 		saved.listening = false;
+		if (chosen && this.room.state?.room.visibility === 'private') saved.setSoloOff(this.room.roomCode, true);
 		clearInterval(this.timer);
 		this.audio.pause();
 		this.setMediaKeys(false);
@@ -219,7 +222,8 @@ class NativePlayer implements RoomPlayer {
 			onCommand: (command) => void this.room.run(command),
 			onStatus: (status) => {
 				this.buffering = status === 'buffering';
-				if (status === 'stopped') this.disable();
+				// Another app took the audio, or headphones were unplugged: not a choice to stop listening here.
+				if (status === 'stopped') this.disable(false);
 				if (status === 'error') this.error = "Can't play this song on this device.";
 			}
 		};
@@ -229,13 +233,15 @@ class NativePlayer implements RoomPlayer {
 		this.enabled = true;
 		this.error = null;
 		saved.listening = true;
+		saved.setSoloOff(this.room.roomCode, false);
 		this.sync();
 		await this.room.run({ kind: 'SetListening', on: true });
 	}
 
-	disable(): void {
+	disable(chosen = true): void {
 		this.enabled = false;
 		saved.listening = false;
+		if (chosen && this.room.state?.room.visibility === 'private') saved.setSoloOff(this.room.roomCode, true);
 		this.sync();
 		this.room.run({ kind: 'SetListening', on: false });
 	}

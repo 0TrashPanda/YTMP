@@ -217,3 +217,44 @@ def test_library_items():
     assert podcast == {"kind": "podcast", "id": "MPSPPLx", "title": "The Daily", "author": "NYT", "thumbnails": []}
     new = core._library_podcast({"title": "New Episodes", "channel": {"id": None, "name": "Auto playlist"}, "browseId": "VLRDPN", "podcastId": "RDPN"})
     assert new["kind"] == "playlist" and new["id"] == "RDPN"
+
+
+def test_likes_and_playlists_need_an_account():
+    import pytest
+    ytm = core.YtmCore()
+    for call in (lambda: ytm.liked("ytm:abc"), lambda: ytm.set_liked("ytm:abc", True), ytm.own_playlists,
+                 lambda: ytm.add_to_playlist("PLx", ["ytm:abc"]), lambda: ytm.create_playlist("Mine", ["ytm:abc"])):
+        with pytest.raises(core.NotSignedIn):
+            call()
+
+
+class _FakeUser:
+    def __init__(self):
+        self.rated = []
+
+    def get_watch_playlist(self, videoId, limit):
+        return {"tracks": [{"videoId": videoId, "likeStatus": "LIKE" if videoId == "liked" else "INDIFFERENT"}, {"videoId": "next", "likeStatus": "LIKE"}]}
+
+    def rate_song(self, vid, rating):
+        self.rated.append((vid, rating))
+
+    def get_library_playlists(self, limit):
+        return [{"playlistId": "LM", "title": "Liked music", "owned": False}, {"playlistId": "PLmine", "title": "Mine", "owned": True},
+                {"playlistId": "PLtheirs", "title": "Theirs", "owned": False}]
+
+    def add_playlist_items(self, playlist_id, video_ids):
+        return {"status": "STATUS_SUCCEEDED"} if video_ids != ["dupe"] else {"actions": ["confirmDialog: duplicate"]}
+
+
+def test_likes_and_saving_with_an_account():
+    import pytest
+    ytm = core.YtmCore()
+    user = ytm._user = _FakeUser()
+    assert ytm.liked("ytm:liked") and not ytm.liked("ytm:other")
+    ytm.set_liked("ytm:abc", True)
+    ytm.set_liked("ytm:abc", False)
+    assert user.rated == [("abc", core.LikeStatus.LIKE), ("abc", core.LikeStatus.INDIFFERENT)]
+    assert [p["id"] for p in ytm.own_playlists()] == ["PLmine"]
+    ytm.add_to_playlist("PLmine", ["ytm:abc"])
+    with pytest.raises(core.Unavailable, match="Already"):
+        ytm.add_to_playlist("PLmine", ["ytm:dupe"])

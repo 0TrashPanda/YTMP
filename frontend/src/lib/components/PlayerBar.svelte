@@ -161,6 +161,7 @@
 					<Icon name="cast" size={20} />
 				</button>
 				<button
+					data-listen-toggle
 					class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium
 						{player.enabled ? 'bg-white text-black' : 'bg-raised hover:bg-line'}"
 					onclick={() => (player.enabled ? player.disable() : player.enable())}

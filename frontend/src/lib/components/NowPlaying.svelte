@@ -5,9 +5,11 @@
 	// which keeps the controls; the art on the left, Up next and Related on the right.
 	import { fly } from 'svelte/transition';
 	import { MediaQuery } from 'svelte/reactivity';
-	import { prefetch } from '../api';
+	import { getLiked, prefetch, setLiked } from '../api';
+	import { youtube } from '../youtube.svelte';
 	import type { PageHandlers } from '../cards';
 	import type { RoomPlayer } from '../player.svelte';
+	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
@@ -26,6 +28,7 @@
 		onToast,
 		onMenu,
 		onSongMenu,
+		onSave,
 		...open
 	}: {
 		room: RoomConnection;
@@ -36,6 +39,8 @@
 		onMenu: (target: MenuTarget) => void;
 		/** Right-click or ⋮ on the current song. */
 		onSongMenu: (event: MouseEvent) => void;
+		/** Save to one of your YouTube Music playlists. */
+		onSave: (song: Song) => void;
 	} & Omit<PageHandlers, 'onPlaylist'> = $props();
 
 	const current = $derived(room.state?.nowPlaying ?? null);
@@ -46,6 +51,31 @@
 	/** Desktop shows the tabs next to the art, always open. */
 	const wide = new MediaQuery('min-width: 1024px');
 	let tab = $state<'queue' | 'related'>('queue');
+
+	// Thumbs up, with your YouTube Music sign-in (the phone app).
+	let liked = $state<boolean | null>(null);
+	$effect(() => {
+		const id = song?.id;
+		void youtube.version;
+		liked = null;
+		if (!id || !youtube.account) return;
+		getLiked(id)
+			.then((value) => song?.id === id && (liked = value))
+			.catch(() => {});
+	});
+
+	async function toggleLike() {
+		if (!song || liked === null) return;
+		const next = !liked;
+		liked = next; // right away; back if it didn't work
+		try {
+			await setLiked(song.id, next);
+			onToast(next ? 'Added to Liked music' : 'Removed from Liked music');
+		} catch (e) {
+			liked = !next;
+			onToast(e instanceof Error ? e.message : "Couldn't change the like");
+		}
+	}
 	/** Phones: Up next / Related slid up over the player. */
 	let sheet = $state(false);
 	let showOutputs = $state(false);
@@ -185,7 +215,8 @@
 			</div>
 
 			{#if song && current}
-				<div class="w-full max-w-[36rem] min-w-0 shrink-0" role="presentation" oncontextmenu={onSongMenu}>
+				<div class="flex w-full max-w-[36rem] min-w-0 shrink-0 items-center gap-1" role="presentation" oncontextmenu={onSongMenu}>
+				<div class="min-w-0 flex-1">
 					<h1 class="truncate text-2xl font-bold">{song.title}</h1>
 					<p class="truncate text-muted">
 						{#if song.podcast}
@@ -203,6 +234,22 @@
 					<p class="mt-0.5 truncate text-xs text-muted">
 						Added by {current.item.addedByName}{loading ? ' • loading…' : player.buffering ? ' • buffering…' : ''}
 					</p>
+				</div>
+				{#if youtube.account}
+					{@const shown = song}
+					<button
+						class="shrink-0 rounded-full p-2.5 hover:bg-white/10 disabled:opacity-40"
+						disabled={liked === null}
+						aria-label={liked ? 'Remove like' : 'Like'}
+						aria-pressed={!!liked}
+						onclick={toggleLike}
+					>
+						<Icon name={liked ? 'liked' : 'like'} size={26} />
+					</button>
+					<button class="shrink-0 rounded-full p-2.5 hover:bg-white/10" aria-label="Save to playlist" onclick={() => onSave(shown)}>
+						<Icon name="save" size={26} />
+					</button>
+				{/if}
 				</div>
 
 				<!-- Phones: the controls (desktop has them in the player bar). -->

@@ -51,6 +51,9 @@ export const saved = {
 	set syncOffsetMs(value: number) {
 		write('ytmp.syncOffset', String(value));
 	},
+	/** You turned "this device" off in this solo room (solo rooms play here by default). */
+	soloOff: (roomCode: string) => read(`ytmp.soloOff.${code(roomCode)}`) === '1',
+	setSoloOff: (roomCode: string, off: boolean) => write(`ytmp.soloOff.${code(roomCode)}`, off ? '1' : '0'),
 	/** Recent searches, newest first. */
 	get recentSearches(): string[] {
 		try {

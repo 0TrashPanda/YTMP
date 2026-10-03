@@ -8,6 +8,12 @@ import dev.trashpanda.ytmp.protocol.HomeSection
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
+import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
+import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
+import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.MyPlaylists
+import dev.trashpanda.ytmp.protocol.PlaylistSummary
+import dev.trashpanda.ytmp.protocol.SaveSongsRequest
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ClientMessage
@@ -40,6 +46,7 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -250,6 +257,13 @@ class ApplicationTest {
         override suspend fun home() = HomePage(listOf(HomeSection("Mine", emptyList())))
         override suspend fun library() = HomePage(listOf(HomeSection("Playlists", emptyList())))
         override suspend fun playlist(id: String) = PlaylistPage(id, "Liked music", null, null, emptyList(), emptyList())
+        val liked = mutableSetOf<String>()
+        val saved = mutableListOf<Pair<String, List<String>>>()
+        override suspend fun liked(songId: String) = songId in liked
+        override suspend fun setLiked(songId: String, liked: Boolean) { if (liked) this.liked += songId else this.liked -= songId }
+        override suspend fun ownPlaylists() = listOf(PlaylistSummary("PLmine", "Mine", emptyList()))
+        override suspend fun addToPlaylist(playlistId: String, songIds: List<String>) { saved += playlistId to songIds }
+        override suspend fun createPlaylist(title: String, songIds: List<String>) = "PLnew".also { saved += it to songIds }
         override suspend fun signOut() { account = null }
     }
 
@@ -271,6 +285,19 @@ class ApplicationTest {
         assertEquals(HttpStatusCode.Forbidden, client.get("/api/me/library") { remote(this) }.status)
         assertEquals(HttpStatusCode.Forbidden, client.get("/api/me/playlists/LM") { remote(this) }.status)
         assertEquals(HttpStatusCode.Forbidden, client.delete("/api/me/youtube") { remote(this) }.status)
+
+        // Likes and saving to playlists: the phone itself only.
+        assertEquals(HttpStatusCode.NoContent, client.put("/api/me/likes/ytm:abc") { contentType(ContentType.Application.Json); setBody(LikeStatus(true)) }.status)
+        assertEquals(LikeStatus(true), client.get("/api/me/likes/ytm:abc").body<LikeStatus>())
+        assertEquals(listOf("PLmine"), client.get("/api/me/playlists").body<MyPlaylists>().playlists.map { it.id })
+        assertEquals(HttpStatusCode.NoContent, client.post("/api/me/playlists/PLmine/songs") { contentType(ContentType.Application.Json); setBody(SaveSongsRequest(listOf("ytm:abc"))) }.status)
+        assertEquals("PLnew", client.post("/api/me/playlists") { contentType(ContentType.Application.Json); setBody(CreatePlaylistRequest("New", listOf("ytm:abc"))) }.body<CreatePlaylistResponse>().id)
+        assertEquals(listOf("PLmine" to listOf("ytm:abc"), "PLnew" to listOf("ytm:abc")), owner.saved)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/me/likes/ytm:abc") { remote(this) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.put("/api/me/likes/ytm:abc") { remote(this); contentType(ContentType.Application.Json); setBody(LikeStatus(false)) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/me/playlists") { remote(this) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.post("/api/me/playlists/PLmine/songs") { remote(this); contentType(ContentType.Application.Json); setBody(SaveSongsRequest(listOf("ytm:x"))) }.status)
+        assertEquals(setOf("ytm:abc"), owner.liked)
 
         // Signed out: the general home again.
         assertEquals(HttpStatusCode.NoContent, client.delete("/api/me/youtube").status)
