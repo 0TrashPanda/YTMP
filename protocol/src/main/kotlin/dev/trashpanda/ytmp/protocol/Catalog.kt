@@ -158,3 +158,21 @@ data class HomeSection(
     val title: String,
     val items: List<SearchItem>,
 )
+
+/** A signed-in YouTube Music account. */
+@Serializable
+@SerialName("YoutubeAccount")
+data class YoutubeAccount(val name: String, val handle: String?, val photoUrl: String?)
+
+/**
+ * `GET /api/me/youtube`: the YouTube Music account of this host's owner. Only a phone host
+ * has one, and only tells its own app; the library is `GET /api/me/library` (a [HomePage]
+ * with "Playlists" and "Podcasts"), private playlists `GET /api/me/playlists/{id}`.
+ */
+@Serializable
+@SerialName("YoutubeAccountStatus")
+data class YoutubeAccountStatus(
+    /** You can sign in here (the phone app on its own host). */
+    val available: Boolean,
+    val account: YoutubeAccount?,
+)

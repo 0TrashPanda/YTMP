@@ -807,6 +807,17 @@ export interface HomePage {
   sections: HomeSection[];
 }
 
+export interface YoutubeAccount {
+  name: string;
+  handle: string | null;
+  photoUrl: string | null;
+}
+
+export interface YoutubeAccountStatus {
+  available: boolean;
+  account: YoutubeAccount | null;
+}
+
 export interface SuggestionsResponse {
   items: string[];
 }

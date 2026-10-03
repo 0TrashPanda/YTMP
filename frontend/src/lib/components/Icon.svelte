@@ -2,6 +2,8 @@
 	// Material Icons (Apache 2.0).
 	const paths = {
 		play: 'M8 5v14l11-7z',
+		home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+		library: 'M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 5h-3v5.5c0 1.38-1.12 2.5-2.5 2.5S10 13.88 10 12.5s1.12-2.5 2.5-2.5c.57 0 1.08.19 1.5.51V5h4v2zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z',
 		pause: 'M6 19h4V5H6v14zm8-14v14h4V5h-4z',
 		next: 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z',
 		expand: 'M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z',

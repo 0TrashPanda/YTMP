@@ -30,6 +30,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.common.util.concurrent.ListenableFuture
 import dev.trashpanda.ytmp.host.LocalHost
 import dev.trashpanda.ytmp.host.NearbyRoom
+import dev.trashpanda.ytmp.host.SourceException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
@@ -50,6 +51,23 @@ class MainActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("ytmp", MODE_PRIVATE) }
     private val json = Json { ignoreUnknownKeys = true }
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+    /** Back from [YoutubeLoginActivity]: sign the host in, then tell the page (null = signed in, else why not). */
+    private val youtubeLogin = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val cookie = result.data?.getStringExtra(YoutubeLoginActivity.EXTRA_COOKIE)
+        lifecycleScope.launch {
+            val error = when {
+                result.resultCode != RESULT_OK || cookie == null -> "Not signed in"
+                else -> try {
+                    app.host.youtube.signIn(cookie)
+                    null
+                } catch (e: SourceException) {
+                    e.message ?: "Signing in didn't work"
+                }
+            }
+            js("window.__ytmpNative && window.__ytmpNative.onYoutubeSignIn && window.__ytmpNative.onYoutubeSignIn(${error?.let(JSONObject::quote) ?: "null"})")
+        }
+    }
 
     /** Serves the bundled setup page from assets on a fake https origin. */
     private val assets by lazy {
@@ -243,6 +261,10 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun nearbyRooms(): String = json.encodeToString(ListSerializer(NearbyRoom.serializer()), app.nearby.rooms.value)
 
+        /** Opens YouTube Music's sign-in; the page hears back through `onYoutubeSignIn`. */
+        @JavascriptInterface
+        fun youtubeSignIn() = runOnUiThread { youtubeLogin.launch(Intent(this@MainActivity, YoutubeLoginActivity::class.java)) }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -261,6 +283,6 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 1
+        const val BRIDGE_VERSION = 2
     }
 }

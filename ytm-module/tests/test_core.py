@@ -192,3 +192,28 @@ def test_home_items_of_each_kind():
     playlist = core._home_item({"playlistId": "RDCLAK5uy_x", "title": "Pop Gold", "description": "Alicia Keys, Ed Sheeran"})
     assert playlist == {"kind": "playlist", "id": "RDCLAK5uy_x", "title": "Pop Gold", "author": "Alicia Keys, Ed Sheeran", "itemCount": None, "thumbnails": []}
     assert core._home_item({"title": "Nothing to open"}) is None
+
+
+def test_signing_in_needs_youtube_music_cookies():
+    import pytest
+    with pytest.raises(core.NotSignedIn):
+        core.YtmCore().sign_in("SID=abc; HSID=def")
+
+
+def test_personal_pages_need_an_account():
+    import pytest
+    ytm = core.YtmCore()
+    assert ytm.account() is None
+    with pytest.raises(core.NotSignedIn):
+        ytm.library()
+    with pytest.raises(core.NotSignedIn):
+        ytm.home(personal=True)
+
+
+def test_library_items():
+    liked = core._library_playlist({"playlistId": "LM", "title": "Liked music", "count": "1,204"})
+    assert liked["kind"] == "playlist" and liked["itemCount"] == 1204
+    podcast = core._library_podcast({"title": "The Daily", "channel": {"id": "UC1", "name": "NYT"}, "browseId": "MPSPPLx", "podcastId": "PLx"})
+    assert podcast == {"kind": "podcast", "id": "MPSPPLx", "title": "The Daily", "author": "NYT", "thumbnails": []}
+    new = core._library_podcast({"title": "New Episodes", "channel": {"id": None, "name": "Auto playlist"}, "browseId": "VLRDPN", "podcastId": "RDPN"})
+    assert new["kind"] == "playlist" and new["id"] == "RDPN"

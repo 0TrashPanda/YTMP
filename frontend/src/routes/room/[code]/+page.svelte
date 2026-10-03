@@ -6,6 +6,9 @@
 	import PlayerBar from '../../../lib/components/PlayerBar.svelte';
 	import NowPlaying from '../../../lib/components/NowPlaying.svelte';
 	import HomeView from '../../../lib/components/HomeView.svelte';
+	import LibraryView from '../../../lib/components/LibraryView.svelte';
+	import YoutubeSheet from '../../../lib/components/YoutubeSheet.svelte';
+	import { youtube } from '../../../lib/youtube.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
 	import ArtistView from '../../../lib/components/ArtistView.svelte';
 	import AlbumView from '../../../lib/components/AlbumView.svelte';
@@ -43,7 +46,7 @@
 		| { kind: 'similar'; song: Song }
 		| { kind: 'artist'; id: string; name: string }
 		| { kind: 'album'; id: string; title: string }
-		| { kind: 'playlist'; id: string; title: string }
+		| { kind: 'playlist'; id: string; title: string; personal?: boolean }
 		| { kind: 'podcast'; id: string; title: string };
 	let views = $state<View[]>([]);
 	let browsing = $state(false);
@@ -67,7 +70,18 @@
 
 	function toggleHome() {
 		if (browsing) browsing = false;
+		else if (section !== 'home') section = 'home';
 		else if (views.length) browsing = true;
+	}
+
+	// Home and Library (the bottom bar, in the app with YouTube Music sign-in), under the pages above.
+	let section = $state<'home' | 'library'>('home');
+	let accountOpen = $state(false);
+
+	function pickSection(next: 'home' | 'library') {
+		section = next;
+		browsing = false;
+		scroller?.scrollTo({ top: 0 });
 	}
 
 	// The full player (album art, controls, Up next) over everything. A history entry, so
@@ -92,8 +106,9 @@
 		else searchFor(`${album.name} ${artist}`.trim());
 	}
 
-	function openPlaylist(playlist: { id: string; title: string }) {
-		show({ kind: 'playlist', id: playlist.id, title: playlist.title });
+	/** [personal]: one of yours, from your library. */
+	function openPlaylist(playlist: { id: string; title: string }, personal = false) {
+		show({ kind: 'playlist', id: playlist.id, title: playlist.title, personal });
 	}
 
 	function openPodcast(podcast: PodcastRef) {
@@ -120,6 +135,7 @@
 		room = new RoomConnection(code, name.trim());
 		player = createPlayer(room);
 		room.connect();
+		youtube.load();
 	}
 	if (initialName.trim()) start();
 
@@ -231,8 +247,9 @@
 					<SearchBox {query} onopen={() => (headerHidden = false)} onsearch={searchFor} />
 					<div class="ml-auto flex items-center gap-2">
 						<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
+						<!-- Phones: centered in the header. -->
 						<button
-							class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line"
+							class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line max-sm:absolute max-sm:left-1/2 max-sm:-translate-x-1/2"
 							onclick={() => (sharing = true)}
 							title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
 						>
@@ -242,6 +259,15 @@
 							{code}
 							<Icon name="share" size={16} class="text-muted" />
 						</button>
+						{#if youtube.available}
+							<button class="shrink-0 rounded-full p-1" aria-label="YouTube Music account" onclick={() => (accountOpen = true)}>
+								{#if youtube.account?.photoUrl}
+									<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-7 w-7 rounded-full" />
+								{:else}
+									<Icon name="person" size={22} class="text-muted" />
+								{/if}
+							</button>
+						{/if}
 						<button
 							class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
 							aria-label="People in this room"
@@ -301,20 +327,31 @@
 						{:else if view.kind === 'album'}
 							<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
 						{:else if view.kind === 'playlist'}
-							<PlaylistView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
+							<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={(target) => (menu = target)} />
 						{:else if view.kind === 'podcast'}
 							<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
 						{/if}
-					{:else}
-						<HomeView
-							{room}
+					{:else if section === 'library'}
+						<LibraryView
 							onToast={toast}
-							onMenu={(target) => (menu = target)}
 							onArtist={openArtist}
 							onAlbum={(a) => openAlbum(a)}
-							onPlaylist={openPlaylist}
+							onPlaylist={(p) => openPlaylist(p, true)}
 							onPodcast={openPodcast}
 						/>
+					{:else}
+						<!-- Signing in or out changes the suggestions. -->
+						{#key youtube.version}
+							<HomeView
+								{room}
+								onToast={toast}
+								onMenu={(target) => (menu = target)}
+								onArtist={openArtist}
+								onAlbum={(a) => openAlbum(a)}
+								onPlaylist={openPlaylist}
+								onPodcast={openPodcast}
+							/>
+						{/key}
 					{/if}
 				</main>
 			</div>
@@ -338,6 +375,18 @@
 		{#if player}
 			<PlayerBar {room} {player} {positionMs} {expanded} onExpand={(open) => (open ? openPlayer() : closePlayer())} onToast={toast} onSongMenu={currentMenu} />
 		{/if}
+		{#if youtube.available}
+			<!-- Like YTM's bottom bar. -->
+			<nav class="flex shrink-0 bg-surface">
+				{#each [['home', 'Home'], ['library', 'Library']] as const as [value, label] (value)}
+					{@const active = section === value && !browsing}
+					<button class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs {active ? 'text-white' : 'text-muted'}" aria-current={active ? 'page' : undefined} onclick={() => pickSection(value)}>
+						<Icon name={value} size={24} />
+						{label}
+					</button>
+				{/each}
+			</nav>
+		{/if}
 	</div>
 
 	{#if menu}
@@ -355,6 +404,10 @@
 
 	{#if settings && room.state}
 		<RoomSettings {room} start={settings} onClose={() => (settings = null)} />
+	{/if}
+
+	{#if accountOpen}
+		<YoutubeSheet onClose={() => (accountOpen = false)} onToast={toast} />
 	{/if}
 
 	{#if sharing}

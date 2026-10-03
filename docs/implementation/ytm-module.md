@@ -13,6 +13,19 @@ Feature description: [features/sources.md](../features/sources.md#youtube-music-
 
 ## Linking a YouTube account
 
+**Phone app (done):** `YoutubeLoginActivity` shows Google's sign-in in a WebView (without
+the `; wv` user-agent marker, which Google refuses). Once it lands on music.youtube.com with
+`__Secure-3PAPISID`, the cookies go to `PhoneYoutubeAccount` (app-private SharedPreferences
+`youtube`, excluded from backup and device transfer) and to the on-device module's
+`YtmCore.sign_in()`, which keeps a second, signed-in `YTMusic` next to the anonymous one.
+Only `home(personal=True)`, `library()` and `playlist(personal=True)` use it; search, rooms
+and yt-dlp stay anonymous. The host serves it through `PersonalCatalog`: `GET /api/home`
+(own home for the phone itself), `GET/DELETE /api/me/youtube`, `GET /api/me/library`,
+`GET /api/me/playlists/{id}`, all only for loopback requests. An expired sign-in
+(`NotSignedIn`) is forgotten; being offline isn't.
+
+**Servers (planned):**
+
 **Decision: cookies / request headers.** The user pastes their YouTube Music browser
 cookies or request headers once ("browser auth" in ytmusicapi). yt-dlp can use the same
 cookies. They are stored encrypted with the user's account on the auth server.

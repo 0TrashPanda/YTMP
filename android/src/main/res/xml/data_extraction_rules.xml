@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The YouTube Music sign-in stays on this phone: not in backups, not moved to a new phone. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="youtube.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="youtube.xml" />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// A playlist page (community or YouTube Music's own): its songs, in order.
+	// A playlist page (community or YouTube Music's own, or one of yours): its songs, in order.
 	import { getPlaylist } from '../api';
 	import { formatTime } from '../format';
 	import type { PlaylistPage } from '../protocol.gen';
@@ -12,11 +12,14 @@
 		room,
 		id,
 		title,
+		personal = false,
 		onToast,
 		onMenu
 	}: {
 		room: RoomConnection;
 		id: string;
+		/** One of yours, from your library (through your YouTube Music sign-in). */
+		personal?: boolean;
 		/** Shown while loading. */
 		title: string;
 		onToast: (text: string) => void;
@@ -31,7 +34,7 @@
 		const playlistId = id;
 		playlist = null;
 		error = null;
-		getPlaylist(playlistId)
+		getPlaylist(playlistId, personal)
 			.then((p) => playlistId === id && (playlist = p))
 			.catch((e) => (error = e instanceof Error ? e.message : "Couldn't load the playlist"));
 	});

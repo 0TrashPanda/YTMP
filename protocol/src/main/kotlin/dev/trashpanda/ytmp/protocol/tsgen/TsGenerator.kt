@@ -31,6 +31,7 @@ import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.protocol.SuggestionsResponse
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import kotlinx.serialization.descriptors.PolymorphicKind
@@ -177,6 +178,7 @@ fun main(args: Array<String>) {
     generator.addRoot(SearchPage.serializer().descriptor)
     generator.addRoot(PodcastPage.serializer().descriptor)
     generator.addRoot(HomePage.serializer().descriptor)
+    generator.addRoot(YoutubeAccountStatus.serializer().descriptor)
     generator.addRoot(SuggestionsResponse.serializer().descriptor)
     out.parentFile.mkdirs()
     out.writeText(generator.render())

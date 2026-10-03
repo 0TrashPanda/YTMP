@@ -14,6 +14,7 @@ import type {
 	SearchResponse,
 	SearchType,
 	SuggestionsResponse,
+	YoutubeAccountStatus,
 	Song
 } from './protocol.gen';
 
@@ -121,8 +122,11 @@ export function getAlbum(id: string): Promise<AlbumPage> {
 	return cached(`album:${id}`, () => request(`/api/albums/${encodeURIComponent(id)}`));
 }
 
-export function getPlaylist(id: string): Promise<PlaylistPage> {
-	return cached(`playlist:${id}`, () => request(`/api/playlists/${encodeURIComponent(id)}`));
+/** [personal]: one of your own (from your library, e.g. Liked music "LM"), through your YouTube Music sign-in. */
+export function getPlaylist(id: string, personal = false): Promise<PlaylistPage> {
+	return personal
+		? cached(`me:playlist:${id}`, () => request(`/api/me/playlists/${encodeURIComponent(id)}`))
+		: cached(`playlist:${id}`, () => request(`/api/playlists/${encodeURIComponent(id)}`));
 }
 
 export function getPodcast(id: string): Promise<PodcastPage> {
@@ -132,6 +136,26 @@ export function getPodcast(id: string): Promise<PodcastPage> {
 /** Suggestions for the home page: quick picks, new releases, mixes. */
 export function getHome(): Promise<HomePage> {
 	return cached('home', () => request('/api/home'));
+}
+
+/** Your YouTube Music sign-in on this host (the phone app only). */
+export function getYoutubeAccount(): Promise<YoutubeAccountStatus> {
+	return request('/api/me/youtube');
+}
+
+export async function signOutOfYoutube(): Promise<void> {
+	await request<null>('/api/me/youtube', { method: 'DELETE' });
+	forgetPersonal();
+}
+
+/** Your playlists (Liked music first) and podcasts in YouTube Music. */
+export function getLibrary(): Promise<HomePage> {
+	return cached('me:library', () => request('/api/me/library'));
+}
+
+/** After signing in or out: the home page and your library change. */
+export function forgetPersonal(): void {
+	for (const key of [...cache.keys()]) if (key === 'home' || key.startsWith('me:')) cache.delete(key);
 }
 
 const pages = { artist: getArtist, album: getAlbum, playlist: getPlaylist, podcast: getPodcast };

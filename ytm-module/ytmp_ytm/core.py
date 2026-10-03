@@ -13,8 +13,10 @@ from concurrent.futures import ThreadPoolExecutor
 import urllib.parse
 from dataclasses import dataclass, field
 
+import requests
 import yt_dlp
 from ytmusicapi import YTMusic
+from ytmusicapi.helpers import initialize_headers
 
 MODULE_ID = "ytm"
 _PREFIXES = ("ytm:", "yt:")
@@ -22,6 +24,8 @@ _LARGE_ART = 544
 _ARTIST_SONGS = 20
 _PLAYLIST_SONGS = 200
 _HOME_SECTIONS = 12
+_LIBRARY_ITEMS = 200
+_YTM_ORIGIN = "https://music.youtube.com"
 # Search types (the chips above the results) -> ytmusicapi's search filter.
 SEARCH_TYPES = {
     "songs": "songs",
@@ -59,6 +63,10 @@ class NotFound(Exception):
 
 
 class Unavailable(Exception):
+    pass
+
+
+class NotSignedIn(Exception):
     pass
 
 
@@ -104,6 +112,50 @@ class YtmCore:
             self._ydl_opts["js_runtimes"] = {js_runtime: {}}
         self._streams: dict[str, StreamInfo] = {}
         self._lock = threading.Lock()
+        self._language = language
+        self._location = location
+        # The signed-in YouTube Music account (the phone owner's), next to the anonymous one
+        # that everything shared (search, rooms) keeps using.
+        self._user: YTMusic | None = None
+
+    def sign_in(self, cookie: str) -> dict:
+        """Uses the cookies of a signed-in music.youtube.com session for personal pages.
+
+        Raises NotSignedIn when they don't belong to a signed-in session (any more).
+        Returns the account (see account()).
+        """
+        if "__Secure-3PAPISID=" not in cookie:
+            raise NotSignedIn("Not signed in to YouTube Music")
+        headers = initialize_headers()
+        headers.update({"cookie": cookie, "x-goog-authuser": "0", "x-origin": _YTM_ORIGIN, "origin": _YTM_ORIGIN, "authorization": "SAPISIDHASH 0"})
+        user = YTMusic(auth=dict(headers), language=self._language, location=self._location)
+        account = _account(user)
+        self._user = user
+        return account
+
+    def sign_out(self) -> None:
+        self._user = None
+
+    def account(self) -> dict | None:
+        """The signed-in account: {name, handle, photoUrl}, or None."""
+        return _account(self._user) if self._user else None
+
+    def _signed_in(self) -> YTMusic:
+        if not self._user:
+            raise NotSignedIn("Not signed in to YouTube Music")
+        return self._user
+
+    def library(self) -> dict:
+        """The signed-in account's playlists (Liked music first) and podcasts, as home sections."""
+        user = self._signed_in()
+        with ThreadPoolExecutor(2) as pool:
+            playlists = pool.submit(user.get_library_playlists, limit=_LIBRARY_ITEMS)
+            podcasts = pool.submit(user.get_library_podcasts, limit=_LIBRARY_ITEMS)
+            sections = [
+                {"title": "Playlists", "items": [item for p in playlists.result() if (item := _library_playlist(p))]},
+                {"title": "Podcasts", "items": [item for p in podcasts.result() if (item := _library_podcast(p))]},
+            ]
+        return {"sections": sections}
 
     def search(self, query: str, type: str = "all", limit: int = 20) -> dict:
         """Search results as sections (see SearchPage in protocol/Catalog.kt).
@@ -197,10 +249,11 @@ class YtmCore:
             "songs": songs,
         }
 
-    def playlist(self, playlist_id: str) -> dict:
-        """A public playlist (community or YouTube Music's) with its songs."""
+    def playlist(self, playlist_id: str, personal: bool = False) -> dict:
+        """A playlist with its songs: a public one, or with [personal] also the signed-in account's own (Liked music is "LM")."""
+        ytm = self._signed_in() if personal else self._ytm
         try:
-            p = self._ytm.get_playlist(playlist_id, limit=_PLAYLIST_SONGS)
+            p = ytm.get_playlist(playlist_id, limit=_PLAYLIST_SONGS)
         except Exception as e:
             raise NotFound(str(e)) from e
         author = p.get("author")
@@ -234,10 +287,14 @@ class YtmCore:
             ],
         }
 
-    def home(self) -> dict:
-        """YTM's home page without an account: quick picks, new releases, mixes and playlists."""
+    def home(self, personal: bool = False) -> dict:
+        """YTM's home page: quick picks, new releases, mixes and playlists.
+
+        [personal]: the signed-in account's own home, instead of the one without an account.
+        """
+        ytm = self._signed_in() if personal else self._ytm
         sections = []
-        for s in self._ytm.get_home(limit=_HOME_SECTIONS):
+        for s in ytm.get_home(limit=_HOME_SECTIONS):
             items = [item for c in s.get("contents") or [] if (item := _home_item(c))]
             if items:
                 sections.append({"title": s.get("title") or "", "items": items})
@@ -368,6 +425,41 @@ def _home_item(c: dict) -> dict | None:
             "itemCount": None,
             "thumbnails": _thumbnails(c.get("thumbnails") or []),
         }
+    return None
+
+
+def _account(user: YTMusic) -> dict:
+    try:
+        info = user.get_account_info()
+    except requests.RequestException:
+        raise  # offline: that says nothing about the sign-in
+    except Exception as e:  # expired or signed out: YouTube answers without an account
+        raise NotSignedIn(f"Not signed in to YouTube Music ({e})") from e
+    return {"name": info.get("accountName") or "", "handle": info.get("channelHandle"), "photoUrl": info.get("accountPhotoUrl")}
+
+
+def _library_playlist(p: dict) -> dict | None:
+    if not p.get("playlistId"):
+        return None
+    count = p.get("count")
+    return {
+        "kind": "playlist",
+        "id": p["playlistId"],
+        "title": p.get("title") or "",
+        "author": p.get("description") or None,
+        "itemCount": int(count.replace(",", "")) if isinstance(count, str) and count.replace(",", "").isdigit() else None,
+        "thumbnails": _thumbnails(p.get("thumbnails") or []),
+    }
+
+
+def _library_podcast(p: dict) -> dict | None:
+    """A podcast in the library; "New episodes" (an automatic playlist) is a playlist."""
+    browse_id = p.get("browseId") or ""
+    channel = (p.get("channel") or {}).get("name")
+    if browse_id.startswith("MPSP"):
+        return {"kind": "podcast", "id": browse_id, "title": p.get("title") or "", "author": channel, "thumbnails": _thumbnails(p.get("thumbnails") or [])}
+    if p.get("podcastId"):
+        return {"kind": "playlist", "id": p["podcastId"], "title": p.get("title") or "", "author": channel, "itemCount": None, "thumbnails": _thumbnails(p.get("thumbnails") or [])}
     return None
 
 

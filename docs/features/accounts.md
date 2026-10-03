@@ -48,6 +48,23 @@ A YTMP account can be linked to a **YouTube account**. This lets the user:
 - see their YouTube Music **playlists** and **likes**
 - **edit** playlists and likes from within YTMP
 
+**On your own phone** ✅ (first step): in the app, the avatar in the room's header (or
+*Library*) signs in to YouTube Music on **Google's own sign-in page**; YTMP never sees the
+password. The sign-in stays **on that phone** (not in backups) and is only used for the
+phone's owner:
+
+- **Home** shows your own suggestions (your quick picks, mixes, listen again).
+- **Library** (bottom bar, like YTM): your playlists (Liked music first) and podcasts
+  (including New episodes); they open like other playlist and podcast pages.
+- **Guests** in a room on your phone never see any of it: they get the general Home, and
+  your library isn't reachable from other devices.
+- Playing songs doesn't use the sign-in (YouTube may flag accounts used for downloading).
+- Signing out also forgets the sign-in page's session, so you can pick another account.
+
+Later: liking songs and editing playlists; using your sign-in in rooms on someone else's
+phone or a server, by loading your library from your own device or YTMP server so the room
+host never gets your sign-in.
+
 ## Creating an account
 
 Who can create an account on a server is set in the **server config**: open sign-up,

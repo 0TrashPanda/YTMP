@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.QueueItem
 import dev.trashpanda.ytmp.protocol.SearchPage
@@ -49,6 +50,24 @@ interface CatalogSource {
     suspend fun podcast(id: String): PodcastPage
 
     suspend fun home(): HomePage
+}
+
+/**
+ * The YouTube Music account of a phone host's owner: their own home page, library and
+ * private playlists. Only for the host's own app, never for guests.
+ */
+interface PersonalCatalog {
+    /** Null when signed out (or the sign-in expired). */
+    suspend fun account(): YoutubeAccount?
+
+    suspend fun home(): HomePage
+
+    /** "Playlists" (Liked music first) and "Podcasts". */
+    suspend fun library(): HomePage
+
+    suspend fun playlist(id: String): PlaylistPage
+
+    suspend fun signOut()
 }
 
 /** A speaker or TV the host found, that rooms can play on. */

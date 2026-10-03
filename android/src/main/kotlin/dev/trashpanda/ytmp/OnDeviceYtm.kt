@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
@@ -24,6 +25,9 @@ import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
+
+/** The YouTube Music sign-in doesn't work (any more): signed out elsewhere, or the cookies expired. */
+class NotSignedInException(message: String) : SourceException(message)
 
 /**
  * The YTM source module running on the phone: the Python code from ytm-module/ (ytmusicapi +
@@ -77,6 +81,31 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("home")).toString())
     }
 
+    // The owner's YouTube Music account (see PhoneYoutubeAccount).
+
+    /** Signs in with the cookies of a music.youtube.com session; throws [SourceException] when they aren't signed in. */
+    suspend fun signIn(cookie: String): YoutubeAccount = python { account(core.callAttr("sign_in", cookie))!! }
+
+    suspend fun signOut() = python { core.callAttr("sign_out"); Unit }
+
+    /** Null when signed out; throws [SourceException] when the sign-in expired. */
+    suspend fun account(): YoutubeAccount? = python { account(core.callAttr("account")) }
+
+    suspend fun personalHome(): HomePage = python {
+        ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("home", true)).toString())
+    }
+
+    suspend fun library(): HomePage = python {
+        ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("library")).toString())
+    }
+
+    suspend fun personalPlaylist(id: String): PlaylistPage = python {
+        ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id, true)).toString())
+    }
+
+    private fun account(value: PyObject?): YoutubeAccount? =
+        value?.let { ProtocolJson.decodeFromString(YoutubeAccount.serializer(), json.callAttr("dumps", it).toString()) }
+
     override suspend fun resolveStream(songId: String): String = stream(songId).url
 
     override suspend fun resolve(songId: String): ResolvedStream = stream(songId).let { ResolvedStream(it.url, it.durationMs) }
@@ -94,7 +123,8 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
             block()
         } catch (e: PyException) {
             // e.g. "Unavailable: Video unavailable" -> "Video unavailable"
-            throw SourceException(e.message?.substringAfter(": ") ?: "YouTube Music error")
+            val message = e.message?.substringAfter(": ") ?: "YouTube Music error"
+            throw if (e.message.orEmpty().startsWith("NotSignedIn")) NotSignedInException(message) else SourceException(message)
         }
     }
 }

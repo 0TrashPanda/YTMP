@@ -40,6 +40,8 @@ class LocalHost(private val context: Context) {
     val sonosFinder = SonosFinder(context, sonos)
     private val outputs = combine(casts.devices, sonos.devices) { a, b -> a + b }.stateIn(scope, SharingStarted.Eagerly, emptyList())
     val authLink = AuthLink(context, PORT)
+    /** The phone owner's YouTube Music account. */
+    val youtube = PhoneYoutubeAccount(context) { ytm }
 
     /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
     private val cached = CachedSource(
@@ -86,6 +88,7 @@ class LocalHost(private val context: Context) {
                 extraApi = { authLink.routes(this) },
                 similar = cached,
                 catalog = cached,
+                personal = youtube,
                 suggestions = cached,
             )
         }.start(wait = false)

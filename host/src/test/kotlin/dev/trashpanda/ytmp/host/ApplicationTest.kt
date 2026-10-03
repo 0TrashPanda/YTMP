@@ -1,6 +1,13 @@
 package dev.trashpanda.ytmp.host
 
+import dev.trashpanda.ytmp.core.CatalogSource
+import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.HomeSection
+import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.YoutubeAccount
+import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ClientMessage
@@ -210,20 +217,65 @@ class ApplicationTest {
     }
 
     /** Phone mode. Requests with the "X-Remote" header count as coming from another device. */
-    private fun ApplicationTestBuilder.setupPhone() {
+    private fun ApplicationTestBuilder.setupPhone(catalog: CatalogSource? = null, personal: PersonalCatalog? = null) {
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
             ytmpModule(
                 rooms, search, audio = null, webApp = null,
-                HostOptions(
+                options = HostOptions(
                     kind = HostKind.PHONE,
                     shareUrl = { "http://192.168.1.23:8765" },
                     localOnlyRoomManagement = true,
                     supportsPrivateRooms = true,
                     isLocal = { it.request.headers["X-Remote"] == null },
                 ),
+                catalog = catalog,
+                personal = personal,
             )
         }
+    }
+
+    private fun home(title: String) = HomePage(listOf(HomeSection(title, emptyList())))
+
+    private val generalCatalog = object : CatalogSource {
+        override suspend fun artist(id: String) = error("no")
+        override suspend fun album(id: String) = error("no")
+        override suspend fun playlist(id: String) = error("no")
+        override suspend fun podcast(id: String) = error("no")
+        override suspend fun home() = home("General")
+    }
+
+    private class Owner(var account: YoutubeAccount?) : PersonalCatalog {
+        override suspend fun account() = account
+        override suspend fun home() = HomePage(listOf(HomeSection("Mine", emptyList())))
+        override suspend fun library() = HomePage(listOf(HomeSection("Playlists", emptyList())))
+        override suspend fun playlist(id: String) = PlaylistPage(id, "Liked music", null, null, emptyList(), emptyList())
+        override suspend fun signOut() { account = null }
+    }
+
+    @Test
+    fun `the YouTube Music account of a phone's owner is only for the phone itself`() = testApplication {
+        val owner = Owner(YoutubeAccount("Jonah", "@jonah", null))
+        setupPhone(generalCatalog, owner)
+        val client = jsonClient()
+        fun remote(builder: io.ktor.client.request.HttpRequestBuilder) = builder.header("X-Remote", "1")
+
+        assertEquals(YoutubeAccountStatus(true, owner.account), client.get("/api/me/youtube").body<YoutubeAccountStatus>())
+        assertEquals("Mine", client.get("/api/home").body<HomePage>().sections.single().title)
+        assertEquals("Playlists", client.get("/api/me/library").body<HomePage>().sections.single().title)
+        assertEquals("Liked music", client.get("/api/me/playlists/LM").body<PlaylistPage>().title)
+
+        // A guest in a room on this phone: nothing of the owner's.
+        assertEquals(YoutubeAccountStatus(false, null), client.get("/api/me/youtube") { remote(this) }.body<YoutubeAccountStatus>())
+        assertEquals("General", client.get("/api/home") { remote(this) }.body<HomePage>().sections.single().title)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/me/library") { remote(this) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/me/playlists/LM") { remote(this) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.delete("/api/me/youtube") { remote(this) }.status)
+
+        // Signed out: the general home again.
+        assertEquals(HttpStatusCode.NoContent, client.delete("/api/me/youtube").status)
+        assertEquals(YoutubeAccountStatus(true, null), client.get("/api/me/youtube").body<YoutubeAccountStatus>())
+        assertEquals("General", client.get("/api/home").body<HomePage>().sections.single().title)
     }
 
     @Test

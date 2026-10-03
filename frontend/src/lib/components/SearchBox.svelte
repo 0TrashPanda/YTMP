@@ -218,10 +218,9 @@
 		{/if}
 	</div>
 {:else}
-	<!-- Phones: the header only has a button; searching happens on its own page. -->
-	<button class="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-raised px-3 py-2 text-left" onclick={open}>
-		<Icon name="search" size={20} class="shrink-0 text-muted" />
-		<span class="truncate {query ? '' : 'text-muted'}">{query || 'Search'}</span>
+	<!-- Phones: a search icon; searching happens on its own page. -->
+	<button class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label="Search" onclick={open}>
+		<Icon name="search" size={24} />
 	</button>
 	{#if active}
 		<div class="fixed inset-0 z-50 flex flex-col bg-bg" use:portal>

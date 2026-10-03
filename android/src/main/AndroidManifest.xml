@@ -19,7 +19,8 @@
         android:icon="@drawable/ic_launcher"
         android:roundIcon="@drawable/ic_launcher"
         android:theme="@style/Theme.Ytmp"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:dataExtractionRules="@xml/data_extraction_rules">
 
         <activity
             android:name=".MainActivity"
@@ -32,6 +33,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".YoutubeLoginActivity"
+            android:exported="false"
+            android:label="Sign in to YouTube Music"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
+            android:windowSoftInputMode="adjustResize" />
 
         <service
             android:name=".host.HostService"

@@ -13,6 +13,8 @@ export interface NativeBridge {
 	nearbyRooms(): string;
 	/** JSON of PlaybackTarget (android/.../PlaybackHub.kt). */
 	playback(targetJson: string): void;
+	/** Opens YouTube Music's sign-in (bridge version 2); the answer comes as onYoutubeSignIn. */
+	youtubeSignIn?(): void;
 }
 
 /** Callbacks the app calls on the page. */
@@ -21,6 +23,8 @@ export interface NativeCallbacks {
 	onCommand(command: Command): void;
 	/** "buffering" | "ready" | "stopped" | "error" */
 	onStatus(status: string): void;
+	/** Back from YouTube Music's sign-in: null when signed in, else why not. */
+	onYoutubeSignIn?(error: string | null): void;
 	/** The list of rooms found on the local network changed. */
 	onNearbyRooms?(rooms: NearbyRoom[]): void;
 }

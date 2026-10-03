@@ -3,6 +3,8 @@ package dev.trashpanda.ytmp.host
 import dev.trashpanda.ytmp.core.Outbox
 import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
+import dev.trashpanda.ytmp.core.PersonalCatalog
+import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
@@ -111,6 +113,8 @@ fun Application.ytmpModule(
     similar: RadioSource? = null,
     /** Artist, album and playlist pages. */
     catalog: CatalogSource? = null,
+    /** The owner's YouTube Music account (phone hosts), for requests from the host's own app. */
+    personal: PersonalCatalog? = null,
     /** Search suggestions while typing. */
     suggestions: SearchSuggestions? = null,
 ) {
@@ -213,8 +217,24 @@ fun Application.ytmpModule(
                 call.respond(source.podcast(call.parameters["id"]!!))
             }
             get("/home") {
+                // The owner's own home page in their app; everyone else gets the general one.
+                if (personal != null && options.isLocal(call) && personal.account() != null) return@get call.respond(personal.home())
                 val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No home page here")
                 call.respond(source.home())
+            }
+            route("/me") {
+                fun ApplicationCall.owner(): PersonalCatalog =
+                    personal?.takeIf { options.isLocal(this) } ?: throw forbidden()
+                get("/youtube") {
+                    val mine = personal?.takeIf { options.isLocal(call) }
+                    call.respond(YoutubeAccountStatus(available = mine != null, account = mine?.account()))
+                }
+                delete("/youtube") {
+                    call.owner().signOut()
+                    call.respond(HttpStatusCode.NoContent)
+                }
+                get("/library") { call.respond(call.owner().library()) }
+                get("/playlists/{id}") { call.respond(call.owner().playlist(call.parameters["id"]!!)) }
             }
             get("/audio/{songId}") {
                 val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")

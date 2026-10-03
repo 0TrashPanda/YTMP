@@ -90,5 +90,8 @@ class TtlCache<K : Any, V>(private val maxSize: Int, private val ttl: Duration, 
         }
     }
 
+    /** Forgets everything, e.g. after signing in or out. */
+    fun clear() = synchronized(entries) { entries.clear() }
+
     private fun Deferred<V>.isFailed() = runCatching { getCompletionExceptionOrNull() != null }.getOrDefault(false)
 }
