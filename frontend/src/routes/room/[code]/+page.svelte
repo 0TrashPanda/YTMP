@@ -164,7 +164,7 @@
 			class="flex flex-col gap-3"
 			onsubmit={(e) => {
 				e.preventDefault();
-				if (initialName.trim()) start();
+				if (name.trim()) start();
 			}}
 		>
 			<input
