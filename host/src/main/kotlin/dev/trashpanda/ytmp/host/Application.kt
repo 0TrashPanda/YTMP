@@ -210,17 +210,26 @@ fun Application.ytmpModule(
                 close(CloseReason(CloseReason.Codes.NORMAL, "bye"))
             }
 
-            val hello = (incoming.receiveCatching().getOrNull() as? Frame.Text)?.let { decode(it) } as? ClientMessage.Hello
-            val room = hello?.let { rooms[it.roomCode] }
-            if (hello == null || room == null) {
+            val first = (incoming.receiveCatching().getOrNull() as? Frame.Text)?.let { decode(it) }
+            val room = when (first) {
+                is ClientMessage.Hello -> rooms[first.roomCode]
+                is ClientMessage.Attach -> rooms[first.roomCode]
+                else -> null
+            }
+            if (room == null) {
                 outbox.send(ServerMessage.Rejected(RejectReason.ROOM_NOT_FOUND))
                 outgoing.close()
                 sender.join()
                 return@webSocket
             }
-            val account = hello.accountToken?.let(options.auth::verify)
-            if (hello.accountToken != null && account == null) log.info("Room {}: account token not accepted, joining as a guest", room.code)
-            val participantId = room.join(hello, outbox, local = options.isLocal(call), account = account)
+            val participantId = if (first is ClientMessage.Attach) {
+                room.attach(first, outbox, local = options.isLocal(call))
+            } else {
+                val hello = first as ClientMessage.Hello
+                val account = hello.accountToken?.let(options.auth::verify)
+                if (hello.accountToken != null && account == null) log.info("Room {}: account token not accepted, joining as a guest", room.code)
+                room.join(hello, outbox, local = options.isLocal(call), account = account)
+            }
             if (participantId == null) {
                 outgoing.close()
                 sender.join()
@@ -229,7 +238,7 @@ fun Application.ytmpModule(
             try {
                 for (frame in incoming) {
                     val message = (frame as? Frame.Text)?.let { decode(it) } ?: continue
-                    room.handle(participantId, message)
+                    room.handle(participantId, message, outbox)
                 }
             } finally {
                 room.disconnect(participantId, outbox)

@@ -84,6 +84,21 @@ class Room(
         var accountToken: String? = null,
         var hideFromHistory: Boolean = false,
     ) {
+        /** Extra connections for this participant (see [attach]). */
+        val attached = LinkedHashSet<Outbox>()
+
+        /** Sends to the participant's connection and to all its attached ones. */
+        fun send(message: ServerMessage) {
+            outbox?.send(message)
+            for (extra in attached) extra.send(message)
+        }
+
+        /** Tells all attached connections that they're done (kicked, banned, removed). */
+        fun dropAttached(reason: RejectReason) {
+            for (extra in attached) extra.send(ServerMessage.Rejected(reason))
+            attached.clear()
+        }
+
         fun toParticipant() = Participant(
             id, name, isOwner, online = outbox != null, listening = listening, accountId = accountId,
             roleId = roleId, allow = allow.sorted(), deny = deny.sorted(),
@@ -210,8 +225,34 @@ class Room(
         member.id
     }
 
+    /**
+     * Adds a second connection for a participant who is already here (see
+     * [ClientMessage.Attach]). It gets everything the participant gets, but doesn't make
+     * them online or replace their connection. Returns the participant's id.
+     */
+    suspend fun attach(message: ClientMessage.Attach, outbox: Outbox, local: Boolean = true): String? = mutex.withLock {
+        if (visibility == RoomVisibility.PRIVATE && !local) {
+            outbox.send(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM))
+            return null
+        }
+        if (message.protocolVersion != PROTOCOL_VERSION) {
+            outbox.send(ServerMessage.Rejected(RejectReason.VERSION_MISMATCH))
+            return null
+        }
+        val member = members.values.firstOrNull { it.token == message.guestToken }
+        if (member == null) {
+            // Not (or no longer) in the room, e.g. kicked or removed after being away.
+            outbox.send(ServerMessage.Rejected(RejectReason.KICKED))
+            return null
+        }
+        member.attached += outbox
+        outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = member.accountId))
+        member.id
+    }
+
     suspend fun disconnect(participantId: String, outbox: Outbox) = mutex.withLock {
         val member = members[participantId] ?: return@withLock
+        if (member.attached.remove(outbox)) return@withLock
         if (member.outbox !== outbox) return@withLock
         member.outbox = null
         member.listening = false
@@ -220,10 +261,13 @@ class Room(
         emit(Event.ParticipantUpdated(member.toParticipant()))
     }
 
-    suspend fun handle(participantId: String, message: ClientMessage) {
+    /** Handles a message from [from], one of [participantId]'s connections (by default their main one). */
+    suspend fun handle(participantId: String, message: ClientMessage, from: Outbox? = null) {
         mutex.withLock {
             val member = members[participantId] ?: return@withLock
-            val outbox = member.outbox ?: return@withLock
+            val outbox = from ?: member.outbox ?: return@withLock
+            // A replaced or dropped connection can't act anymore.
+            if (outbox !== member.outbox && outbox !in member.attached) return@withLock
             when (message) {
                 is ClientMessage.Ping -> outbox.send(ServerMessage.Pong(message.clientTime, clock()))
                 is ClientMessage.RequestSnapshot -> outbox.send(ServerMessage.Snapshot(seq, snapshot()))
@@ -232,7 +276,7 @@ class Room(
                         .fold({ it }, { e -> if (e is CancellationException) throw e else ErrorInfo(ErrorCode.INVALID, e.message ?: "error") })
                     outbox.send(ServerMessage.Result(message.id, error))
                 }
-                is ClientMessage.Hello -> Unit
+                is ClientMessage.Hello, is ClientMessage.Attach -> Unit
             }
         }
     }
@@ -243,6 +287,7 @@ class Room(
         val expired = members.values.filter { it.offlineSince?.let { since -> now - since > offlineTimeoutMs } == true }
         for (member in expired) {
             members.remove(member.id)
+            member.dropAttached(RejectReason.KICKED)
             emit(Event.ParticipantLeft(member.id))
         }
         members.values.none { it.outbox != null }
@@ -544,6 +589,7 @@ class Room(
                 if (ban) bans += Ban(BanInfo(Ids.short(), target.name, target.accountId), target.token)
                 target.outbox?.send(ServerMessage.Rejected(if (ban) RejectReason.BANNED else RejectReason.KICKED))
                 target.outbox = null
+                target.dropAttached(if (ban) RejectReason.BANNED else RejectReason.KICKED)
                 emit(Event.ParticipantLeft(target.id))
                 if (ban) emit(Event.BansChanged(banInfos()))
             }
@@ -1059,7 +1105,7 @@ class Room(
     private fun emit(event: Event) {
         val message = ServerMessage.EventMessage(++seq, event)
         isPlaying = wantPlaying
-        for (member in members.values) member.outbox?.send(message)
+        for (member in members.values) member.send(message)
         for (listener in changeListeners) listener()
     }
 

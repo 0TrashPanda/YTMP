@@ -90,6 +90,8 @@ tasks.matching { it.name.startsWith("merge") && it.name.contains("PythonSources"
 dependencies {
     implementation(project(":host"))
     implementation(libs.ktor.server.cio)
+    // The player's own room connection (RoomFollower).
+    implementation(libs.ktor.client.cio)
     // Sends the shared code's slf4j logs (host, Cast driver) to logcat.
     implementation(libs.logback.android)
     implementation(libs.media3.exoplayer)

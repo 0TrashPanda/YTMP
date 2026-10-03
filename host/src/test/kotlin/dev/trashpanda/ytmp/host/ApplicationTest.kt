@@ -98,6 +98,53 @@ class ApplicationTest {
     }
 
     @Test
+    fun `a second connection can attach to a participant and follow the room`() = testApplication {
+        setup()
+        val client = jsonClient()
+        val created = client.post("/api/rooms") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateRoomRequest("Party"))
+        }.body<CreateRoomResponse>()
+
+        client.webSocket("/ws") {
+            val page = this
+            page.sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Anna", null, created.ownerToken))
+            val welcome = assertIs<ServerMessage.Welcome>(page.receiveMessage())
+
+            client.webSocket("/ws") {
+                sendMessage(ClientMessage.Attach(PROTOCOL_VERSION, created.code, welcome.guestToken))
+                val attached = assertIs<ServerMessage.Welcome>(receiveMessage())
+                assertEquals(welcome.participantId, attached.participantId)
+                assertEquals(true, attached.state.participants.single().online)
+
+                // Commands from the attached connection act as Anna, and both connections get the events.
+                sendMessage(ClientMessage.CommandMessage("n1", Command.AddSongs(listOf(song), QueuePosition.END)))
+                var gotResult = false
+                var gotStream = false
+                while (!gotResult || !gotStream) {
+                    when (val message = receiveMessage()) {
+                        is ServerMessage.Result -> { assertEquals("n1", message.id); assertEquals(null, message.error); gotResult = true }
+                        is ServerMessage.EventMessage -> if (message.event is Event.StreamReady) gotStream = true
+                        else -> Unit
+                    }
+                }
+                while (true) {
+                    val message = page.receiveMessage()
+                    assertIs<ServerMessage.EventMessage>(message)
+                    // Attaching didn't change Anna's participant (no ParticipantUpdated for her).
+                    assertEquals(false, message.event is Event.ParticipantUpdated)
+                    if (message.event is Event.StreamReady) break
+                }
+            }
+        }
+
+        client.webSocket("/ws") {
+            sendMessage(ClientMessage.Attach(PROTOCOL_VERSION, created.code, "not-a-token"))
+            assertEquals(ServerMessage.Rejected(RejectReason.KICKED), receiveMessage())
+        }
+    }
+
+    @Test
     fun `joining an unknown room is rejected`() = testApplication {
         setup()
         jsonClient().webSocket("/ws") {

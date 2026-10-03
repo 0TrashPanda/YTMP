@@ -17,7 +17,7 @@ generated from them.
 ## Envelope
 
 ```jsonc
-// client → host  (message types: hello, command, ping, request_snapshot)
+// client → host  (message types: hello, attach, command, ping, request_snapshot)
 { "type": "command", "id": "c42", "command": { "kind": "AddSongs", ... } }
 
 // host → client  (message types: welcome, rejected, result, event, snapshot, pong)
@@ -35,6 +35,7 @@ generated from them.
 | Direction | Message | Content |
 |-----------|---------|---------|
 | → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`, `accountToken` ✅ (a host token, see [auth](auth.md)), `hideFromHistory` ✅ (keep me out of others' listening history) |
+| → | `attach` ✅ | Instead of `hello`: `protocolVersion`, `roomCode`, `guestToken`. A **second connection for a participant who is already in the room**: it gets the same `welcome` and events and may send `command`s and `ping`s as them, but doesn't replace their connection or change whether they're online. Kicks, bans and cleanup end it (`rejected`: `kicked`/`banned`); an unknown token gets `kicked`. Used by the Android app's player, see [android-app](android-app.md) |
 | ← | `welcome` ✅ | `participantId`, `guestToken`, `seq`, `state` (the snapshot), `accountId` ✅ (null when joined as a guest, also when the token wasn't accepted) |
 | ← | `rejected` ✅ | `reason`: `room_not_found`, `version_mismatch`, `invalid_name`, `replaced` ✅. Later: `banned`, `accounts_only`, `untrusted_auth_server` |
 | ⇄ | `ping` / `pong` ✅ | `clientTime` / `clientTime, hostTime`, for clock sync |

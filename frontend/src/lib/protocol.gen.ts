@@ -3,6 +3,13 @@
 
 export const PROTOCOL_VERSION = 1;
 
+export interface ClientMessageAttach {
+  type: "attach";
+  protocolVersion: number;
+  roomCode: string;
+  guestToken: string;
+}
+
 export interface ArtistRef {
   id: string | null;
   name: string;
@@ -256,6 +263,7 @@ export interface ClientMessageRequestSnapshot {
 }
 
 export type ClientMessage =
+  | ClientMessageAttach
   | ClientMessageCommand
   | ClientMessageHello
   | ClientMessagePing

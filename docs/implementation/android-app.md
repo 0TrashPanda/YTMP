@@ -12,9 +12,17 @@
   screen, notification, headphones, Bluetooth) are turned into **room commands**
   (`window.__ytmpNative.onCommand`), so they control the room, not just this phone.
 - Losing audio focus or unplugging headphones stops playback **on this phone only**.
-- The page keeps running in the background (renderer priority *important*), so it
-  follows the room with the screen off. Tested on the emulator: other people's skips
-  arrive with the screen off, and media keys work with the app in the background.
+- **The player follows the room itself** (`RoomFollower`). Android's WebView **freezes
+  the page** after about 5 minutes hidden (screen off): timers, fetches and WebSocket
+  messages stop, even with renderer priority *important* and the foreground services
+  running. The room then kept playing, but the phone stopped at the end of the song. So the
+  page also sends the room's address, code and its guest token, and `PlaybackService` opens
+  its **own connection** with `attach` (see [protocol-messages](protocol-messages.md)). While
+  that is connected, the song, stream, proxy URL, playback clock, clock offset and "alone"
+  come from it; the page still decides "Play here", volume and sync offset. Media buttons
+  go over it too. If it can't connect, the page's target is used as before.
+- Losing audio focus stops playback here at once and sends `SetListening off` over the
+  player's own connection, since the page may be frozen.
 - Known limitation: swiping the app away from recents stops playback, because the room
   connection lives in the page.
 - Debug builds enable WebView debugging (`chrome://inspect`) and log the page's console to

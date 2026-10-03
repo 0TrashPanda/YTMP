@@ -27,6 +27,21 @@ sealed interface ClientMessage {
         val hideFromHistory: Boolean = false,
     ) : ClientMessage
 
+    /**
+     * Instead of [Hello]: a second connection for a participant who is already in the room
+     * (by their [guestToken]). It gets the same welcome and events and may send commands and
+     * pings as that participant, but doesn't replace their connection or change whether
+     * they're online. The Android app's player uses it, because Android freezes the app's
+     * web page after a few minutes in the background.
+     */
+    @Serializable
+    @SerialName("attach")
+    data class Attach(
+        val protocolVersion: Int,
+        val roomCode: String,
+        val guestToken: String,
+    ) : ClientMessage
+
     @Serializable
     @SerialName("command")
     data class CommandMessage(

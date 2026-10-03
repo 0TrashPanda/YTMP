@@ -278,9 +278,18 @@ class NativePlayer implements RoomPlayer {
 				clockOffset: this.room.clockOffset,
 				syncOffsetMs: this.syncOffsetMs,
 				alone: this.room.listeningAlone,
-				volume: this.volume
+				volume: this.volume,
+				// So the app can follow the room itself while this page is frozen in the background.
+				room: this.followableRoom()
 			})
 		);
+	}
+
+	private followableRoom() {
+		const guestToken = saved.guestToken(this.room.roomCode);
+		return this.room.participantId && guestToken
+			? { hostUrl: location.origin, code: this.room.roomCode, guestToken }
+			: null;
 	}
 
 	destroy(): void {

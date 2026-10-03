@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -32,6 +33,10 @@ import kotlin.math.abs
  * The media session gives lock screen, notification and headphone/Bluetooth controls. Those
  * controls don't act on the local player: they become room commands (see [RoomPlayer]), and
  * the resulting room state comes back through [PlaybackHub.target].
+ *
+ * What should play comes from the page ([PlaybackHub.target]), but while the player's own
+ * room connection ([RoomFollower]) is up, the room's song, stream and clock come from that
+ * instead: Android freezes the page after a few minutes with the screen off.
  */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
@@ -45,6 +50,17 @@ class PlaybackService : MediaSessionService() {
     private var loadedItemId: String? = null
     private var loadedUrl: String? = null
     private var useProxy = false
+
+    private val follower = RoomFollower()
+
+    /** What the player follows right now: the page's target, with the room parts from [follower]. */
+    private var current: PlaybackTarget? = null
+
+    /** The last room state from [follower], kept while it reconnects. */
+    private var lastFollowed: FollowedRoom? = null
+
+    /** Stopped here because another app took the audio; until the page has switched "Play here" off. */
+    private var stoppedHere = false
 
     override fun onCreate() {
         super.onCreate()
@@ -66,12 +82,21 @@ class PlaybackService : MediaSessionService() {
         )
         session = MediaSession.Builder(this, RoomPlayer(exo)).setSessionActivity(openApp).build()
 
-        scope.launch { PlaybackHub.target.collect { apply(it) } }
+        PlaybackHub.followerCommands = follower::command
+        scope.launch {
+            PlaybackHub.target.collect { target ->
+                if (target?.enabled != true) stoppedHere = false
+                follower.follow(target?.room?.takeIf { target.enabled })
+            }
+        }
+        scope.launch {
+            combine(PlaybackHub.target, follower.room) { target, room -> merge(target, room) }.collect { apply(it) }
+        }
         // Drift correction: the host's clock keeps moving, so check regularly.
         scope.launch {
             while (isActive) {
                 delay(SyncCorrection.SAMPLE_INTERVAL_MS)
-                PlaybackHub.target.value?.let { correct(it) }
+                current?.let { correct(it) }
             }
         }
     }
@@ -85,15 +110,43 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        if (PlaybackHub.followerCommands == follower::command) PlaybackHub.followerCommands = null
+        follower.close()
         scope.cancel()
         session.release()
         exo.release()
         super.onDestroy()
     }
 
+    /** The page's [target], with the room's song, stream and clock from [live] when it's the same room. */
+    private fun merge(target: PlaybackTarget?, live: FollowedRoom?): PlaybackTarget? {
+        if (target == null) return null
+        if (live != null) lastFollowed = live
+        // While the follower reconnects, its last state is still better than a frozen page's,
+        // unless the page has heard of something newer (every change moves the host time).
+        val room = live ?: lastFollowed?.takeIf { it.link == target.room && it.state.playback.hostTimeMs >= target.hostTimeMs }
+        val followed = if (room != null && room.link == target.room) {
+            val now = room.state.nowPlaying
+            target.copy(
+                item = now?.let { TargetItem.of(it.item.itemId, it.item.song) },
+                streamUrl = now?.streamUrl,
+                proxyUrl = now?.let { "${room.link.hostUrl.trimEnd('/')}/api/audio/${Uri.encode(it.item.song.id)}" },
+                playing = room.state.playback.playing,
+                positionMs = room.state.playback.positionMs,
+                hostTimeMs = room.state.playback.hostTimeMs,
+                clockOffset = room.clockOffset,
+                alone = room.alone,
+            )
+        } else {
+            target
+        }
+        return if (stoppedHere) followed.copy(enabled = false) else followed
+    }
+
     private var lastTarget: PlaybackTarget? = null
 
     private fun apply(target: PlaybackTarget?) {
+        current = target
         lastTarget?.let { old ->
             if (target != null && (old.clockOffset != target.clockOffset || old.hostTimeMs != target.hostTimeMs)) {
                 val now = System.currentTimeMillis()
@@ -178,7 +231,7 @@ class PlaybackService : MediaSessionService() {
 
     private val listener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            val target = PlaybackHub.target.value ?: return
+            val target = current ?: return
             if (!useProxy && target.proxyUrl != null) {
                 // The direct URL is probably tied to the host's IP; stream through the host instead.
                 useProxy = true
@@ -195,6 +248,10 @@ class PlaybackService : MediaSessionService() {
             if (!playWhenReady && (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS ||
                     reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY)
             ) {
+                // Stop right away: the page (which switches "Play here" off) may be frozen for a while.
+                stoppedHere = true
+                current = current?.copy(enabled = false)
+                follower.command("""{"kind":"SetListening","on":false}""")
                 PlaybackHub.status("stopped")
             }
         }
