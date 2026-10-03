@@ -3,34 +3,81 @@
 **A shared music queue for you and your friends.** Like Spotify Jam, but for YouTube
 Music, without Premium, and not tied to a single music service.
 
-> 🚧 **Early development.** Milestone 1 works: host or join a room in the browser, search
-> YouTube Music, share a queue and play in sync. The full design is in [`docs/`](docs/README.md).
+> 🚧 **In development, already usable day to day.** Rooms, the Android app (with hosting on
+> the phone itself), Chromecast and Sonos, accounts, roles, radio, podcasts and a YouTube
+> Music–style app work. See [what works](#what-works-today) and [what's next](#whats-next).
+> The full design is in [`docs/`](docs/README.md).
 
 ## What it does
 
-- **One queue, many people.** Someone hosts a room, others join with a short room code
-  (or automatically on the same Wi-Fi) and add, remove and reorder songs together.
+- **One queue, many people.** Someone hosts a room, others join with a short room code,
+  a QR code, or automatically on the same Wi-Fi, and add, remove and reorder songs together.
 - **Host anywhere.** On a Linux server (everyone joins from a browser), or on an Android
   phone with no server at all.
-- **Fair queue.** Optional round-robin ordering, so nobody takes over the queue.
-- **Listen anywhere.** Every phone or browser can play along in sync, or send the audio
-  to outputs like Sonos or Chromecast.
-- **Many sources.** YouTube Music first, plus YouTube, local files and your own media
-  server (Plex, Jellyfin, …).
+- **Listen anywhere.** Every phone or browser can play along in sync, or the room plays on
+  Chromecast and Sonos speakers.
+- **Feels like YouTube Music.** Home with suggestions, search with chips, artist, album,
+  playlist and podcast pages, a mini player and a full player with Up next.
+- **Music and podcasts.** Episodes resume where you left off, with skip buttons.
 - **Radio & recommendations.** Start a radio, keep the party going with autoplay, or
-  browse similar songs. YTMP learns which songs go together from what you play.
+  browse similar songs.
 - **Permissions & roles.** Decide who can add, skip, remove or manage, per person or per
   role.
-- **Optional accounts.** For moving a room between your devices, playlists, listening
-  history and recaps ("you listened 12 hours with Sam").
+- **Optional accounts.** Listening history now; later moving a room between your
+  devices, playlists and recaps ("you listened 12 hours with Sam").
+
+## What works today
+
+**Rooms**
+- Party rooms that friends join from a browser or the app (room code, QR code, or rooms
+  nearby on the same Wi-Fi), and solo rooms just for you. Rooms survive restarts.
+- One shared queue: add, play next, drag to reorder, swipe to remove, jump to any song,
+  clear. Played songs stay above the current one; autoplay songs below.
+- Everyone who listens stays in sync, with a per-device sync adjustment (for Bluetooth).
+
+**Finding music** (through YouTube Music, no Premium needed)
+- Home with YouTube Music's suggestions (quick picks, new releases, mixes).
+- Search with suggestions while typing and YouTube Music's chips: songs, videos, albums,
+  artists, playlists, podcasts, episodes.
+- Artist, album, playlist and podcast pages.
+- Radio from a song, autoplay when the queue runs out, find similar.
+- Podcasts: exact episode lengths, resume where you stopped, back 10 s / ahead 30 s, no
+  music radio after an episode.
+
+**The player**
+- A mini player that opens a full player (tap or swipe up): album art, controls, like,
+  save to playlist, and Up next / Related tabs.
+- Play on this device, on Chromecasts (including speakers with Chromecast built in) and on
+  Sonos speakers, with their volume.
+- Android: lock screen and notification controls, keeps playing with the screen off.
+
+**People and accounts**
+- Roles and permissions with a Discord-style editor (one role per person plus per-person
+  overrides), kicking and bans.
+- YTMP accounts (username and password) on a server, also usable in rooms on a phone that
+  is linked to that server.
+- Listening history (off by default), with search, delete and export.
+- **Sign in to YouTube Music on your phone:** your own Home, a Library with your playlists,
+  liked songs and podcasts, liking and saving to playlists. The sign-in stays on the phone,
+  and guests in a room on your phone never see it.
+
+## What's next
+
+- Using your YouTube Music sign-in in rooms on someone else's phone or a server
+- New podcast episodes on Home, playback speed, played marks
+- Fair queue (round-robin, so nobody takes over the queue)
+- More sources: YouTube, local files, Plex / Jellyfin
+- Learning which songs go together (song graph) for better radio, and recaps
+- Moving a room between your devices, YTMP playlists
+- Lyrics, explore page, party screen for a TV
 
 ## Platforms
 
 | Platform | Status |
 |----------|--------|
-| Linux server (Docker) | ✅ Milestone 1: hosts rooms and serves the web app |
-| Android 13+ | ✅ Join rooms with native playback and lock screen controls; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed) |
-| Web browser | ✅ Milestone 1: join, or host through a server |
+| Linux server (Docker) | ✅ Hosts rooms, serves the web app, accounts and listening history |
+| Android 13+ | ✅ Join rooms with native playback and lock screen controls; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music |
+| Web browser | ✅ Join rooms, or host through a server |
 | iOS | Not supported (the web app may work, but background playback won't) |
 
 ## Running a server
