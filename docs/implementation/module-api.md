@@ -103,7 +103,24 @@ So the operations below are the contract for both. HTTP is only the transport on
   "isrc": null                 // when known, helps matching songs across sources
 }
 // Album, Artist, Playlist: id, name/title, thumbnails, and their songs/albums (paginated)
+
+// SearchPage: sections; one for a single type, several for "all"
+{
+  "sections": [
+    { "title": "Top result", "type": null, "items": [ SearchItem ] },
+    { "title": "Songs", "type": "songs", "items": [ SearchItem, … ] }   // type: the chip for "More"
+  ]
+}
+// SearchItem, by "kind":
+{ "kind": "song", "song": Song, "video": false }        // videos play like songs
+{ "kind": "album", "album": AlbumSummary, "artists": [ArtistRef] }
+{ "kind": "artist", "id": "UC…", "name": "Daft Punk", "thumbnails": [...] }
+{ "kind": "playlist", "id": "VLPL…", "title": "…", "author": "…", "itemCount": 35, "thumbnails": [...] }
 ```
+
+For `all`, the YTM module runs YTM's mixed search (for the top result, albums, artists
+and playlists) plus a `songs` and a `videos` search at the same time: YTM's mixed results
+mostly lack song durations, and a song without a duration can't end on its own in a room.
 
 ## Endpoints
 
@@ -122,13 +139,13 @@ So the operations below are the contract for both. HTTP is only the transport on
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/search?q=&type=song\|album\|artist\|playlist\|all&cursor=` | Search |
+| GET | `/search?q=&type=&limit=` ✅ | Search. `type`: `all` (default), `songs`, `videos`, `albums`, `artists`, `community_playlists`, `featured_playlists`. Answers a `SearchPage` (below). Paging (`cursor`) later |
 | GET | `/search/suggestions?q=` | Suggestions while typing |
 | GET | `/search?isrc=` | Find a song by ISRC (optional `isrc_lookup` capability, helps [matching](storage.md#song-matching)) |
 | GET | `/songs/{id}` | Song details |
 | GET | `/albums/{id}` | Album with songs |
 | GET | `/artists/{id}` | Artist: top songs, albums, singles |
-| GET | `/playlists/{id}?cursor=` | Public playlist with songs |
+| GET | `/playlists/{id}?cursor=` | Public playlist with songs ✅ (`PlaylistPage`: `id, title, author, description, thumbnails, songs`; the first 200 songs, no paging yet) |
 | GET | `/resolve?url=` | Turn a YTM/YT URL into `{ type, item }` (for links pasted in search) |
 | GET | `/home` | Home page sections (mixes, recommendations, …). Personalised with credentials. |
 | GET | `/explore` | Explore page: new releases, charts, moods & genres |

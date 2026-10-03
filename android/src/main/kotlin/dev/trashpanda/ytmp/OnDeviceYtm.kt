@@ -6,6 +6,10 @@ import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
+import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.SearchPage
+import dev.trashpanda.ytmp.protocol.SearchType
+import dev.trashpanda.ytmp.protocol.wireName
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
@@ -36,9 +40,9 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         json = python.getModule("json")
     }
 
-    override suspend fun search(query: String): List<Song> = python {
-        val results = core.callAttr("search", query, 20)
-        ProtocolJson.decodeFromString(ListSerializer(Song.serializer()), json.callAttr("dumps", results).toString())
+    override suspend fun search(query: String, type: SearchType): SearchPage = python {
+        val page = core.callAttr("search", query, type.wireName, 20)
+        ProtocolJson.decodeFromString(SearchPage.serializer(), json.callAttr("dumps", page).toString())
     }
 
     override suspend fun radio(seedSongId: String): List<Song> = python {
@@ -52,6 +56,10 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
 
     override suspend fun album(id: String): AlbumPage = python {
         ProtocolJson.decodeFromString(AlbumPage.serializer(), json.callAttr("dumps", core.callAttr("album", id)).toString())
+    }
+
+    override suspend fun playlist(id: String): PlaylistPage = python {
+        ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id)).toString())
     }
 
     override suspend fun resolveStream(songId: String): String = stream(songId).url

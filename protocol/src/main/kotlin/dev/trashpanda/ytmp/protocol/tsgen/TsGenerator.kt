@@ -27,6 +27,8 @@ import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.SearchResponse
+import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -168,6 +170,8 @@ fun main(args: Array<String>) {
     generator.addRoot(PlayReport.serializer().descriptor)
     generator.addRoot(ArtistPage.serializer().descriptor)
     generator.addRoot(AlbumPage.serializer().descriptor)
+    generator.addRoot(PlaylistPage.serializer().descriptor)
+    generator.addRoot(SearchPage.serializer().descriptor)
     out.parentFile.mkdirs()
     out.writeText(generator.render())
     println("Wrote ${out.path}")

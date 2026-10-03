@@ -1,6 +1,10 @@
 package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.SearchItem
+import dev.trashpanda.ytmp.protocol.SearchPage
+import dev.trashpanda.ytmp.protocol.SearchSection
+import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -35,12 +39,17 @@ class CachedSourceTest {
     fun `search is cached by its words, ignoring case`() = runTest {
         var searches = 0
         val song = Song("ytm:1", "One", listOf(ArtistRef(null, "A")), null, 1, emptyList())
-        val source = CachedSource({ searches++; listOf(song) }, { emptyList() }, object : dev.trashpanda.ytmp.core.CatalogSource {
+        val page = SearchPage(listOf(SearchSection("Songs", SearchType.SONGS, listOf(SearchItem.SongResult(song)))))
+        val source = CachedSource({ _, _ -> searches++; page }, { emptyList() }, object : dev.trashpanda.ytmp.core.CatalogSource {
             override suspend fun artist(id: String) = error("no")
             override suspend fun album(id: String) = error("no")
+            override suspend fun playlist(id: String) = error("no")
         })
-        source.search("Daft Punk")
-        source.search(" daft punk ")
+        source.search("Daft Punk", SearchType.SONGS)
+        source.search(" daft punk ", SearchType.SONGS)
         assertEquals(1, searches)
+        // Another type is another search.
+        source.search("daft punk", SearchType.ALBUMS)
+        assertEquals(2, searches)
     }
 }

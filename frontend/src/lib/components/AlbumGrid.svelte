@@ -1,29 +1,20 @@
 <script lang="ts">
 	import { prefetch } from '../api';
 	import type { AlbumSummary } from '../protocol.gen';
+	import CardGrid from './CardGrid.svelte';
 
 	let { albums, onOpen }: { albums: AlbumSummary[]; onOpen: (album: AlbumSummary) => void } = $props();
 
-	const art = (a: AlbumSummary) => a.thumbnails.at(-1)?.url;
+	const cards = $derived(
+		albums.map((album) => ({
+			key: album.id,
+			title: album.title,
+			subtitle: [album.kind, album.year].filter(Boolean).join(' • '),
+			art: album.thumbnails.at(-1)?.url,
+			open: () => onOpen(album),
+			prefetch: () => prefetch('album', album.id)
+		}))
+	);
 </script>
 
-<div class="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2">
-	{#each albums as album (album.id)}
-		<button
-			class="group flex min-w-0 flex-col gap-2 text-left"
-			onclick={() => onOpen(album)}
-			onpointerenter={() => prefetch('album', album.id)}
-			ontouchstart={() => prefetch('album', album.id)}
-		>
-			<div class="aspect-square w-full overflow-hidden rounded-md bg-raised">
-				{#if art(album)}
-					<img src={art(album)} alt="" loading="lazy" class="h-full w-full object-cover transition-transform group-hover:scale-105" />
-				{/if}
-			</div>
-			<div class="min-w-0">
-				<p class="truncate text-sm font-medium">{album.title}</p>
-				<p class="truncate text-xs text-muted">{[album.kind, album.year].filter(Boolean).join(' • ')}</p>
-			</div>
-		</button>
-	{/each}
-</div>
+<CardGrid {cards} />

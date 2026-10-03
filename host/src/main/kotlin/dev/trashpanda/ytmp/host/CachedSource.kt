@@ -5,6 +5,9 @@ import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
+import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.SearchPage
+import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
@@ -13,7 +16,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * Remembers search results, radios, artist and album pages for a while: browsing back and
+ * Remembers search results, radios, artist, album and playlist pages for a while: browsing back and
  * forth between an artist and their albums is instant, and YouTube gets fewer requests
  * (which helps against its "not a bot" check). Requests for the same thing at the same time
  * share one fetch. Failures aren't remembered.
@@ -24,18 +27,23 @@ class CachedSource(
     private val catalog: CatalogSource,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : SongSearch, RadioSource, CatalogSource {
-    private val searches = TtlCache<String, List<Song>>(200, 30.minutes, clock)
+    private val searches = TtlCache<Pair<SearchType, String>, SearchPage>(200, 30.minutes, clock)
     private val radios = TtlCache<String, List<Song>>(200, 1.hours, clock)
     private val artists = TtlCache<String, ArtistPage>(100, 6.hours, clock)
     private val albums = TtlCache<String, AlbumPage>(300, 6.hours, clock)
+    private val playlists = TtlCache<String, PlaylistPage>(100, 1.hours, clock)
 
-    override suspend fun search(query: String) = searches.get(query.trim().lowercase()) { search.search(query) }
+    override suspend fun search(query: String, type: SearchType) =
+        searches.get(type to query.trim().lowercase()) { search.search(query, type) }
 
     override suspend fun radio(seedSongId: String) = radios.get(seedSongId) { radio.radio(seedSongId) }
 
     override suspend fun artist(id: String) = artists.get(id) { catalog.artist(id) }
 
     override suspend fun album(id: String) = albums.get(id) { catalog.album(id) }
+
+    // Shorter: people edit their playlists.
+    override suspend fun playlist(id: String) = playlists.get(id) { catalog.playlist(id) }
 }
 
 /** A small least-recently-used cache whose entries expire after [ttl]. */

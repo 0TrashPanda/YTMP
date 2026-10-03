@@ -98,3 +98,56 @@ def test_album_summary():
     assert summary["id"] == "MPRE1"
     assert summary["kind"] == "Album"
     assert summary["year"] == "2001"
+
+
+def test_search_items_of_each_kind():
+    thumbs = [{"url": "https://lh3/x=w60-h60-l90-rj", "width": 60, "height": 60}]
+    video = core._search_item({"resultType": "video", "videoId": "v1", "title": "Live", "artists": [], "thumbnails": thumbs})
+    assert video["kind"] == "song" and video["video"] is True and video["song"]["id"] == "ytm:v1"
+    album = core._search_item({
+        "resultType": "album", "browseId": "MPRE1", "title": "Discovery", "type": "Album", "year": "2001",
+        "artists": [{"name": "Daft Punk", "id": "UC1"}], "thumbnails": thumbs,
+    })
+    assert album["album"]["id"] == "MPRE1" and album["artists"] == [{"id": "UC1", "name": "Daft Punk"}]
+    artist = core._search_item({"resultType": "artist", "artist": "Daft Punk", "browseId": "UC1", "thumbnails": thumbs})
+    assert (artist["id"], artist["name"]) == ("UC1", "Daft Punk")
+    playlist = core._search_item({"resultType": "playlist", "browseId": "VLPL1", "title": "Mix", "author": "Jazzy", "itemCount": "12"})
+    assert (playlist["id"], playlist["author"], playlist["itemCount"]) == ("VLPL1", "Jazzy", 12)
+    assert core._search_item({"resultType": "podcast", "browseId": "MPSP1"}) is None
+
+
+def test_all_search_is_grouped_like_ytm():
+    results = [
+        # An artist as top result has no browseId, only "artists".
+        {"category": "Top result", "resultType": "artist", "artists": [{"name": "Daft Punk", "id": "UC1"}]},
+        {"resultType": "song", "videoId": "s1", "title": "One"},
+        {"resultType": "playlist", "browseId": "VLRD1", "title": "Presenting Daft Punk", "author": "YouTube Music"},
+        {"resultType": "playlist", "browseId": "VLPL1", "title": "My mix", "author": "Jazzy"},
+        {"resultType": "song", "videoId": "s2", "title": "Two"},
+        {"resultType": "episode", "videoId": "e1", "title": "A podcast episode"},
+    ]
+    # The filtered searches have the complete songs (with durations).
+    songs = [{"resultType": "song", "videoId": "s2", "title": "Two", "duration_seconds": 200}]
+    videos = [{"resultType": "video", "videoId": "v1", "title": "Live", "duration_seconds": 300}]
+    sections = core._sections_from_all(results, songs, videos)
+    assert [(s["title"], s["type"]) for s in sections] == [
+        ("Top result", None),
+        ("Songs", "songs"),
+        ("Featured playlists", "featured_playlists"),
+        ("Community playlists", "community_playlists"),
+        ("Videos", "videos"),
+    ]
+    assert sections[0]["items"][0] == {"kind": "artist", "id": "UC1", "name": "Daft Punk", "thumbnails": []}
+    assert [(i["song"]["id"], i["song"]["durationMs"]) for i in sections[1]["items"]] == [("ytm:s2", 200_000)]
+
+
+def test_a_song_as_top_result_gets_the_complete_data():
+    results = [{"category": "Top result", "resultType": "song", "videoId": "s1", "title": "One"}]
+    songs = [{"resultType": "song", "videoId": "s1", "title": "One", "duration_seconds": 321, "artists": [{"name": "A", "id": "UC1"}]}]
+    top = core._sections_from_all(results, songs, [])[0]["items"][0]["song"]
+    assert (top["durationMs"], top["artists"]) == (321_000, [{"id": "UC1", "name": "A"}])
+
+
+def test_artist_pictures_get_a_large_version_too():
+    thumbs = core._thumbnails([{"url": "https://yt3/x=w120-c-h120-k-c0x00ffffff-no-l90-rj", "width": 120, "height": 120}])
+    assert thumbs[-1] == {"url": "https://yt3/x=w544-c-h544-k-c0x00ffffff-no-l90-rj", "width": 544, "height": 544}

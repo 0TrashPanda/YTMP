@@ -712,3 +712,58 @@ export interface AlbumPage {
   thumbnails: Thumbnail[];
   songs: Song[];
 }
+
+export interface PlaylistPage {
+  id: string;
+  title: string;
+  author: string | null;
+  description: string | null;
+  thumbnails: Thumbnail[];
+  songs: Song[];
+}
+
+export type SearchType = "all" | "songs" | "videos" | "albums" | "artists" | "community_playlists" | "featured_playlists";
+
+export interface SearchItemAlbum {
+  kind: "album";
+  album: AlbumSummary;
+  artists: ArtistRef[];
+}
+
+export interface SearchItemArtist {
+  kind: "artist";
+  id: string;
+  name: string;
+  thumbnails: Thumbnail[];
+}
+
+export interface SearchItemPlaylist {
+  kind: "playlist";
+  id: string;
+  title: string;
+  author: string | null;
+  itemCount: number | null;
+  thumbnails: Thumbnail[];
+}
+
+export interface SearchItemSong {
+  kind: "song";
+  song: Song;
+  video: boolean;
+}
+
+export type SearchItem =
+  | SearchItemAlbum
+  | SearchItemArtist
+  | SearchItemPlaylist
+  | SearchItemSong;
+
+export interface SearchSection {
+  title: string;
+  type: SearchType | null;
+  items: SearchItem[];
+}
+
+export interface SearchPage {
+  sections: SearchSection[];
+}

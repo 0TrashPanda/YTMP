@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.host.AccountTokens
 import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.TrustedAuthServers
 import dev.trashpanda.ytmp.host.ytmpModule
+import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.AccountListResponse
 import dev.trashpanda.ytmp.protocol.AuthServerInfo
 import dev.trashpanda.ytmp.protocol.AuthServerRef
@@ -77,7 +78,7 @@ class AccountApiTest {
         application {
             val scope = CoroutineScope(SupervisorJob())
             val rooms = RoomManager({ id -> "https://stream/$id" }, scope, onPlayFinished = PlayReporter(auth, scope)::report)
-            ytmpModule(rooms, { emptyList() }, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = { service.routes(this) })
+            ytmpModule(rooms, { _, _ -> SearchPage(emptyList()) }, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = { service.routes(this) })
         }
         return service
     }

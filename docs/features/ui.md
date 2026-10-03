@@ -35,6 +35,13 @@ The search bar searches all enabled sources, and shows **suggestions while you t
 
 Pasting a link shows that song (or playlist/album/artist) directly.
 
+Like YouTube Music, **chips** above the results pick what to search for ✅: **All**,
+**Songs**, **Videos**, **Albums**, **Artists**, **Community playlists** and **Featured
+playlists** (YouTube Music's own). *All* shows the **top result** as a big card, then a few
+of each kind, each with **More** (which picks that chip). The chip stays as picked while
+you type something else. Songs and videos play like songs (tap = play next); albums,
+artists and playlists open their page. Podcasts, episodes and profiles are left out.
+
 ## Search history & recently played
 
 - **Search history**: recent searches are shown when you open the search bar, and can
@@ -101,7 +108,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - Browsing is cached (in the page and on the host): going back to an artist or album is
   instant, and album pages start loading when you hover them.
 - Search results end with a link to search the same words **on YouTube Music**.
-- Search, find similar, artist and album pages stack up (a **Back** button goes to the
+- Search, find similar, artist, album and playlist pages stack up (a **Back** button goes to the
   previous one). The **YTMP logo** switches between the current song's album art and the
   last of those, kept as it was.
 - Actions that need a room permission (for example adding songs) are **disabled** when you

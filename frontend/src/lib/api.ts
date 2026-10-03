@@ -4,10 +4,13 @@ import type {
 	ArtistPage,
 	CreateRoomResponse,
 	HostInfo,
+	PlaylistPage,
 	RoomInfo,
 	RoomListResponse,
 	RoomVisibility,
+	SearchPage,
 	SearchResponse,
+	SearchType,
 	Song
 } from './protocol.gen';
 
@@ -57,7 +60,7 @@ export function getRoom(code: string): Promise<RoomInfo> {
 	return request(`/api/rooms/${encodeURIComponent(code)}`);
 }
 
-// Browsing (search, similar, artist and album pages) is remembered for a while, so going
+// Browsing (search, similar, artist, album and playlist pages) is remembered for a while, so going
 // back and forth is instant. The host caches too; this saves the round trip.
 const CACHE_MS = 30 * 60_000;
 const cache = new Map<string, { at: number; value: Promise<unknown> }>();
@@ -82,10 +85,10 @@ function abortable<T>(value: Promise<T>, signal?: AbortSignal): Promise<T> {
 	});
 }
 
-export function search(query: string, signal?: AbortSignal): Promise<Song[]> {
+export function search(query: string, type: SearchType, signal?: AbortSignal): Promise<SearchPage> {
 	const q = query.trim().toLowerCase();
 	return abortable(
-		cached(`search:${q}`, async () => (await request<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}`)).items),
+		cached(`search:${type}:${q}`, () => request<SearchPage>(`/api/search?q=${encodeURIComponent(q)}&type=${type}`)),
 		signal
 	);
 }
@@ -106,9 +109,13 @@ export function getAlbum(id: string): Promise<AlbumPage> {
 	return cached(`album:${id}`, () => request(`/api/albums/${encodeURIComponent(id)}`));
 }
 
+export function getPlaylist(id: string): Promise<PlaylistPage> {
+	return cached(`playlist:${id}`, () => request(`/api/playlists/${encodeURIComponent(id)}`));
+}
+
 /** Starts loading a page you're likely to open (hovering it), so it opens instantly. */
-export function prefetch(kind: 'artist' | 'album', id: string): void {
-	(kind === 'artist' ? getArtist(id) : getAlbum(id)).catch(() => {});
+export function prefetch(kind: 'artist' | 'album' | 'playlist', id: string): void {
+	(kind === 'artist' ? getArtist(id) : kind === 'album' ? getAlbum(id) : getPlaylist(id)).catch(() => {});
 }
 
 /** Audio streamed through the host, for when the direct stream URL doesn't work. */

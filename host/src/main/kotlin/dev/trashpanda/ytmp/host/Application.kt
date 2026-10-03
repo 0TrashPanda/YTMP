@@ -18,6 +18,8 @@ import dev.trashpanda.ytmp.protocol.RejectReason
 import dev.trashpanda.ytmp.protocol.RoomListResponse
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.SearchResponse
+import dev.trashpanda.ytmp.protocol.SearchType
+import dev.trashpanda.ytmp.protocol.wireName
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import io.ktor.http.CacheControl
 import io.ktor.http.HttpHeaders
@@ -176,7 +178,8 @@ fun Application.ytmpModule(
             get("/search") {
                 val query = call.request.queryParameters["q"]?.trim().orEmpty()
                 if (query.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing q")
-                call.respond(SearchResponse(search.search(query)))
+                val type = call.request.queryParameters["type"]?.let(::searchType) ?: SearchType.ALL
+                call.respond(search.search(query, type))
             }
             get("/similar") {
                 val songId = call.request.queryParameters["id"]?.trim().orEmpty()
@@ -191,6 +194,10 @@ fun Application.ytmpModule(
             get("/albums/{id}") {
                 val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No album pages here")
                 call.respond(source.album(call.parameters["id"]!!))
+            }
+            get("/playlists/{id}") {
+                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No playlist pages here")
+                call.respond(source.playlist(call.parameters["id"]!!))
             }
             get("/audio/{songId}") {
                 val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")
@@ -253,6 +260,11 @@ fun Application.ytmpModule(
         }
     }
 }
+
+/** "community_playlists" -> [SearchType.COMMUNITY_PLAYLISTS]. */
+private fun searchType(value: String): SearchType =
+    SearchType.entries.firstOrNull { it.wireName == value }
+        ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Unknown search type: $value")
 
 /** The token in `Authorization: Bearer …`, if any. */
 fun ApplicationCall.bearerToken(): String? =

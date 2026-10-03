@@ -3,7 +3,10 @@ package dev.trashpanda.ytmp.core
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.OutputKind
+import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.QueueItem
+import dev.trashpanda.ytmp.protocol.SearchPage
+import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
 import java.security.SecureRandom
@@ -15,7 +18,7 @@ fun interface StreamResolver {
 
 /** Searches the host's sources. */
 fun interface SongSearch {
-    suspend fun search(query: String): List<Song>
+    suspend fun search(query: String, type: SearchType): SearchPage
 }
 
 /** Songs similar to a seed song (YTM's radio), for Start radio and the autoplay queue. */
@@ -23,11 +26,13 @@ fun interface RadioSource {
     suspend fun radio(seedSongId: String): List<Song>
 }
 
-/** Artist and album pages of a source. */
+/** Artist, album and playlist pages of a source. */
 interface CatalogSource {
     suspend fun artist(id: String): ArtistPage
 
     suspend fun album(id: String): AlbumPage
+
+    suspend fun playlist(id: String): PlaylistPage
 }
 
 /** A speaker or TV the host found, that rooms can play on. */

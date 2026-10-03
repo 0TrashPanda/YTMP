@@ -42,11 +42,12 @@ class LocalHost(private val context: Context) {
 
     /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
     private val cached = CachedSource(
-        search = { ytm.search(it) },
+        search = { query, type -> ytm.search(query, type) },
         radio = { ytm.radio(it) },
         catalog = object : CatalogSource {
             override suspend fun artist(id: String) = ytm.artist(id)
             override suspend fun album(id: String) = ytm.album(id)
+            override suspend fun playlist(id: String) = ytm.playlist(id)
         },
     )
     private val plays = PlayReporter(authLink.auth, scope)

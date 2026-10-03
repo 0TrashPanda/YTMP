@@ -16,7 +16,11 @@ import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.RejectReason
-import dev.trashpanda.ytmp.protocol.SearchResponse
+import dev.trashpanda.ytmp.protocol.SearchItem
+import dev.trashpanda.ytmp.protocol.SearchPage
+import dev.trashpanda.ytmp.protocol.SearchSection
+import dev.trashpanda.ytmp.protocol.SearchType
+import dev.trashpanda.ytmp.protocol.wireName
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
 import io.ktor.client.call.body
@@ -45,7 +49,8 @@ import kotlin.test.assertIs
 
 class ApplicationTest {
     private val song = Song("ytm:abc", "One More Time", listOf(ArtistRef(null, "Daft Punk")), null, 320_000, emptyList())
-    private val search = SongSearch { listOf(song) }
+    /** Answers with the song, in a section named after the type it was asked for. */
+    private val search = SongSearch { _, type -> SearchPage(listOf(SearchSection(type.wireName, type, listOf(SearchItem.SongResult(song))))) }
 
     private fun ApplicationTestBuilder.setup() {
         application {
@@ -175,8 +180,12 @@ class ApplicationTest {
     @Test
     fun `search goes to the sources`() = testApplication {
         setup()
-        val result = jsonClient().get("/api/search?q=daft").body<SearchResponse>()
-        assertEquals(listOf(song), result.items)
+        val all = jsonClient().get("/api/search?q=daft").body<SearchPage>()
+        assertEquals(SearchType.ALL, all.sections.single().type)
+        assertEquals(listOf<SearchItem>(SearchItem.SongResult(song)), all.sections.single().items)
+        val playlists = jsonClient().get("/api/search?q=daft&type=community_playlists").body<SearchPage>()
+        assertEquals(SearchType.COMMUNITY_PLAYLISTS, playlists.sections.single().type)
+        assertEquals(HttpStatusCode.BadRequest, jsonClient().get("/api/search?q=daft&type=podcasts").status)
         assertEquals(HttpStatusCode.BadRequest, jsonClient().get("/api/search?q=").status)
     }
 

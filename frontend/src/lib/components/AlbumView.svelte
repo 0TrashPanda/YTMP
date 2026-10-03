@@ -4,7 +4,7 @@
 	import { formatTime } from '../format';
 	import type { AlbumPage, ArtistRef } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
-	import Icon from './Icon.svelte';
+	import PlayAllButtons from './PlayAllButtons.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import SongList from './SongList.svelte';
 
@@ -38,20 +38,6 @@
 	});
 
 	const total = $derived(album?.songs.reduce((sum, s) => sum + s.durationMs, 0) ?? 0);
-
-	async function addAll(position: 'next' | 'end') {
-		if (!album?.songs.length) return;
-		const e = await room.run({ kind: 'AddSongs', songs: album.songs, position });
-		onToast(e ? e.message : position === 'next' ? `Playing ${album.title} next` : `Added ${album.title} to the queue`);
-	}
-
-	async function playNow() {
-		if (!album?.songs.length) return;
-		const [first, ...rest] = album.songs;
-		let e = await room.run({ kind: 'PlayNow', song: first });
-		if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
-		if (e) onToast(e.message);
-	}
 </script>
 
 <div class="flex flex-col gap-6">
@@ -75,21 +61,7 @@
 					{#if album.year} • {album.year}{/if} • {album.songs.length} songs • {formatTime(total)}
 				</p>
 			{/if}
-			<div class="mt-3 flex flex-wrap gap-2">
-				{#if room.can('play_now')}
-					<button class="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-40" disabled={!album} onclick={playNow}>
-						<Icon name="play" size={18} /> Play
-					</button>
-				{/if}
-				{#if room.can('add_songs')}
-					<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm hover:bg-line disabled:opacity-40" disabled={!album} onclick={() => addAll('next')}>
-						<Icon name="playNext" size={18} /> Play next
-					</button>
-					<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm hover:bg-line disabled:opacity-40" disabled={!album} onclick={() => addAll('end')}>
-						<Icon name="playlistAdd" size={18} /> Add to queue
-					</button>
-				{/if}
-			</div>
+			<PlayAllButtons {room} songs={album?.songs ?? null} name={album?.title ?? title} {onToast} />
 		</div>
 	</header>
 

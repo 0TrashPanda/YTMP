@@ -8,8 +8,9 @@
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
 	import ArtistView from '../../../lib/components/ArtistView.svelte';
 	import AlbumView from '../../../lib/components/AlbumView.svelte';
+	import PlaylistView from '../../../lib/components/PlaylistView.svelte';
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
-	import type { AlbumRef, ArtistRef, Song } from '../../../lib/protocol.gen';
+	import type { AlbumRef, ArtistRef, SearchType, Song } from '../../../lib/protocol.gen';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
 	import { getHost, prefetch } from '../../../lib/api';
@@ -29,16 +30,19 @@
 	let room = $state<RoomConnection | null>(null);
 	let player = $state<RoomPlayer | null>(null);
 	let query = $state('');
+	// The search chip: stays as picked while you type something else.
+	let searchType = $state<SearchType>('all');
 	let menu = $state<MenuTarget | null>(null);
 
-	// What the main area shows besides the album art: search, find similar, artist and album
-	// pages, as a stack (the back arrow pops it). The logo switches between the album art
+	// What the main area shows besides the album art: search, find similar, artist, album and
+	// playlist pages, as a stack (the back arrow pops it). The logo switches between the album art
 	// and the last one, which stays as it was.
 	type View =
 		| { kind: 'search' }
 		| { kind: 'similar'; song: Song }
 		| { kind: 'artist'; id: string; name: string }
-		| { kind: 'album'; id: string; title: string };
+		| { kind: 'album'; id: string; title: string }
+		| { kind: 'playlist'; id: string; title: string };
 	let views = $state<View[]>([]);
 	let browsing = $state(false);
 	const view = $derived(browsing ? (views.at(-1) ?? null) : null);
@@ -71,6 +75,10 @@
 	function openAlbum(album: AlbumRef, artist = '') {
 		if (album.id) show({ kind: 'album', id: album.id, title: album.name });
 		else searchFor(`${album.name} ${artist}`.trim());
+	}
+
+	function openPlaylist(playlist: { id: string; title: string }) {
+		show({ kind: 'playlist', id: playlist.id, title: playlist.title });
 	}
 
 	function searchFor(text: string) {
@@ -210,7 +218,7 @@
 				<Icon name="search" size={20} class="shrink-0 text-muted" />
 				<input
 					class="min-w-0 flex-1 bg-transparent outline-none"
-					placeholder="Search songs"
+					placeholder="Search songs, albums, artists, playlists"
 					bind:value={query}
 					onfocus={() => ((headerHidden = false), query.trim() && show({ kind: 'search' }))}
 					oninput={() => show({ kind: 'search' })}
@@ -273,13 +281,25 @@
 						</button>
 					{/if}
 					{#if view.kind === 'search'}
-						<SearchResults {room} {query} onToast={toast} onMenu={(target) => (menu = target)} />
+						<SearchResults
+							{room}
+							{query}
+							type={searchType}
+							onType={(t) => (searchType = t)}
+							onToast={toast}
+							onMenu={(target) => (menu = target)}
+							onArtist={openArtist}
+							onAlbum={(a) => openAlbum(a)}
+							onPlaylist={openPlaylist}
+						/>
 					{:else if view.kind === 'similar'}
 						<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={(target) => (menu = target)} />
 					{:else if view.kind === 'artist'}
 						<ArtistView {room} id={view.id} name={view.name} onToast={toast} onMenu={(target) => (menu = target)} onAlbum={(a) => openAlbum({ id: a.id, name: a.title })} />
 					{:else if view.kind === 'album'}
 						<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
+					{:else if view.kind === 'playlist'}
+						<PlaylistView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
 					{/if}
 				{:else if room.state?.nowPlaying}
 					{@const song = room.state.nowPlaying.item.song}

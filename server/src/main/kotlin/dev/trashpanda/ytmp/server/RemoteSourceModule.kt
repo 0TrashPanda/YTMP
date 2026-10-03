@@ -15,6 +15,10 @@ import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
+import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.SearchPage
+import dev.trashpanda.ytmp.protocol.SearchType
+import dev.trashpanda.ytmp.protocol.wireName
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -57,12 +61,13 @@ class RemoteSourceModule(
 
     class ModuleException(val code: String, message: String) : SourceException(message)
 
-    override suspend fun search(query: String): List<Song> =
+    override suspend fun search(query: String, type: SearchType): SearchPage =
         client.get("$baseUrl/search") {
             auth()
             parameter("q", query)
+            parameter("type", type.wireName)
             parameter("limit", 20)
-        }.orThrow().body<SearchResult>().items
+        }.orThrow().body()
 
     override suspend fun radio(seedSongId: String): List<Song> =
         client.get("$baseUrl/radio") {
@@ -76,6 +81,9 @@ class RemoteSourceModule(
 
     override suspend fun album(id: String): AlbumPage =
         client.get("$baseUrl/albums/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
+
+    override suspend fun playlist(id: String): PlaylistPage =
+        client.get("$baseUrl/playlists/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
 
     override suspend fun resolveStream(songId: String): String =
         client.get("$baseUrl/songs/${songId.encodeURLPathPart()}/stream") { auth() }

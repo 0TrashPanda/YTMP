@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 import urllib.parse
 from dataclasses import dataclass, field
 
@@ -19,6 +20,28 @@ MODULE_ID = "ytm"
 _PREFIXES = ("ytm:", "yt:")
 _LARGE_ART = 544
 _ARTIST_SONGS = 20
+_PLAYLIST_SONGS = 200
+# Search types (the chips above the results) -> ytmusicapi's search filter.
+SEARCH_TYPES = {
+    "songs": "songs",
+    "videos": "videos",
+    "albums": "albums",
+    "artists": "artists",
+    "community_playlists": "community_playlists",
+    "featured_playlists": "featured_playlists",
+}
+_SECTION_TITLES = {
+    "songs": "Songs",
+    "videos": "Videos",
+    "albums": "Albums",
+    "artists": "Artists",
+    "community_playlists": "Community playlists",
+    "featured_playlists": "Featured playlists",
+}
+# How many of each kind the "all" search shows; the section's chip shows more.
+_ALL_LIMITS = {"songs": 4, "videos": 4, "albums": 6, "artists": 6, "community_playlists": 6, "featured_playlists": 6}
+# YouTube Music's own playlists are "featured"; everyone else's are "community".
+_YTM_AUTHOR = "YouTube Music"
 # Re-resolve stream URLs this long before YouTube says they expire.
 _EXPIRY_MARGIN_S = 10 * 60
 
@@ -71,10 +94,25 @@ class YtmCore:
         self._streams: dict[str, StreamInfo] = {}
         self._lock = threading.Lock()
 
-    def search(self, query: str, limit: int = 20) -> list[dict]:
-        results = self._ytm.search(query, filter="songs", limit=limit)
+    def search(self, query: str, type: str = "all", limit: int = 20) -> dict:
+        """Search results as sections (see SearchPage in protocol/Catalog.kt).
+
+        One type gives one section; "all" gives YTM's mixed results, grouped like YTM does.
+        """
+        if type == "all":
+            # YTM's mixed results mostly lack song durations (and sometimes artists), so the
+            # songs and videos come from their own searches, run at the same time.
+            with ThreadPoolExecutor(3) as pool:
+                mixed = pool.submit(self._ytm.search, query)
+                songs = pool.submit(self._ytm.search, query, filter="songs", limit=_ALL_LIMITS["songs"])
+                videos = pool.submit(self._ytm.search, query, filter="videos", limit=_ALL_LIMITS["videos"])
+                return {"sections": _sections_from_all(mixed.result(), songs.result(), videos.result())}
+        if type not in SEARCH_TYPES:
+            raise NotFound(f"Unknown search type: {type}")
+        results = self._ytm.search(query, filter=SEARCH_TYPES[type], limit=limit)
         # ytmusicapi treats limit as a minimum, so cut the list ourselves.
-        return [song for r in results if (song := _song_from_search(r))][:limit]
+        items = [item for r in results if (item := _search_item(r))][:limit]
+        return {"sections": [{"title": _SECTION_TITLES[type], "type": type, "items": items}]}
 
     def radio(self, seed_id: str, limit: int = 25) -> list[dict]:
         """YTM's radio for a song: similar songs, usually starting with the song itself."""
@@ -142,6 +180,22 @@ class YtmCore:
             "songs": songs,
         }
 
+    def playlist(self, playlist_id: str) -> dict:
+        """A public playlist (community or YouTube Music's) with its songs."""
+        try:
+            p = self._ytm.get_playlist(playlist_id, limit=_PLAYLIST_SONGS)
+        except Exception as e:
+            raise NotFound(str(e)) from e
+        author = p.get("author")
+        return {
+            "id": playlist_id,
+            "title": p.get("title") or "",
+            "author": (author.get("name") if isinstance(author, dict) else author) or None,
+            "description": p.get("description"),
+            "thumbnails": _thumbnails(p.get("thumbnails") or []),
+            "songs": [s for t in p.get("tracks") or [] if (s := _song_from_search(t))],
+        }
+
     def stream(self, song_id: str, fresh: bool = False) -> StreamInfo:
         """Direct stream URL, resolved on demand and cached until shortly before it expires.
 
@@ -190,6 +244,80 @@ def _song_from_search(r: dict) -> dict | None:
     }
 
 
+def _search_item(r: dict) -> dict | None:
+    """One search result as a SearchItem (protocol/Catalog.kt), or None for kinds we don't show."""
+    kind = r.get("resultType")
+    if kind in ("song", "video"):
+        song = _song_from_search(r)
+        return {"kind": "song", "song": song, "video": kind == "video"} if song else None
+    if kind == "album" and r.get("browseId"):
+        return {
+            "kind": "album",
+            "album": _album_summary(r, "Album"),
+            "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in r.get("artists") or []],
+        }
+    if kind == "artist":
+        # An artist as the top result has its name and ID in "artists" instead.
+        ref = next(iter(r.get("artists") or []), {})
+        artist_id = r.get("browseId") or ref.get("id")
+        if not artist_id:
+            return None
+        return {
+            "kind": "artist",
+            "id": artist_id,
+            "name": r.get("artist") or ref.get("name") or "",
+            "thumbnails": _thumbnails(r.get("thumbnails") or []),
+        }
+    if kind == "playlist" and r.get("browseId"):
+        count = r.get("itemCount")
+        return {
+            "kind": "playlist",
+            "id": r["browseId"],
+            "title": r.get("title") or "",
+            "author": r.get("author"),
+            "itemCount": int(count) if isinstance(count, (int, str)) and str(count).isdigit() else None,
+            "thumbnails": _thumbnails(r.get("thumbnails") or []),
+        }
+    return None  # podcasts, episodes, profiles, …
+
+
+def _search_type(r: dict) -> str | None:
+    """Which search type (chip) a result of the "all" search belongs to."""
+    kind = r.get("resultType")
+    if kind == "playlist":
+        return "featured_playlists" if r.get("author") == _YTM_AUTHOR else "community_playlists"
+    return {"song": "songs", "video": "videos", "album": "albums", "artist": "artists"}.get(kind)
+
+
+def _sections_from_all(results: list[dict], songs: list[dict], videos: list[dict]) -> list[dict]:
+    """YTM's unfiltered search: the top result, then a few of each kind, in YTM's order.
+
+    [songs] and [videos] (filtered searches) replace the mixed results' songs and videos,
+    which lack durations.
+    """
+    complete = {r["videoId"]: r for r in songs + videos if r.get("videoId")}
+    sections: list[dict] = []
+    for r in results:
+        if r.get("category") == "Top result":
+            r = complete.get(r.get("videoId"), r) if r.get("videoId") else r
+            if item := _search_item(r):
+                sections.append({"title": "Top result", "type": None, "items": [item]})
+            break
+    by_type: dict[str, list[dict]] = {}
+    for r in results:
+        if r.get("category") != "Top result" and (t := _search_type(r)) and (item := _search_item(r)):
+            by_type.setdefault(t, []).append(item)
+    for t, filtered in (("songs", songs), ("videos", videos)):
+        items = [item for r in filtered if (item := _search_item(r))]
+        if items:
+            by_type[t] = items  # keeps its place if the mixed results had it, else goes last
+        else:
+            by_type.pop(t, None)
+    for t, items in by_type.items():  # dicts keep insertion order: the order YTM gave
+        sections.append({"title": _SECTION_TITLES[t], "type": t, "items": items[:_ALL_LIMITS[t]]})
+    return sections
+
+
 def _song_from_watch(t: dict) -> dict | None:
     """A track of a watch playlist (radio) has slightly different fields than a search result."""
     vid = t.get("videoId")
@@ -233,8 +361,10 @@ def _parse_length(length: str | None) -> int:
 def _thumbnails(thumbs: list[dict]) -> list[dict]:
     out = [{"url": t["url"], "width": t.get("width", 0), "height": t.get("height", 0)} for t in thumbs]
     # YTM only lists small sizes; the same image is available larger by changing the URL.
-    if thumbs and re.search(r"=w\d+-h\d+", thumbs[-1]["url"]):
-        large = re.sub(r"=w\d+-h\d+", f"=w{_LARGE_ART}-h{_LARGE_ART}", thumbs[-1]["url"])
+    # Artist pictures are cropped ("=w120-c-h120-…"), album art isn't ("=w120-h120-…").
+    size = r"=w\d+-(c-)?h\d+"
+    if thumbs and re.search(size, thumbs[-1]["url"]):
+        large = re.sub(size, lambda m: f"=w{_LARGE_ART}-{m.group(1) or ''}h{_LARGE_ART}", thumbs[-1]["url"])
         out.append({"url": large, "width": _LARGE_ART, "height": _LARGE_ART})
     return out
 
