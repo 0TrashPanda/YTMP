@@ -52,7 +52,8 @@
 					{artistNames(song)}{showAlbum && song.album ? ` • ${song.album.name}` : ''}
 				</div>
 			</div>
-			<span class="text-sm text-muted tabular-nums">{formatTime(song.durationMs)}</span>
+			<!-- Some listings have no length (episodes in search); it's known once it plays. -->
+			<span class="text-sm text-muted tabular-nums">{song.durationMs ? formatTime(song.durationMs) : ''}</span>
 		</button>
 		<button class="rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="More for {song.title}" onclick={(e) => menu(e, song, false)}>
 			<Icon name="more" />

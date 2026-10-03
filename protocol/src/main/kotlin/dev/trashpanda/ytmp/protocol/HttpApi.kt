@@ -22,6 +22,11 @@ data class CreateRoomResponse(val code: String, val ownerToken: String)
 @SerialName("SearchResponse")
 data class SearchResponse(val items: List<Song>)
 
+/** `GET /api/search/suggestions?q=`: what to search for, while typing. */
+@Serializable
+@SerialName("SuggestionsResponse")
+data class SuggestionsResponse(val items: List<String>)
+
 /** Error body of every `/api` endpoint. */
 @Serializable
 @SerialName("ApiError")

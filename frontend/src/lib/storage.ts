@@ -51,6 +51,18 @@ export const saved = {
 	set syncOffsetMs(value: number) {
 		write('ytmp.syncOffset', String(value));
 	},
+	/** Recent searches, newest first. */
+	get recentSearches(): string[] {
+		try {
+			const list = JSON.parse(read('ytmp.recentSearches') ?? '[]');
+			return Array.isArray(list) ? list.filter((q) => typeof q === 'string') : [];
+		} catch {
+			return [];
+		}
+	},
+	set recentSearches(list: string[]) {
+		write('ytmp.recentSearches', JSON.stringify(list.slice(0, 20)));
+	},
 	get volume() {
 		const value = Number(read('ytmp.volume'));
 		return Number.isFinite(value) && read('ytmp.volume') !== null ? value : 0.8;

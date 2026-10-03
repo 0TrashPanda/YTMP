@@ -1,6 +1,8 @@
 package dev.trashpanda.ytmp.server
 
+import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
+import dev.trashpanda.ytmp.core.ResolvedStream
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.host.AudioProxy
 import dev.trashpanda.ytmp.host.SourceException
@@ -16,8 +18,11 @@ import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
+import dev.trashpanda.ytmp.protocol.SuggestionsResponse
 import dev.trashpanda.ytmp.protocol.wireName
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
@@ -45,13 +50,13 @@ class RemoteSourceModule(
     private val client: HttpClient,
     private val baseUrl: String,
     private val key: String,
-) : SongSearch, StreamResolver, AudioProxy, RadioSource, CatalogSource {
+) : SongSearch, StreamResolver, AudioProxy, RadioSource, CatalogSource, SearchSuggestions {
 
     @Serializable
     private data class SearchResult(val items: List<Song>)
 
     @Serializable
-    private data class StreamResult(val url: String)
+    private data class StreamResult(val url: String, val durationMs: Long? = null)
 
     @Serializable
     private data class ErrorBody(val error: Detail) {
@@ -69,6 +74,12 @@ class RemoteSourceModule(
             parameter("limit", 20)
         }.orThrow().body()
 
+    override suspend fun suggestions(query: String): List<String> =
+        client.get("$baseUrl/search/suggestions") {
+            auth()
+            parameter("q", query)
+        }.orThrow().body<SuggestionsResponse>().items
+
     override suspend fun radio(seedSongId: String): List<Song> =
         client.get("$baseUrl/radio") {
             auth()
@@ -85,9 +96,16 @@ class RemoteSourceModule(
     override suspend fun playlist(id: String): PlaylistPage =
         client.get("$baseUrl/playlists/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
 
-    override suspend fun resolveStream(songId: String): String =
+    override suspend fun podcast(id: String): PodcastPage =
+        client.get("$baseUrl/podcasts/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
+
+    override suspend fun home(): HomePage = client.get("$baseUrl/home") { auth() }.orThrow().body()
+
+    override suspend fun resolveStream(songId: String): String = resolve(songId).url
+
+    override suspend fun resolve(songId: String): ResolvedStream =
         client.get("$baseUrl/songs/${songId.encodeURLPathPart()}/stream") { auth() }
-            .orThrow().body<StreamResult>().url
+            .orThrow().body<StreamResult>().let { ResolvedStream(it.url, it.durationMs) }
 
     /** Streams the module's audio (status, range headers, body) straight through to the caller. */
     override suspend fun respond(call: ApplicationCall, songId: String, range: String?) {

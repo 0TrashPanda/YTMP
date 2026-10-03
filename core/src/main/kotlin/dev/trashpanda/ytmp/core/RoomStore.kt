@@ -45,6 +45,8 @@ data class SavedRoom(
     val autoplaySeed: Song? = null,
     /** The permissions that existed when it was saved (null: before radio), to give roles the newer ones. */
     val knownPermissions: List<Permission>? = null,
+    /** Where podcast episodes were left off (song ID -> ms). */
+    val episodePositions: Map<String, Long> = emptyMap(),
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 

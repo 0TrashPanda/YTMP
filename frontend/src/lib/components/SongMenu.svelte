@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import type { AlbumRef, ArtistRef, QueueItem, Song } from '../protocol.gen';
+	import type { AlbumRef, ArtistRef, PodcastRef, QueueItem, Song } from '../protocol.gen';
 
 	/** Where a song in a menu comes from. */
 	export type SongPlace = 'search' | 'history' | 'current' | 'queue' | 'autoplay';
@@ -29,8 +29,9 @@
 		onFindSimilar: (song: Song) => void;
 		onArtist: (artist: ArtistRef) => void;
 		onAlbum: (album: AlbumRef, artist: string) => void;
+		onPodcast: (podcast: PodcastRef) => void;
 	}
-	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum }: Props = $props();
+	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast }: Props = $props();
 
 	const song = $derived(target.song);
 	const item = $derived(target.item);
@@ -85,14 +86,21 @@
 			list.push({ icon: 'previous', label: 'Play from the start', run: () => command({ kind: 'Seek', positionMs: 0 }) });
 		}
 		list.push(null);
-		if (room.can('start_radio')) list.push({ icon: 'radio', label: 'Start radio', run: () => command({ kind: 'StartRadio', song }, `Starting a radio from "${song.title}"`) });
-		if (room.can('autoplay_from_here')) {
-			list.push({ icon: 'autoplay', label: 'Autoplay this', run: () => command({ kind: 'AutoplayFromHere', song }, `Autoplay: songs like "${song.title}"`) });
+		// Radio and "similar" are about music, not podcast episodes.
+		if (!song.podcast) {
+			if (room.can('start_radio')) list.push({ icon: 'radio', label: 'Start radio', run: () => command({ kind: 'StartRadio', song }, `Starting a radio from "${song.title}"`) });
+			if (room.can('autoplay_from_here')) {
+				list.push({ icon: 'autoplay', label: 'Autoplay this', run: () => command({ kind: 'AutoplayFromHere', song }, `Autoplay: songs like "${song.title}"`) });
+			}
+			// Read everything from the target before closing: closing clears it.
+			const current = song;
+			list.push({ icon: 'similar', label: 'Find similar', run: () => (onFindSimilar(current), onClose()) });
+			list.push(null);
 		}
-		// Read everything from the target before closing: closing clears it.
-		const current = song;
-		list.push({ icon: 'similar', label: 'Find similar', run: () => (onFindSimilar(current), onClose()) });
-		list.push(null);
+		if (song.podcast) {
+			const podcast = song.podcast;
+			list.push({ icon: 'podcast', label: `Go to ${podcast.name}`, run: () => (onPodcast(podcast), onClose()) });
+		}
 		for (const artist of song.artists.slice(0, 3)) {
 			list.push({ icon: 'person', label: `Go to ${artist.name}`, run: () => (onArtist(artist), onClose()) });
 		}
@@ -104,10 +112,11 @@
 		if (ytmId) {
 			list.push({ icon: 'open', label: 'Open in YouTube Music', href: `https://music.youtube.com/watch?v=${encodeURIComponent(ytmId)}`, run: onClose });
 		}
-		if (item && place !== 'current' && room.can(item.addedBy === room.participantId ? 'remove_own' : 'remove_others')) {
+		if (item && room.can(item.addedBy === room.participantId ? 'remove_own' : 'remove_others')) {
 			list.push(null);
 			list.push({
 				icon: 'remove',
+				// The current song too: the next one plays.
 				label: place === 'history' ? 'Remove from history' : place === 'autoplay' ? 'Remove from autoplay' : 'Remove from queue',
 				danger: true,
 				run: () => command({ kind: 'RemoveQueueItem', itemId: item.itemId })

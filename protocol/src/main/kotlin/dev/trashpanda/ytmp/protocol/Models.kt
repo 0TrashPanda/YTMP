@@ -28,7 +28,10 @@ data class Thumbnail(
     val height: Int,
 )
 
-/** A song as returned by a source module. [id] is namespaced, e.g. `ytm:dQw4w9WgXcQ`. */
+/**
+ * A song as returned by a source module. [id] is namespaced, e.g. `ytm:dQw4w9WgXcQ`.
+ * Podcast episodes are songs too, with [podcast] set.
+ */
 @Serializable
 @SerialName("Song")
 data class Song(
@@ -39,7 +42,13 @@ data class Song(
     val durationMs: Long,
     val thumbnails: List<Thumbnail>,
     val explicit: Boolean = false,
+    /** The podcast this is an episode of; null for music. */
+    val podcast: PodcastRef? = null,
 )
+
+@Serializable
+@SerialName("PodcastRef")
+data class PodcastRef(val id: String, val name: String)
 
 @Serializable
 @SerialName("QueueItemResult")

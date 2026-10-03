@@ -1,21 +1,23 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { pushState } from '$app/navigation';
 	import { onDestroy, untrack } from 'svelte';
-	import Art from '../../../lib/components/Art.svelte';
 	import Icon from '../../../lib/components/Icon.svelte';
 	import PlayerBar from '../../../lib/components/PlayerBar.svelte';
-	import QueuePanel from '../../../lib/components/QueuePanel.svelte';
+	import NowPlaying from '../../../lib/components/NowPlaying.svelte';
+	import HomeView from '../../../lib/components/HomeView.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
 	import ArtistView from '../../../lib/components/ArtistView.svelte';
 	import AlbumView from '../../../lib/components/AlbumView.svelte';
 	import PlaylistView from '../../../lib/components/PlaylistView.svelte';
+	import PodcastView from '../../../lib/components/PodcastView.svelte';
+	import SearchBox from '../../../lib/components/SearchBox.svelte';
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
-	import type { AlbumRef, ArtistRef, SearchType, Song } from '../../../lib/protocol.gen';
+	import type { AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
-	import { getHost, prefetch } from '../../../lib/api';
+	import { getHost } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
-	import { artistNames } from '../../../lib/format';
 	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
 	import { saved } from '../../../lib/storage';
@@ -29,33 +31,34 @@
 	let name = $state(initialName);
 	let room = $state<RoomConnection | null>(null);
 	let player = $state<RoomPlayer | null>(null);
-	let query = $state('');
-	// The search chip: stays as picked while you type something else.
+	// The search chip: stays as picked for the next search.
 	let searchType = $state<SearchType>('all');
 	let menu = $state<MenuTarget | null>(null);
 
-	// What the main area shows besides the album art: search, find similar, artist, album and
-	// playlist pages, as a stack (the back arrow pops it). The logo switches between the album art
+	// What the main area shows besides the home page: search, find similar, artist, album,
+	// playlist and podcast pages, as a stack (the back arrow pops it). The logo switches between home
 	// and the last one, which stays as it was.
 	type View =
-		| { kind: 'search' }
+		| { kind: 'search'; query: string }
 		| { kind: 'similar'; song: Song }
 		| { kind: 'artist'; id: string; name: string }
 		| { kind: 'album'; id: string; title: string }
-		| { kind: 'playlist'; id: string; title: string };
+		| { kind: 'playlist'; id: string; title: string }
+		| { kind: 'podcast'; id: string; title: string };
 	let views = $state<View[]>([]);
 	let browsing = $state(false);
 	const view = $derived(browsing ? (views.at(-1) ?? null) : null);
 
 	function show(next: View) {
+		closePlayer();
 		const top = views.at(-1);
-		if (next.kind === 'search' && top?.kind === 'search') {
-			browsing = true;
-			return;
-		}
-		views = [...views, next].slice(-20);
+		// A new search replaces the results on top instead of piling up.
+		views = [...(next.kind === 'search' && top?.kind === 'search' ? views.slice(0, -1) : views), next].slice(-20);
 		browsing = true;
 	}
+
+	/** The search shown in the search box: the last one. */
+	const query = $derived(views.findLast((v): v is Extract<View, { kind: 'search' }> => v.kind === 'search')?.query ?? '');
 
 	function back() {
 		views = views.slice(0, -1);
@@ -65,6 +68,18 @@
 	function toggleHome() {
 		if (browsing) browsing = false;
 		else if (views.length) browsing = true;
+	}
+
+	// The full player (album art, controls, Up next) over everything. A history entry, so
+	// the phone's Back button closes it.
+	const expanded = $derived(!!page.state.player);
+
+	function openPlayer() {
+		if (!page.state.player) pushState('', { player: true });
+	}
+
+	function closePlayer() {
+		if (page.state.player) history.back();
 	}
 
 	function openArtist(artist: ArtistRef) {
@@ -81,12 +96,15 @@
 		show({ kind: 'playlist', id: playlist.id, title: playlist.title });
 	}
 
-	function searchFor(text: string) {
-		query = text;
-		show({ kind: 'search' });
+	function openPodcast(podcast: PodcastRef) {
+		show({ kind: 'podcast', id: podcast.id, title: podcast.name });
 	}
 
-	/** Right-click (or ⋮) on the current song outside the queue: the album art and the player bar. */
+	function searchFor(text: string) {
+		show({ kind: 'search', query: text });
+	}
+
+	/** Right-click (or ⋮) on the current song outside the queue: the full player and the player bar. */
 	function currentMenu(event: MouseEvent) {
 		const item = room?.state?.nowPlaying?.item;
 		if (!item) return;
@@ -156,7 +174,7 @@
 	}
 
 	let sharing = $state(false);
-	let settings = $state<'overview' | 'roles' | 'members' | 'bans' | null>(null);
+	let settings = $state<'list' | 'members' | null>(null);
 	let host = $state<HostInfo | null>(null);
 	getHost().then((h) => (host = h)).catch(() => {});
 </script>
@@ -200,142 +218,125 @@
 	</main>
 {:else}
 	<div class="flex h-full flex-col">
-		<!-- Phones: one scrolling page whose header slides away while scrolling down.
-		     Desktop: header on top, song and queue scroll separately. -->
-		<div
-			bind:this={scroller}
-			onscroll={onScroll}
-			class="min-h-0 flex-1 overflow-y-auto lg:flex lg:flex-col lg:overflow-hidden"
-		>
-		<header
-			class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:px-4 lg:translate-y-0
-				{headerHidden ? '-translate-y-full' : ''}"
-		>
-			<button class="text-xl font-black tracking-tight" title={browsing ? 'Now playing' : 'Back to where you were'} onclick={toggleHome}>
-				YT<span class="text-accent">MP</span>
-			</button>
-			<label class="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-raised px-3 py-2 sm:max-w-xl">
-				<Icon name="search" size={20} class="shrink-0 text-muted" />
-				<input
-					class="min-w-0 flex-1 bg-transparent outline-none"
-					placeholder="Search songs, albums, artists, playlists"
-					bind:value={query}
-					onfocus={() => ((headerHidden = false), query.trim() && show({ kind: 'search' }))}
-					oninput={() => show({ kind: 'search' })}
-				/>
-				{#if query}
-					<button aria-label="Clear search" onclick={() => (query = '')}><Icon name="close" size={20} /></button>
-				{/if}
-			</label>
-			<div class="ml-auto flex items-center gap-2">
-				<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
-				<button
-					class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line"
-					onclick={() => (sharing = true)}
-					title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
+		<div class="relative min-h-0 flex-1">
+			<!-- One scrolling page whose header slides away while scrolling down (phones). -->
+			<div bind:this={scroller} onscroll={onScroll} class="h-full overflow-y-auto">
+				<header
+					class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:px-4 lg:translate-y-0
+						{headerHidden ? '-translate-y-full' : ''}"
 				>
-					{#if room.state?.room.visibility === 'private'}
-						<Icon name="headphones" size={16} class="text-muted" />
-					{/if}
-					{code}
-					<Icon name="share" size={16} class="text-muted" />
-				</button>
-				<button
-					class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
-					aria-label="People in this room"
-					onclick={() => (settings = 'members')}
-					title={room.state?.participants
-						.filter((p: Participant) => p.online)
-						.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
-						.join(', ')}
-				>
-					<Icon name="people" size={20} />
-					<span class="hidden sm:inline">{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}</span>
-				</button>
-				{#if room.can('change_settings') || room.can('edit_roles')}
-					<button
-						class="rounded-full p-1.5 text-muted hover:bg-raised hover:text-white"
-						aria-label="Room settings"
-						title="Room settings"
-						onclick={() => (settings = room?.can('change_settings') ? 'overview' : 'roles')}
-					>
-						<Icon name="settings" size={20} />
+					<button class="text-xl font-black tracking-tight" title={browsing ? 'Home' : 'Back to where you were'} onclick={toggleHome}>
+						YT<span class="text-accent">MP</span>
 					</button>
-				{/if}
-			</div>
-		</header>
-
-		{#if room.status !== 'connected'}
-			<div class="bg-raised px-4 py-1 text-center text-sm text-muted">
-				{room.status === 'connecting' ? 'Connecting…' : 'Connection lost, reconnecting…'}
-			</div>
-		{/if}
-
-		<div class="lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_420px]">
-			<main class="p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto">
-				{#if view}
-					{#if views.length > 1}
-						<button class="mb-2 flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted hover:bg-raised hover:text-white" onclick={back}>
-							<svg viewBox="0 0 24 24" class="h-5 w-5"><path fill="currentColor" d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" /></svg>
-							Back
+					<SearchBox {query} onopen={() => (headerHidden = false)} onsearch={searchFor} />
+					<div class="ml-auto flex items-center gap-2">
+						<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
+						<button
+							class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line"
+							onclick={() => (sharing = true)}
+							title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
+						>
+							{#if room.state?.room.visibility === 'private'}
+								<Icon name="headphones" size={16} class="text-muted" />
+							{/if}
+							{code}
+							<Icon name="share" size={16} class="text-muted" />
 						</button>
-					{/if}
-					{#if view.kind === 'search'}
-						<SearchResults
+						<button
+							class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
+							aria-label="People in this room"
+							onclick={() => (settings = 'members')}
+							title={room.state?.participants
+								.filter((p: Participant) => p.online)
+								.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
+								.join(', ')}
+						>
+							<Icon name="people" size={20} />
+							<span class="hidden sm:inline">{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}</span>
+						</button>
+						{#if room.can('change_settings') || room.can('edit_roles')}
+							<button
+								class="rounded-full p-1.5 text-muted hover:bg-raised hover:text-white"
+								aria-label="Room settings"
+								title="Room settings"
+								onclick={() => (settings = 'list')}
+							>
+								<Icon name="settings" size={20} />
+							</button>
+						{/if}
+					</div>
+				</header>
+
+				{#if room.status !== 'connected'}
+					<div class="bg-raised px-4 py-1 text-center text-sm text-muted">
+						{room.status === 'connecting' ? 'Connecting…' : 'Connection lost, reconnecting…'}
+					</div>
+				{/if}
+
+				<main class="mx-auto w-full max-w-7xl p-3 sm:p-6">
+					{#if view}
+						{#if views.length > 1}
+							<button class="mb-2 flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted hover:bg-raised hover:text-white" onclick={back}>
+								<Icon name="back" size={20} />
+								Back
+							</button>
+						{/if}
+						{#if view.kind === 'search'}
+							<SearchResults
+								{room}
+								query={view.query}
+								type={searchType}
+								onType={(t) => (searchType = t)}
+								onToast={toast}
+								onMenu={(target) => (menu = target)}
+								onArtist={openArtist}
+								onAlbum={(a) => openAlbum(a)}
+								onPlaylist={openPlaylist}
+								onPodcast={openPodcast}
+							/>
+						{:else if view.kind === 'similar'}
+							<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={(target) => (menu = target)} />
+						{:else if view.kind === 'artist'}
+							<ArtistView {room} id={view.id} name={view.name} onToast={toast} onMenu={(target) => (menu = target)} onAlbum={(a) => openAlbum({ id: a.id, name: a.title })} />
+						{:else if view.kind === 'album'}
+							<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
+						{:else if view.kind === 'playlist'}
+							<PlaylistView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
+						{:else if view.kind === 'podcast'}
+							<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
+						{/if}
+					{:else}
+						<HomeView
 							{room}
-							{query}
-							type={searchType}
-							onType={(t) => (searchType = t)}
 							onToast={toast}
 							onMenu={(target) => (menu = target)}
 							onArtist={openArtist}
 							onAlbum={(a) => openAlbum(a)}
 							onPlaylist={openPlaylist}
+							onPodcast={openPodcast}
 						/>
-					{:else if view.kind === 'similar'}
-						<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={(target) => (menu = target)} />
-					{:else if view.kind === 'artist'}
-						<ArtistView {room} id={view.id} name={view.name} onToast={toast} onMenu={(target) => (menu = target)} onAlbum={(a) => openAlbum({ id: a.id, name: a.title })} />
-					{:else if view.kind === 'album'}
-						<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
-					{:else if view.kind === 'playlist'}
-						<PlaylistView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
 					{/if}
-				{:else if room.state?.nowPlaying}
-					{@const song = room.state.nowPlaying.item.song}
-					<div class="flex min-w-0 flex-col items-center justify-center gap-4 py-4 text-center sm:gap-6 lg:h-full lg:py-0">
-						<div class="contents" role="presentation" oncontextmenu={currentMenu}>
-							<Art {song} size={544} class="aspect-square w-[min(100%,28rem,38vh)] shadow-2xl" />
-						</div>
-						<div class="w-full min-w-0" role="presentation" oncontextmenu={currentMenu}>
-							<h1 class="text-xl font-bold break-words sm:text-2xl">{song.title}</h1>
-							<p class="text-muted">
-								{#each song.artists as artist, i (i)}
-									{#if i > 0}{', '}{/if}<button class="hover:text-white hover:underline" onclick={() => openArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}>{artist.name}</button>
-								{/each}
-								{#if song.album}
-									• <button class="hover:text-white hover:underline" onclick={() => openAlbum(song.album!, song.artists[0]?.name)} onpointerenter={() => song.album?.id && prefetch('album', song.album.id)}>{song.album.name}</button>
-								{/if}
-							</p>
-							<p class="mt-1 text-sm text-muted">Added by {room.state.nowPlaying.item.addedByName}</p>
-						</div>
-					</div>
-				{:else}
-					<div class="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted lg:h-full lg:py-0">
-						<Icon name="search" size={48} />
-						<p>Search for a song to start the music.</p>
-					</div>
-				{/if}
-			</main>
-			<!-- On phones the queue makes room for search results, like YTM. -->
-			<div class="border-t border-line lg:min-h-0 lg:border-t-0 lg:border-l {view ? 'hidden lg:block' : ''}">
-				<QueuePanel {room} onMenu={(target) => (menu = target)} />
+				</main>
 			</div>
-		</div>
+
+			{#if expanded && player}
+				<NowPlaying
+					{room}
+					{player}
+					{positionMs}
+					onClose={closePlayer}
+					onToast={toast}
+					onMenu={(target) => (menu = target)}
+					onSongMenu={currentMenu}
+					onArtist={openArtist}
+					onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
+					onPodcast={openPodcast}
+				/>
+			{/if}
 		</div>
 
 		{#if player}
-			<PlayerBar {room} {player} {positionMs} onToast={toast} onSongMenu={currentMenu} />
+			<PlayerBar {room} {player} {positionMs} {expanded} onExpand={(open) => (open ? openPlayer() : closePlayer())} onToast={toast} onSongMenu={currentMenu} />
 		{/if}
 	</div>
 
@@ -348,6 +349,7 @@
 			onFindSimilar={(song) => show({ kind: 'similar', song })}
 			onArtist={openArtist}
 			onAlbum={openAlbum}
+			onPodcast={openPodcast}
 		/>
 	{/if}
 

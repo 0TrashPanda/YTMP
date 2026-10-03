@@ -53,7 +53,8 @@ data class TargetItem(
             itemId = itemId,
             songId = song.id,
             title = song.title,
-            artist = song.artists.joinToString(", ") { it.name },
+            // A podcast episode shows its podcast (like the web app's artistNames).
+            artist = song.artists.joinToString(", ") { it.name }.ifEmpty { song.podcast?.name.orEmpty() },
             // The smallest thumbnail that is at least 544 px, or the largest one.
             artUrl = song.thumbnails.sortedBy { it.width }.let { t -> (t.firstOrNull { it.width >= 544 } ?: t.lastOrNull())?.url },
             durationMs = song.durationMs,

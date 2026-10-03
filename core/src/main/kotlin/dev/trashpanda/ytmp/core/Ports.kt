@@ -4,6 +4,8 @@ import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.QueueItem
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
@@ -14,11 +16,21 @@ import java.security.SecureRandom
 /** Resolves a direct, playable stream URL for a song. Implemented by the source modules. */
 fun interface StreamResolver {
     suspend fun resolveStream(songId: String): String
+
+    /** The stream with its exact length, when the source knows it (listings round podcast lengths). */
+    suspend fun resolve(songId: String): ResolvedStream = ResolvedStream(resolveStream(songId), durationMs = null)
 }
+
+data class ResolvedStream(val url: String, val durationMs: Long?)
 
 /** Searches the host's sources. */
 fun interface SongSearch {
     suspend fun search(query: String, type: SearchType): SearchPage
+}
+
+/** Search suggestions while typing, e.g. "daft p" -> "daft punk one more time". */
+fun interface SearchSuggestions {
+    suspend fun suggestions(query: String): List<String>
 }
 
 /** Songs similar to a seed song (YTM's radio), for Start radio and the autoplay queue. */
@@ -26,13 +38,17 @@ fun interface RadioSource {
     suspend fun radio(seedSongId: String): List<Song>
 }
 
-/** Artist, album and playlist pages of a source. */
+/** The home page, and artist, album, playlist and podcast pages of a source. */
 interface CatalogSource {
     suspend fun artist(id: String): ArtistPage
 
     suspend fun album(id: String): AlbumPage
 
     suspend fun playlist(id: String): PlaylistPage
+
+    suspend fun podcast(id: String): PodcastPage
+
+    suspend fun home(): HomePage
 }
 
 /** A speaker or TV the host found, that rooms can play on. */

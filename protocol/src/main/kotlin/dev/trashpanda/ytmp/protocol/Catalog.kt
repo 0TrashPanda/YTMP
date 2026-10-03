@@ -57,6 +57,28 @@ data class PlaylistPage(
     val songs: List<Song>,
 )
 
+/** A podcast (`GET /api/podcasts/{id}`): its newest episodes first. */
+@Serializable
+@SerialName("PodcastPage")
+data class PodcastPage(
+    val id: String,
+    val title: String,
+    val author: String?,
+    val description: String?,
+    val thumbnails: List<Thumbnail>,
+    val episodes: List<Episode>,
+)
+
+/** An episode on a podcast page: playable like a song, plus what a list of episodes shows. */
+@Serializable
+@SerialName("Episode")
+data class Episode(
+    val song: Song,
+    /** As the source says it, e.g. "Oct 18, 2020" or "3 days ago". */
+    val date: String?,
+    val description: String?,
+)
+
 /** What to search for; the chips above the results. */
 @Serializable
 @SerialName("SearchType")
@@ -69,6 +91,8 @@ enum class SearchType {
     @SerialName("artists") ARTISTS,
     @SerialName("community_playlists") COMMUNITY_PLAYLISTS,
     @SerialName("featured_playlists") FEATURED_PLAYLISTS,
+    @SerialName("podcasts") PODCASTS,
+    @SerialName("episodes") EPISODES,
 }
 
 /** The name on the wire and in URLs, e.g. "community_playlists". */
@@ -90,6 +114,10 @@ sealed interface SearchItem {
     @Serializable
     @SerialName("artist")
     data class ArtistResult(val id: String, val name: String, val thumbnails: List<Thumbnail>) : SearchItem
+
+    @Serializable
+    @SerialName("podcast")
+    data class PodcastResult(val id: String, val title: String, val author: String?, val thumbnails: List<Thumbnail>) : SearchItem
 
     @Serializable
     @SerialName("playlist")
@@ -117,3 +145,16 @@ data class SearchSection(
 @Serializable
 @SerialName("SearchPage")
 data class SearchPage(val sections: List<SearchSection>)
+
+/** The home page (`GET /api/home`): suggestions in rows, like YTM's quick picks and mixes. */
+@Serializable
+@SerialName("HomePage")
+data class HomePage(val sections: List<HomeSection>)
+
+@Serializable
+@SerialName("HomeSection")
+data class HomeSection(
+    /** e.g. "Quick picks", "New releases". */
+    val title: String,
+    val items: List<SearchItem>,
+)

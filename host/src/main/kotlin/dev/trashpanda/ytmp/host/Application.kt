@@ -4,6 +4,7 @@ import dev.trashpanda.ytmp.core.Outbox
 import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.protocol.ApiError
 import dev.trashpanda.ytmp.protocol.ClientMessage
@@ -19,6 +20,7 @@ import dev.trashpanda.ytmp.protocol.RoomListResponse
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.SearchType
+import dev.trashpanda.ytmp.protocol.SuggestionsResponse
 import dev.trashpanda.ytmp.protocol.wireName
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import io.ktor.http.CacheControl
@@ -107,8 +109,10 @@ fun Application.ytmpModule(
     extraApi: Route.() -> Unit = {},
     /** Similar songs (YTM's radio), for Find similar. */
     similar: RadioSource? = null,
-    /** Artist and album pages. */
+    /** Artist, album and playlist pages. */
     catalog: CatalogSource? = null,
+    /** Search suggestions while typing. */
+    suggestions: SearchSuggestions? = null,
 ) {
     install(ContentNegotiation) { json(ProtocolJson) }
     install(WebSockets) {
@@ -181,6 +185,11 @@ fun Application.ytmpModule(
                 val type = call.request.queryParameters["type"]?.let(::searchType) ?: SearchType.ALL
                 call.respond(search.search(query, type))
             }
+            get("/search/suggestions") {
+                // Typing goes on without them, so no source (or an empty box) is just no suggestions.
+                val query = call.request.queryParameters["q"].orEmpty()
+                call.respond(SuggestionsResponse(if (query.isBlank()) emptyList() else suggestions?.suggestions(query).orEmpty()))
+            }
             get("/similar") {
                 val songId = call.request.queryParameters["id"]?.trim().orEmpty()
                 if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
@@ -198,6 +207,14 @@ fun Application.ytmpModule(
             get("/playlists/{id}") {
                 val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No playlist pages here")
                 call.respond(source.playlist(call.parameters["id"]!!))
+            }
+            get("/podcasts/{id}") {
+                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No podcast pages here")
+                call.respond(source.podcast(call.parameters["id"]!!))
+            }
+            get("/home") {
+                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No home page here")
+                call.respond(source.home())
             }
             get("/audio/{songId}") {
                 val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")

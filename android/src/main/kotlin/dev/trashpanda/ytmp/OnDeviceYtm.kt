@@ -7,6 +7,8 @@ import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.wireName
@@ -14,6 +16,7 @@ import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import dev.trashpanda.ytmp.core.SongSearch
+import dev.trashpanda.ytmp.core.ResolvedStream
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.ProtocolJson
@@ -27,8 +30,8 @@ import kotlinx.serialization.builtins.ListSerializer
  * yt-dlp), called directly through Chaquopy instead of over HTTP.
  */
 class OnDeviceYtm(context: Context, language: String = "en", location: String = "BE") : SongSearch, StreamResolver, RadioSource, CatalogSource {
-    /** A resolved stream: the URL plus the headers YouTube expects when fetching it. */
-    class Stream(val url: String, val headers: Map<String, String>)
+    /** A resolved stream: the URL plus the headers YouTube expects when fetching it, and its exact length. */
+    class Stream(val url: String, val headers: Map<String, String>, val durationMs: Long?)
 
     private val python: Python
     private val core: PyObject by lazy { python.getModule("ytmp_ytm.core").callAttr("YtmCore", language, location, null) }
@@ -43,6 +46,10 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
     override suspend fun search(query: String, type: SearchType): SearchPage = python {
         val page = core.callAttr("search", query, type.wireName, 20)
         ProtocolJson.decodeFromString(SearchPage.serializer(), json.callAttr("dumps", page).toString())
+    }
+
+    suspend fun suggestions(query: String): List<String> = python {
+        core.callAttr("suggestions", query).asList().map { it.toString() }
     }
 
     override suspend fun radio(seedSongId: String): List<Song> = python {
@@ -62,12 +69,23 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id)).toString())
     }
 
+    override suspend fun podcast(id: String): PodcastPage = python {
+        ProtocolJson.decodeFromString(PodcastPage.serializer(), json.callAttr("dumps", core.callAttr("podcast", id)).toString())
+    }
+
+    override suspend fun home(): HomePage = python {
+        ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("home")).toString())
+    }
+
     override suspend fun resolveStream(songId: String): String = stream(songId).url
+
+    override suspend fun resolve(songId: String): ResolvedStream = stream(songId).let { ResolvedStream(it.url, it.durationMs) }
 
     suspend fun stream(songId: String, fresh: Boolean = false): Stream = python {
         val info = core.callAttr("stream", songId, fresh)
         val headers = info["http_headers"]!!.asMap().entries.associate { (k, v) -> k.toString() to v.toString() }
-        Stream(info["url"].toString(), headers)
+        // Python's None arrives as null.
+        Stream(info["url"].toString(), headers, info["duration_ms"]?.toLong())
     }
 
     /** Runs Python off the main thread, and turns Python errors into [SourceException]s. */

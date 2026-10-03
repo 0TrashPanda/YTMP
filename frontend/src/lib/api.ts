@@ -3,14 +3,17 @@ import type {
 	ApiError,
 	ArtistPage,
 	CreateRoomResponse,
+	HomePage,
 	HostInfo,
 	PlaylistPage,
+	PodcastPage,
 	RoomInfo,
 	RoomListResponse,
 	RoomVisibility,
 	SearchPage,
 	SearchResponse,
 	SearchType,
+	SuggestionsResponse,
 	Song
 } from './protocol.gen';
 
@@ -93,6 +96,15 @@ export function search(query: string, type: SearchType, signal?: AbortSignal): P
 	);
 }
 
+/** What to search for, while typing. Empty when the host has no suggestions. */
+export function suggestions(query: string, signal?: AbortSignal): Promise<string[]> {
+	const q = query.toLowerCase();
+	return abortable(
+		cached(`suggest:${q}`, async () => (await request<SuggestionsResponse>(`/api/search/suggestions?q=${encodeURIComponent(q)}`)).items),
+		signal
+	);
+}
+
 /** Songs similar to a song (YTM's radio), for Find similar. */
 export function similar(songId: string, signal?: AbortSignal): Promise<Song[]> {
 	return abortable(
@@ -113,9 +125,20 @@ export function getPlaylist(id: string): Promise<PlaylistPage> {
 	return cached(`playlist:${id}`, () => request(`/api/playlists/${encodeURIComponent(id)}`));
 }
 
+export function getPodcast(id: string): Promise<PodcastPage> {
+	return cached(`podcast:${id}`, () => request(`/api/podcasts/${encodeURIComponent(id)}`));
+}
+
+/** Suggestions for the home page: quick picks, new releases, mixes. */
+export function getHome(): Promise<HomePage> {
+	return cached('home', () => request('/api/home'));
+}
+
+const pages = { artist: getArtist, album: getAlbum, playlist: getPlaylist, podcast: getPodcast };
+
 /** Starts loading a page you're likely to open (hovering it), so it opens instantly. */
-export function prefetch(kind: 'artist' | 'album' | 'playlist', id: string): void {
-	(kind === 'artist' ? getArtist(id) : kind === 'album' ? getAlbum(id) : getPlaylist(id)).catch(() => {});
+export function prefetch(kind: keyof typeof pages, id: string): void {
+	pages[kind](id).catch(() => {});
 }
 
 /** Audio streamed through the host, for when the direct stream URL doesn't work. */

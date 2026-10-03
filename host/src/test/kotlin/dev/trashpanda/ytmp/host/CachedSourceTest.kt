@@ -44,6 +44,8 @@ class CachedSourceTest {
             override suspend fun artist(id: String) = error("no")
             override suspend fun album(id: String) = error("no")
             override suspend fun playlist(id: String) = error("no")
+            override suspend fun podcast(id: String) = error("no")
+            override suspend fun home() = error("no")
         })
         source.search("Daft Punk", SearchType.SONGS)
         source.search(" daft punk ", SearchType.SONGS)

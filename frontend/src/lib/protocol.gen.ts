@@ -26,6 +26,11 @@ export interface Thumbnail {
   height: number;
 }
 
+export interface PodcastRef {
+  id: string;
+  name: string;
+}
+
 export interface Song {
   id: string;
   title: string;
@@ -34,6 +39,7 @@ export interface Song {
   durationMs: number;
   thumbnails: Thumbnail[];
   explicit: boolean;
+  podcast: PodcastRef | null;
 }
 
 export type QueuePosition = "next" | "end";
@@ -722,7 +728,7 @@ export interface PlaylistPage {
   songs: Song[];
 }
 
-export type SearchType = "all" | "songs" | "videos" | "albums" | "artists" | "community_playlists" | "featured_playlists";
+export type SearchType = "all" | "songs" | "videos" | "albums" | "artists" | "community_playlists" | "featured_playlists" | "podcasts" | "episodes";
 
 export interface SearchItemAlbum {
   kind: "album";
@@ -746,6 +752,14 @@ export interface SearchItemPlaylist {
   thumbnails: Thumbnail[];
 }
 
+export interface SearchItemPodcast {
+  kind: "podcast";
+  id: string;
+  title: string;
+  author: string | null;
+  thumbnails: Thumbnail[];
+}
+
 export interface SearchItemSong {
   kind: "song";
   song: Song;
@@ -756,6 +770,7 @@ export type SearchItem =
   | SearchItemAlbum
   | SearchItemArtist
   | SearchItemPlaylist
+  | SearchItemPodcast
   | SearchItemSong;
 
 export interface SearchSection {
@@ -766,4 +781,32 @@ export interface SearchSection {
 
 export interface SearchPage {
   sections: SearchSection[];
+}
+
+export interface Episode {
+  song: Song;
+  date: string | null;
+  description: string | null;
+}
+
+export interface PodcastPage {
+  id: string;
+  title: string;
+  author: string | null;
+  description: string | null;
+  thumbnails: Thumbnail[];
+  episodes: Episode[];
+}
+
+export interface HomeSection {
+  title: string;
+  items: SearchItem[];
+}
+
+export interface HomePage {
+  sections: HomeSection[];
+}
+
+export interface SuggestionsResponse {
+  items: string[];
 }

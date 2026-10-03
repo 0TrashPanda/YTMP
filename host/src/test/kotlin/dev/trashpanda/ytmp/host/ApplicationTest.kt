@@ -23,6 +23,7 @@ import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.wireName
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.protocol.SuggestionsResponse
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
@@ -185,8 +186,27 @@ class ApplicationTest {
         assertEquals(listOf<SearchItem>(SearchItem.SongResult(song)), all.sections.single().items)
         val playlists = jsonClient().get("/api/search?q=daft&type=community_playlists").body<SearchPage>()
         assertEquals(SearchType.COMMUNITY_PLAYLISTS, playlists.sections.single().type)
-        assertEquals(HttpStatusCode.BadRequest, jsonClient().get("/api/search?q=daft&type=podcasts").status)
+        assertEquals(HttpStatusCode.BadRequest, jsonClient().get("/api/search?q=daft&type=profiles").status)
         assertEquals(HttpStatusCode.BadRequest, jsonClient().get("/api/search?q=").status)
+    }
+
+    @Test
+    fun `suggestions while typing`() = testApplication {
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(
+                rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER),
+                suggestions = { q -> listOf("$q punk", "$q punk one more time") },
+            )
+        }
+        assertEquals(listOf("daft punk", "daft punk one more time"), jsonClient().get("/api/search/suggestions?q=daft").body<SuggestionsResponse>().items)
+        assertEquals(emptyList(), jsonClient().get("/api/search/suggestions?q=%20").body<SuggestionsResponse>().items)
+    }
+
+    @Test
+    fun `no suggestion source means no suggestions`() = testApplication {
+        setup()
+        assertEquals(emptyList(), jsonClient().get("/api/search/suggestions?q=daft").body<SuggestionsResponse>().items)
     }
 
     /** Phone mode. Requests with the "X-Remote" header count as coming from another device. */

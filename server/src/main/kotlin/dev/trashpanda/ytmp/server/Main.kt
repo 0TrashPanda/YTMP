@@ -54,7 +54,7 @@ fun main(args: Array<String>) {
         expectSuccess = false
     }
     val ytm = RemoteSourceModule(http, config.ytm.url.trimEnd('/'), config.ytm.key)
-    val cached = CachedSource(ytm, ytm, ytm)
+    val cached = CachedSource(ytm, ytm, ytm, ytm)
 
     embeddedServer(Netty, port = config.server.port, host = config.server.host) {
         val casts = CastOutputs(this) { localAddress ->
@@ -107,6 +107,7 @@ fun main(args: Array<String>) {
             extraApi = { service.routes(this) },
             similar = cached,
             catalog = cached,
+            suggestions = cached,
         )
     }.start(wait = true)
 }

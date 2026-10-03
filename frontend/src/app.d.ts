@@ -5,7 +5,12 @@ declare global {
 		// interface Error {}
 		// interface Locals {}
 		// interface PageData {}
-		// interface PageState {}
+		interface PageState {
+			/** The phone search page is open (so the back button closes it). */
+			searching?: boolean;
+			/** The full player is open (so the back button closes it). */
+			player?: boolean;
+		}
 		// interface Platform {}
 	}
 }

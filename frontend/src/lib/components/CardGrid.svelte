@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	/** An album, artist or playlist as a card. */
+	/** An album, artist, podcast or playlist as a card. */
 	export interface Card {
 		key: string;
 		title: string;
@@ -14,15 +14,20 @@
 </script>
 
 <script lang="ts">
-	let { cards }: { cards: Card[] } = $props();
+	/** [row]: one row that scrolls sideways (the home page), instead of a grid. */
+	let { cards, row = false }: { cards: Card[]; row?: boolean } = $props();
 </script>
 
-<div class="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2">
+<div
+	class={row
+		? 'grid snap-x auto-cols-[9.5rem] grid-flow-col gap-4 overflow-x-auto scroll-px-2 px-2 pb-2 [scrollbar-width:none] sm:auto-cols-[11rem]'
+		: 'grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2'}
+>
 	{#each cards as card (card.key)}
-		<button class="group flex min-w-0 flex-col gap-2 text-left" onclick={card.open} onpointerenter={card.prefetch} ontouchstart={card.prefetch}>
+		<button class="group flex min-w-0 snap-start flex-col gap-2 text-left" onclick={card.open} onpointerenter={card.prefetch} ontouchstart={card.prefetch}>
 			<div class="aspect-square w-full overflow-hidden bg-raised {card.round ? 'rounded-full' : 'rounded-md'}">
 				{#if card.art}
-					<img src={card.art} alt="" loading="lazy" class="h-full w-full object-cover transition-transform group-hover:scale-105" />
+					<img src={card.art} alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover transition-transform group-hover:scale-105" />
 				{/if}
 			</div>
 			<div class="min-w-0 {card.round ? 'text-center' : ''}">

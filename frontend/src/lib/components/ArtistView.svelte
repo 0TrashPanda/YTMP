@@ -57,7 +57,7 @@
 	<header class="flex items-center gap-5 px-2">
 		<div class="h-28 w-28 shrink-0 overflow-hidden rounded-full bg-raised sm:h-40 sm:w-40">
 			{#if artist?.thumbnails.at(-1)}
-				<img src={artist.thumbnails.at(-1)!.url} alt="" class="h-full w-full object-cover" />
+				<img src={artist.thumbnails.at(-1)!.url} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
 			{/if}
 		</div>
 		<div class="min-w-0">

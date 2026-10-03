@@ -12,7 +12,8 @@
 	import Switch from './Switch.svelte';
 
 	type Section = 'overview' | 'roles' | 'members' | 'bans';
-	let { room, start = 'members', onClose }: { room: RoomConnection; start?: Section; onClose: () => void } = $props();
+	/** [start]: the section to open; 'list' opens the list of sections on phones (desktop shows the first one next to it). */
+	let { room, start = 'members', onClose }: { room: RoomConnection; start?: Section | 'list'; onClose: () => void } = $props();
 
 	const rs = $derived(room.state!);
 	const roles = $derived(rs.roles);
@@ -30,9 +31,10 @@
 		).filter(([, , shown]) => shown)
 	);
 	// svelte-ignore state_referenced_locally
-	let section = $state<Section>(start);
-	/** Phones show the section list first. */
-	let showingSection = $state(true);
+	let section = $state<Section>(start === 'list' ? (sections[0]?.[0] ?? 'members') : start);
+	/** Phones: a section (true) or the list of sections. */
+	// svelte-ignore state_referenced_locally
+	let showingSection = $state(start !== 'list');
 
 	async function run(command: Command): Promise<boolean> {
 		return (await room.run(command)) === null;

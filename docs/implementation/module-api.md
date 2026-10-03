@@ -116,6 +116,7 @@ So the operations below are the contract for both. HTTP is only the transport on
 { "kind": "album", "album": AlbumSummary, "artists": [ArtistRef] }
 { "kind": "artist", "id": "UC…", "name": "Daft Punk", "thumbnails": [...] }
 { "kind": "playlist", "id": "VLPL…", "title": "…", "author": "…", "itemCount": 35, "thumbnails": [...] }
+{ "kind": "podcast", "id": "MPSP…", "title": "The Daily", "author": "…", "thumbnails": [...] }   // episodes are "song" items with song.podcast set
 ```
 
 For `all`, the YTM module runs YTM's mixed search (for the top result, albums, artists
@@ -139,15 +140,16 @@ mostly lack song durations, and a song without a duration can't end on its own i
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/search?q=&type=&limit=` ✅ | Search. `type`: `all` (default), `songs`, `videos`, `albums`, `artists`, `community_playlists`, `featured_playlists`. Answers a `SearchPage` (below). Paging (`cursor`) later |
-| GET | `/search/suggestions?q=` | Suggestions while typing |
+| GET | `/search?q=&type=&limit=` ✅ | Search. `type`: `all` (default), `songs`, `videos`, `albums`, `artists`, `community_playlists`, `featured_playlists`, `podcasts`, `episodes`. Answers a `SearchPage` (below). Paging (`cursor`) later |
+| GET | `/search/suggestions?q=` ✅ | Suggestions while typing: `{ items: ["daft punk", …] }` (the host: `GET /api/search/suggestions?q=`, empty without a source) |
 | GET | `/search?isrc=` | Find a song by ISRC (optional `isrc_lookup` capability, helps [matching](storage.md#song-matching)) |
 | GET | `/songs/{id}` | Song details |
 | GET | `/albums/{id}` | Album with songs |
 | GET | `/artists/{id}` | Artist: top songs, albums, singles |
+| GET | `/podcasts/{id}` ✅ | A podcast: `PodcastPage` (`id, title, author, description, thumbnails, episodes: [{ song, date, description }]`). Episodes are `Song`s with `podcast: { id, name }` |
 | GET | `/playlists/{id}?cursor=` | Public playlist with songs ✅ (`PlaylistPage`: `id, title, author, description, thumbnails, songs`; the first 200 songs, no paging yet) |
 | GET | `/resolve?url=` | Turn a YTM/YT URL into `{ type, item }` (for links pasted in search) |
-| GET | `/home` | Home page sections (mixes, recommendations, …). Personalised with credentials. |
+| GET | `/home` ✅ | Home page: `{ sections: [{ title, items: [SearchItem] }] }` (quick picks, new releases, mixes, …). Songs there have no length (the stream has it). Personalised with credentials (later). The host: `GET /api/home`, cached 30 min |
 | GET | `/explore` | Explore page: new releases, charts, moods & genres |
 | GET | `/explore/{sectionId}` | One explore section, for example a mood or genre |
 
@@ -155,7 +157,7 @@ mostly lack song durations, and a song without a duration can't end on its own i
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/songs/{id}/stream` | Resolve a **direct stream URL** on demand: `{ url, expiresAt, mimeType, bitrate, loudnessDb }` |
+| GET | `/songs/{id}/stream` | Resolve a **direct stream URL** on demand: `{ url, expiresAt, mimeType, bitrate, loudnessDb, durationMs }`. `durationMs` ✅ is the exact length (listings round podcast lengths); the host gives the current song that length |
 | GET | `/songs/{id}/audio?format=` | The **audio bytes** themselves, with HTTP `Range` support. Used for proxying, the cache, and [downloads](downloads.md). `format` is a preference (for example `m4a`). |
 
 - `/stream` is for the direct path of the [hybrid approach](playback-sync.md). `/audio` is

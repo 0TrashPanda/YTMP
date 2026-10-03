@@ -26,6 +26,7 @@ import dev.trashpanda.ytmp.protocol.RoomState
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
+import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -118,6 +119,9 @@ class Room(
     private val autoplay = ArrayList<QueueItem>()
     /** Set by Autoplay from here: the autoplay queue keeps going even with the autoplay setting off. */
     private var autoplaySeed: Song? = null
+
+    /** Where podcast episodes were left off (song ID -> ms), to resume them. Oldest first. */
+    private val episodePositions = LinkedHashMap<String, Long>()
     /** Who chose Autoplay from here (the autoplay songs are theirs), or null for the room's own autoplay. */
     private var autoplayBy: Pair<String, String>? = null
     private var autoplayJob: Job? = null
@@ -317,6 +321,7 @@ class Room(
             autoplay = autoplay.toList(),
             autoplaySeed = autoplaySeed,
             knownPermissions = Permission.entries,
+            episodePositions = episodePositions.toMap(),
         )
     }
 
@@ -333,6 +338,7 @@ class Room(
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay += saved.autoplay
         autoplaySeed = saved.autoplaySeed
+        episodePositions += saved.episodePositions
         val roleIds = roles.map { it.id }.toSet()
         for (m in saved.members) {
             val roleId = m.roleId?.takeIf { it in roleIds }
@@ -865,6 +871,7 @@ class Room(
 
     private fun retireCurrent(result: QueueItemResult) {
         val item = current ?: return
+        if (item.song.podcast != null) rememberEpisodePosition(item.song, if (result == QueueItemResult.PLAYED) item.song.durationMs else position())
         // Only songs that actually played count for the listening history.
         if (streamUrl != null) {
             val heard = if (result == QueueItemResult.PLAYED) item.song.durationMs else position()
@@ -875,6 +882,14 @@ class Room(
         }
         current = null
         appendHistory(item, result)
+    }
+
+    /** Remembers where an episode was left; one that's (nearly) done or barely started starts over. */
+    private fun rememberEpisodePosition(song: Song, positionMs: Long) {
+        episodePositions.remove(song.id)
+        if (positionMs < RESUME_MIN_MS || positionMs > song.durationMs - RESUME_END_MS) return
+        episodePositions[song.id] = positionMs
+        while (episodePositions.size > MAX_EPISODE_POSITIONS) episodePositions.remove(episodePositions.keys.first())
     }
 
     private fun appendHistory(item: QueueItem, result: QueueItemResult) {
@@ -983,8 +998,11 @@ class Room(
         val source = radio ?: return
         if (!autoplayActive() || autoplay.size >= AUTOPLAY_LOW || queue.size > 1 || autoplayJob?.isActive == true) return
         val first = (autoplay.lastOrNull() ?: queue.lastOrNull() ?: current ?: history.lastOrNull())?.song ?: return
+        // After a podcast episode the room stops, like a podcast app: a music radio from it makes no sense.
+        if (first.podcast != null) return
         // If a radio only has songs we just heard, try one from a few other recent songs.
-        val seeds = (listOf(first) + history.takeLast(RECENT_SONGS).map { it.song }.shuffled().take(2)).distinctBy { it.id }
+        val recentMusic = history.takeLast(RECENT_SONGS).map { it.song }.filter { it.podcast == null }
+        val seeds = (listOf(first) + recentMusic.shuffled().take(2)).distinctBy { it.id }
         autoplayJob = scope.launch {
             var songs: Result<List<Song>> = Result.success(emptyList())
             for (seed in seeds) {
@@ -1021,7 +1039,8 @@ class Room(
         current = item
         streamUrl = null
         currentStartedAt = clock()
-        positionAtAnchor = 0
+        // An episode that was left halfway goes on from there.
+        positionAtAnchor = item?.song?.takeIf { it.podcast != null }?.let { episodePositions[it.id] } ?: 0
         anchorTime = clock()
         if (item == null) wantPlaying = false
         emit(Event.NowPlayingChanged(item))
@@ -1033,13 +1052,14 @@ class Room(
     private fun resolve(item: QueueItem) {
         resolveJob?.cancel()
         resolveJob = scope.launch {
-            val url = runCatching { streams.resolveStream(item.song.id) }
+            val stream = runCatching { streams.resolve(item.song.id) }
             val next = mutex.withLock {
                 if (current?.itemId != item.itemId) return@withLock null
-                url.onSuccess {
-                    streamUrl = it
+                stream.onSuccess {
+                    exactDuration(item, it.durationMs)
+                    streamUrl = it.url
                     anchorTime = clock()
-                    emit(Event.StreamReady(item.itemId, it))
+                    emit(Event.StreamReady(item.itemId, it.url))
                     emitPlayback()
                 }.onFailure { e ->
                     if (e is CancellationException) throw e
@@ -1052,6 +1072,18 @@ class Room(
             // Warm up the next song so it starts quickly.
             if (next != null) runCatching { streams.resolveStream(next.song.id) }
         }
+    }
+
+    /**
+     * Listings round some lengths (podcasts: "3 hr 36 min") or leave them out, but the song
+     * ends by its length. When the stream knows better, the current song gets its exact length.
+     */
+    private fun exactDuration(item: QueueItem, durationMs: Long?) {
+        if (durationMs == null || durationMs <= 0 || abs(durationMs - item.song.durationMs) < DURATION_TOLERANCE_MS) return
+        val exact = item.copy(song = item.song.copy(durationMs = durationMs))
+        current = exact
+        // Clients take it as the same song (same item ID) with a new length; the stream follows.
+        emit(Event.NowPlayingChanged(exact))
     }
 
     private fun emitPlayback() {
@@ -1120,6 +1152,13 @@ class Room(
         const val SAVED_HISTORY = 500
         /** A speaker moving to the next song this close to the end means the song finished. */
         const val END_GRACE_MS = 5_000L
+        /** A stream length this close to the listed one is the same; no need to update it. */
+        const val DURATION_TOLERANCE_MS = 1_500L
+        /** Episodes resume from where they were left after this much... */
+        const val RESUME_MIN_MS = 30_000L
+        /** ...unless less than this was left. */
+        const val RESUME_END_MS = 60_000L
+        const val MAX_EPISODE_POSITIONS = 200
         /** Fetch more autoplay songs when fewer than this are left. */
         const val AUTOPLAY_LOW = 5
         /** Radio songs don't repeat anything from the last this many songs. */

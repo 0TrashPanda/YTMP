@@ -44,7 +44,7 @@
 	<header class="flex flex-col gap-5 px-2 sm:flex-row sm:items-end">
 		<div class="aspect-square w-48 shrink-0 overflow-hidden rounded-lg bg-raised shadow-2xl sm:w-56">
 			{#if album?.thumbnails.at(-1)}
-				<img src={album.thumbnails.at(-1)!.url} alt="" class="h-full w-full object-cover" />
+				<img src={album.thumbnails.at(-1)!.url} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
 			{/if}
 		</div>
 		<div class="min-w-0">

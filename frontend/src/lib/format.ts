@@ -7,8 +7,9 @@ export function formatTime(ms: number): string {
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+/** The artists, or for a podcast episode the podcast. */
 export function artistNames(song: Song): string {
-	return song.artists.map((a) => a.name).join(', ');
+	return song.artists.map((a) => a.name).join(', ') || song.podcast?.name || '';
 }
 
 /** The smallest thumbnail that is at least [size] px, or the largest one. */
