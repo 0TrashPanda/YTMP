@@ -347,7 +347,7 @@
 				ontouchend={pullEnd}
 				ontouchcancel={pullEnd}
 				role="presentation"
-				class="h-full overflow-y-auto"
+				class="h-full overflow-y-auto overscroll-y-contain"
 			>
 				<header
 					class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:px-4 lg:translate-y-0

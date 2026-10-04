@@ -813,9 +813,16 @@ export interface YoutubeAccount {
   photoUrl: string | null;
 }
 
+export type YoutubeHistory = "off" | "solo" | "all";
+
 export interface YoutubeAccountStatus {
   available: boolean;
   account: YoutubeAccount | null;
+  history: YoutubeHistory;
+}
+
+export interface YoutubeHistorySetting {
+  history: YoutubeHistory;
 }
 
 export interface LikeStatus {

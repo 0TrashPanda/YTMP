@@ -6,12 +6,15 @@ import android.net.ConnectivityManager
 import android.util.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
 import dev.trashpanda.ytmp.core.CatalogSource
+import dev.trashpanda.ytmp.core.FinishedPlay
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.RoomVisibility
+import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -63,9 +66,35 @@ class LocalHost(private val context: Context) {
             override suspend fun resolve(songId: String) = ytm.resolve(songId)
         },
         scope = scope, outputs = outputs, store = PhoneRoomStore(context),
-        onPlayFinished = plays::report,
+        onPlayFinished = { play ->
+            plays.report(play)
+            addToYoutubeHistory(play)
+        },
         radio = cached,
     )
+
+    /**
+     * Songs played on this phone go into the owner's YouTube Music history, so its suggestions
+     * learn from them (see [YoutubeHistory]). Like YouTube, a play counts after 30 seconds.
+     */
+    private fun addToYoutubeHistory(play: FinishedPlay) {
+        if (play.heardMs < HISTORY_MIN_MS && play.skipped) return
+        scope.launch {
+            val wanted = when (youtube.historySetting()) {
+                YoutubeHistory.OFF -> false
+                YoutubeHistory.SOLO -> play.visibility == RoomVisibility.PRIVATE
+                YoutubeHistory.ALL -> true
+            }
+            if (!wanted || youtube.account() == null) return@launch
+            try {
+                youtube.addToHistory(play.item.song.id)
+                Log.d(TAG, "Added ${play.item.song.id} to the YouTube Music history")
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Log.w(TAG, "Couldn't add ${play.item.song.id} to the YouTube Music history: ${e.message}")
+            }
+        }
+    }
 
     fun start() {
         val webApp = installWebApp()
@@ -140,5 +169,8 @@ class LocalHost(private val context: Context) {
         const val PORT = 8765
         const val LOCAL_URL = "http://127.0.0.1:$PORT"
         private const val TAG = "YtmpHost"
+
+        /** A skipped song counts as played after this long, like on YouTube. */
+        private const val HISTORY_MIN_MS = 30_000L
     }
 }

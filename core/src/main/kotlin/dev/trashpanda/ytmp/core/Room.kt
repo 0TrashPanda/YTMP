@@ -878,7 +878,7 @@ class Room(
             val listeners = members.values.filter { it.outbox != null }.map {
                 FinishedPlay.Listener(it.id, it.name, it.accountId, it.accountToken, it.hideFromHistory)
             }
-            onPlayFinished?.invoke(FinishedPlay(item, currentStartedAt, heard, result == QueueItemResult.SKIPPED, code, name, listeners))
+            onPlayFinished?.invoke(FinishedPlay(item, currentStartedAt, heard, result == QueueItemResult.SKIPPED, code, name, listeners, visibility))
         }
         current = null
         appendHistory(item, result)

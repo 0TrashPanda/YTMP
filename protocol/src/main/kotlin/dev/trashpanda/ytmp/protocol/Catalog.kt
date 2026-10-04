@@ -175,7 +175,27 @@ data class YoutubeAccountStatus(
     /** You can sign in here (the phone app on its own host). */
     val available: Boolean,
     val account: YoutubeAccount?,
+    /** Which songs go into your YouTube Music history (so its suggestions learn from them). */
+    val history: YoutubeHistory = YoutubeHistory.SOLO,
 )
+
+/** Which songs played on this phone go into its owner's YouTube Music history. */
+@Serializable
+@SerialName("YoutubeHistory")
+enum class YoutubeHistory {
+    @SerialName("off") OFF,
+
+    /** Songs in solo rooms: only you hear those. */
+    @SerialName("solo") SOLO,
+
+    /** Also what plays in party rooms on this phone, whoever added it. */
+    @SerialName("all") ALL,
+}
+
+/** `PUT /api/me/youtube/history`. */
+@Serializable
+@SerialName("YoutubeHistorySetting")
+data class YoutubeHistorySetting(val history: YoutubeHistory)
 
 /** `GET`/`PUT /api/me/likes/{songId}`: whether you like a song (thumbs up) in YouTube Music. */
 @Serializable

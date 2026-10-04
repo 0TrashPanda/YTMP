@@ -61,6 +61,10 @@ phone's owner:
 - **Like** ✅ (👍 next to the song in the full player; filled when you like it) and **Save to
   playlist** ✅ (also in the song menu): your own playlists, or a new private one.
 - Playing songs doesn't use the sign-in (YouTube may flag accounts used for downloading).
+- **YouTube Music history**: songs played on the phone (after 30 s, or to the end) are added
+  to your YTM history, like YTM's own player does, so its suggestions learn from them. A
+  setting in the profile menu: **Off**, **Solo rooms** (default), or **All rooms** on this
+  phone (also what friends add in a party).
 - Signing out also forgets the sign-in page's session, so you can pick another account.
 
 Later: removing songs from your playlists, dislike; using your sign-in in rooms on someone else's

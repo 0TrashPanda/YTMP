@@ -6,6 +6,8 @@ import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
+import dev.trashpanda.ytmp.protocol.YoutubeHistory
+import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.QueueItem
@@ -88,6 +90,14 @@ interface PersonalCatalog {
     suspend fun createPlaylist(title: String, songIds: List<String>): String
 
     suspend fun signOut()
+
+    /** Which plays go into the YouTube Music history (see [addToHistory]). */
+    suspend fun historySetting(): YoutubeHistory = YoutubeHistory.SOLO
+
+    suspend fun setHistorySetting(history: YoutubeHistory) {}
+
+    /** Tells YouTube Music you played this song, like its own player does. */
+    suspend fun addToHistory(songId: String) {}
 }
 
 /** A speaker or TV the host found, that rooms can play on. */
@@ -148,6 +158,7 @@ data class FinishedPlay(
     val roomName: String,
     /** Everyone online when it finished. */
     val listeners: List<Listener>,
+    val visibility: RoomVisibility = RoomVisibility.PUBLIC,
 ) {
     data class Listener(
         val participantId: String,

@@ -2,6 +2,7 @@
 	// The avatar in the header (top right): your YouTube Music sign-in, the room's settings,
 	// and this phone's settings in the app.
 	import { nativeBridge } from '../native';
+	import type { YoutubeHistory } from '../protocol.gen';
 	import { saved, type BackLimit, type HeadphonesAction } from '../storage';
 	import { youtube } from '../youtube.svelte';
 	import Icon from './Icon.svelte';
@@ -37,6 +38,11 @@
 	let partyBack = $state(saved.backLimit(false));
 	let headphones = $state(saved.headphonesAction);
 
+	const historyOptions: [YoutubeHistory, string][] = [
+		['off', 'Off'],
+		['solo', 'Solo rooms'],
+		['all', 'All rooms']
+	];
 	const backOptions: [BackLimit, string][] = [
 		['home', 'Home page'],
 		['rooms', 'Room list']
@@ -90,6 +96,13 @@
 				</div>
 			</div>
 			<p class="text-sm text-muted">Your Home and Library come from this YouTube Music account. Only you see them, also when friends are in a room on this phone.</p>
+			{@render choice(
+				'Add to your YouTube Music history',
+				'Songs you play here show up in your history, and YouTube Music suggests from them.',
+				historyOptions,
+				youtube.history,
+				(v) => youtube.setHistory(v as YoutubeHistory).catch((e) => onToast(e instanceof Error ? e.message : "Couldn't change it"))
+			)}
 			<button class="rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={signOut}>Sign out of YouTube Music</button>
 		{:else if youtube.available}
 			<h2 class="text-lg font-bold">YouTube Music account</h2>

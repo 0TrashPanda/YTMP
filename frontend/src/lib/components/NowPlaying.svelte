@@ -78,6 +78,7 @@
 	}
 	/** Phones: Up next / Related slid up over the player. */
 	let sheet = $state(false);
+	let tabsSwipe: { x: number; y: number } | null = null;
 	let showOutputs = $state(false);
 
 	const activeOutputs = $derived(room.state?.outputs.filter((o) => o.active) ?? []);
@@ -180,7 +181,7 @@
 	{/if}
 
 	<div
-		class="flex h-14 shrink-0 items-center gap-2 px-2"
+		class="flex h-14 shrink-0 touch-none items-center gap-2 px-2"
 		role="presentation"
 		ontouchstart={(e) => (swipeStart = e.touches[0].clientY)}
 		ontouchmove={(e) => swipeStart !== null && (dragY = Math.max(0, e.touches[0].clientY - swipeStart))}
@@ -205,7 +206,7 @@
 	<div class="flex min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,32rem)] lg:gap-8 lg:px-8 lg:pb-6">
 		<!-- The song: everything on phones, the art and title on desktop. -->
 		<div
-			class="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-5 px-6 pb-2"
+			class="flex min-h-0 min-w-0 flex-1 touch-pan-x flex-col items-center justify-center gap-5 px-6 pb-2"
 			role="presentation"
 			ontouchstart={(e) => (swipeStart = e.touches[0].clientY)}
 			ontouchmove={(e) => swipeStart !== null && (dragY = Math.max(0, e.touches[0].clientY - swipeStart))}
@@ -302,7 +303,27 @@
 	</div>
 
 	<!-- Phones: the tabs at the bottom; tapping one slides it up over the player. -->
-	<div class="shrink-0 lg:hidden">{@render tabs(true)}</div>
+	<!-- Swipe them up to open, like YTM (a tap works too). -->
+	<div
+		class="shrink-0 touch-none lg:hidden"
+		role="presentation"
+		ontouchstart={(e) => (tabsSwipe = { y: e.touches[0].clientY, x: e.touches[0].clientX })}
+		ontouchmove={(e) => {
+			if (!tabsSwipe) return;
+			const dy = tabsSwipe.y - e.touches[0].clientY;
+			if (dy > 30 && dy > Math.abs(e.touches[0].clientX - tabsSwipe.x)) {
+				// The tab under the finger.
+				const label = (document.elementFromPoint(tabsSwipe.x, tabsSwipe.y) as HTMLElement | null)?.closest('[role=tab]');
+				const pick = label?.textContent?.trim().toLowerCase() === 'related' ? 'related' : 'queue';
+				tabsSwipe = null;
+				tab = pick;
+				sheet = true;
+			}
+		}}
+		ontouchend={() => (tabsSwipe = null)}
+	>
+		{@render tabs(true)}
+	</div>
 	{#if sheet && !wide.current}
 		<div
 			class="absolute inset-x-0 top-14 bottom-0 z-10 flex flex-col rounded-t-2xl bg-surface shadow-2xl lg:hidden {sheetY ? '' : 'transition-transform'}"

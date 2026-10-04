@@ -108,6 +108,8 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
 
     suspend fun setLiked(songId: String, liked: Boolean) = python { core.callAttr("set_liked", songId, liked); Unit }
 
+    suspend fun addToHistory(songId: String) = python { core.callAttr("add_to_history", songId); Unit }
+
     suspend fun ownPlaylists(): List<PlaylistSummary> = python {
         ProtocolJson.decodeFromString(ListSerializer(PlaylistSummary.serializer()), json.callAttr("dumps", core.callAttr("own_playlists")).toString())
     }

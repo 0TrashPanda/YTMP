@@ -296,6 +296,13 @@ class YtmCore:
     def set_liked(self, song_id: str, liked: bool) -> None:
         self._signed_in().rate_song(video_id(song_id), LikeStatus.LIKE if liked else LikeStatus.INDIFFERENT)
 
+    def add_to_history(self, song_id: str) -> None:
+        """Tells YouTube Music the signed-in account played this song (its history, and so its suggestions)."""
+        user = self._signed_in()
+        status = user.add_history_item(user.get_song(video_id(song_id))).status_code
+        if status != 204:
+            raise Unavailable(f"YouTube Music didn't take the play ({status})")
+
     def own_playlists(self) -> list[dict]:
         """The signed-in account's own playlists (the ones songs can be saved to): {id, title, thumbnails}."""
         return [

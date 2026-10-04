@@ -12,6 +12,7 @@ import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
+import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.minutes
@@ -87,6 +88,16 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         ytm().setLiked(songId, liked)
         synchronized(likesChanged) { likesChanged[songId] = liked }
         playlists.clear() // Liked music changed
+    }
+
+    override suspend fun historySetting(): YoutubeHistory =
+        prefs.getString("history", null)?.let { saved -> YoutubeHistory.entries.firstOrNull { it.name == saved } } ?: YoutubeHistory.SOLO
+
+    override suspend fun setHistorySetting(history: YoutubeHistory) = prefs.edit().putString("history", history.name).apply()
+
+    override suspend fun addToHistory(songId: String) {
+        requireSignedIn()
+        ytm().addToHistory(songId)
     }
 
     override suspend fun ownPlaylists(): List<PlaylistSummary> { requireSignedIn(); return ytm().ownPlaylists() }

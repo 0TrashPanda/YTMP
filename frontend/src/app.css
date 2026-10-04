@@ -32,6 +32,8 @@ body {
 	background: var(--color-bg);
 	color: white;
 	height: 100%;
+	/* No browser pull-to-refresh: swiping the player down closes it, Home has its own. */
+	overscroll-behavior-y: none;
 }
 
 /* Thin scrollbars like YTM. */

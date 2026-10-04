@@ -42,7 +42,7 @@ Like YTM:
   music plays ("Playing on this device and Kitchen", or *Not playing here. Tap to
   listen*). **Swipe down**, the ˅ or the phone's **Back** closes it.
 - **Up next / Related** ✅ tabs: at the bottom of the full player on phones (tapping one
-  slides it up over the player; swipe it down, from the tabs or from the list once it is
+  slides it up over the player, and so does **swiping a tab up**; swipe it down, from the tabs or from the list once it is
   scrolled to the top, or tap the handle to close it), next to the album art on desktop. *Up next* is the queue
   (see below); *Related* is [find similar](history-and-recommendations.md#find-similar)
   for the current song. *Lyrics* comes later.

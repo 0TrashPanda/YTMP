@@ -21,6 +21,8 @@ import type {
 	SearchType,
 	SuggestionsResponse,
 	YoutubeAccountStatus,
+	YoutubeHistory,
+	YoutubeHistorySetting,
 	Song
 } from './protocol.gen';
 
@@ -147,6 +149,10 @@ export function getHome(): Promise<HomePage> {
 /** Your YouTube Music sign-in on this host (the phone app only). */
 export function getYoutubeAccount(): Promise<YoutubeAccountStatus> {
 	return request('/api/me/youtube');
+}
+
+export async function setYoutubeHistory(history: YoutubeHistory): Promise<void> {
+	await request<null>('/api/me/youtube/history', { method: 'PUT', body: JSON.stringify({ history } satisfies YoutubeHistorySetting) });
 }
 
 export async function signOutOfYoutube(): Promise<void> {

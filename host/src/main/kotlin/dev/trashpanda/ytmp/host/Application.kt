@@ -5,6 +5,8 @@ import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
+import dev.trashpanda.ytmp.protocol.YoutubeHistory
+import dev.trashpanda.ytmp.protocol.YoutubeHistorySetting
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
 import dev.trashpanda.ytmp.protocol.LikeStatus
@@ -237,7 +239,14 @@ fun Application.ytmpModule(
                     personal?.takeIf { options.isLocal(this) } ?: throw forbidden()
                 get("/youtube") {
                     val mine = personal?.takeIf { options.isLocal(call) }
-                    call.respond(YoutubeAccountStatus(available = mine != null, account = mine?.account()))
+                    call.respond(
+                        YoutubeAccountStatus(available = mine != null, account = mine?.account(), history = mine?.historySetting() ?: YoutubeHistory.SOLO),
+                    )
+                }
+                put("/youtube/history") {
+                    val owner = call.owner()
+                    owner.setHistorySetting(call.receive<YoutubeHistorySetting>().history)
+                    call.respond(HttpStatusCode.NoContent)
                 }
                 delete("/youtube") {
                     call.owner().signOut()
