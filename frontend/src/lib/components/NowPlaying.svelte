@@ -140,11 +140,12 @@
 	}
 </script>
 
-{#snippet tabs()}
-	<div class="flex shrink-0 border-b border-white/10" role="tablist">
+<!-- [bottom]: the phone's tabs under the player, with more room to tap. -->
+{#snippet tabs(bottom = false)}
+	<div class="flex shrink-0 {bottom ? 'pb-2' : 'border-b border-white/10'}" role="tablist">
 		{#each [['queue', 'Up next'], ['related', 'Related']] as const as [value, label] (value)}
 			<button
-				class="flex-1 py-3 text-sm font-medium tracking-wide uppercase {tab === value && (sheet || wide.current) ? 'border-b-2 border-white text-white' : 'text-muted'}"
+				class="flex-1 {bottom ? 'py-5' : 'py-4'} text-sm font-medium tracking-wide uppercase {tab === value && (sheet || wide.current) ? 'border-b-2 border-white text-white' : 'text-muted'}"
 				role="tab"
 				aria-selected={tab === value}
 				onclick={() => pickTab(value)}>{label}</button
@@ -301,7 +302,7 @@
 	</div>
 
 	<!-- Phones: the tabs at the bottom; tapping one slides it up over the player. -->
-	<div class="shrink-0 lg:hidden">{@render tabs()}</div>
+	<div class="shrink-0 lg:hidden">{@render tabs(true)}</div>
 	{#if sheet && !wide.current}
 		<div
 			class="absolute inset-x-0 top-14 bottom-0 z-10 flex flex-col rounded-t-2xl bg-surface shadow-2xl lg:hidden {sheetY ? '' : 'transition-transform'}"

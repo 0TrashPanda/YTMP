@@ -19,6 +19,17 @@ function write(key: string, value: string): void {
 
 const code = (roomCode: string) => roomCode.toUpperCase();
 
+/** How far the phone's Back button goes in a room: its home page, or out to the room list. */
+export type BackLimit = 'home' | 'rooms';
+
+/** When headphones are unplugged or Bluetooth disconnects (the app). */
+export type HeadphonesAction = 'pause' | 'stop' | 'keep';
+
+function pick<T extends string>(key: string, options: readonly T[], fallback: T): T {
+	const value = read(key);
+	return options.includes(value as T) ? (value as T) : fallback;
+}
+
 export const saved = {
 	get displayName() {
 		return read('ytmp.name') ?? '';
@@ -72,5 +83,15 @@ export const saved = {
 	},
 	set volume(value: number) {
 		write('ytmp.volume', String(value));
+	},
+	/** Back at a room's home page: stay (the app goes to the background) or go to the room list. */
+	backLimit: (solo: boolean): BackLimit => pick(solo ? 'ytmp.backLimit.solo' : 'ytmp.backLimit.party', ['home', 'rooms'], solo ? 'home' : 'rooms'),
+	setBackLimit: (solo: boolean, limit: BackLimit) => write(solo ? 'ytmp.backLimit.solo' : 'ytmp.backLimit.party', limit),
+	/** Pause the music (when you're the only one listening), stop playing here, or keep playing on the speaker. */
+	get headphonesAction(): HeadphonesAction {
+		return pick('ytmp.headphones', ['pause', 'stop', 'keep'], 'pause');
+	},
+	set headphonesAction(action: HeadphonesAction) {
+		write('ytmp.headphones', action);
 	}
 };

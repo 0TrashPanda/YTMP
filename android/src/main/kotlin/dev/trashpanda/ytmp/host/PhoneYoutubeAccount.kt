@@ -64,6 +64,11 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
 
     override suspend fun home(): HomePage = homes.get(Unit) { requireSignedIn(); ytm().personalHome() }
 
+    override suspend fun freshHome(): HomePage {
+        homes.clear()
+        return home()
+    }
+
     override suspend fun library(): HomePage = libraries.get(Unit) { requireSignedIn(); ytm().library() }
 
     override suspend fun playlist(id: String): PlaylistPage = playlists.get(id) { requireSignedIn(); ytm().personalPlaylist(id) }

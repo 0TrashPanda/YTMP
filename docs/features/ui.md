@@ -171,6 +171,14 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - Search, find similar, artist, album and playlist pages stack up (a **Back** button goes to the
   previous one). The **YTMP logo** switches between the home page and the last of those,
   kept as it was.
+- The phone's **Back** button (app) closes what's open, goes back through those pages, then to
+  Home. On Home it either stops (the app goes to the background, like YTM) or goes on to the
+  room list: a setting, separately for solo rooms (default: stop) and party rooms (default:
+  room list).
+- The **avatar** (top right; also on the room list in the app) opens YouTube Music sign-in,
+  **Room settings** and the phone's settings. The people icon is hidden in solo rooms.
+- **Pull Home down** to load new suggestions. Rows that scroll sideways have **page dots**.
+- Phones: the mini player's progress line is at its **bottom**, between it and the bottom bar.
 - Actions that need a room permission (for example adding songs) are **disabled** when you
   don't have that permission.
 - The menu is **customisable**: you can change the **order** of the actions and

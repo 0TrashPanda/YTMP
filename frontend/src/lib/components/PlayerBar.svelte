@@ -42,7 +42,7 @@
 	let swipeStart: number | null = null;
 </script>
 
-<footer class="relative z-40 border-t border-line bg-surface">
+<footer class="relative z-40 border-line bg-surface sm:border-t">
 	<!-- Phones: YTM's mini player. The song (tap or swipe up for the full player), play/pause, next. -->
 	<div
 		class="sm:hidden"
@@ -56,9 +56,6 @@
 		}}
 		ontouchend={() => (swipeStart = null)}
 	>
-		<div class="h-0.5 bg-line">
-			<div class="h-full bg-accent" style:width="{duration ? Math.min(100, (positionMs / duration) * 100) : 0}%"></div>
-		</div>
 		<div class="flex h-16 items-center gap-1 pr-1 pl-2">
 			<button class="flex min-w-0 flex-1 items-center gap-2.5 text-left" disabled={!current} onclick={() => onExpand(true)} oncontextmenu={onSongMenu}>
 				<Art song={current?.item.song ?? null} size={96} class="h-10 w-10 shrink-0" />
@@ -80,6 +77,10 @@
 			<button class="shrink-0 rounded-full p-1.5 disabled:opacity-40" aria-label="Next" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Skip' })}>
 				<Icon name="next" size={26} />
 			</button>
+		</div>
+		<!-- At the bottom, between the mini player and the bottom bar, like YTM. -->
+		<div class="h-0.5 bg-white/15">
+			<div class="h-full bg-accent" style:width="{duration ? Math.min(100, (positionMs / duration) * 100) : 0}%"></div>
 		</div>
 	</div>
 

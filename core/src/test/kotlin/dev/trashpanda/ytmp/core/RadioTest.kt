@@ -73,6 +73,26 @@ class RadioTest {
     }
 
     @Test
+    fun `start radio on the song that's playing keeps playing it`() = runTest {
+        val room = room()
+        room.run(Command.AddSongs(listOf(song("a"), song("x")), QueuePosition.END))
+        runCurrent()
+        advanceTimeBy(20_000)
+        val playing = room.state().nowPlaying?.item
+        assertEquals("a", playing?.song?.id)
+
+        room.run(Command.StartRadio(song("a")))
+        runCurrent()
+
+        val state = room.state()
+        assertEquals(playing?.itemId, state.nowPlaying?.item?.itemId)
+        assertTrue(state.playback.positionMs >= 20_000)
+        assertTrue(state.queue.isEmpty())
+        assertEquals((1..10).map { "a-$it" }, state.autoplay.map { it.song.id })
+        assertEquals("a", state.autoplaySeed?.id)
+    }
+
+    @Test
     fun `clearing the queues, and a cleared autoplay stays empty until something new plays`() = runTest {
         val room = room()
         room.run(Command.AddSongs(listOf(song("a"), song("b"), song("c")), QueuePosition.END))

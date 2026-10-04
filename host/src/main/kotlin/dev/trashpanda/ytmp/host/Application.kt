@@ -224,9 +224,13 @@ fun Application.ytmpModule(
             }
             get("/home") {
                 // The owner's own home page in their app; everyone else gets the general one.
-                if (personal != null && options.isLocal(call) && personal.account() != null) return@get call.respond(personal.home())
+                // ?fresh=1: pulled down to refresh, so not from the cache.
+                val fresh = call.request.queryParameters["fresh"] == "1"
+                if (personal != null && options.isLocal(call) && personal.account() != null) {
+                    return@get call.respond(if (fresh) personal.freshHome() else personal.home())
+                }
                 val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No home page here")
-                call.respond(source.home())
+                call.respond(if (fresh) source.freshHome() else source.home())
             }
             route("/me") {
                 fun ApplicationCall.owner(): PersonalCatalog =

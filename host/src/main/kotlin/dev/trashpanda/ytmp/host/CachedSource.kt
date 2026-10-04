@@ -61,6 +61,11 @@ class CachedSource(
     override suspend fun podcast(id: String) = podcasts.get(id) { catalog.podcast(id) }
 
     override suspend fun home() = homes.get(Unit) { catalog.home() }
+
+    override suspend fun freshHome(): HomePage {
+        homes.clear()
+        return home()
+    }
 }
 
 /** A small least-recently-used cache whose entries expire after [ttl]. */

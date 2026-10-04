@@ -10,6 +10,7 @@
 	import Art from './Art.svelte';
 	import CardGrid from './CardGrid.svelte';
 	import Icon from './Icon.svelte';
+	import PageDots from './PageDots.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 
 	let {
@@ -21,6 +22,8 @@
 
 	let home = $state<HomePage | null>(null);
 	let error = $state<string | null>(null);
+	/** The quick picks' sideways-scrolling rows, per section, for their page dots. */
+	let songRows = $state<HTMLElement[]>([]);
 
 	getHome()
 		.then((h) => (home = h))
@@ -68,6 +71,7 @@
 				<h2 class="px-2 text-xl font-bold sm:text-2xl">{section.title}</h2>
 				{#if list.length}
 					<div
+						bind:this={songRows[i]}
 						class="grid snap-x grid-flow-col grid-rows-4 gap-x-2 overflow-x-auto px-0 [scrollbar-width:none]
 							{list.length > 4 ? 'auto-cols-[88%] sm:auto-cols-[24rem]' : 'auto-cols-[100%] sm:auto-cols-[32rem]'}"
 					>
@@ -86,6 +90,7 @@
 							</div>
 						{/each}
 					</div>
+					<PageDots target={songRows[i]} />
 				{/if}
 				{#if others.length}
 					<CardGrid cards={others} row />

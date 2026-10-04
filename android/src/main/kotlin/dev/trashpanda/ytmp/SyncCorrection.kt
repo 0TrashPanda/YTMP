@@ -66,8 +66,17 @@ class SyncCorrection {
         /** Closer than this counts as in sync. The median of readings still varies ±40 ms. */
         const val TOLERANCE_MS = 80L
 
-        /** Listening alone: only drift bigger than this is fixed. */
+        /** Listening alone: only drift bigger than this is fixed with a seek here. */
         const val ALONE_TOLERANCE_MS = 1500L
+
+        /**
+         * Listening alone: drift bigger than this, which this device caused (buffering at the
+         * start of a song), moves the room to this device instead: nothing to hear.
+         */
+        const val ALONE_ROOM_TOLERANCE_MS = 400L
+
+        /** More drift than this isn't a slow start: this device follows the room. */
+        const val MAX_ROOM_FOLLOW_MS = 10_000L
 
         /** Wait this long after a seek or load before measuring again. */
         const val SETTLE_MS = 1500L

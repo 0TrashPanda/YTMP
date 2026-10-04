@@ -4,6 +4,8 @@
 	import { identity, type Identity } from '../lib/account';
 	import { closeRoom, createRoom, getHost, getRoom, linkAuthServer, listRooms } from '../lib/api';
 	import Icon from '../lib/components/Icon.svelte';
+	import ProfileSheet from '../lib/components/ProfileSheet.svelte';
+	import { youtube } from '../lib/youtube.svelte';
 	import { nativeBridge, type NearbyRoom } from '../lib/native';
 	import type { HostInfo, RoomInfo, RoomVisibility } from '../lib/protocol.gen';
 	import { saved } from '../lib/storage';
@@ -22,6 +24,8 @@
 	let authUrl = $state('');
 	let editingAuth = $state(false);
 	let hideFromHistory = $state(saved.hideFromHistory);
+	let profileOpen = $state(false);
+	let toastText = $state<string | null>(null);
 	$effect(() => {
 		saved.hideFromHistory = hideFromHistory;
 	});
@@ -42,12 +46,14 @@
 		}
 		if (nativeBridge) {
 			nearby = JSON.parse(nativeBridge.nearbyRooms());
-			window.__ytmpNative = { ...window.__ytmpNative!, onNearbyRooms: (rooms) => (nearby = rooms) };
+			// The room list is the app's first page: Back from here puts the app away.
+			window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: (rooms) => (nearby = rooms), onBack: () => (profileOpen ? ((profileOpen = false), 'handled') : 'exit') };
+			youtube.load();
 		}
 	});
 
 	onDestroy(() => {
-		if (window.__ytmpNative) window.__ytmpNative.onNearbyRooms = undefined;
+		if (window.__ytmpNative) window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: undefined, onBack: undefined };
 	});
 
 	async function join(event: SubmitEvent) {
@@ -106,6 +112,29 @@
 		}
 	}
 </script>
+
+{#if nativeBridge}
+	<!-- In the app: your YouTube Music sign-in and this phone's settings, like in a room. -->
+	<button class="fixed top-3 right-3 z-10 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (profileOpen = true)}>
+		{#if youtube.account?.photoUrl}
+			<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-8 w-8 rounded-full" />
+		{:else}
+			<span class="grid h-8 w-8 place-items-center rounded-full bg-raised"><Icon name="person" size={22} class="text-muted" /></span>
+		{/if}
+	</button>
+{/if}
+{#if profileOpen}
+	<ProfileSheet
+		onClose={() => (profileOpen = false)}
+		onToast={(text) => {
+			toastText = text;
+			setTimeout(() => toastText === text && (toastText = null), 3000);
+		}}
+	/>
+{/if}
+{#if toastText}
+	<p class="fixed inset-x-0 bottom-8 z-50 mx-auto w-fit rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">{toastText}</p>
+{/if}
 
 <main class="mx-auto flex min-h-full max-w-md flex-col justify-center gap-6 px-4 py-12">
 	<header class="text-center">

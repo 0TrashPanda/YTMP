@@ -40,6 +40,7 @@ queue runs out.
   queue. If a radio only has such songs, a couple of other recent songs are tried as seed.
 - **Start radio** clears the queue and puts the song's radio in the autoplay queue, the song
   itself first; it then plays from there, so the song is heard once and the radio follows.
+  On the song that's **already playing**, it keeps playing (like YTM) and only the queue changes.
 - **Autoplay this** (called *Autoplay from here* in older notes) replaces only the autoplay
   queue.
 - **Clear queue** and **Clear** (autoplay) empty the queue or the autoplay queue. A cleared

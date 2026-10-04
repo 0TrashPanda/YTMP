@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { pushState } from '$app/navigation';
-	import { onDestroy, untrack } from 'svelte';
+	import { goto, pushState } from '$app/navigation';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import Icon from '../../../lib/components/Icon.svelte';
 	import PlayerBar from '../../../lib/components/PlayerBar.svelte';
 	import NowPlaying from '../../../lib/components/NowPlaying.svelte';
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
-	import YoutubeSheet from '../../../lib/components/YoutubeSheet.svelte';
+	import ProfileSheet from '../../../lib/components/ProfileSheet.svelte';
 	import SaveSheet from '../../../lib/components/SaveSheet.svelte';
 	import { youtube } from '../../../lib/youtube.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
@@ -20,11 +20,12 @@
 	import type { AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
-	import { getHost } from '../../../lib/api';
+	import { forgetHome, getHost } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
 	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
 	import { saved } from '../../../lib/storage';
+	import { nativeBridge } from '../../../lib/native';
 	import { identity } from '../../../lib/account';
 	import type { Participant } from '../../../lib/protocol.gen';
 
@@ -219,6 +220,78 @@
 		setTimeout(() => (toasts = toasts.filter((t) => t.id !== id)), 3000);
 	}
 
+	const solo = $derived(room?.state?.room.visibility === 'private');
+
+	// The phone's Back button (the app asks the page first, see MainActivity): close what's
+	// open, then go back through the pages you opened, then to Home. On Home it stops, or goes
+	// on to the room list, as set in the profile sheet (separately for solo and party rooms).
+	function onBack(): 'handled' | 'exit' | 'default' {
+		if (!room || room.status === 'rejected') return 'default';
+		if (menu || saving || settings || accountOpen || sharing) {
+			menu = saving = settings = null;
+			accountOpen = sharing = false;
+			return 'handled';
+		}
+		// The full player and the phone's search page are history entries.
+		if (Object.keys(page.state).length) {
+			history.back();
+			return 'handled';
+		}
+		if (browsing) {
+			back();
+			return 'handled';
+		}
+		if (section !== 'home') {
+			pickSection('home');
+			return 'handled';
+		}
+		if (scroller && scroller.scrollTop > 0) {
+			scroller.scrollTo({ top: 0, behavior: 'smooth' });
+			return 'handled';
+		}
+		if (saved.backLimit(solo) === 'home') return 'exit';
+		goto('/');
+		return 'handled';
+	}
+
+	// A changed setting (e.g. what unplugging headphones does) goes to the app's player.
+	const onSettings = () => player?.sync();
+	onMount(() => {
+		if (nativeBridge) window.__ytmpNative = { ...window.__ytmpNative, onBack };
+		window.addEventListener('ytmp:settings', onSettings);
+		return () => {
+			if (window.__ytmpNative?.onBack === onBack) window.__ytmpNative = { ...window.__ytmpNative, onBack: undefined };
+			window.removeEventListener('ytmp:settings', onSettings);
+		};
+	});
+
+	// Phones: pull Home down to load new suggestions.
+	let homeVersion = $state(0);
+	let pullStart: number | null = null;
+	let pull = $state(0);
+	const PULL_TO_REFRESH = 72;
+	function pullStartAt(event: TouchEvent) {
+		pullStart = !view && section === 'home' && (scroller?.scrollTop ?? 1) <= 0 ? event.touches[0].clientY : null;
+	}
+	function pullMove(event: TouchEvent) {
+		if (pullStart === null) return;
+		const distance = event.touches[0].clientY - pullStart;
+		if (distance <= 0 || (scroller?.scrollTop ?? 0) > 0) {
+			pull = 0;
+			return;
+		}
+		// Harder to pull the further it goes.
+		pull = Math.min(PULL_TO_REFRESH * 1.5, distance * 0.5);
+	}
+	function pullEnd() {
+		if (pull >= PULL_TO_REFRESH) {
+			forgetHome();
+			homeVersion++;
+		}
+		pullStart = null;
+		pull = 0;
+	}
+
 	let sharing = $state(false);
 	let settings = $state<'list' | 'members' | null>(null);
 	let host = $state<HostInfo | null>(null);
@@ -266,7 +339,16 @@
 	<div class="flex h-full flex-col">
 		<div class="relative min-h-0 flex-1">
 			<!-- One scrolling page whose header slides away while scrolling down (phones). -->
-			<div bind:this={scroller} onscroll={onScroll} class="h-full overflow-y-auto">
+			<div
+				bind:this={scroller}
+				onscroll={onScroll}
+				ontouchstart={pullStartAt}
+				ontouchmove={pullMove}
+				ontouchend={pullEnd}
+				ontouchcancel={pullEnd}
+				role="presentation"
+				class="h-full overflow-y-auto"
+			>
 				<header
 					class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:px-4 lg:translate-y-0
 						{headerHidden ? '-translate-y-full' : ''}"
@@ -289,37 +371,28 @@
 							{code}
 							<Icon name="share" size={16} class="text-muted" />
 						</button>
-						{#if youtube.available}
-							<button class="shrink-0 rounded-full p-1" aria-label="YouTube Music account" onclick={() => (accountOpen = true)}>
-								{#if youtube.account?.photoUrl}
-									<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-7 w-7 rounded-full" />
-								{:else}
-									<Icon name="person" size={22} class="text-muted" />
-								{/if}
-							</button>
-						{/if}
-						<button
-							class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
-							aria-label="People in this room"
-							onclick={() => (settings = 'members')}
-							title={room.state?.participants
-								.filter((p: Participant) => p.online)
-								.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
-								.join(', ')}
-						>
-							<Icon name="people" size={20} />
-							<span class="hidden sm:inline">{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}</span>
-						</button>
-						{#if room.can('change_settings') || room.can('edit_roles')}
+						{#if !solo}
 							<button
-								class="rounded-full p-1.5 text-muted hover:bg-raised hover:text-white"
-								aria-label="Room settings"
-								title="Room settings"
-								onclick={() => (settings = 'list')}
+								class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
+								aria-label="People in this room"
+								onclick={() => (settings = 'members')}
+								title={room.state?.participants
+									.filter((p: Participant) => p.online)
+									.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
+									.join(', ')}
 							>
-								<Icon name="settings" size={20} />
+								<Icon name="people" size={20} />
+								<span class="hidden sm:inline">{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}</span>
 							</button>
 						{/if}
+						<!-- Your account and the settings (YTM keeps them behind the avatar too). -->
+						<button class="shrink-0 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (accountOpen = true)}>
+							{#if youtube.account?.photoUrl}
+								<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-7 w-7 rounded-full" />
+							{:else}
+								<span class="grid h-7 w-7 place-items-center rounded-full bg-raised"><Icon name="person" size={20} class="text-muted" /></span>
+							{/if}
+						</button>
 					</div>
 				</header>
 
@@ -329,6 +402,13 @@
 					</div>
 				{/if}
 
+				{#if pull > 0}
+					<div class="flex justify-center overflow-hidden" style:height="{pull}px">
+						<span class="mt-auto mb-2 grid h-9 w-9 place-items-center rounded-full bg-raised shadow-lg" style:transform="rotate({pull * 4}deg)" style:opacity={Math.min(1, pull / PULL_TO_REFRESH)}>
+							<Icon name="replay" size={20} class={pull >= PULL_TO_REFRESH ? 'text-white' : 'text-muted'} />
+						</span>
+					</div>
+				{/if}
 				<main class="mx-auto w-full max-w-7xl p-3 sm:p-6">
 					{#if view}
 						{#if views.length > 1}
@@ -371,7 +451,7 @@
 						/>
 					{:else}
 						<!-- Signing in or out changes the suggestions. -->
-						{#key youtube.version}
+						{#key `${youtube.version}:${homeVersion}`}
 							<HomeView
 								{room}
 								onToast={toast}
@@ -443,7 +523,16 @@
 	{/if}
 
 	{#if accountOpen}
-		<YoutubeSheet onClose={() => (accountOpen = false)} onToast={toast} />
+		<ProfileSheet
+			onClose={() => (accountOpen = false)}
+			onToast={toast}
+			onRoomSettings={room.can('change_settings') || room.can('edit_roles')
+				? () => {
+						accountOpen = false;
+						settings = 'list';
+					}
+				: undefined}
+		/>
 	{/if}
 
 	{#if sharing}

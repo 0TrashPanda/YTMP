@@ -141,7 +141,7 @@ export function getPodcast(id: string): Promise<PodcastPage> {
 
 /** Suggestions for the home page: quick picks, new releases, mixes. */
 export function getHome(): Promise<HomePage> {
-	return cached('home', () => request('/api/home'));
+	return cached('home', () => request<HomePage>(`/api/home${refreshHome ? '?fresh=1' : ''}`).finally(() => (refreshHome = false)));
 }
 
 /** Your YouTube Music sign-in on this host (the phone app only). */
@@ -196,6 +196,14 @@ export async function createPlaylist(title: string, songIds: string[]): Promise<
 	});
 	cache.delete('me:library');
 	return response.id;
+}
+
+let refreshHome = false;
+
+/** Pulled down to refresh: load new suggestions, also past the host's cache. */
+export function forgetHome(): void {
+	cache.delete('home');
+	refreshHome = true;
 }
 
 /** After signing in or out: the home page and your library change. */

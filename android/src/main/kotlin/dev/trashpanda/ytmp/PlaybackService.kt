@@ -62,6 +62,21 @@ class PlaybackService : MediaSessionService() {
     /** Stopped here because another app took the audio; until the page has switched "Play here" off. */
     private var stoppedHere = false
 
+    /** Headphones were unplugged and the room was asked to pause: stay quiet until it has. */
+    private var pausingRoom = false
+
+    /**
+     * Listening alone, this device was behind (or ahead) by itself, e.g. buffering at the start
+     * of a song: the room was asked to seek to where this device is. Until the room answers.
+     */
+    private var roomSeekTo: Long? = null
+
+    /** The room didn't follow a [roomSeekTo] during this song, so don't keep asking. */
+    private var roomWontFollow: String? = null
+
+    /** The room's last play position and time, to see when someone seeks, pauses or plays. */
+    private var lastAnchor: Triple<String?, Long, Long>? = null
+
     override fun onCreate() {
         super.onCreate()
         exo = ExoPlayer.Builder(this)
@@ -186,7 +201,34 @@ class PlaybackService : MediaSessionService() {
             settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
         }
         exo.volume = target.volume
+        exo.setHandleAudioBecomingNoisy(target.headphones != "keep")
+        if (!target.playing || !target.alone) pausingRoom = false
+        followRoomJump(target)
         correct(target)
+    }
+
+    /**
+     * Listening alone: when the room jumps (someone seeks or skips ahead 30 s), go there right
+     * away instead of after the usual measuring. With others listening, [correct] handles it.
+     */
+    private fun followRoomJump(target: PlaybackTarget) {
+        val anchor = Triple(target.item?.itemId, target.positionMs, target.hostTimeMs)
+        val previous = lastAnchor
+        lastAnchor = anchor
+        if (previous == null || previous == anchor || previous.first != anchor.first) return
+        val asked = roomSeekTo
+        if (asked != null && abs(target.positionMs - asked) < ROOM_SEEK_MATCH_MS) {
+            // The room followed this device: nothing to do here.
+            roomSeekTo = null
+            return
+        }
+        if (!target.alone || !target.playing || SystemClock.elapsedRealtime() < settledAt) return
+        val expected = expectedPosition(target)
+        if (abs(exo.currentPosition - expected) <= SyncCorrection.ALONE_TOLERANCE_MS) return
+        Log.d(TAG, "room jumped -> seek")
+        exo.seekTo(expected + sync.seekLeadMs)
+        sync.resetSamples()
+        settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
     }
 
     /** Keeps the local position close to the host's: nudge the speed for small drift, seek for large. */
@@ -195,7 +237,7 @@ class PlaybackService : MediaSessionService() {
         val expected = expectedPosition(target)
         val reading = exo.currentPosition - expected
 
-        if (!target.playing) {
+        if (!target.playing || pausingRoom) {
             exo.playWhenReady = false
             if (abs(reading) > PAUSED_TOLERANCE_MS) exo.seekTo(expected)
             return
@@ -210,6 +252,22 @@ class PlaybackService : MediaSessionService() {
             return
         }
         val drift = sync.addSample(reading) ?: return
+
+        if (roomSeekTo != null) roomWontFollow = loadedItemId
+        if (target.alone && abs(drift) > SyncCorrection.ALONE_ROOM_TOLERANCE_MS && roomSeekTo == null &&
+            abs(drift) <= SyncCorrection.MAX_ROOM_FOLLOW_MS && roomWontFollow != loadedItemId
+        ) {
+            // Nobody else listens, so rather than jumping (which you hear), the room moves to
+            // where this device is. If the room doesn't (no permission to seek), the next
+            // measurement seeks here as before.
+            val position = maxOf(0, exo.currentPosition - target.syncOffsetMs)
+            Log.d(TAG, "alone, drift $drift ms -> room seeks to $position")
+            roomSeekTo = position
+            PlaybackHub.command("""{"kind":"Seek","positionMs":$position}""")
+            settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
+            return
+        }
+        roomSeekTo = null
 
         val seekTo = sync.onSettledDrift(drift, expected, target.alone) ?: return
         Log.d(TAG, "drift $drift ms -> seek (lead ${sync.seekLeadMs} ms)")
@@ -243,22 +301,42 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            if (playWhenReady) return
+            val target = current
+            // Headphones unplugged, set to pause, and nobody else listens: pause the room, like YTM.
+            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY && target?.headphones == "pause" && target.alone) {
+                pausingRoom = true
+                PlaybackHub.command("""{"kind":"Pause"}""")
+                // If the room doesn't pause (no connection, no permission), stop playing here instead.
+                scope.launch {
+                    delay(PAUSE_WAIT_MS)
+                    if (pausingRoom && current?.playing == true) stopHere()
+                    pausingRoom = false
+                }
+                return
+            }
             // Another app took the audio, or headphones were unplugged: stop playing here,
             // but don't pause the room for everyone else.
-            if (!playWhenReady && (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS ||
-                    reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY)
+            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS ||
+                reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY
             ) {
-                // Stop right away: the page (which switches "Play here" off) may be frozen for a while.
-                stoppedHere = true
-                current = current?.copy(enabled = false)
-                follower.command("""{"kind":"SetListening","on":false}""")
-                PlaybackHub.status("stopped")
+                stopHere()
             }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             PlaybackHub.status(if (playbackState == Player.STATE_BUFFERING) "buffering" else "ready")
         }
+    }
+
+    /** Stops playing on this device (not in the room). */
+    private fun stopHere() {
+        // Stop right away: the page (which switches "Play here" off) may be frozen for a while.
+        stoppedHere = true
+        current = current?.copy(enabled = false)
+        exo.playWhenReady = false
+        follower.command("""{"kind":"SetListening","on":false}""")
+        PlaybackHub.status("stopped")
     }
 
     /** Turns media controls (lock screen, notification, headphones) into room commands. */
@@ -306,5 +384,9 @@ class PlaybackService : MediaSessionService() {
     companion object {
         private const val TAG = "YtmpSync"
         private const val PAUSED_TOLERANCE_MS = 250L
+        private const val PAUSE_WAIT_MS = 3000L
+
+        /** The room's answer to a seek from here lands about where it was asked to. */
+        private const val ROOM_SEEK_MATCH_MS = 1000L
     }
 }

@@ -119,8 +119,17 @@ class MainActivity : ComponentActivity() {
             else -> openHome()
         }
 
+        // The page decides first (closing a sheet, going back a page in a room, see
+        // `onBack` in frontend/src/lib/native.ts); a page without an answer gets the WebView's history.
         onBackPressedDispatcher.addCallback(this) {
-            if (webView.canGoBack()) webView.goBack() else finish()
+            webView.evaluateJavascript("window.__ytmpNative && window.__ytmpNative.onBack ? window.__ytmpNative.onBack() : null") { answer ->
+                when (answer) {
+                    "\"handled\"" -> Unit
+                    // Like YTM at its home page: the app goes to the background and keeps playing.
+                    "\"exit\"" -> moveTaskToBack(true)
+                    else -> if (webView.canGoBack()) webView.goBack() else moveTaskToBack(true)
+                }
+            }
         }
     }
 
@@ -154,8 +163,8 @@ class MainActivity : ComponentActivity() {
 
     // This screen's own hooks: when Android replaces the screen, the old one's onDestroy can
     // come after the new one's onCreate, and must not unhook the new one.
-    private val commandSink: (String) -> Unit = { command -> js("window.__ytmpNative && window.__ytmpNative.onCommand($command)") }
-    private val statusSink: (String) -> Unit = { status -> js("window.__ytmpNative && window.__ytmpNative.onStatus(${JSONObject.quote(status)})") }
+    private val commandSink: (String) -> Unit = { command -> js("window.__ytmpNative && window.__ytmpNative.onCommand && window.__ytmpNative.onCommand($command)") }
+    private val statusSink: (String) -> Unit = { status -> js("window.__ytmpNative && window.__ytmpNative.onStatus && window.__ytmpNative.onStatus(${JSONObject.quote(status)})") }
 
     override fun onDestroy() {
         if (PlaybackHub.commandSink === commandSink) PlaybackHub.commandSink = null

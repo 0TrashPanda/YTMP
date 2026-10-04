@@ -51,6 +51,9 @@ interface CatalogSource {
     suspend fun podcast(id: String): PodcastPage
 
     suspend fun home(): HomePage
+
+    /** Home, not from a cache: pulled down to refresh. */
+    suspend fun freshHome(): HomePage = home()
 }
 
 /**
@@ -62,6 +65,9 @@ interface PersonalCatalog {
     suspend fun account(): YoutubeAccount?
 
     suspend fun home(): HomePage
+
+    /** Home, not from a cache: pulled down to refresh. */
+    suspend fun freshHome(): HomePage = home()
 
     /** "Playlists" (Liked music first) and "Podcasts". */
     suspend fun library(): HomePage

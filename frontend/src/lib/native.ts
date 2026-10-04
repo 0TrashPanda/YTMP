@@ -20,11 +20,16 @@ export interface NativeBridge {
 /** Callbacks the app calls on the page. */
 export interface NativeCallbacks {
 	/** A media button (lock screen, notification, headphones) was pressed. */
-	onCommand(command: Command): void;
+	onCommand?(command: Command): void;
 	/** "buffering" | "ready" | "stopped" | "error" */
-	onStatus(status: string): void;
+	onStatus?(status: string): void;
 	/** Back from YouTube Music's sign-in: null when signed in, else why not. */
 	onYoutubeSignIn?(error: string | null): void;
+	/**
+	 * The phone's Back button: "handled" when the page went back itself, "exit" to put the
+	 * app in the background, anything else for the WebView's own history.
+	 */
+	onBack?(): 'handled' | 'exit' | 'default';
 	/** The list of rooms found on the local network changed. */
 	onNearbyRooms?(rooms: NearbyRoom[]): void;
 }

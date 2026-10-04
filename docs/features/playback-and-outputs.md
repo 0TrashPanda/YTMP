@@ -15,7 +15,12 @@ permissions say otherwise (permission: *Play audio locally*).
 - **Solo rooms play on your device by default** ✅ when you open them (in a browser, from
   your first tap or key press, since browsers only allow audio after one). Switching
   *this device* off in a solo room is remembered for that room. Another app taking the
-  audio, or unplugging headphones, stops it for now but doesn't count as switching off.
+  audio stops it for now but doesn't count as switching off.
+- **Headphones disconnected** (unplugged, Bluetooth gone) is a setting in the app (profile
+  menu): **Pause** (default; pauses the room like YTM when you're the only one listening,
+  otherwise stops playing here), **Stop here**, or **Keep playing** on the speaker.
+- Listening **alone**, a device that starts a song late (buffering) doesn't jump ahead: the
+  room moves to where the device is, so there's no audible skip.
 - Other rooms remember your last choice in the app.
 
 ## Host outputs

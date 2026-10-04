@@ -25,6 +25,8 @@ data class PlaybackTarget(
     /** Nobody else plays along: only fix big drift (see [SyncCorrection.ALONE_TOLERANCE_MS]). */
     val alone: Boolean = false,
     val volume: Float,
+    /** What unplugging headphones (or Bluetooth disconnecting) does: "pause", "stop" (playing here) or "keep" (playing). */
+    val headphones: String = "stop",
     /** The room this is from, so the app can follow it itself (see [RoomFollower]). */
     val room: RoomLink? = null,
 )

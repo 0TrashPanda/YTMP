@@ -15,10 +15,14 @@
 
 <script lang="ts">
 	/** [row]: one row that scrolls sideways (the home page), instead of a grid. */
+	import PageDots from './PageDots.svelte';
+
 	let { cards, row = false }: { cards: Card[]; row?: boolean } = $props();
+	let scroller = $state<HTMLElement>();
 </script>
 
 <div
+	bind:this={scroller}
 	class={row
 		? 'grid snap-x auto-cols-[9.5rem] grid-flow-col gap-4 overflow-x-auto scroll-px-2 px-2 pb-2 [scrollbar-width:none] sm:auto-cols-[11rem]'
 		: 'grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2'}
@@ -37,3 +41,6 @@
 		</button>
 	{/each}
 </div>
+{#if row}
+	<PageDots target={scroller} />
+{/if}

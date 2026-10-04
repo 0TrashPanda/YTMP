@@ -930,7 +930,10 @@ class Room(
     private fun radioItem(song: Song, origin: QueueItemOrigin, by: Pair<String, String>?) =
         QueueItem(Ids.short(), song, by?.first ?: "autoplay", by?.second ?: "Autoplay", clock(), result = null, origin = origin)
 
-    /** Start radio: plays [song] now, and the queue becomes a radio from it. */
+    /**
+     * Start radio: plays [song] now, and the queue becomes a radio from it. On the song that's
+     * playing, it keeps playing (like YTM) and only the queue changes.
+     */
     private fun startRadio(song: Song, byId: String, byName: String) {
         val source = radio ?: return
         scope.launch {
@@ -945,7 +948,8 @@ class Room(
                 // it plays from there, so it's heard once, and the radio keeps going after it.
                 autoplayJob?.cancel()
                 autoplayDismissed = false
-                retireCurrent(QueueItemResult.SKIPPED)
+                val keepPlaying = current?.song?.id == song.id
+                if (!keepPlaying) retireCurrent(QueueItemResult.SKIPPED)
                 if (queue.isNotEmpty()) {
                     queue.clear()
                     emit(Event.QueueReplaced(emptyList()))
@@ -953,9 +957,10 @@ class Room(
                 autoplaySeed = song
                 autoplayBy = byId to byName
                 autoplay.clear()
-                autoplay += (listOf(song) + songs.getOrThrow().filter { it.id != song.id }).distinctBy { it.id }
+                autoplay += (listOf(song).takeUnless { keepPlaying }.orEmpty() + songs.getOrThrow().filter { it.id != song.id }).distinctBy { it.id }
                     .map { radioItem(it, QueueItemOrigin.RADIO, autoplayBy) }
                 emitAutoplay()
+                if (keepPlaying) return@withLock
                 wantPlaying = true
                 playNextFromQueue()
             }

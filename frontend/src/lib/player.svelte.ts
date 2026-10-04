@@ -219,10 +219,12 @@ class NativePlayer implements RoomPlayer {
 		private readonly bridge: NativeBridge
 	) {
 		window.__ytmpNative = {
+			...window.__ytmpNative,
 			onCommand: (command) => void this.room.run(command),
 			onStatus: (status) => {
 				this.buffering = status === 'buffering';
-				// Another app took the audio, or headphones were unplugged: not a choice to stop listening here.
+				// Another app took the audio, or headphones were unplugged (see saved.headphonesAction):
+				// not a choice to stop listening here.
 				if (status === 'stopped') this.disable(false);
 				if (status === 'error') this.error = "Can't play this song on this device.";
 			}
@@ -285,6 +287,7 @@ class NativePlayer implements RoomPlayer {
 				syncOffsetMs: this.syncOffsetMs,
 				alone: this.room.listeningAlone,
 				volume: this.volume,
+				headphones: saved.headphonesAction,
 				// So the app can follow the room itself while this page is frozen in the background.
 				room: this.followableRoom()
 			})
@@ -301,6 +304,6 @@ class NativePlayer implements RoomPlayer {
 	destroy(): void {
 		this.enabled = false;
 		this.sync();
-		window.__ytmpNative = undefined;
+		if (window.__ytmpNative) window.__ytmpNative = { ...window.__ytmpNative, onCommand: undefined, onStatus: undefined };
 	}
 }
