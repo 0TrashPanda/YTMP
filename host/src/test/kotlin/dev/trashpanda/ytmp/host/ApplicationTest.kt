@@ -38,6 +38,7 @@ import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.SuggestionsResponse
 import io.ktor.client.call.body
+import io.ktor.client.statement.bodyAsText
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
@@ -52,6 +53,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.response.respondText
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import io.ktor.websocket.Frame
@@ -190,6 +192,17 @@ class ApplicationTest {
         assertEquals("no-cache", page.headers[io.ktor.http.HttpHeaders.CacheControl])
         assertEquals(HttpStatusCode.NotFound, client.get("/_app/immutable/old.js").status)
         assertEquals(HttpStatusCode.OK, client.get("/_app/immutable/app.abc.js").status)
+    }
+
+    @Test
+    fun `a host that doesn't stream audio for this client says so`() = testApplication {
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            val audio = AudioProxy { call, _, _ -> call.respondText("audio") }
+            ytmpModule(rooms, search, audio, webApp = null, HostOptions(kind = HostKind.SERVER, mayProxyAudio = { it.request.headers["X-Test-Lan"] == "1" }))
+        }
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/audio/ytm:abc").status)
+        assertEquals("audio", client.get("/api/audio/ytm:abc") { header("X-Test-Lan", "1") }.bodyAsText())
     }
 
     @Test

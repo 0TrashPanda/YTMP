@@ -18,6 +18,7 @@ data class Config(
     val sonos: SonosConfig = SonosConfig(),
     val database: DatabaseConfig = DatabaseConfig(),
     val accounts: AccountsConfig = AccountsConfig(),
+    val audio: AudioConfig = AudioConfig(),
 ) {
     companion object {
         private val toml = Toml(TomlInputConfig(ignoreUnknownNames = true))
@@ -36,6 +37,9 @@ data class Config(
                 ),
                 accounts = base.accounts.copy(
                     url = env["YTMP_URL"] ?: base.accounts.url,
+                ),
+                audio = base.audio.copy(
+                    proxy = env["YTMP_AUDIO_PROXY"] ?: base.audio.proxy,
                 ),
                 database = base.database.copy(
                     type = env["YTMP_DB_TYPE"] ?: base.database.type,
@@ -77,6 +81,18 @@ data class CastConfig(
     @SerialName("audio_base_url")
     val audioBaseUrl: String = "",
 )
+
+/** See docs/implementation/playback-sync.md and [AudioProxyMode]. */
+@Serializable
+data class AudioConfig(
+    /**
+     * Streaming audio through the server, for clients whose direct YouTube link doesn't work
+     * (it only works on the server's own internet connection): always | lan | never.
+     */
+    val proxy: String = "always",
+) {
+    fun proxyMode(): AudioProxyMode = AudioProxyMode.parse(proxy)
+}
 
 @Serializable
 data class SonosConfig(

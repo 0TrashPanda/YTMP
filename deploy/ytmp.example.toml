@@ -18,6 +18,14 @@ path = "ytmp.db"
 # PostgreSQL, e.g. "postgresql://ytmp:secret@localhost/ytmp"
 url = ""
 
+[audio]
+# Clients play YouTube's own stream links. Those only work on the server's internet connection
+# (they're tied to its IP address); elsewhere a client falls back to streaming through the
+# server, which uses its bandwidth. Who may do that:
+#   always | lan (only devices on the server's local network, e.g. speakers) | never
+# YTMP_AUDIO_PROXY overrides it.
+proxy = "always"
+
 [sonos]
 # Find Sonos speakers (SSDP). Needs UDP multicast replies to reach the server.
 discovery = true

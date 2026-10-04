@@ -42,6 +42,13 @@ network uses it. Options:
 3. The client remembers the result for the room, so it doesn't retry the direct URL for
    every song.
 
+A server can limit step 2 to save its bandwidth: `[audio] proxy = "always" | "lan" | "never"`
+in `ytmp.toml` (`AudioProxyMode` in server/). With `lan`, only clients with a private,
+loopback or link-local address may use `/api/audio`; behind a reverse proxy on the local
+network (e.g. Caddy) the last `X-Forwarded-For` entry counts, and the header is ignored when
+the request doesn't come from such a proxy. Others get 403 and the player shows it can't
+play the song. Verified: the stream URL carries `ip=<server's public IPv4>` in `sparams`.
+
 Local files, media server songs and cached songs are always served by the host.
 
 ## Sync accuracy

@@ -1,0 +1,5 @@
+# Used by docker-compose.caddy.yml. Caddy passes the visitor's address on in
+# X-Forwarded-For, which YTMP uses for [audio] proxy = "lan".
+{$YTMP_DOMAIN} {
+	reverse_proxy ytmp:8080
+}

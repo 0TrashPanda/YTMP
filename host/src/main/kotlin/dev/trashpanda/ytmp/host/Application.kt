@@ -102,6 +102,8 @@ data class HostOptions(
     val isLocal: (ApplicationCall) -> Boolean = ::isLoopback,
     /** Which accounts can join. */
     val auth: HostAuth = NoAuth,
+    /** Whether this request may stream audio through the host (a server can limit it to save bandwidth). */
+    val mayProxyAudio: (ApplicationCall) -> Boolean = { true },
 )
 
 fun isLoopback(call: ApplicationCall): Boolean {
@@ -276,6 +278,9 @@ fun Application.ytmpModule(
             }
             get("/audio/{songId}") {
                 val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")
+                if (!options.mayProxyAudio(call)) {
+                    throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "This server doesn't stream audio to devices outside its network")
+                }
                 proxy.respond(call, call.parameters["songId"]!!, call.request.header(HttpHeaders.Range))
             }
             extraApi()

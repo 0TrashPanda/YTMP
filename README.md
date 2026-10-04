@@ -97,7 +97,16 @@ echo "YTMP_MODULE_KEY=$(openssl rand -hex 32)" > .env
 docker compose up -d --build
 ```
 
-Open `http://<server>:8080`. For HTTPS, put a reverse proxy such as Caddy in front of it.
+Open `http://<server>:8080`. For HTTPS, put a reverse proxy such as Caddy in front of it
+(`deploy/docker-compose.caddy.yml` does that for you), or use your own nginx.
+
+**Step-by-step guide:** [running YTMP on Proxmox](deploy/proxmox.md) (LXC container with
+Docker, your own domain with HTTPS through Caddy or your existing nginx).
+
+**Bandwidth:** players stream straight from YouTube, but YouTube's links only work on the
+server's own internet connection. Elsewhere they fall back to streaming through the server.
+To keep music off a slow upload, set `[audio] proxy = "lan"` in `ytmp.toml`: then only
+devices on the server's network (like speakers at home) may do that. See the guide.
 
 ## Development
 

@@ -55,6 +55,8 @@ fun main(args: Array<String>) {
     }
     val ytm = RemoteSourceModule(http, config.ytm.url.trimEnd('/'), config.ytm.key)
     val cached = CachedSource(ytm, ytm, ytm, ytm)
+    val audioProxy = config.audio.proxyMode()
+    log.info("Streaming audio through the server: {}", audioProxy.name.lowercase())
 
     embeddedServer(Netty, port = config.server.port, host = config.server.host) {
         val casts = CastOutputs(this) { localAddress ->
@@ -103,7 +105,7 @@ fun main(args: Array<String>) {
             search = cached,
             audio = ytm,
             webApp = File(config.server.frontend),
-            HostOptions(kind = HostKind.SERVER, auth = auth),
+            HostOptions(kind = HostKind.SERVER, auth = auth, mayProxyAudio = audioProxy::allows),
             extraApi = { service.routes(this) },
             similar = cached,
             catalog = cached,
