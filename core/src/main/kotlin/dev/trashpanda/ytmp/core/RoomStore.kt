@@ -47,6 +47,12 @@ data class SavedRoom(
     val knownPermissions: List<Permission>? = null,
     /** Where podcast episodes were left off (song ID -> ms). */
     val episodePositions: Map<String, Long> = emptyMap(),
+    /** The same room on the owner's other hosts (see [Room.syncId]). */
+    val syncId: String? = null,
+    val epoch: Int = 0,
+    /** When it was saved, and whether it was playing then: a room that moves continues from there. */
+    val savedAt: Long = 0,
+    val playing: Boolean = false,
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 

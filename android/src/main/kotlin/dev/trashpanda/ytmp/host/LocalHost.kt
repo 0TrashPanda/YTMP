@@ -60,7 +60,7 @@ class LocalHost(private val context: Context) {
         suggest = { ytm.suggestions(it) },
     )
     private val plays = PlayReporter(authLink.auth, scope)
-    val rooms = RoomManager(
+    val rooms: RoomManager = RoomManager(
         streams = object : StreamResolver {
             override suspend fun resolveStream(songId: String) = ytm.resolveStream(songId)
             override suspend fun resolve(songId: String) = ytm.resolve(songId)
@@ -71,7 +71,12 @@ class LocalHost(private val context: Context) {
             addToYoutubeHistory(play)
         },
         radio = cached,
+        onRoomSaved = { sync.saved(it) },
+        onRoomClosed = { sync.closed(it) },
     )
+
+    /** Your rooms here and on your server (docs/features/room-sync.md). */
+    private val sync: RoomSync by lazy { RoomSync(context, authLink, { rooms }, ::lanUrl, scope) }
 
     /**
      * Songs played on this phone go into the owner's YouTube Music history, so its suggestions
@@ -99,6 +104,7 @@ class LocalHost(private val context: Context) {
     fun start() {
         val webApp = installWebApp()
         rooms.startCleanup()
+        sync.start()
         casts.attach(rooms)
         sonos.attach(rooms)
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
@@ -113,8 +119,12 @@ class LocalHost(private val context: Context) {
                     localOnlyRoomManagement = true,
                     supportsPrivateRooms = true,
                     auth = authLink.auth,
+                    onAccountToken = sync::remember,
                 ),
-                extraApi = { authLink.routes(this) },
+                extraApi = {
+                    authLink.routes(this)
+                    sync.routes(this)
+                },
                 similar = cached,
                 catalog = cached,
                 personal = youtube,

@@ -56,6 +56,13 @@ class Room(
     template: RoleTemplate = DefaultRoles.template,
     /** Similar songs, for Start radio and the autoplay queue. Null: no radio. */
     private val radio: RadioSource? = null,
+    /**
+     * The same room on all the owner's hosts (docs/features/room-sync.md): only rooms with an
+     * owner account have one.
+     */
+    val syncId: String? = ownerAccount?.let { Ids.token() },
+    /** Goes up every time the room moves to another host; the highest one is the real room. */
+    val epoch: Int = 0,
     /** Called when the room's [info] changes, e.g. it was made public. */
     private val onInfoChanged: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
@@ -323,7 +330,25 @@ class Room(
             autoplaySeed = autoplaySeed,
             knownPermissions = Permission.entries,
             episodePositions = episodePositions.toMap(),
+            syncId = syncId,
+            epoch = epoch,
+            savedAt = clock(),
+            playing = wantPlaying && current != null,
         )
+    }
+
+    /**
+     * The room moved to another of the owner's hosts: everyone here is sent there ([url], if
+     * known). Call before closing it.
+     */
+    suspend fun movedAway(url: String?) = mutex.withLock {
+        for (member in members.values) {
+            val message = ServerMessage.Rejected(RejectReason.ROOM_MOVED, movedTo = url)
+            member.outbox?.send(message)
+            member.attached.forEach { it.send(message) }
+            member.outbox = null
+            member.attached.clear()
+        }
     }
 
     /** Fills a new room from [saved]. Everyone starts offline and playback starts paused. */
@@ -334,7 +359,7 @@ class Room(
             val restored = Permissions.sanitize(RoleTemplate(upgraded, saved.settings))
             roles.clear()
             roles += restored.roles
-            settings = restored.settings
+            settings = restored.settings.copy(openElsewhere = saved.settings.openElsewhere)
         }
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay += saved.autoplay
@@ -565,6 +590,13 @@ class Room(
                 activeOutputs[command.outputId] = command.volume.coerceIn(0.0, 1.0)
                 emit(Event.OutputsChanged(outputInfos()))
             }
+            is Command.SetOpenElsewhere -> {
+                if (!member.isOwner) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "Only the owner can change this")
+                if (settings.openElsewhere != command.mode) {
+                    settings = settings.copy(openElsewhere = command.mode)
+                    emit(Event.SettingsChanged(settings))
+                }
+            }
             is Command.SetVisibility -> {
                 if (!member.isOwner) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "Only the owner can change this")
                 if (visibility != command.visibility) {
@@ -680,10 +712,10 @@ class Room(
                     emit(Event.RoomUpdated(info))
                     onInfoChanged()
                 }
-                val updated = RoomSettings(
-                    command.defaultGuestRole ?: settings.defaultGuestRole,
-                    command.defaultAccountRole ?: settings.defaultAccountRole,
-                    command.autoplay ?: settings.autoplay,
+                val updated = settings.copy(
+                    defaultGuestRole = command.defaultGuestRole ?: settings.defaultGuestRole,
+                    defaultAccountRole = command.defaultAccountRole ?: settings.defaultAccountRole,
+                    autoplay = command.autoplay ?: settings.autoplay,
                 )
                 if (updated != settings) {
                     val autoplayChanged = updated.autoplay != settings.autoplay
@@ -1177,8 +1209,16 @@ class Room(
             scope: CoroutineScope,
             onInfoChanged: () -> Unit = {},
             radio: RadioSource? = null,
+            /** The code here, when it's not [SavedRoom.code] (a room that moved here, whose code was taken). */
+            code: String = saved.code,
+            /** The epoch here: one more when it moved here. */
+            epoch: Int = saved.epoch,
             clock: () -> Long = System::currentTimeMillis,
-        ) = Room(saved.code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, radio = radio, onInfoChanged = onInfoChanged, clock = clock)
-            .apply { restore(saved) }
+        ) = Room(
+            code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, radio = radio, onInfoChanged = onInfoChanged, clock = clock,
+            // Rooms saved before syncing get their ID now.
+            syncId = saved.syncId ?: saved.ownerAccount?.let { Ids.token() },
+            epoch = epoch,
+        ).apply { restore(saved) }
     }
 }

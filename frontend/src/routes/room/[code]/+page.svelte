@@ -333,7 +333,12 @@
 {:else if room.status === 'rejected'}
 	<main class="mx-auto flex min-h-full max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
 		<p class="text-lg">{room.rejectMessage}</p>
-		<a href="/" class="rounded-full bg-white px-6 py-3 font-medium text-black">Back</a>
+		{#if room.movedTo}
+			<a href={room.movedTo} class="rounded-full bg-white px-6 py-3 font-medium text-black">Open it there</a>
+			<a href="/" class="text-sm text-muted underline">Back</a>
+		{:else}
+			<a href="/" class="rounded-full bg-white px-6 py-3 font-medium text-black">Back</a>
+		{/if}
 	</main>
 {:else}
 	<div class="flex h-full flex-col">

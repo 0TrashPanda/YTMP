@@ -108,6 +108,7 @@ fun main(args: Array<String>) {
             radio = cached,
         )
         rooms.startCleanup()
+        val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere)
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
         casts.attach(rooms)
         sonos.attach(rooms)
@@ -126,7 +127,10 @@ fun main(args: Array<String>) {
                 isLocal = { false },
                 mayProxyAudio = audioProxy::allows,
             ),
-            extraApi = { service.routes(this) },
+            extraApi = {
+                service.routes(this)
+                hub.routes(this)
+            },
             similar = cached,
             catalog = cached,
             suggestions = cached,

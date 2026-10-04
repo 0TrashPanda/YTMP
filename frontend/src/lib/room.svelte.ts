@@ -23,7 +23,8 @@ const REJECT_MESSAGES: Record<RejectReason, string> = {
 	version_mismatch: 'This app and the host are different versions. Reload the page.',
 	invalid_name: 'Pick a name of 1–32 characters.',
 	replaced: 'You opened this room somewhere else.',
-	private_room: 'This is a solo room; only the phone that hosts it can join.',
+	private_room: 'This is a solo room; only its owner can join.',
+	room_moved: 'This room moved to your other device.',
 	kicked: 'You were removed from this room. You can join again.',
 	banned: "You're banned from this room."
 };
@@ -37,6 +38,8 @@ export class RoomConnection {
 	state = $state<RoomState | null>(null);
 	participantId = $state<string | null>(null);
 	rejectMessage = $state<string | null>(null);
+	/** The room moved to another of its owner's hosts: its link there, if known. */
+	movedTo = $state<string | null>(null);
 	notices = $state<{ id: number; text: string }[]>([]);
 
 	/** Host clock minus our clock, in ms. */
@@ -193,6 +196,7 @@ export class RoomConnection {
 			case 'rejected':
 				this.status = 'rejected';
 				this.rejectMessage = REJECT_MESSAGES[message.reason];
+				this.movedTo = message.movedTo ?? null;
 				break;
 		}
 	}

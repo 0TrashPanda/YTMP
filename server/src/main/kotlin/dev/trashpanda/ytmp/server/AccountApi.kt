@@ -30,6 +30,7 @@ import io.ktor.server.routing.delete
 import io.ktor.server.response.header
 import io.ktor.http.HttpHeaders
 import dev.trashpanda.ytmp.protocol.AccountSettings
+import dev.trashpanda.ytmp.protocol.RoomOpenMode
 import dev.trashpanda.ytmp.protocol.HistoryPage
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.core.DefaultRoles
@@ -254,8 +255,14 @@ class AccountService(
     }
 
     /** A host token signed by us (made for any host), from `Authorization: Bearer`. */
-    private fun ApplicationCall.ownToken(): AccountTokens.Claims? =
-        bearerToken()?.let { AccountTokens.verify(it, { iss -> if (iss == issuer) key.public else null }, clock() / 1000) }
+    private fun ApplicationCall.ownToken(): AccountTokens.Claims? = bearerToken()?.let(::verifyOwnToken)
+
+    /** A host token of one of this server's accounts, for any host (they act for the account here). */
+    fun verifyOwnToken(token: String): AccountTokens.Claims? =
+        AccountTokens.verify(token, { iss -> if (iss == issuer) key.public else null }, clock() / 1000)
+
+    /** The account's setting for opening its rooms on another host. */
+    fun openElsewhere(username: String): RoomOpenMode = accounts.find(username)?.let(::settings)?.openElsewhere ?: RoomOpenMode.ASK
 
     private suspend fun ApplicationCall.admin(): Accounts.Account =
         account().takeIf { it.isAdmin } ?: throw forbidden("Only the server admin can do this")

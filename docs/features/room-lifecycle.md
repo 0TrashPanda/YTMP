@@ -95,6 +95,10 @@ Participants **keep their role** when they migrate to the new room.
 phone → PC), taking **everything** with it: queue, history, playback position and
 settings. It requires a [YTMP account](accounts.md).
 
+> ✅ Built between a phone and your server as [room sync](room-sync.md): your rooms are listed
+> on both, and opening one on the other device moves it there (or opens it where it is).
+> The table below is the fuller plan.
+
 It can be started from either side, or from the account:
 
 | Start from | Action |

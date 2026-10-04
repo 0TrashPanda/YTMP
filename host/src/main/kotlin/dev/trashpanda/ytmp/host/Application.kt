@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.host
 
+import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.core.Outbox
 import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
@@ -106,6 +107,8 @@ data class HostOptions(
     val auth: HostAuth = NoAuth,
     /** Whether this request may stream audio through the host (a server can limit it to save bandwidth). */
     val mayProxyAudio: (ApplicationCall) -> Boolean = { true },
+    /** An account token was accepted (a phone keeps the latest, to sync the account's rooms). */
+    val onAccountToken: (token: String, account: AccountIdentity) -> Unit = { _, _ -> },
 )
 
 fun isLoopback(call: ApplicationCall): Boolean {
@@ -157,7 +160,10 @@ fun Application.ytmpModule(
     fun ApplicationCall.personal(): PersonalCatalog? = personalFor?.invoke(this) ?: personal?.takeIf { options.isLocal(this) }
 
     /** The account this request proves (bearer host token), if any. */
-    fun ApplicationCall.account() = bearerToken()?.let(options.auth::verify)
+    fun ApplicationCall.account(): AccountIdentity? {
+        val token = bearerToken() ?: return null
+        return options.auth.verify(token)?.also { options.onAccountToken(token, it) }
+    }
 
     /** The room's owner: its owner token (header), or its owner account. */
     fun ApplicationCall.owns(room: Room) =
@@ -194,9 +200,9 @@ fun Application.ytmpModule(
                     throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Solo rooms aren't supported here")
                 }
                 val token = call.bearerToken()
-                val account = token?.let(options.auth::verify)
+                val account = call.account()
                 // The creator's own roles, if they saved a template to their account.
-                val template = if (account != null) options.auth.roleTemplate(token) else null
+                val template = if (account != null && token != null) options.auth.roleTemplate(token) else null
                 val room = rooms.create(name, request.visibility, ownerAccount = account?.id, template = template)
                 log.info("Created room {} ({}, {}{})", room.code, room.name, room.visibility, account?.let { ", owner ${it.id}" } ?: "")
                 call.respond(CreateRoomResponse(room.code, room.ownerToken))
@@ -337,7 +343,13 @@ fun Application.ytmpModule(
                 else -> null
             }
             if (room == null) {
-                outbox.send(ServerMessage.Rejected(RejectReason.ROOM_NOT_FOUND))
+                // A room that moved to another of its owner's hosts: say where.
+                val code = (first as? ClientMessage.Hello)?.roomCode ?: (first as? ClientMessage.Attach)?.roomCode
+                val movedTo = code?.let(rooms::movedTo)
+                outbox.send(
+                    if (movedTo != null) ServerMessage.Rejected(RejectReason.ROOM_MOVED, movedTo.ifEmpty { null })
+                    else ServerMessage.Rejected(RejectReason.ROOM_NOT_FOUND),
+                )
                 outgoing.close()
                 sender.join()
                 return@webSocket
@@ -346,7 +358,7 @@ fun Application.ytmpModule(
                 room.attach(first, outbox, local = options.isLocal(call))
             } else {
                 val hello = first as ClientMessage.Hello
-                val account = hello.accountToken?.let(options.auth::verify)
+                val account = hello.accountToken?.let { token -> options.auth.verify(token)?.also { options.onAccountToken(token, it) } }
                 if (hello.accountToken != null && account == null) log.info("Room {}: account token not accepted, joining as a guest", room.code)
                 room.join(hello, outbox, local = options.isLocal(call), account = account)
             }

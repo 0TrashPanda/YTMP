@@ -165,6 +165,11 @@ sealed interface Command {
     @SerialName("SetVisibility")
     data class SetVisibility(val visibility: RoomVisibility) : Command
 
+    /** Owner only. Opening this room on another of your hosts; null: your account's setting. */
+    @Serializable
+    @SerialName("SetOpenElsewhere")
+    data class SetOpenElsewhere(val mode: RoomOpenMode?) : Command
+
     // --- people & roles (see Roles.kt) ---
 
     /** Removes someone; they can rejoin right away. */
@@ -237,7 +242,11 @@ sealed interface ServerMessage {
 
     @Serializable
     @SerialName("rejected")
-    data class Rejected(val reason: RejectReason) : ServerMessage
+    data class Rejected(
+        val reason: RejectReason,
+        /** [RejectReason.ROOM_MOVED]: where the room is now, e.g. `https://ytmp.example.com/room/ABCD`. */
+        val movedTo: String? = null,
+    ) : ServerMessage
 
     @Serializable
     @SerialName("result")
@@ -274,6 +283,9 @@ enum class RejectReason {
 
     /** The same participant connected again from somewhere else. */
     @SerialName("replaced") REPLACED,
+
+    /** The room moved to another of its owner's hosts ([ServerMessage.Rejected.movedTo]). */
+    @SerialName("room_moved") ROOM_MOVED,
 
     /** A solo room; only the hosting device can join it. */
     @SerialName("private_room") PRIVATE_ROOM,

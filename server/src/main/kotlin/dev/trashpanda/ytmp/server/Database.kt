@@ -98,6 +98,18 @@ class Database private constructor(private val url: String, private val user: St
                 )""",
                 "CREATE INDEX plays_account_time ON plays (account_id, played_at)",
             ),
+            // 5: copies of accounts' rooms that live on another host (a phone), see RoomHub
+            listOf(
+                """CREATE TABLE room_copies (
+                    sync_id VARCHAR(64) PRIMARY KEY,
+                    account VARCHAR(160) NOT NULL,
+                    home TEXT NOT NULL,
+                    epoch INTEGER NOT NULL,
+                    data TEXT NOT NULL,
+                    last_seen BIGINT NOT NULL
+                )""",
+                "CREATE INDEX room_copies_account ON room_copies (account)",
+            ),
         )
 
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {

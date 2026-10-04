@@ -60,6 +60,8 @@ data class RoomSettings(
     val defaultAccountRole: String,
     /** When the queue runs out, keep playing a radio from the last song (like YTM). */
     val autoplay: Boolean = true,
+    /** Opening this room on another of the owner's hosts; null: the owner's account setting. */
+    val openElsewhere: RoomOpenMode? = null,
 )
 
 /** The roles a room starts with. Saved to an account, so every room you create gets yours. */

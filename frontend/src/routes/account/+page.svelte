@@ -6,7 +6,7 @@
 	import LoginForm from '../../lib/components/LoginForm.svelte';
 	import TemplateSettings from '../../lib/components/settings/TemplateSettings.svelte';
 	import Switch from '../../lib/components/settings/Switch.svelte';
-	import type { AccountInfo, AccountSettings, AuthServerInfo } from '../../lib/protocol.gen';
+	import type { AccountInfo, AccountSettings, AuthServerInfo, RoomOpenMode } from '../../lib/protocol.gen';
 
 	const invite = page.url.searchParams.get('invite');
 
@@ -160,6 +160,27 @@
 					</div>
 					<Switch checked={s.hideFromOthers} label="Keep me out of others' history" disabled={busy} onchange={(on) => saveSettings({ ...s, hideFromOthers: on })} />
 				</div>
+			</section>
+		{/if}
+
+		{#if settings}
+			{@const s = settings}
+			<section class={card}>
+				<h2 class="font-bold">Your rooms on your other devices</h2>
+				<p class="text-sm text-muted">
+					A room lives on one device: this server or your phone. When you open it on the other one, it can move there and continue where it was (each room can
+					change this in its settings).
+				</p>
+				<select
+					class="rounded-lg bg-raised px-3 py-2.5 outline-none"
+					value={s.openElsewhere}
+					disabled={busy}
+					onchange={(e) => saveSettings({ ...s, openElsewhere: e.currentTarget.value as RoomOpenMode })}
+				>
+					<option value="ask">Ask each time: open it where it is, or move it</option>
+					<option value="move">Always move it to where I open it</option>
+					<option value="move_if_away">Move it only if its device is away</option>
+				</select>
 			</section>
 		{/if}
 

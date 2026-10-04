@@ -60,6 +60,10 @@ class RoomManager(
     private val onPlayFinished: (FinishedPlay) -> Unit = {},
     /** YTM's radio, for Start radio and autoplay. */
     private val radio: RadioSource? = null,
+    /** A room with an owner account was saved: its copy elsewhere can be updated (see [Room.syncId]). Must not block. */
+    private val onRoomSaved: (SavedRoom) -> Unit = {},
+    /** A room with an owner account was closed or expired here (not moved away). Must not block. */
+    private val onRoomClosed: (Room) -> Unit = {},
 ) {
     private val rooms = ConcurrentHashMap<String, Room>()
     private val random = SecureRandom()
@@ -135,7 +139,52 @@ class RoomManager(
         rooms.remove(normalize(code))?.let(::remove)
     }
 
-    private fun remove(room: Room) {
+    /** The room with this [Room.syncId], if it lives here. */
+    fun bySyncId(syncId: String): Room? = rooms.values.firstOrNull { it.syncId == syncId }
+
+    /**
+     * A room that moved here from another host: it continues from [saved] (where a playing
+     * room would be by now, but paused) with [epoch], under its old code if that's free here.
+     */
+    fun adopt(saved: SavedRoom, epoch: Int): Room {
+        val position = if (saved.playing && saved.savedAt > 0) saved.positionMs + (clock() - saved.savedAt) else saved.positionMs
+        val length = saved.current?.song?.durationMs?.takeIf { it > 0 } ?: Long.MAX_VALUE
+        val state = saved.copy(positionMs = position.coerceIn(0, length), lastActive = clock())
+        var code = normalize(saved.code)
+        while (true) {
+            val room = Room.restore(state, streams, scope, onInfoChanged = { roomChanged(code) }, radio = radio, clock = clock, code = code, epoch = epoch)
+            if (add(room)) {
+                moved.remove(code)
+                roomChanged(code)
+                log.info("Room {} ({}) moved here", code, room.name)
+                return room
+            }
+            code = newCode()
+        }
+    }
+
+    /** The room moved to another host: everyone in it is sent to [url], and it's gone from here. */
+    suspend fun movedAway(code: String, url: String?) {
+        val room = rooms[normalize(code)] ?: return
+        room.movedAway(url)
+        if (!rooms.remove(room.code, room)) return
+        moved[room.code] = url.orEmpty()
+        while (moved.size > MAX_MOVED) moved.remove(moved.keys.first())
+        remove(room, closedHere = false)
+        log.info("Room {} ({}) moved to {}", room.code, room.name, url ?: "another host")
+    }
+
+    /**
+     * Where a room that moved away went (for people who still have its code): its link, ""
+     * when that isn't known, or null when no room with this code moved away.
+     */
+    fun movedTo(code: String): String? = moved[normalize(code)]
+
+    /** Codes of rooms that moved away, and where to (oldest first). */
+    private val moved = java.util.Collections.synchronizedMap(LinkedHashMap<String, String>())
+
+    private fun remove(room: Room, closedHere: Boolean = true) {
+        if (closedHere && room.syncId != null) onRoomClosed(room)
         room.close()
         refreshList()
         if (store != null) scope.launch(storeContext) { runCatching { store.delete(room.code) }.onFailure { log.warn("Couldn't delete room {}", room.code, it) } }
@@ -173,6 +222,7 @@ class RoomManager(
                 if (e is CancellationException) throw e
                 log.warn("Couldn't save room {}", code, e)
             }
+            if (saved.syncId != null) onRoomSaved(saved)
         }
     }
 
@@ -209,5 +259,6 @@ class RoomManager(
         val log = LoggerFactory.getLogger(RoomManager::class.java)
         val SAVE_DELAY = 1.seconds
         val POSITION_SAVE_INTERVAL = 15.seconds
+        const val MAX_MOVED = 200
     }
 }

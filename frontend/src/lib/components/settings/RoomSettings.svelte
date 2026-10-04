@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { DEFAULT_ROLE_COLOR, rank } from '../../permissions';
-	import type { Command, Participant, Permission, Role } from '../../protocol.gen';
+	import type { Command, Participant, Permission, Role, RoomOpenMode } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
 	import MemberPermissions from './MemberPermissions.svelte';
 	import RoleEditor from './RoleEditor.svelte';
@@ -153,6 +153,24 @@
 						</div>
 						<Switch checked={autoplay} label="Autoplay" onchange={(on) => (autoplay = on)} />
 					</div>
+					{#if me?.isOwner && me.accountId}
+						<!-- Rooms of an account live on one of its hosts and can move (docs/features/room-sync.md). -->
+						<div class="my-6 h-px bg-d-line"></div>
+						<label class="block">
+							<span class={label}>Opening it on your other device</span>
+							<select
+								class={input}
+								value={rs.settings.openElsewhere ?? ''}
+								onchange={(e) => run({ kind: 'SetOpenElsewhere', mode: (e.currentTarget.value || null) as RoomOpenMode | null })}
+							>
+								<option value="">Your account's setting</option>
+								<option value="ask">Ask: open it here, or move it</option>
+								<option value="move">Move it there</option>
+								<option value="move_if_away">Move it only if this device is away</option>
+							</select>
+						</label>
+						<p class="mt-2 text-sm text-d-muted">This room lives here. When you open it on your phone or server, it can move there and continue.</p>
+					{/if}
 				</div>
 				{#if overviewDirty}
 					<div class="pb-4"><SaveBar busy={overviewBusy} onReset={resetOverview} onSave={saveOverview} /></div>

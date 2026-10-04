@@ -2,12 +2,12 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { identity, type Identity } from '../lib/account';
-	import { closeRoom, createRoom, getHost, getRoom, linkAuthServer, listRooms } from '../lib/api';
+	import { closeRoom, createRoom, getHost, getRoom, getRoomsElsewhere, linkAuthServer, listRooms, moveRoomHere } from '../lib/api';
 	import Icon from '../lib/components/Icon.svelte';
 	import ProfileSheet from '../lib/components/ProfileSheet.svelte';
 	import { youtube } from '../lib/youtube.svelte';
 	import { nativeBridge, type NearbyRoom } from '../lib/native';
-	import type { HostInfo, RoomInfo, RoomVisibility } from '../lib/protocol.gen';
+	import type { HostInfo, RoomInfo, RoomOpenMode, RoomVisibility, SyncedRoom } from '../lib/protocol.gen';
 	import { saved } from '../lib/storage';
 
 	let name = $state(saved.displayName);
@@ -42,6 +42,7 @@
 			if (me) name = me.account.displayName;
 			if (onThisPhone) myRooms = await listRooms();
 			else if (host.kind === 'server') myRooms = await serverRooms();
+			if (me) loadElsewhere();
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Can't reach the host";
 		}
@@ -92,6 +93,51 @@
 				)
 		);
 		return [...mine, ...here.filter((r): r is RoomInfo => r !== null)];
+	}
+
+	// Your rooms on your other device (docs/features/room-sync.md): on the phone, the ones on
+	// your server; on the server, the ones on your phone. Opening one either opens it where it
+	// lives or moves it here, as your account (or the room) says.
+	let elsewhere = $state<SyncedRoom[]>([]);
+	let openMode = $state<RoomOpenMode>('ask');
+	let choosing = $state<SyncedRoom | null>(null);
+
+	async function loadElsewhere() {
+		try {
+			const answer = await getRoomsElsewhere();
+			elsewhere = answer.rooms;
+			openMode = answer.openElsewhere;
+		} catch {
+			// No server linked, or it can't be reached: nothing to show.
+		}
+	}
+
+	/** Its home checked in recently: probably up. */
+	const seenRecently = (room: SyncedRoom) => Date.now() - room.lastSeen < 60_000;
+
+	function openElsewhere(room: SyncedRoom) {
+		const mode = room.openElsewhere ?? openMode;
+		if (mode === 'move' || !room.home.url) return moveHere(room);
+		if (mode === 'move_if_away') return seenRecently(room) ? openThere(room) : moveHere(room);
+		choosing = room;
+	}
+
+	function openThere(room: SyncedRoom) {
+		location.href = `${room.home.url}/room/${room.code}`;
+	}
+
+	async function moveHere(room: SyncedRoom) {
+		choosing = null;
+		await attempt(async () => {
+			const code = await moveRoomHere(room.syncId);
+			await goto(`/room/${code}`);
+		});
+	}
+
+	function seen(room: SyncedRoom): string {
+		const minutes = Math.round((Date.now() - room.lastSeen) / 60_000);
+		if (room.home.kind === 'server' || minutes < 1) return room.playing && room.nowPlaying ? `playing ${room.nowPlaying}` : 'up now';
+		return minutes < 60 ? `seen ${minutes} min ago` : `seen ${Math.round(minutes / 60)} h ago`;
 	}
 
 	async function close(room: RoomInfo) {
@@ -155,6 +201,53 @@
 {/if}
 {#if toastText}
 	<p class="fixed inset-x-0 bottom-8 z-50 mx-auto w-fit rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">{toastText}</p>
+{/if}
+
+{#snippet elsewhereList()}
+	{#each [...new Set(elsewhere.map((r) => r.home.hostId))] as hostId (hostId)}
+		{@const list = elsewhere.filter((r) => r.home.hostId === hostId)}
+		<section class="flex flex-col gap-1">
+			<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">On {list[0].home.kind === 'server' ? 'your server' : list[0].home.hostName}</h2>
+			{#each list as room (room.syncId)}
+				<button class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2 text-left ring-1 ring-line disabled:opacity-40" disabled={busy} onclick={() => openElsewhere(room)}>
+					<Icon name={room.visibility === 'private' ? 'headphones' : 'people'} size={20} class="text-muted" />
+					<span class="min-w-0 flex-1">
+						<span class="block truncate">{room.name}</span>
+						<span class="block truncate text-xs text-muted">{seen(room)}</span>
+					</span>
+					<span class="font-mono text-sm text-muted">{room.code}</span>
+				</button>
+			{/each}
+		</section>
+	{/each}
+{/snippet}
+
+{#if choosing}
+	{@const room = choosing}
+	<!-- Ask: open it where it lives, or move it here. -->
+	<div class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={() => (choosing = null)}>
+		<div
+			class="flex w-full max-w-sm flex-col gap-3 rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
+			role="dialog"
+			aria-label="Open {room.name}"
+			tabindex="-1"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && (choosing = null)}
+		>
+			<h2 class="text-lg font-bold">{room.name}</h2>
+			<p class="text-sm text-muted">
+				This room is on {room.home.kind === 'server' ? 'your server' : room.home.hostName} ({seen(room)}). Open it there, or move it here: it continues here, and
+				stops there.
+			</p>
+			<button class="rounded-full bg-white py-2.5 font-medium text-black" onclick={() => openThere(room)}>
+				Open on {room.home.kind === 'server' ? 'your server' : room.home.hostName}
+			</button>
+			<button class="rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={() => moveHere(room)}>Move it here</button>
+			{#if room.home.kind === 'phone'}
+				<p class="text-xs text-muted">Opening it on your phone only works on the phone's Wi-Fi.</p>
+			{/if}
+		</div>
+	</div>
 {/if}
 
 {#snippet roomList(title: string)}
@@ -288,6 +381,7 @@
 		</section>
 
 		{@render roomList('Your rooms on this phone')}
+		{@render elsewhereList()}
 	{:else if host}
 		<form class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line" onsubmit={join}>
 			<h2 class="text-lg font-bold">Join a room</h2>
@@ -348,6 +442,7 @@
 		{/if}
 
 		{@render roomList('Your rooms')}
+		{@render elsewhereList()}
 	{/if}
 
 	{#if nativeBridge}

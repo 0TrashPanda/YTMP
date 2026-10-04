@@ -151,6 +151,13 @@ export interface CommandSetListening {
   on: boolean;
 }
 
+export type RoomOpenMode = "ask" | "move" | "move_if_away";
+
+export interface CommandSetOpenElsewhere {
+  kind: "SetOpenElsewhere";
+  mode: RoomOpenMode | null;
+}
+
 export interface CommandSetOutput {
   kind: "SetOutput";
   outputId: string;
@@ -232,6 +239,7 @@ export type Command =
   | CommandRemoveQueueItem
   | CommandSeek
   | CommandSetListening
+  | CommandSetOpenElsewhere
   | CommandSetOutput
   | CommandSetOutputVolume
   | CommandSetParticipantPermissions
@@ -426,6 +434,7 @@ export interface RoomSettings {
   defaultGuestRole: string;
   defaultAccountRole: string;
   autoplay: boolean;
+  openElsewhere: RoomOpenMode | null;
 }
 
 export interface EventSettingsChanged {
@@ -473,11 +482,12 @@ export interface ServerMessagePong {
   hostTime: number;
 }
 
-export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "private_room" | "kicked" | "banned";
+export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "room_moved" | "private_room" | "kicked" | "banned";
 
 export interface ServerMessageRejected {
   type: "rejected";
   reason: RejectReason;
+  movedTo: string | null;
 }
 
 export type ErrorCode = "not_found" | "invalid" | "permission_denied";
@@ -676,6 +686,7 @@ export interface HistoryPage {
 export interface AccountSettings {
   tracking: boolean;
   hideFromOthers: boolean;
+  openElsewhere: RoomOpenMode;
 }
 
 export interface PlayReport {
@@ -828,6 +839,35 @@ export interface YoutubeHistorySetting {
 
 export interface YoutubeSignInRequest {
   cookie: string;
+}
+
+export interface RoomHome {
+  kind: HostKind;
+  hostId: string;
+  hostName: string;
+  url: string | null;
+}
+
+export interface SyncedRoom {
+  syncId: string;
+  code: string;
+  name: string;
+  visibility: RoomVisibility;
+  home: RoomHome;
+  epoch: number;
+  lastSeen: number;
+  playing: boolean;
+  nowPlaying: string | null;
+  openElsewhere: RoomOpenMode | null;
+}
+
+export interface SyncedRoomsResponse {
+  openElsewhere: RoomOpenMode;
+  rooms: SyncedRoom[];
+}
+
+export interface MovedRoomResponse {
+  code: string;
 }
 
 export interface LikeStatus {

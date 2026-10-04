@@ -25,6 +25,8 @@ import type {
 	YoutubeHistorySetting,
 	YoutubeAccount,
 	YoutubeSignInRequest,
+	SyncedRoomsResponse,
+	MovedRoomResponse,
 	Song
 } from './protocol.gen';
 
@@ -83,6 +85,16 @@ function ownerHeaders(code: string): Record<string, string> {
 
 export async function closeRoom(code: string): Promise<void> {
 	await request<null>(`/api/rooms/${encodeURIComponent(code)}`, { method: 'DELETE', headers: ownerHeaders(code) });
+}
+
+/** Your rooms that live on your other hosts (phone or server), with your account. */
+export function getRoomsElsewhere(): Promise<SyncedRoomsResponse> {
+	return request('/api/rooms/elsewhere');
+}
+
+/** Moves one of your rooms here from your other host; resolves with its code here. */
+export async function moveRoomHere(syncId: string): Promise<string> {
+	return (await request<MovedRoomResponse>(`/api/rooms/elsewhere/${encodeURIComponent(syncId)}/move`, { method: 'POST' })).code;
 }
 
 export function getRoom(code: string): Promise<RoomInfo> {

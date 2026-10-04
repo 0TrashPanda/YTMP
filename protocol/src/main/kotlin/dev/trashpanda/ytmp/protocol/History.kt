@@ -59,4 +59,6 @@ data class AccountSettings(
     val tracking: Boolean,
     /** Don't name me in other people's history. Applies to rooms you join after changing it. */
     val hideFromOthers: Boolean,
+    /** Opening one of your rooms on a host where it doesn't live (each room can override it). */
+    val openElsewhere: RoomOpenMode = RoomOpenMode.ASK,
 )

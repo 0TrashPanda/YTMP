@@ -20,6 +20,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [features/joining.md](features/joining.md) | Room codes, finding hosts on the LAN (auto, QR, IP) |
 | [features/platforms.md](features/platforms.md) | What each device type can do, Android app features |
 | [features/room-lifecycle.md](features/room-lifecycle.md) | Admin leaving, changing the owner, cloning, migration, transfer, multiple solo rooms |
+| [features/room-sync.md](features/room-sync.md) | Your rooms on all your devices: one home, moving between phone and server |
 | [features/queue.md](features/queue.md) | Queue, autoplay queue, history, fair ordering, shuffle, repeat, vote to skip, limits |
 | [features/room-management.md](features/room-management.md) | Permissions, kicking, access control, co-admins |
 | [features/accounts.md](features/accounts.md) | Optional accounts, room transfer, playlists, linked YouTube account and media servers |
@@ -47,4 +48,5 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [implementation/android-app.md](implementation/android-app.md) | Android app structure, native audio playback, app updates |
 | [implementation/downloads.md](implementation/downloads.md) | How downloads are made (tagging, formats) |
 | [implementation/chromecast.md](implementation/chromecast.md) | Chromecast output module |
+| [implementation/room-sync.md](implementation/room-sync.md) | Room sync: hub on the server, copies, epochs, moving |
 | [implementation/networking.md](implementation/networking.md) | LAN discovery, QR, room code generation, transport security, default timeouts |
