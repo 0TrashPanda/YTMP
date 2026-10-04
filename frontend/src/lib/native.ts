@@ -15,6 +15,11 @@ export interface NativeBridge {
 	playback(targetJson: string): void;
 	/** Opens YouTube Music's sign-in (bridge version 2); the answer comes as onYoutubeSignIn. */
 	youtubeSignIn?(): void;
+	/**
+	 * For a server's page (bridge version 3): asks you, then opens YouTube Music's sign-in and
+	 * hands the page the cookies as onYoutubeCookie, to keep in your account there.
+	 */
+	youtubeCookie?(): void;
 }
 
 /** Callbacks the app calls on the page. */
@@ -25,6 +30,8 @@ export interface NativeCallbacks {
 	onStatus?(status: string): void;
 	/** Back from YouTube Music's sign-in: null when signed in, else why not. */
 	onYoutubeSignIn?(error: string | null): void;
+	/** Back from youtubeCookie: the cookies, or null (with why, or null when you cancelled). */
+	onYoutubeCookie?(cookie: string | null, error: string | null): void;
 	/**
 	 * The phone's Back button: "handled" when the page went back itself, "exit" to put the
 	 * app in the background, anything else for the WebView's own history.

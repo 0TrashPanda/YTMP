@@ -433,7 +433,15 @@
 						{:else if view.kind === 'similar'}
 							<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={(target) => (menu = target)} />
 						{:else if view.kind === 'artist'}
-							<ArtistView {room} id={view.id} name={view.name} onToast={toast} onMenu={(target) => (menu = target)} onAlbum={(a) => openAlbum({ id: a.id, name: a.title })} />
+							<ArtistView
+								{room}
+								id={view.id}
+								name={view.name}
+								onToast={toast}
+								onMenu={(target) => (menu = target)}
+								onAlbum={(a) => openAlbum({ id: a.id, name: a.title })}
+								onPlaylist={openPlaylist}
+							/>
 						{:else if view.kind === 'album'}
 							<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
 						{:else if view.kind === 'playlist'}

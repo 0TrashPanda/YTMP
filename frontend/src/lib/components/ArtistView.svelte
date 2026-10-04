@@ -14,7 +14,8 @@
 		name,
 		onToast,
 		onMenu,
-		onAlbum
+		onAlbum,
+		onPlaylist
 	}: {
 		room: RoomConnection;
 		id: string;
@@ -23,6 +24,8 @@
 		onToast: (text: string) => void;
 		onMenu: (target: MenuTarget) => void;
 		onAlbum: (album: AlbumSummary) => void;
+		/** Opens all the artist's songs, as a playlist page. */
+		onPlaylist: (playlist: { id: string; title: string }) => void;
 	} = $props();
 
 	let artist = $state<ArtistPage | null>(null);
@@ -89,7 +92,11 @@
 		<section class="flex flex-col gap-1">
 			<h2 class="px-2 pb-1 text-xl font-bold">Songs</h2>
 			<SongList {room} songs={showAllSongs ? artist.songs : artist.songs.slice(0, 5)} {onToast} {onMenu} />
-			{#if artist.songs.length > 5}
+			{#if artist.songsPlaylistId}
+				{@const all = { id: artist.songsPlaylistId, title: `Songs by ${artist.name}` }}
+				<!-- Like YTM: all their songs on a page of their own. -->
+				<button class="self-start rounded-full border border-line px-4 py-1.5 text-sm font-medium hover:bg-raised" onclick={() => onPlaylist(all)}>Show all</button>
+			{:else if artist.songs.length > 5}
 				<button class="self-start rounded-full px-3 py-1.5 text-sm text-muted hover:bg-raised hover:text-white" onclick={() => (showAllSongs = !showAllSongs)}>
 					{showAllSongs ? 'Show less' : `Show all ${artist.songs.length}`}
 				</button>

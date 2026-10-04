@@ -29,6 +29,8 @@ data class ArtistPage(
     val songs: List<Song>,
     val albums: List<AlbumSummary>,
     val singles: List<AlbumSummary>,
+    /** All their songs, as a playlist (YTM's "Show all"). */
+    val songsPlaylistId: String? = null,
 )
 
 @Serializable
@@ -191,6 +193,14 @@ enum class YoutubeHistory {
     /** Also what plays in party rooms on this phone, whoever added it. */
     @SerialName("all") ALL,
 }
+
+/**
+ * `PUT /api/me/youtube`: sign in to YouTube Music on a server with the cookies of a signed-in
+ * music.youtube.com session, or text that contains them (copied request headers, cURL).
+ */
+@Serializable
+@SerialName("YoutubeSignInRequest")
+data class YoutubeSignInRequest(val cookie: String)
 
 /** `PUT /api/me/youtube/history`. */
 @Serializable

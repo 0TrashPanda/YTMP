@@ -35,6 +35,11 @@ data class RoomTimeouts(
     val participantOffline: Duration = 15.minutes,
     /** A public room with nobody connected is deleted after this long. Solo rooms stay until closed. */
     val emptyRoom: Duration = 1.hours,
+    /**
+     * A solo room without an owner account (a guest's, on a server), with nobody connected, is
+     * deleted after this long. Null: kept until closed (phones; account owners can always find theirs).
+     */
+    val guestSoloRoom: Duration? = null,
     val checkInterval: Duration = 1.minutes,
 )
 
@@ -177,13 +182,18 @@ class RoomManager(
         _hosting.value = all.filter { it.visibility == RoomVisibility.PUBLIC || it.isPlaying }.map { it.info }
     }
 
-    /** Periodically drops offline participants and deletes public rooms that have been empty too long. */
+    /** Periodically drops offline participants and deletes rooms that have been empty too long. */
     fun startCleanup() = scope.launch {
         while (isActive) {
             delay(timeouts.checkInterval)
             for (room in rooms.values) {
                 val nobodyOnline = room.cleanup(timeouts.participantOffline.inWholeMilliseconds)
-                val expired = room.visibility == RoomVisibility.PUBLIC && clock() - room.lastActive > timeouts.emptyRoom.inWholeMilliseconds
+                val idle = clock() - room.lastActive
+                val expired = when {
+                    room.visibility == RoomVisibility.PUBLIC -> idle > timeouts.emptyRoom.inWholeMilliseconds
+                    room.ownerAccount == null -> timeouts.guestSoloRoom?.let { idle > it.inWholeMilliseconds } ?: false
+                    else -> false
+                }
                 if (nobodyOnline && expired && rooms.remove(room.code, room)) remove(room)
             }
         }

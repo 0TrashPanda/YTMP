@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import secrets
+import threading
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 
 import httpx
@@ -40,6 +43,10 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
     async def not_found(_: Request, e: core.NotFound):
         return _error(404, "not_found", str(e))
 
+    @app.exception_handler(core.NotSignedIn)
+    async def not_signed_in(_: Request, e: core.NotSignedIn):
+        return _error(401, "not_signed_in", str(e))
+
     @app.exception_handler(_ApiError)
     async def api_error(_: Request, e: _ApiError):
         return _error(e.status, e.code, e.message)
@@ -55,7 +62,7 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
             "name": "YouTube Music",
             "version": VERSION,
             "apiVersion": API_VERSION,
-            "capabilities": ["search", "suggestions", "stream", "audio", "radio", "artist", "album", "playlist", "podcast", "home"],
+            "capabilities": ["search", "suggestions", "stream", "audio", "radio", "artist", "album", "playlist", "podcast", "home", "personal"],
         }
 
     @app.get("/search", dependencies=[Depends(check_key)])
@@ -145,7 +152,73 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
             headers["content-range"] = f"bytes {start}-{end}/{total}"
         return StreamingResponse(body(), status_code=206 if range else 200, headers=headers, media_type=info.mime_type)
 
+    # --- one account's YouTube Music (a server keeps the sign-in, and sends it each time) ---
+
+    users: OrderedDict[str, core.YtmCore] = OrderedDict()
+    users_lock = threading.Lock()
+
+    def me(x_ytm_cookie: str = Header()) -> core.YtmCore:
+        """The signed-in view for the cookies in X-Ytm-Cookie, kept for the next request."""
+        key_ = hashlib.sha256(x_ytm_cookie.encode()).hexdigest()
+        with users_lock:
+            if (user := users.get(key_)) is not None:
+                users.move_to_end(key_)
+                return user
+        user = ytm.signed_in_as(x_ytm_cookie)
+        with users_lock:
+            users[key_] = user
+            while len(users) > _MAX_USERS:
+                users.popitem(last=False)
+        return user
+
+    @app.get("/me/account", dependencies=[Depends(check_key)])
+    def my_account(user: core.YtmCore = Depends(me)):
+        return user.account()
+
+    @app.get("/me/home", dependencies=[Depends(check_key)])
+    def my_home(user: core.YtmCore = Depends(me)):
+        return user.home(personal=True)
+
+    @app.get("/me/library", dependencies=[Depends(check_key)])
+    def my_library(user: core.YtmCore = Depends(me)):
+        return user.library()
+
+    @app.get("/me/playlists", dependencies=[Depends(check_key)])
+    def my_playlists(user: core.YtmCore = Depends(me)):
+        return user.own_playlists()
+
+    @app.post("/me/playlists", dependencies=[Depends(check_key)])
+    def my_new_playlist(body: dict, user: core.YtmCore = Depends(me)):
+        return {"id": user.create_playlist(str(body.get("title") or ""), list(body.get("songIds") or []))}
+
+    @app.get("/me/playlists/{playlist_id}", dependencies=[Depends(check_key)])
+    def my_playlist(playlist_id: str, user: core.YtmCore = Depends(me)):
+        return user.playlist(playlist_id, personal=True)
+
+    @app.post("/me/playlists/{playlist_id}/songs", dependencies=[Depends(check_key)])
+    def my_playlist_add(playlist_id: str, body: dict, user: core.YtmCore = Depends(me)):
+        user.add_to_playlist(playlist_id, list(body.get("songIds") or []))
+        return {"ok": True}
+
+    @app.get("/me/likes/{song_id}", dependencies=[Depends(check_key)])
+    def my_like(song_id: str, user: core.YtmCore = Depends(me)):
+        return {"liked": user.liked(song_id)}
+
+    @app.put("/me/likes/{song_id}", dependencies=[Depends(check_key)])
+    def my_like_set(song_id: str, body: dict, user: core.YtmCore = Depends(me)):
+        user.set_liked(song_id, bool(body.get("liked")))
+        return {"liked": bool(body.get("liked"))}
+
+    @app.post("/me/history/{song_id}", dependencies=[Depends(check_key)])
+    def my_history_add(song_id: str, user: core.YtmCore = Depends(me)):
+        user.add_to_history(song_id)
+        return {"ok": True}
+
     return app
+
+
+# Signed-in accounts kept ready (each holds a YTMusic session).
+_MAX_USERS = 50
 
 
 class _ApiError(Exception):

@@ -127,7 +127,9 @@ YTMP_DOMAIN=ytmp.example.com
 EOF
 ```
 
-`YTMP_URL` is where YTMP accounts log in. `YTMP_DOMAIN` is the domain Caddy gets a
+`YTMP_URL` is where YTMP accounts log in. Keep `YTMP_MODULE_KEY` safe and the same: it
+also encrypts the YouTube Music sign-ins people connect to their accounts (changing it means
+everyone signs in again). `YTMP_DOMAIN` is the domain Caddy gets a
 certificate for: only for option A, leave it out with nginx.
 
 ## 4. Domain and HTTPS

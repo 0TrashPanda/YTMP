@@ -131,8 +131,9 @@ Open it with the **⋮** button or by **right-clicking** the song.
 > queue, the history or the autoplay queue). The current song has the menu too: right-click
 > the album art in the full player or the player bar, or its ⋮.
 >
-> **Artist pages** show the artist's top songs (20), albums and singles, with *Radio* and
-> *Add top songs*. **Album pages** list the songs in order, with *Play*, *Play next* and
+> **Artist pages** show the artist's top songs, albums and singles, with *Radio* and
+> *Add top songs*. **Show all** under the songs opens all their songs (YTM's list, up to 200)
+> as a page with *Play*, *Play next* and *Add to queue*. **Album pages** list the songs in order, with *Play*, *Play next* and
 > *Add to queue*. Artist and album names under the current song open them.
 
 | Action | Notes |

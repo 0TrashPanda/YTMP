@@ -91,6 +91,13 @@ interface PersonalCatalog {
 
     suspend fun signOut()
 
+    /**
+     * Signs in with the cookies of a signed-in music.youtube.com session (or something that
+     * contains them, like copied request headers). Where that isn't possible (a phone signs in
+     * in the app itself), it throws [UnsupportedOperationException].
+     */
+    suspend fun signIn(cookie: String): YoutubeAccount = throw UnsupportedOperationException("Sign in in the app")
+
     /** Which plays go into the YouTube Music history (see [addToHistory]). */
     suspend fun historySetting(): YoutubeHistory = YoutubeHistory.SOLO
 

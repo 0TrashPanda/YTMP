@@ -6,6 +6,7 @@ See docs/implementation/module-api.md.
 
 from __future__ import annotations
 
+import copy
 import re
 import threading
 import time
@@ -136,6 +137,17 @@ class YtmCore:
     def sign_out(self) -> None:
         self._user = None
 
+    def signed_in_as(self, cookie: str) -> "YtmCore":
+        """This core for one signed-in account (a server serves several): the same anonymous
+        YouTube Music and stream cache, with [cookie]'s account for the personal pages.
+
+        Raises NotSignedIn when the cookies aren't (or no longer) signed in.
+        """
+        view = copy.copy(self)
+        view._user = None
+        view.sign_in(cookie)
+        return view
+
     def account(self) -> dict | None:
         """The signed-in account: {name, handle, photoUrl}, or None."""
         return _account(self._user) if self._user else None
@@ -216,6 +228,7 @@ class YtmCore:
             "songs": songs[:_ARTIST_SONGS],
             "albums": [_album_summary(x, "Album") for x in (a.get("albums") or {}).get("results") or [] if x.get("browseId")],
             "singles": [_album_summary(x, "Single") for x in (a.get("singles") or {}).get("results") or [] if x.get("browseId")],
+            "songsPlaylistId": (songs_section.get("browseId") or "").removeprefix("VL") or None,
         }
 
     def album(self, album_id: str) -> dict:

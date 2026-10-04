@@ -23,13 +23,25 @@ import type {
 	YoutubeAccountStatus,
 	YoutubeHistory,
 	YoutubeHistorySetting,
+	YoutubeAccount,
+	YoutubeSignInRequest,
 	Song
 } from './protocol.gen';
 
+import { identity } from './account';
+import { saved } from './storage';
+
 export class ApiRequestError extends Error {}
 
+/**
+ * Every request carries your account (the host token for this page), if you logged in: on a
+ * server it finds your rooms and your YouTube Music. The token only works on this host.
+ */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-	const response = await fetch(path, init);
+	const headers = new Headers(init?.headers);
+	const token = identity.token;
+	if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+	const response = await fetch(path, { ...init, headers });
 	if (!response.ok) {
 		const body = (await response.json().catch(() => null)) as ApiError | null;
 		throw new ApiRequestError(body?.error.message ?? `Request failed (${response.status})`);
@@ -63,13 +75,18 @@ export async function listRooms(): Promise<RoomInfo[]> {
 	return (await request<RoomListResponse>('/api/rooms')).rooms;
 }
 
+/** Proves you made a room, without an account (see OWNER_TOKEN_HEADER on the host). */
+function ownerHeaders(code: string): Record<string, string> {
+	const token = saved.ownerToken(code);
+	return token ? { 'X-Ytmp-Owner': token } : {};
+}
+
 export async function closeRoom(code: string): Promise<void> {
-	const response = await fetch(`/api/rooms/${encodeURIComponent(code)}`, { method: 'DELETE' });
-	if (!response.ok) throw new ApiRequestError(`Couldn't close the room (${response.status})`);
+	await request<null>(`/api/rooms/${encodeURIComponent(code)}`, { method: 'DELETE', headers: ownerHeaders(code) });
 }
 
 export function getRoom(code: string): Promise<RoomInfo> {
-	return request(`/api/rooms/${encodeURIComponent(code)}`);
+	return request(`/api/rooms/${encodeURIComponent(code)}`, { headers: ownerHeaders(code) });
 }
 
 // Browsing (search, similar, artist, album and playlist pages) is remembered for a while, so going
@@ -153,6 +170,11 @@ export function getYoutubeAccount(): Promise<YoutubeAccountStatus> {
 
 export async function setYoutubeHistory(history: YoutubeHistory): Promise<void> {
 	await request<null>('/api/me/youtube/history', { method: 'PUT', body: JSON.stringify({ history } satisfies YoutubeHistorySetting) });
+}
+
+/** On a server: keep this YouTube Music sign-in (cookies, or text that contains them) in your account. */
+export function signInToYoutube(cookie: string): Promise<YoutubeAccount> {
+	return request('/api/me/youtube', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cookie } satisfies YoutubeSignInRequest) });
 }
 
 export async function signOutOfYoutube(): Promise<void> {

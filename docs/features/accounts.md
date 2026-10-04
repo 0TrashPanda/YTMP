@@ -67,9 +67,23 @@ phone's owner:
   phone (also what friends add in a party).
 - Signing out also forgets the sign-in page's session, so you can pick another account.
 
-Later: removing songs from your playlists, dislike; using your sign-in in rooms on someone else's
-phone or a server, by loading your library from your own device or YTMP server so the room
-host never gets your sign-in.
+### YouTube Music on a server account ✅
+
+On a YTMP server you can connect YouTube Music to **your YTMP account**: then your Home,
+Library, likes, saving to playlists and the history setting work in rooms on that server, in
+every browser where you're logged in. Only you see them.
+
+- **Sign in with the YTMP app**: the app opens Google's sign-in page (after asking whether to
+  send it to that server) and gives the sign-in to the server.
+- **Paste from a browser**: copy the `Cookie` header of a music.youtube.com request (or the
+  whole request, or *Copy as cURL*) from the developer tools and paste it.
+- The server keeps the sign-in **encrypted** (with a key from its module key, not stored in
+  its database) and only sends it to its YouTube Music module. Changing the module key
+  means signing in again.
+- History on a server: **Off**, **Solo rooms** (your solo rooms), or **All rooms** you're in.
+
+Later: removing songs from your playlists, dislike; using your sign-in in rooms on someone
+else's phone or server without giving that host your sign-in.
 
 ## Creating an account
 

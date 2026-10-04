@@ -365,7 +365,7 @@ class ApplicationTest {
     }
 
     @Test
-    fun `a server has no solo rooms and never lists rooms`() = testApplication {
+    fun `a host without solo rooms refuses them, and lists no rooms without an account`() = testApplication {
         setup()
         val client = jsonClient()
         val solo = client.post("/api/rooms") {
@@ -373,6 +373,24 @@ class ApplicationTest {
             setBody(CreateRoomRequest("Solo", RoomVisibility.PRIVATE))
         }
         assertEquals(HttpStatusCode.BadRequest, solo.status)
-        assertEquals(HttpStatusCode.Forbidden, client.get("/api/rooms").status)
+        assertEquals(emptyList(), client.get("/api/rooms").body<RoomListResponse>().rooms)
+    }
+
+    @Test
+    fun `a solo room on a server is only there for its owner`() = testApplication {
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, supportsPrivateRooms = true, isLocal = { false }))
+        }
+        val client = jsonClient()
+        val created = client.post("/api/rooms") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateRoomRequest("Solo", RoomVisibility.PRIVATE))
+        }.body<CreateRoomResponse>()
+
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/rooms/${created.code}").status)
+        assertEquals(HttpStatusCode.OK, client.get("/api/rooms/${created.code}") { header(OWNER_TOKEN_HEADER, created.ownerToken) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.delete("/api/rooms/${created.code}").status)
+        assertEquals(HttpStatusCode.NoContent, client.delete("/api/rooms/${created.code}") { header(OWNER_TOKEN_HEADER, created.ownerToken) }.status)
     }
 }

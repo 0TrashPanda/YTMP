@@ -174,12 +174,14 @@ class Room(
 
     /**
      * Adds a participant. [local] means the connection comes from the hosting device itself;
-     * only local connections may join a private (solo) room. [account] is set when the
+     * a private (solo) room only lets in local connections and its owner (by owner token or
+     * account, e.g. on a server). [account] is set when the
      * participant proved an account; it then shows on them, and the room's account owner
      * is recognised on any device.
      */
     suspend fun join(hello: ClientMessage.Hello, outbox: Outbox, local: Boolean = true, account: AccountIdentity? = null): String? = mutex.withLock {
-        if (visibility == RoomVisibility.PRIVATE && !local) {
+        val isOwner = hello.ownerToken == ownerToken || (account != null && account.id == ownerAccount)
+        if (visibility == RoomVisibility.PRIVATE && !local && !isOwner) {
             outbox.send(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM))
             return null
         }
@@ -193,7 +195,6 @@ class Room(
             return null
         }
 
-        val isOwner = hello.ownerToken == ownerToken || (account != null && account.id == ownerAccount)
         val banned = bans.any { (account != null && it.info.accountId == account.id) || (it.guestToken != null && it.guestToken == hello.guestToken) }
         if (banned && !isOwner) {
             outbox.send(ServerMessage.Rejected(RejectReason.BANNED))
@@ -235,10 +236,6 @@ class Room(
      * them online or replace their connection. Returns the participant's id.
      */
     suspend fun attach(message: ClientMessage.Attach, outbox: Outbox, local: Boolean = true): String? = mutex.withLock {
-        if (visibility == RoomVisibility.PRIVATE && !local) {
-            outbox.send(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM))
-            return null
-        }
         if (message.protocolVersion != PROTOCOL_VERSION) {
             outbox.send(ServerMessage.Rejected(RejectReason.VERSION_MISMATCH))
             return null
@@ -247,6 +244,10 @@ class Room(
         if (member == null) {
             // Not (or no longer) in the room, e.g. kicked or removed after being away.
             outbox.send(ServerMessage.Rejected(RejectReason.KICKED))
+            return null
+        }
+        if (visibility == RoomVisibility.PRIVATE && !local && !member.isOwner) {
+            outbox.send(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM))
             return null
         }
         member.attached += outbox

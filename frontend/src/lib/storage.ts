@@ -41,6 +41,23 @@ export const saved = {
 	setGuestToken: (roomCode: string, token: string) => write(`ytmp.guest.${code(roomCode)}`, token),
 	ownerToken: (roomCode: string) => read(`ytmp.owner.${code(roomCode)}`),
 	setOwnerToken: (roomCode: string, token: string) => write(`ytmp.owner.${code(roomCode)}`, token),
+	forgetOwnerToken: (roomCode: string) => {
+		try {
+			localStorage.removeItem(`ytmp.owner.${code(roomCode)}`);
+		} catch {
+			// Nothing saved anyway.
+		}
+	},
+	/** Codes of the rooms made in this browser (it has their owner tokens). */
+	get ownedRooms(): string[] {
+		try {
+			return Object.keys(localStorage)
+				.filter((key) => key.startsWith('ytmp.owner.'))
+				.map((key) => key.slice('ytmp.owner.'.length));
+		} catch {
+			return [];
+		}
+	},
 	/** Keep me out of other people's listening history (sent when joining a room). */
 	get hideFromHistory() {
 		return read('ytmp.hideFromHistory') === '1';

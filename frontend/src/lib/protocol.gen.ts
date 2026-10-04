@@ -707,6 +707,7 @@ export interface ArtistPage {
   songs: Song[];
   albums: AlbumSummary[];
   singles: AlbumSummary[];
+  songsPlaylistId: string | null;
 }
 
 export interface AlbumPage {
@@ -823,6 +824,10 @@ export interface YoutubeAccountStatus {
 
 export interface YoutubeHistorySetting {
   history: YoutubeHistory;
+}
+
+export interface YoutubeSignInRequest {
+  cookie: string;
 }
 
 export interface LikeStatus {

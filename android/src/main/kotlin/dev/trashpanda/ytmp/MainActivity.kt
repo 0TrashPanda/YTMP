@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -67,6 +68,16 @@ class MainActivity : ComponentActivity() {
             }
             js("window.__ytmpNative && window.__ytmpNative.onYoutubeSignIn && window.__ytmpNative.onYoutubeSignIn(${error?.let(JSONObject::quote) ?: "null"})")
         }
+    }
+
+    /**
+     * Back from [YoutubeLoginActivity] for a server's page (bridge `youtubeCookie`): the page
+     * gets the cookies and stores them in your account there.
+     */
+    private val youtubeCookieLogin = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val cookie = result.data?.getStringExtra(YoutubeLoginActivity.EXTRA_COOKIE)?.takeIf { result.resultCode == RESULT_OK }
+        val answer = if (cookie != null) "${JSONObject.quote(cookie)}, null" else "null, ${JSONObject.quote("Not signed in")}"
+        js("window.__ytmpNative && window.__ytmpNative.onYoutubeCookie && window.__ytmpNative.onYoutubeCookie($answer)")
     }
 
     /** Serves the bundled setup page from assets on a fake https origin. */
@@ -270,6 +281,24 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun nearbyRooms(): String = json.encodeToString(ListSerializer(NearbyRoom.serializer()), app.nearby.rooms.value)
 
+        /**
+         * For a server's page: after you confirm, opens YouTube Music's sign-in and gives the
+         * page the cookies (`onYoutubeCookie`), to keep in your account on that server.
+         */
+        @JavascriptInterface
+        fun youtubeCookie() = runOnUiThread {
+            val host = Uri.parse(webView.url ?: "").host ?: "this server"
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("Sign in to YouTube Music for $host?")
+                .setMessage("Your YouTube Music sign-in will be kept in your YTMP account on $host, so your Home, Library and likes work there in any browser. Only sign in on servers you trust.")
+                .setPositiveButton("Sign in") { _, _ -> youtubeCookieLogin.launch(Intent(this@MainActivity, YoutubeLoginActivity::class.java)) }
+                .setNegativeButton("Cancel") { _, _ ->
+                    js("window.__ytmpNative && window.__ytmpNative.onYoutubeCookie && window.__ytmpNative.onYoutubeCookie(null, null)")
+                }
+                .setOnCancelListener { js("window.__ytmpNative && window.__ytmpNative.onYoutubeCookie && window.__ytmpNative.onYoutubeCookie(null, null)") }
+                .show()
+        }
+
         /** Opens YouTube Music's sign-in; the page hears back through `onYoutubeSignIn`. */
         @JavascriptInterface
         fun youtubeSignIn() = runOnUiThread { youtubeLogin.launch(Intent(this@MainActivity, YoutubeLoginActivity::class.java)) }
@@ -292,6 +321,6 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 2
+        const val BRIDGE_VERSION = 3
     }
 }

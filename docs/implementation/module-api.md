@@ -186,17 +186,26 @@ Lyrics from modules are a **fallback**. The host first looks up the song on **LR
 itself (by title, artist, album and duration), so synced lyrics work for every source,
 including local files.
 
-### Library (user-scoped, needs `X-YTMP-Credentials`)
+### Library (user-scoped, needs `X-Ytm-Cookie`)
+
+Implemented in the YTM module: the server sends the account's music.youtube.com cookies in
+`X-Ytm-Cookie` with every request (it stores them encrypted, see `YoutubeLinks.kt`); the
+module keeps a signed-in session per cookie (up to 50). Cookies that aren't (or no longer)
+signed in give `401 not_signed_in`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/me/playlists` | The user's YTM playlists |
-| GET | `/me/likes?cursor=` | Liked songs |
-| PUT / DELETE | `/me/likes/{songId}` | Like / unlike |
-| POST | `/me/playlists` | Create a playlist: `{ title, description, privacy }` |
+| GET | `/me/account` | `{ name, handle, photoUrl }`: checks the sign-in |
+| GET | `/me/home` | The account's own home page |
+| GET | `/me/library` | Playlists (Liked music first) and podcasts, as home sections |
+| GET | `/me/playlists` | The account's own playlists (to save songs to) |
+| POST | `/me/playlists` | Create a private playlist: `{ title, songIds }` → `{ id }` |
+| GET | `/me/playlists/{id}` | A playlist, also private ones (`LM` = Liked music) |
 | POST | `/me/playlists/{id}/songs` | Add songs: `{ songIds: [...] }` |
-| DELETE | `/me/playlists/{id}/songs/{songId}` | Remove a song |
-| GET | `/me/check` | Are the credentials still valid? (for the "relink your account" message) |
+| GET / PUT | `/me/likes/{songId}` | `{ liked }` |
+| POST | `/me/history/{songId}` | Add a play to the account's YouTube Music history |
+
+Not yet: removing songs, unliking from a list, liked songs paging.
 
 ### Admin
 

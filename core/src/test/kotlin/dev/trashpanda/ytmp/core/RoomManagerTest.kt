@@ -23,6 +23,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -60,7 +61,7 @@ class RoomManagerTest {
 
     private val timeouts = RoomTimeouts(participantOffline = 15.minutes, emptyRoom = 60.minutes, checkInterval = 1.minutes)
 
-    private fun TestScope.manager(store: RoomStore) = RoomManager(
+    private fun TestScope.manager(store: RoomStore, timeouts: RoomTimeouts = this@RoomManagerTest.timeouts) = RoomManager(
         streams = { id -> "https://stream/$id" },
         scope = backgroundScope,
         timeouts = timeouts,
@@ -162,5 +163,40 @@ class RoomManagerTest {
 
         solo.pause()
         assertEquals(listOf(party.code), rooms.hosting.value.map { it.code })
+    }
+
+    @Test
+    fun `on a server, a guest's unused solo room expires, an account's stays`() = runTest {
+        val rooms = manager(MemoryStore(), timeouts.copy(guestSoloRoom = 30.days))
+        val guests = rooms.create("Solo", RoomVisibility.PRIVATE)
+        val mine = rooms.create("Mine", RoomVisibility.PRIVATE, ownerAccount = "anna@example.com")
+        rooms.startCleanup()
+
+        advanceTimeBy(29.days)
+        runCurrent()
+        assertNotNull(rooms[guests.code])
+
+        advanceTimeBy(2.days)
+        runCurrent()
+        assertNull(rooms[guests.code])
+        assertNotNull(rooms[mine.code])
+    }
+
+    @Test
+    fun `a solo room lets in the hosting device and its owner, nobody else`() = runTest {
+        val rooms = manager(MemoryStore())
+        val solo = rooms.create("Solo", RoomVisibility.PRIVATE, ownerAccount = "anna@example.com")
+        fun hello(ownerToken: String? = null) = ClientMessage.Hello(PROTOCOL_VERSION, solo.code, "Me", null, ownerToken)
+
+        val stranger = Client()
+        assertNull(solo.join(hello(), stranger, local = false))
+        val byToken = Client()
+        assertNotNull(solo.join(hello(ownerToken = solo.ownerToken), byToken, local = false))
+        val byAccount = Client()
+        assertNotNull(solo.join(hello(), byAccount, local = false, account = AccountIdentity("anna@example.com", "Anna")))
+        val someoneElse = Client()
+        assertNull(solo.join(hello(), someoneElse, local = false, account = AccountIdentity("bob@example.com", "Bob")))
+        val onTheHost = Client()
+        assertNotNull(solo.join(hello(), onTheHost, local = true))
     }
 }

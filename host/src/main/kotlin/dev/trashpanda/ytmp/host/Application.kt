@@ -7,11 +7,13 @@ import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import dev.trashpanda.ytmp.protocol.YoutubeHistorySetting
+import dev.trashpanda.ytmp.protocol.YoutubeSignInRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
 import dev.trashpanda.ytmp.protocol.LikeStatus
 import dev.trashpanda.ytmp.protocol.MyPlaylists
 import dev.trashpanda.ytmp.protocol.SaveSongsRequest
+import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
@@ -125,6 +127,11 @@ fun Application.ytmpModule(
     catalog: CatalogSource? = null,
     /** The owner's YouTube Music account (phone hosts), for requests from the host's own app. */
     personal: PersonalCatalog? = null,
+    /**
+     * Whose YouTube Music a request may use, instead of [personal]: on a server, the account
+     * the request proves. Null: none (the general pages).
+     */
+    personalFor: ((ApplicationCall) -> PersonalCatalog?)? = null,
     /** Search suggestions while typing. */
     suggestions: SearchSuggestions? = null,
 ) {
@@ -146,6 +153,16 @@ fun Application.ytmpModule(
 
     fun ApplicationCall.mayManageRooms() = !options.localOnlyRoomManagement || options.isLocal(this)
 
+    /** Your YouTube Music: the phone owner's in their own app, or (a server) your account's. */
+    fun ApplicationCall.personal(): PersonalCatalog? = personalFor?.invoke(this) ?: personal?.takeIf { options.isLocal(this) }
+
+    /** The account this request proves (bearer host token), if any. */
+    fun ApplicationCall.account() = bearerToken()?.let(options.auth::verify)
+
+    /** The room's owner: its owner token (header), or its owner account. */
+    fun ApplicationCall.owns(room: Room) =
+        request.header(OWNER_TOKEN_HEADER) == room.ownerToken || (room.ownerAccount != null && account()?.id == room.ownerAccount)
+
     routing {
         route("/api") {
             get("/host") {
@@ -160,9 +177,13 @@ fun Application.ytmpModule(
                 )
             }
             get("/rooms") {
-                // Only the hosting phone may see its rooms; a server never lists them.
-                if (!options.localOnlyRoomManagement || !options.isLocal(call)) throw forbidden()
-                call.respond(RoomListResponse(rooms.list.value))
+                // The hosting phone sees all its rooms; on a server, you see the rooms your account owns.
+                if (options.localOnlyRoomManagement) {
+                    if (!options.isLocal(call)) throw forbidden()
+                    return@get call.respond(RoomListResponse(rooms.list.value))
+                }
+                val me = call.account()?.id ?: return@get call.respond(RoomListResponse(emptyList()))
+                call.respond(RoomListResponse(rooms.all().filter { it.ownerAccount == me }.map { it.info }))
             }
             post("/rooms") {
                 if (!call.mayManageRooms()) throw forbidden()
@@ -182,15 +203,17 @@ fun Application.ytmpModule(
             }
             get("/rooms/{code}") {
                 val room = rooms[call.parameters["code"]!!]
-                // A private room doesn't exist for anyone but the hosting device.
-                if (room == null || (room.visibility == RoomVisibility.PRIVATE && !options.isLocal(call))) {
+                // A private room doesn't exist for anyone but the hosting device and its owner.
+                if (room == null || (room.visibility == RoomVisibility.PRIVATE && !options.isLocal(call) && !call.owns(room))) {
                     throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
                 }
                 call.respond(room.info)
             }
             delete("/rooms/{code}") {
-                if (!options.localOnlyRoomManagement || !options.isLocal(call)) throw forbidden()
-                rooms.close(call.parameters["code"]!!)
+                val room = rooms[call.parameters["code"]!!] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
+                val hostingPhone = options.localOnlyRoomManagement && options.isLocal(call)
+                if (!hostingPhone && !call.owns(room)) throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Only the room's owner can close it")
+                rooms.close(room.code)
                 call.respond(HttpStatusCode.NoContent)
             }
             get("/search") {
@@ -230,17 +253,18 @@ fun Application.ytmpModule(
                 // The owner's own home page in their app; everyone else gets the general one.
                 // ?fresh=1: pulled down to refresh, so not from the cache.
                 val fresh = call.request.queryParameters["fresh"] == "1"
-                if (personal != null && options.isLocal(call) && personal.account() != null) {
-                    return@get call.respond(if (fresh) personal.freshHome() else personal.home())
+                val mine = call.personal()
+                if (mine != null && mine.account() != null) {
+                    return@get call.respond(if (fresh) mine.freshHome() else mine.home())
                 }
                 val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No home page here")
                 call.respond(if (fresh) source.freshHome() else source.home())
             }
             route("/me") {
                 fun ApplicationCall.owner(): PersonalCatalog =
-                    personal?.takeIf { options.isLocal(this) } ?: throw forbidden()
+                    personal() ?: throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Log in to use your YouTube Music here")
                 get("/youtube") {
-                    val mine = personal?.takeIf { options.isLocal(call) }
+                    val mine = call.personal()
                     call.respond(
                         YoutubeAccountStatus(available = mine != null, account = mine?.account(), history = mine?.historySetting() ?: YoutubeHistory.SOLO),
                     )
@@ -249,6 +273,15 @@ fun Application.ytmpModule(
                     val owner = call.owner()
                     owner.setHistorySetting(call.receive<YoutubeHistorySetting>().history)
                     call.respond(HttpStatusCode.NoContent)
+                }
+                put("/youtube") {
+                    val owner = call.owner()
+                    val account = try {
+                        owner.signIn(call.receive<YoutubeSignInRequest>().cookie)
+                    } catch (e: UnsupportedOperationException) {
+                        throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "Sign in in the app")
+                    }
+                    call.respond(account)
                 }
                 delete("/youtube") {
                     call.owner().signOut()
@@ -347,6 +380,9 @@ private fun searchType(value: String): SearchType =
         ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Unknown search type: $value")
 
 /** The token in `Authorization: Bearer …`, if any. */
+/** Proves you own a room without an account: the owner token from creating it. */
+const val OWNER_TOKEN_HEADER = "X-Ytmp-Owner"
+
 fun ApplicationCall.bearerToken(): String? =
     request.header(HttpHeaders.Authorization)?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }?.substring(7)?.trim()?.ifEmpty { null }
 

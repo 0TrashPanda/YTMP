@@ -40,7 +40,7 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         set(value) = prefs.edit().putString("cookie", value).apply()
 
     /** Signs in with the cookies from [YoutubeLoginActivity]; throws [SourceException] when they don't work. */
-    suspend fun signIn(cookie: String): YoutubeAccount = lock.withLock {
+    override suspend fun signIn(cookie: String): YoutubeAccount = lock.withLock {
         val account = ytm().signIn(cookie)
         this.cookie = cookie
         loaded = cookie

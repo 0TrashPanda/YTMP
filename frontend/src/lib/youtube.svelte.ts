@@ -1,12 +1,16 @@
-// Your YouTube Music sign-in. Only the phone app has one, on its own host: signing in
-// happens in the app (android/.../YoutubeLoginActivity.kt), and the cookies stay there.
-import { forgetPersonal, getYoutubeAccount, setYoutubeHistory, signOutOfYoutube } from './api';
+// Your YouTube Music sign-in. On a phone it belongs to the phone's own host: signing in
+// happens in the app (android/.../YoutubeLoginActivity.kt), and the cookies stay there. On a
+// server it belongs to your YTMP account there: you sign in through the app, or paste the
+// cookies from a browser, and the server keeps them (server/.../YoutubeLinks.kt).
+import { forgetPersonal, getHost, getYoutubeAccount, setYoutubeHistory, signInToYoutube, signOutOfYoutube } from './api';
 import { nativeBridge } from './native';
 import type { YoutubeAccount, YoutubeHistory } from './protocol.gen';
 
 class YoutubeSignIn {
-	/** This host can sign in for you (the phone app). */
+	/** You can sign in here: the phone app on its own host, or logged in to your account on a server. */
 	available = $state(false);
+	/** This host is a server, where your account keeps the sign-in. */
+	onServer = $state(false);
 	account = $state<YoutubeAccount | null>(null);
 	/** Which songs played here go into your YouTube Music history. */
 	history = $state<YoutubeHistory>('solo');
@@ -14,10 +18,16 @@ class YoutubeSignIn {
 	version = $state(0);
 	busy = $state(false);
 
+	/** On a server: the app can sign in for you (bridge version 3). */
+	get canUseApp(): boolean {
+		return this.onServer && !!nativeBridge?.youtubeCookie;
+	}
+
 	async load(): Promise<void> {
 		try {
-			const status = await getYoutubeAccount();
-			this.available = status.available && !!nativeBridge?.youtubeSignIn;
+			const [status, host] = await Promise.all([getYoutubeAccount(), getHost()]);
+			this.onServer = host.kind === 'server';
+			this.available = status.available && (this.onServer || !!nativeBridge?.youtubeSignIn);
 			this.account = status.account;
 			this.history = status.history;
 		} catch {
@@ -25,25 +35,62 @@ class YoutubeSignIn {
 		}
 	}
 
-	/** Opens the sign-in in the app. Resolves with null when signed in, else why not. */
+	/** Signs in (the app on a phone, or for a server). Resolves with null when signed in, else why not. */
 	signIn(): Promise<string | null> {
+		return this.onServer ? this.signInWithApp() : this.signInOnPhone();
+	}
+
+	/** On a server: keeps what you pasted (the cookies, or a request that has them) in your account. */
+	async signInWithText(text: string): Promise<string | null> {
+		this.busy = true;
+		try {
+			await signInToYoutube(text);
+			await this.signedIn();
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : "Couldn't sign in";
+		} finally {
+			this.busy = false;
+		}
+	}
+
+	private signInOnPhone(): Promise<string | null> {
 		return new Promise((resolve) => {
 			if (!nativeBridge?.youtubeSignIn) return resolve('Signing in only works in the app');
 			this.busy = true;
 			window.__ytmpNative = {
-				...window.__ytmpNative!,
+				...window.__ytmpNative,
 				onYoutubeSignIn: async (error) => {
-					if (!error) {
-						forgetPersonal();
-						await this.load();
-						this.version++;
-					}
+					if (!error) await this.signedIn();
 					this.busy = false;
 					resolve(error);
 				}
 			};
 			nativeBridge.youtubeSignIn();
 		});
+	}
+
+	private signInWithApp(): Promise<string | null> {
+		return new Promise((resolve) => {
+			if (!nativeBridge?.youtubeCookie) return resolve('Signing in with the app needs a newer version of the app');
+			this.busy = true;
+			window.__ytmpNative = {
+				...window.__ytmpNative,
+				onYoutubeCookie: async (cookie, error) => {
+					this.busy = false;
+					// Cancelled: nothing to say.
+					if (!cookie) return resolve(error ?? '');
+					resolve(await this.signInWithText(cookie));
+				}
+			};
+			nativeBridge.youtubeCookie();
+		});
+	}
+
+	private async signedIn(): Promise<void> {
+		forgetPersonal();
+		await this.load();
+		this.version++;
 	}
 
 	async setHistory(history: YoutubeHistory): Promise<void> {

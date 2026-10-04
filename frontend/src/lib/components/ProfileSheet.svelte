@@ -20,6 +20,17 @@
 
 	async function signIn() {
 		const problem = await youtube.signIn();
+		// '': you cancelled.
+		if (problem === '') return;
+		if (problem) onToast(problem);
+		else onClose();
+	}
+
+	// On a server: paste the sign-in from a browser.
+	let pasting = $state(false);
+	let pasted = $state('');
+	async function signInWithText() {
+		const problem = await youtube.signInWithText(pasted);
 		if (problem) onToast(problem);
 		else onClose();
 	}
@@ -104,6 +115,37 @@
 				(v) => youtube.setHistory(v as YoutubeHistory).catch((e) => onToast(e instanceof Error ? e.message : "Couldn't change it"))
 			)}
 			<button class="rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={signOut}>Sign out of YouTube Music</button>
+		{:else if youtube.available && youtube.onServer}
+			<h2 class="text-lg font-bold">YouTube Music account</h2>
+			<p class="text-sm text-muted">
+				Connect YouTube Music to your YTMP account on this server: your playlists, liked songs and podcasts, and your own suggestions on Home, in every browser. The
+				server keeps the sign-in (encrypted); only you can use it.
+			</p>
+			{#if youtube.canUseApp}
+				<button class="rounded-full bg-white py-2.5 font-medium text-black disabled:opacity-50" disabled={youtube.busy} onclick={signIn}>
+					{youtube.busy ? 'Signing in…' : 'Sign in with the YTMP app'}
+				</button>
+			{/if}
+			{#if !pasting}
+				<button class="rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={() => (pasting = true)}>Paste from a browser</button>
+			{:else}
+				<ol class="list-decimal space-y-1 pl-5 text-sm text-muted">
+					<li>On a computer, open <span class="text-white">music.youtube.com</span>, signed in.</li>
+					<li>Open the developer tools (F12) and go to <span class="text-white">Network</span>.</li>
+					<li>Click around once, then click a request to <span class="text-white">music.youtube.com</span> (like <span class="text-white">browse</span>).</li>
+					<li>Copy its <span class="text-white">Cookie</span> request header, or right-click it → <span class="text-white">Copy as cURL</span>, and paste it here.</li>
+				</ol>
+				<textarea
+					class="h-28 rounded-lg bg-raised p-3 font-mono text-xs outline-none ring-white/40 focus:ring-2"
+					placeholder="cookie: …  or  curl 'https://music.youtube.com/…'"
+					spellcheck="false"
+					bind:value={pasted}
+				></textarea>
+				<p class="text-xs text-muted">This is your Google session for YouTube: only paste it on a server you trust. Signing out of YouTube in that browser ends it.</p>
+				<button class="rounded-full bg-white py-2.5 font-medium text-black disabled:opacity-50" disabled={youtube.busy || !pasted.trim()} onclick={signInWithText}>
+					{youtube.busy ? 'Checking…' : 'Connect'}
+				</button>
+			{/if}
 		{:else if youtube.available}
 			<h2 class="text-lg font-bold">YouTube Music account</h2>
 			<p class="text-sm text-muted">
@@ -113,9 +155,12 @@
 			<button class="rounded-full bg-white py-2.5 font-medium text-black disabled:opacity-50" disabled={youtube.busy} onclick={signIn}>
 				{youtube.busy ? 'Signing in…' : 'Sign in with YouTube Music'}
 			</button>
+		{:else if youtube.onServer}
+			<h2 class="text-lg font-bold">YouTube Music account</h2>
+			<p class="text-sm text-muted">Log in with your account on this server (on the room list) to connect your YouTube Music here.</p>
 		{:else if nativeBridge}
 			<h2 class="text-lg font-bold">YouTube Music account</h2>
-			<p class="text-sm text-muted">Signing in to YouTube Music works in rooms hosted on this phone, not in rooms on a server or another phone.</p>
+			<p class="text-sm text-muted">Signing in to YouTube Music works in rooms hosted on this phone, or with your account on a YTMP server.</p>
 		{/if}
 
 		{#if onRoomSettings}

@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.core.RoomTimeouts
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.SonosOutputs
@@ -20,7 +21,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
+import dev.trashpanda.ytmp.host.bearerToken
 import dev.trashpanda.ytmp.host.ytmpModule
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ProtocolJson
@@ -90,9 +93,18 @@ fun main(args: Array<String>) {
         log.info("Accounts: {} (sign-up: {})", issuer, config.accounts.signup)
 
         val plays = PlayReporter(auth, this)
+        val youtube = YoutubeLinks(accounts, config.ytm.key, ytm, this)
+        /** One of this server's own accounts, by account ID (`user@issuer`). */
+        fun localAccount(accountId: String): String? =
+            accountId.takeIf { it.endsWith("@$issuer") }?.substringBeforeLast('@')?.let(accounts::find)?.id
         val rooms = RoomManager(
             ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = outputs, store = JdbcRoomStore(db),
-            onPlayFinished = plays::report,
+            // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
+            timeouts = RoomTimeouts(guestSoloRoom = 30.days),
+            onPlayFinished = { play ->
+                plays.report(play)
+                youtube.report(play, ::localAccount)
+            },
             radio = cached,
         )
         rooms.startCleanup()
@@ -105,11 +117,21 @@ fun main(args: Array<String>) {
             search = cached,
             audio = ytm,
             webApp = File(config.server.frontend),
-            HostOptions(kind = HostKind.SERVER, auth = auth, mayProxyAudio = audioProxy::allows),
+            HostOptions(
+                kind = HostKind.SERVER,
+                auth = auth,
+                supportsPrivateRooms = true,
+                // No request is "the hosting device" on a server: behind a reverse proxy on the
+                // same machine, every visitor comes from localhost. Solo rooms go by owner.
+                isLocal = { false },
+                mayProxyAudio = audioProxy::allows,
+            ),
             extraApi = { service.routes(this) },
             similar = cached,
             catalog = cached,
             suggestions = cached,
+            // Your account's YouTube Music, when you're logged in with an account of this server.
+            personalFor = { call -> call.bearerToken()?.let(auth::verify)?.id?.let(::localAccount)?.let(youtube::of) },
         )
     }.start(wait = true)
 }

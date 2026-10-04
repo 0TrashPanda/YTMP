@@ -41,6 +41,7 @@
 			me = identity.get(host.authServers);
 			if (me) name = me.account.displayName;
 			if (onThisPhone) myRooms = await listRooms();
+			else if (host.kind === 'server') myRooms = await serverRooms();
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Can't reach the host";
 		}
@@ -74,10 +75,30 @@
 		});
 	}
 
+	/**
+	 * Your rooms on a server: the ones your account owns (any device), and the ones made in
+	 * this browser (it has their owner tokens). Rooms that are gone are forgotten.
+	 */
+	async function serverRooms(): Promise<RoomInfo[]> {
+		const mine = me ? await listRooms().catch(() => []) : [];
+		const here = await Promise.all(
+			saved.ownedRooms
+				.filter((code) => !mine.some((r) => r.code === code))
+				.map((code) =>
+					getRoom(code).catch(() => {
+						saved.forgetOwnerToken(code);
+						return null;
+					})
+				)
+		);
+		return [...mine, ...here.filter((r): r is RoomInfo => r !== null)];
+	}
+
 	async function close(room: RoomInfo) {
 		await attempt(async () => {
 			await closeRoom(room.code);
-			myRooms = await listRooms();
+			saved.forgetOwnerToken(room.code);
+			myRooms = onThisPhone ? await listRooms() : await serverRooms();
 		});
 	}
 
@@ -135,6 +156,30 @@
 {#if toastText}
 	<p class="fixed inset-x-0 bottom-8 z-50 mx-auto w-fit rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">{toastText}</p>
 {/if}
+
+{#snippet roomList(title: string)}
+	{#if myRooms.length > 0}
+		<section class="flex flex-col gap-1">
+			<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">{title}</h2>
+			{#each myRooms as room (room.code)}
+				<div class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2 ring-1 ring-line">
+					<a href="/room/{room.code}" class="flex min-w-0 flex-1 items-center gap-3">
+						<Icon name={room.visibility === 'private' ? 'headphones' : 'people'} size={20} class="text-muted" />
+						<span class="min-w-0 flex-1 truncate">{room.name}</span>
+						<span class="font-mono text-sm text-muted">{room.code}</span>
+					</a>
+					<button
+						class="rounded-full p-1.5 text-muted hover:bg-line hover:text-white"
+						aria-label="Close room"
+						onclick={() => close(room)}
+					>
+						<Icon name="close" size={18} />
+					</button>
+				</div>
+			{/each}
+		</section>
+	{/if}
+{/snippet}
 
 <main class="mx-auto flex min-h-full max-w-md flex-col justify-center gap-6 px-4 py-12">
 	<header class="text-center">
@@ -242,27 +287,7 @@
 			{/if}
 		</section>
 
-		{#if myRooms.length > 0}
-			<section class="flex flex-col gap-1">
-				<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">Your rooms on this phone</h2>
-				{#each myRooms as room (room.code)}
-					<div class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2 ring-1 ring-line">
-						<a href="/room/{room.code}" class="flex min-w-0 flex-1 items-center gap-3">
-							<Icon name={room.visibility === 'private' ? 'headphones' : 'people'} size={20} class="text-muted" />
-							<span class="min-w-0 flex-1 truncate">{room.name}</span>
-							<span class="font-mono text-sm text-muted">{room.code}</span>
-						</a>
-						<button
-							class="rounded-full p-1.5 text-muted hover:bg-line hover:text-white"
-							aria-label="Close room"
-							onclick={() => close(room)}
-						>
-							<Icon name="close" size={18} />
-						</button>
-					</div>
-				{/each}
-			</section>
-		{/if}
+		{@render roomList('Your rooms on this phone')}
 	{:else if host}
 		<form class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line" onsubmit={join}>
 			<h2 class="text-lg font-bold">Join a room</h2>
@@ -289,15 +314,40 @@
 					maxlength="64"
 					placeholder={defaultRoomName}
 				/>
-				<button
-					class="rounded-full bg-accent py-3 font-medium disabled:opacity-40"
-					disabled={busy || !validName}
-					onclick={() => hostRoom('public')}
-				>
-					Host
-				</button>
+				{#if host.supportsPrivateRooms}
+					<div class="grid grid-cols-2 gap-3">
+						<button
+							class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
+							disabled={busy || !validName}
+							onclick={() => hostRoom('private')}
+						>
+							<Icon name="headphones" />
+							<span class="font-medium">Solo</span>
+							<span class="text-xs text-muted">{me ? 'Just you, on all your devices' : 'Just you, in this browser'}</span>
+						</button>
+						<button
+							class="flex flex-col items-center gap-1 rounded-xl bg-accent p-3 disabled:opacity-40"
+							disabled={busy || !validName}
+							onclick={() => hostRoom('public')}
+						>
+							<Icon name="people" />
+							<span class="font-medium">Party</span>
+							<span class="text-xs text-white/80">Friends join with the code</span>
+						</button>
+					</div>
+				{:else}
+					<button
+						class="rounded-full bg-accent py-3 font-medium disabled:opacity-40"
+						disabled={busy || !validName}
+						onclick={() => hostRoom('public')}
+					>
+						Host
+					</button>
+				{/if}
 			</section>
 		{/if}
+
+		{@render roomList('Your rooms')}
 	{/if}
 
 	{#if nativeBridge}

@@ -33,9 +33,13 @@ When YTMP runs on a server, it serves a website. A visitor picks one of these op
    - Who may create rooms is set in the **server config** (for example anyone, account
      holders only, or specific accounts).
    - They manage the queue and set permissions for everyone who joins.
-3. **Solo room**
-   - A private room on the server that only the visitor is in, the same as solo
+3. **Solo room** ✅
+   - A private room on the server that only its owner can join, the same as solo
      on Android. It can be made public later.
+   - Built: with an account, only your account gets in, from any device, and your rooms
+     are listed on the start page. Without one, only the browser that made it (it keeps the
+     owner token); such a room is deleted after **30 days** unused. Everyone else, also
+     people who know the code, can't see or join it.
    - A browser can keep **multiple solo rooms** and switch between them.
    - Go straight to your solo rooms with the **`/solo`** URL (for example
      `https://ytmp.example.com/solo`).
