@@ -143,10 +143,16 @@
 	}
 	if (initialName.trim()) start();
 
-	// Tick for the progress bar.
-	const clock = setInterval(() => (now = Date.now()), 250);
+	// Tick for the progress bar, only while it moves and can be seen: a hidden page that keeps
+	// redrawing costs battery on phones.
+	let visibility = $state<DocumentVisibilityState>(document.visibilityState);
+	$effect(() => {
+		if (!room?.state?.playback.playing || visibility !== 'visible') return;
+		now = Date.now();
+		const clock = setInterval(() => (now = Date.now()), 250);
+		return () => clearInterval(clock);
+	});
 	onDestroy(() => {
-		clearInterval(clock);
 		player?.destroy();
 		room?.close();
 	});
@@ -297,6 +303,8 @@
 	let host = $state<HostInfo | null>(null);
 	getHost().then((h) => (host = h)).catch(() => {});
 </script>
+
+<svelte:document bind:visibilityState={visibility} />
 
 <svelte:head>
 	<title>{room?.state ? `${room.state.room.name} · YTMP` : 'YTMP'}</title>

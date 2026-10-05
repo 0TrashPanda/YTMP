@@ -37,6 +37,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -74,6 +76,9 @@ class RoomSync(
 
     private fun token(account: String): String? = prefs.getString("token:$account", null)
 
+    /** The last copy each room's server took (by sync ID). */
+    private val sent = ConcurrentHashMap<String, SavedRoom>()
+
     /** The linked server, if [account] is one of its accounts. */
     private fun serverFor(account: String?): String? {
         val server = authLink.auth.servers().firstOrNull() ?: return null
@@ -87,18 +92,34 @@ class RoomSync(
         }
     }
 
-    /** A room was saved here: send it to its owner's server. */
+    /**
+     * A room was saved here: send it to its owner's server. Not when only time moved on (a playing
+     * room is saved every 15 s for its position): the server works out a playing room's position
+     * from when it was saved, and the heartbeat says this phone is still up. Saves battery and data.
+     */
     fun saved(room: SavedRoom) {
         val account = room.ownerAccount ?: return
         val server = serverFor(account) ?: return
         val token = token(account) ?: return
         val syncId = room.syncId ?: return
+        if (sent[syncId]?.let { onlyTimeMoved(it, room) } == true) return
         scope.launch {
             val (status, body) = call("PUT", "$server/api/auth/rooms/$syncId", token, ProtocolJson.encodeToString(RoomCopyRequest.serializer(), RoomCopyRequest(home, room.epoch, room.toJson())))
                 ?: return@launch
-            if (status == 409) movedAway(ProtocolJson.decodeFromString(RoomMovedAway.serializer(), body))
-            else if (status !in 200..299) Log.w(TAG, "Server didn't take room ${room.code}: $status")
+            when {
+                status in 200..299 -> sent[syncId] = room
+                status == 409 -> movedAway(ProtocolJson.decodeFromString(RoomMovedAway.serializer(), body))
+                else -> Log.w(TAG, "Server didn't take room ${room.code}: $status")
+            }
         }
+    }
+
+    /** [new] is [old] a while later, with nothing changed but the time (no seek, pause or song change). */
+    private fun onlyTimeMoved(old: SavedRoom, new: SavedRoom): Boolean {
+        fun SavedRoom.withoutTime() = copy(positionMs = 0, savedAt = 0, lastActive = 0)
+        if (old.withoutTime() != new.withoutTime()) return false
+        val expected = if (old.playing) old.positionMs + (new.savedAt - old.savedAt) else old.positionMs
+        return abs(new.positionMs - expected) < POSITION_SLACK_MS
     }
 
     /** A room was closed here (not moved): the server forgets its copy. */
@@ -106,6 +127,7 @@ class RoomSync(
         val account = room.ownerAccount ?: return
         val server = serverFor(account) ?: return
         val token = token(account) ?: return
+        room.syncId?.let { sent.remove(it) }
         scope.launch { call("DELETE", "$server/api/auth/rooms/${room.syncId}?host=$hostId", token, null) }
     }
 
@@ -125,6 +147,7 @@ class RoomSync(
     private suspend fun movedAway(moved: RoomMovedAway) {
         val room = rooms().bySyncId(moved.syncId) ?: return
         Log.i(TAG, "Room ${room.code} moved to ${moved.url ?: "another host"}")
+        sent.remove(moved.syncId)
         rooms().movedAway(room.code, moved.url)
     }
 
@@ -188,6 +211,11 @@ class RoomSync(
 
     private companion object {
         const val TAG = "YtmpSync"
-        val HEARTBEAT = 15.seconds
+
+        /** Pages show a host as "seen" for a minute after it checked in: this leaves room for one miss. */
+        val HEARTBEAT = 30.seconds
+
+        /** A position this close to where time alone would have put it isn't a seek. */
+        const val POSITION_SLACK_MS = 2_000L
     }
 }

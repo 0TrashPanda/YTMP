@@ -85,6 +85,12 @@ class SyncCorrection {
         const val SAMPLES = 8
         const val SAMPLE_INTERVAL_MS = 250L
 
+        /** Listening alone, after [QUICK_MEASURE_MS] of settled playback: one reading per second. */
+        const val ALONE_SAMPLE_INTERVAL_MS = 1000L
+
+        /** Long enough for one quick decision ([SAMPLES] readings) after a load or seek. */
+        const val QUICK_MEASURE_MS = SAMPLES * SAMPLE_INTERVAL_MS + 1000L
+
         const val INITIAL_SEEK_LEAD_MS = 250L
         const val MAX_SEEK_LEAD_MS = 1500L
 

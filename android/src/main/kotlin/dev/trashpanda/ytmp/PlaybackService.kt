@@ -22,6 +22,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -107,11 +109,14 @@ class PlaybackService : MediaSessionService() {
         scope.launch {
             combine(PlaybackHub.target, follower.room) { target, room -> merge(target, room) }.collect { apply(it) }
         }
-        // Drift correction: the host's clock keeps moving, so check regularly.
+        // Drift correction: the host's clock keeps moving, so check regularly, but only while
+        // this device plays (a paused or empty player has nothing to correct: [apply] handles it).
         scope.launch {
-            while (isActive) {
-                delay(SyncCorrection.SAMPLE_INTERVAL_MS)
-                current?.let { correct(it) }
+            measuring.collectLatest { on ->
+                while (on && isActive) {
+                    delay(sampleInterval())
+                    current?.let { correct(it) }
+                }
             }
         }
     }
@@ -160,6 +165,20 @@ class PlaybackService : MediaSessionService() {
 
     private var lastTarget: PlaybackTarget? = null
 
+    /** Something plays here, so [correct] runs every [sampleInterval]. */
+    private val measuring = MutableStateFlow(false)
+
+    /**
+     * Listening alone, only big drift matters ([SyncCorrection.ALONE_TOLERANCE_MS]), so after the
+     * first measurement following a load or seek (which catches a slow start), measure less often:
+     * fewer wake-ups with the screen off.
+     */
+    private fun sampleInterval(): Long {
+        val settledFor = SystemClock.elapsedRealtime() - settledAt
+        return if (current?.alone == true && settledFor > SyncCorrection.QUICK_MEASURE_MS) SyncCorrection.ALONE_SAMPLE_INTERVAL_MS
+        else SyncCorrection.SAMPLE_INTERVAL_MS
+    }
+
     private fun apply(target: PlaybackTarget?) {
         current = target
         lastTarget?.let { old ->
@@ -170,6 +189,7 @@ class PlaybackService : MediaSessionService() {
             }
         }
         lastTarget = target
+        measuring.value = target != null && target.enabled && target.playing && target.item != null
         val item = target?.item
         val url = target?.let { if (useProxy) it.proxyUrl else it.streamUrl }
         if (target == null || !target.enabled || item == null || url == null) {
@@ -334,6 +354,7 @@ class PlaybackService : MediaSessionService() {
         // Stop right away: the page (which switches "Play here" off) may be frozen for a while.
         stoppedHere = true
         current = current?.copy(enabled = false)
+        measuring.value = false
         exo.playWhenReady = false
         follower.command("""{"kind":"SetListening","on":false}""")
         PlaybackHub.status("stopped")

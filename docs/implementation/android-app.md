@@ -23,6 +23,10 @@
   go over it too. If it can't connect, the page's target is used as before.
 - Losing audio focus stops playback here at once and sends `SetListening off` over the
   player's own connection, since the page may be frozen.
+- **Battery:** drift correction (`PlaybackService`) only runs while this phone plays. Alone,
+  it measures every 250 ms right after a load or seek (to catch a slow start), then once a
+  second, since only drift over 1.5 s matters then. The room page only ticks its progress
+  bar while the room plays and the page is visible.
 - Known limitation: swiping the app away from recents stops playback, because the room
   connection lives in the page.
 - Debug builds enable WebView debugging (`chrome://inspect`) and log the page's console to
@@ -42,9 +46,12 @@
   `http://<phone-ip>:8765/room/CODE` (QR code in the share sheet).
 - **`HostService`**: a foreground service (type *connected device*) while the phone has public
   rooms or a room is playing, with a "Hosting …" notification and *Stop hosting* (closes the
-  public rooms, pauses solo ones), plus Wi-Fi and wake locks so friends' devices keep getting
-  answers with the screen off. An idle solo room doesn't need it.
-- Chromecast discovery (`CastFinder`) runs while the app is on screen or the service runs.
+  public rooms, pauses solo ones). An idle solo room doesn't need it. To save battery the locks
+  are only held while needed: a **wake lock** while a room plays (songs move on with the screen
+  off, also when only speakers or friends listen), a **Wi-Fi lock** (low latency) while a
+  *public* room plays. An idle public room holds neither: a friend's request wakes the phone.
+- Chromecast and Sonos discovery (`CastFinder`, `SonosFinder`) run while the app is on screen,
+  or while a public room plays; devices found earlier stay in the list.
 - **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
   account holders of that server can join its rooms (see [auth](auth.md)). The WebView keeps
   that server's pages in the app, for logging in.

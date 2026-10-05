@@ -17,8 +17,12 @@ import dev.trashpanda.ytmp.YtmpApp
 
 /**
  * Keeps the phone hosting while it has public rooms or plays music: a foreground notification
- * so Android doesn't stop the app, plus Wi-Fi and wake locks so friends' devices keep getting
- * answers with the screen off. Started and stopped by [YtmpApp]. Idle solo rooms don't need it.
+ * so Android doesn't stop the app. Started and stopped by [YtmpApp]. Idle solo rooms don't need it.
+ *
+ * The locks cost battery, so they're only held while needed: a wake lock while a room plays
+ * (songs must move on with the screen off, also when only speakers or friends listen), and a
+ * Wi-Fi lock while a public room plays (friends' devices keep getting quick answers). An idle
+ * public room needs neither: a request from a friend wakes the phone by itself.
  */
 class HostService : Service() {
     private var wifiLock: WifiManager.WifiLock? = null
@@ -33,19 +37,35 @@ class HostService : Service() {
             return START_NOT_STICKY
         }
         startForeground(NOTIFICATION_ID, notification(intent?.getStringExtra(EXTRA_TEXT) ?: "Hosting"), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-        if (wifiLock == null) {
-            wifiLock = getSystemService(WifiManager::class.java)
-                .createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "ytmp:host").apply { acquire() }
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ytmp:host").apply { acquire() }
-        }
+        holdWakeLock(intent?.getBooleanExtra(EXTRA_WAKE, false) == true)
+        holdWifiLock(intent?.getBooleanExtra(EXTRA_WIFI, false) == true)
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
-        wifiLock?.release()
-        wakeLock?.release()
+        holdWakeLock(false)
+        holdWifiLock(false)
         super.onDestroy()
+    }
+
+    private fun holdWakeLock(hold: Boolean) {
+        if (hold && wakeLock == null) {
+            wakeLock = getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ytmp:host").apply { acquire() }
+        } else if (!hold) {
+            wakeLock?.release()
+            wakeLock = null
+        }
+    }
+
+    private fun holdWifiLock(hold: Boolean) {
+        if (hold && wifiLock == null) {
+            wifiLock = getSystemService(WifiManager::class.java)
+                .createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "ytmp:host").apply { acquire() }
+        } else if (!hold) {
+            wifiLock?.release()
+            wifiLock = null
+        }
     }
 
     private fun notification(text: String): Notification {
@@ -70,9 +90,14 @@ class HostService : Service() {
         private const val NOTIFICATION_ID = 2
         private const val ACTION_STOP = "dev.trashpanda.ytmp.STOP_HOSTING"
         private const val EXTRA_TEXT = "text"
+        private const val EXTRA_WAKE = "wake"
+        private const val EXTRA_WIFI = "wifi"
 
-        fun update(context: Context, text: String) {
-            context.startForegroundService(Intent(context, HostService::class.java).putExtra(EXTRA_TEXT, text))
+        /** Shows [text] in the notification; [wakeLock] and [wifiLock] say which locks to hold. */
+        fun update(context: Context, text: String, wakeLock: Boolean, wifiLock: Boolean) {
+            context.startForegroundService(
+                Intent(context, HostService::class.java).putExtra(EXTRA_TEXT, text).putExtra(EXTRA_WAKE, wakeLock).putExtra(EXTRA_WIFI, wifiLock),
+            )
         }
 
         fun stop(context: Context) {

@@ -9,7 +9,10 @@ Feature: [features/room-sync.md](../features/room-sync.md).
   home, epoch, the room as JSON, last seen).
 - The **phone** (`android/.../host/RoomSync.kt`) sends a room to the hub whenever it's saved
   (`RoomManager.onRoomSaved`: on changes, and every 15 s while playing):
-  `PUT /api/auth/rooms/{syncId}` with `RoomCopyRequest`. Every 15 s it checks in:
+  `PUT /api/auth/rooms/{syncId}` with `RoomCopyRequest`, except when only time moved on since
+  the last copy the server took (no seek, pause or song change): the server works out a
+  playing room's position from `savedAt`, so that saves battery and data. Every 30 s it checks in
+  (pages show a host as seen for a minute):
   `POST /api/auth/rooms/heartbeat` with its rooms' epochs. Both answer with rooms that **moved
   away** (`409` / `moved`): the phone closes them (`RoomManager.movedAway`), sending everyone
   `Rejected(room_moved, movedTo)`; later joins with the old code get the same.

@@ -69,6 +69,7 @@ class RoomManager(
     private val random = SecureRandom()
     private val _list = MutableStateFlow<List<RoomInfo>>(emptyList())
     private val _hosting = MutableStateFlow<List<RoomInfo>>(emptyList())
+    private val _playing = MutableStateFlow<List<RoomInfo>>(emptyList())
 
     private val unsaved = ConcurrentHashMap.newKeySet<String>()
     private val saveSignal = Channel<Unit>(Channel.CONFLATED)
@@ -78,6 +79,9 @@ class RoomManager(
 
     /** Rooms that need the host to stay reachable: public ones (friends may join) and ones playing music. */
     val hosting: StateFlow<List<RoomInfo>> = _hosting
+
+    /** Rooms playing music right now. */
+    val playing: StateFlow<List<RoomInfo>> = _playing
 
     init {
         val store = store
@@ -230,6 +234,7 @@ class RoomManager(
         val all = rooms.values.sortedBy { it.name }
         _list.value = all.map { it.info }
         _hosting.value = all.filter { it.visibility == RoomVisibility.PUBLIC || it.isPlaying }.map { it.info }
+        _playing.value = all.filter { it.isPlaying }.map { it.info }
     }
 
     /** Periodically drops offline participants and deletes rooms that have been empty too long. */
