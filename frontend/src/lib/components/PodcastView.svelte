@@ -97,7 +97,7 @@
 	{:else}
 		<section class="flex flex-col gap-1">
 			<h2 class="px-2 pb-1 text-xl font-bold">Episodes</h2>
-			{#each podcast.episodes as episode (episode.song.id)}
+			{#each podcast.episodes as episode, i (episode.song.id + i)}
 				<div class="group flex items-start gap-3 rounded-md px-2 py-3 hover:bg-raised" role="listitem" oncontextmenu={(e) => menu(e, episode, true)}>
 					<button class="flex min-w-0 flex-1 items-start gap-3 text-left" onclick={() => play(episode, false)} title="Play next">
 						<div class="aspect-video w-28 shrink-0 overflow-hidden rounded bg-raised sm:w-36">

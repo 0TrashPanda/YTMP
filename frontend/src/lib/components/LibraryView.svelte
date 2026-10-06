@@ -57,7 +57,7 @@
 			{/each}
 		</div>
 	{:else}
-		{#each library.sections as section (section.title)}
+		{#each library.sections as section, i (section.title + i)}
 			{@const cards = section.items.flatMap((i) => itemCard(i, open) ?? [])}
 			{#if cards.length}
 				<section class="flex flex-col gap-3">

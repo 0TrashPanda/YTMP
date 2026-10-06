@@ -28,7 +28,11 @@
 			return;
 		}
 		getLibrary()
-			.then((library) => (playlists = library.sections.flatMap((s) => s.items).filter((i): i is SearchItemPlaylist => i.kind === 'playlist')))
+			.then((library) => {
+				// YouTube Music can list a playlist twice: once each.
+				const all = library.sections.flatMap((s) => s.items).filter((i): i is SearchItemPlaylist => i.kind === 'playlist');
+				playlists = all.filter((p, i) => all.findIndex((q) => q.id === p.id) === i);
+			})
 			.catch(() => {}); // the Library page says what went wrong
 	});
 

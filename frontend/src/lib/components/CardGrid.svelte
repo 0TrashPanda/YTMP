@@ -18,6 +18,8 @@
 	import PageDots from './PageDots.svelte';
 
 	let { cards, row = false }: { cards: Card[]; row?: boolean } = $props();
+	// YouTube Music can list the same album or playlist twice: show it once.
+	const unique = $derived(cards.filter((c, i) => cards.findIndex((d) => d.key === c.key) === i));
 	let scroller = $state<HTMLElement>();
 </script>
 
@@ -27,7 +29,7 @@
 		? 'grid snap-x auto-cols-[9.5rem] grid-flow-col gap-4 overflow-x-auto scroll-px-2 px-2 pb-2 [scrollbar-width:none] sm:auto-cols-[11rem]'
 		: 'grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2'}
 >
-	{#each cards as card (card.key)}
+	{#each unique as card (card.key)}
 		<button class="group flex min-w-0 snap-start flex-col gap-2 text-left" onclick={card.open} onpointerenter={card.prefetch} ontouchstart={card.prefetch}>
 			<div class="aspect-square w-full overflow-hidden bg-raised {card.round ? 'rounded-full' : 'rounded-md'}">
 				{#if card.art}
