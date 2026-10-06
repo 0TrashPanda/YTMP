@@ -55,9 +55,9 @@
 - **`HostService`**: a foreground service (type *connected device*) while the phone has public
   rooms or a room is playing, with a "Hosting …" notification and *Stop hosting* (closes the
   public rooms, pauses solo ones). An idle solo room doesn't need it. To save battery the locks
-  are only held while needed: a **wake lock** while a room plays (songs move on with the screen
-  off, also when only speakers or friends listen), a **Wi-Fi lock** (low latency) while a
-  *public* room plays. An idle public room holds neither: a friend's request wakes the phone.
+  are only held while a room plays: a **wake lock** (songs move on with the screen off, also
+  when only speakers or friends listen) and a **Wi-Fi lock** (high-performance; the next song
+  must load). An idle public room holds neither: a friend's request wakes the phone.
 - Chromecast and Sonos discovery (`CastFinder`, `SonosFinder`) run while the app is on screen,
   or while a public room plays; devices found earlier stay in the list.
 - **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
