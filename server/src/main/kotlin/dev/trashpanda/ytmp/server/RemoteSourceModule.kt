@@ -144,6 +144,20 @@ class RemoteSourceModule(
 
     suspend fun myHome(cookie: String): HomePage = client.get("$baseUrl/me/home") { me(cookie) }.orThrow().body()
 
+    suspend fun mySearch(cookie: String, query: String, type: SearchType): SearchPage =
+        client.get("$baseUrl/me/search") {
+            me(cookie)
+            parameter("q", query)
+            parameter("type", type.wireName)
+            parameter("limit", 20)
+        }.orThrow().body()
+
+    suspend fun mySuggestions(cookie: String, query: String): List<String> =
+        client.get("$baseUrl/me/search/suggestions") {
+            me(cookie)
+            parameter("q", query)
+        }.orThrow().body<SuggestionsResponse>().items
+
     suspend fun myLibrary(cookie: String): HomePage = client.get("$baseUrl/me/library") { me(cookie) }.orThrow().body()
 
     suspend fun myPlaylist(cookie: String, id: String): PlaylistPage =

@@ -22,18 +22,14 @@ class CastFinder(context: Context, private val outputs: CastOutputs) {
             }
 
             override fun onServiceFound(info: NsdServiceInfo) {
-                @Suppress("DEPRECATION") // The replacement needs API 34; this works on 33+.
-                nsd.resolveService(info, object : NsdManager.ResolveListener {
-                    override fun onResolveFailed(info: NsdServiceInfo, error: Int) = Unit
-                    override fun onServiceResolved(info: NsdServiceInfo) {
-                        @Suppress("DEPRECATION")
-                        val host = info.host?.hostAddress ?: return
-                        val id = info.attributes["id"]?.decodeToString() ?: info.serviceName
-                        val name = info.attributes["fn"]?.decodeToString() ?: info.serviceName
-                        outputs.add(CastDeviceAddress("cast:$id", name, host, info.port))
-                        Log.d(TAG, "Found Cast device $name at $host")
-                    }
-                })
+                NsdQueue.resolve(nsd, info) { resolved ->
+                    @Suppress("DEPRECATION")
+                    val host = resolved.host?.hostAddress ?: return@resolve
+                    val id = resolved.attributes["id"]?.decodeToString() ?: resolved.serviceName
+                    val name = resolved.attributes["fn"]?.decodeToString() ?: resolved.serviceName
+                    outputs.add(CastDeviceAddress("cast:$id", name, host, resolved.port))
+                    Log.d(TAG, "Found Cast device $name at $host")
+                }
             }
 
             override fun onServiceLost(info: NsdServiceInfo) {

@@ -76,7 +76,7 @@ Music, without Premium, and not tied to a single music service.
 | Platform | Status |
 |----------|--------|
 | Linux server (Docker) | ✅ Hosts rooms, serves the web app, accounts and listening history |
-| Android 13+ | ✅ Join rooms with native playback and lock screen controls; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music |
+| Android 11+ | ✅ Join rooms with native playback and lock screen controls; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music |
 | Web browser | ✅ Join rooms, or host through a server |
 | iOS | Not supported (the web app may work, but background playback won't) |
 

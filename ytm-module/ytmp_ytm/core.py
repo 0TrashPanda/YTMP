@@ -169,31 +169,37 @@ class YtmCore:
             ]
         return {"sections": sections}
 
-    def search(self, query: str, type: str = "all", limit: int = 20) -> dict:
+    def search(self, query: str, type: str = "all", limit: int = 20, personal: bool = False) -> dict:
         """Search results as sections (see SearchPage in protocol/Catalog.kt).
 
         One type gives one section; "all" gives YTM's mixed results, grouped like YTM does.
+        With [personal], as the signed-in account (results fit its taste, like in YTM).
         """
+        ytm = self._signed_in() if personal else self._ytm
         if type == "all":
             # YTM's mixed results mostly lack song durations (and sometimes artists), so the
             # songs and videos come from their own searches, run at the same time.
             with ThreadPoolExecutor(3) as pool:
-                mixed = pool.submit(self._ytm.search, query)
-                songs = pool.submit(self._ytm.search, query, filter="songs", limit=_ALL_LIMITS["songs"])
-                videos = pool.submit(self._ytm.search, query, filter="videos", limit=_ALL_LIMITS["videos"])
+                mixed = pool.submit(ytm.search, query)
+                songs = pool.submit(ytm.search, query, filter="songs", limit=_ALL_LIMITS["songs"])
+                videos = pool.submit(ytm.search, query, filter="videos", limit=_ALL_LIMITS["videos"])
                 return {"sections": _sections_from_all(mixed.result(), songs.result(), videos.result())}
         if type not in SEARCH_TYPES:
             raise NotFound(f"Unknown search type: {type}")
-        results = self._ytm.search(query, filter=SEARCH_TYPES[type], limit=limit)
+        results = ytm.search(query, filter=SEARCH_TYPES[type], limit=limit)
         # ytmusicapi treats limit as a minimum, so cut the list ourselves.
         items = [item for r in results if (item := _search_item(r))][:limit]
         return {"sections": [{"title": _SECTION_TITLES[type], "type": type, "items": items}]}
 
-    def suggestions(self, query: str) -> list[str]:
-        """What YTM suggests while typing [query], e.g. "daft p" -> "daft punk one more time"."""
+    def suggestions(self, query: str, personal: bool = False) -> list[str]:
+        """What YTM suggests while typing [query], e.g. "daft p" -> "daft punk one more time".
+
+        With [personal], as the signed-in account.
+        """
         if not query.strip():
             return []
-        return [s for s in self._ytm.get_search_suggestions(query) if isinstance(s, str)]
+        ytm = self._signed_in() if personal else self._ytm
+        return [s for s in ytm.get_search_suggestions(query) if isinstance(s, str)]
 
     def radio(self, seed_id: str, limit: int = 25) -> list[dict]:
         """YTM's radio for a song: similar songs, usually starting with the song itself."""

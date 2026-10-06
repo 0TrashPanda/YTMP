@@ -204,6 +204,7 @@ signed in give `401 not_signed_in`.
 | POST | `/me/playlists/{id}/songs` | Add songs: `{ songIds: [...] }` |
 | GET / PUT | `/me/likes/{songId}` | `{ liked }` |
 | POST | `/me/history/{songId}` | Add a play to the account's YouTube Music history |
+| GET | `/me/search`, `/me/search/suggestions` | Like `/search` and `/search/suggestions`, as the account |
 
 Not yet: removing songs, unliking from a list, liked songs paging.
 

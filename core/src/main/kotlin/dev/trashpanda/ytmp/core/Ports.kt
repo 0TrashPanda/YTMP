@@ -105,6 +105,17 @@ interface PersonalCatalog {
 
     /** Tells YouTube Music you played this song, like its own player does. */
     suspend fun addToHistory(songId: String) {}
+
+    /** Whether your own searches go through this account (see [search]). On unless turned off. */
+    suspend fun searchWithAccount(): Boolean = true
+
+    suspend fun setSearchWithAccount(on: Boolean) {}
+
+    /** Searches as this account, so results fit its taste like in YouTube Music; null where that isn't possible. */
+    suspend fun search(query: String, type: SearchType): SearchPage? = null
+
+    /** Suggestions while typing, as this account; null where that isn't possible. */
+    suspend fun suggestions(query: String): List<String>? = null
 }
 
 /** A speaker or TV the host found, that rooms can play on. */

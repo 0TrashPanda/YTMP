@@ -1,7 +1,6 @@
 package dev.trashpanda.ytmp.host
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.util.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
@@ -147,7 +146,8 @@ class LocalHost(private val context: Context) {
     /** Copies the bundled web app out of the APK (once per app version), so it can be served as files. */
     private fun installWebApp(): File {
         val dir = File(context.filesDir, "web")
-        val version = context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0)).lastUpdateTime
+        @Suppress("DEPRECATION") // The replacement needs API 33; this works everywhere.
+        val version = context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
         val marker = File(dir, ".version")
         if (marker.takeIf { it.exists() }?.readText() == version.toString()) return dir
 

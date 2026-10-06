@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import dev.trashpanda.ytmp.protocol.YoutubeHistorySetting
+import dev.trashpanda.ytmp.protocol.YoutubeSearchSetting
 import dev.trashpanda.ytmp.protocol.YoutubeSignInRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
@@ -68,6 +69,7 @@ import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -159,6 +161,24 @@ fun Application.ytmpModule(
     /** Your YouTube Music: the phone owner's in their own app, or (a server) your account's. */
     fun ApplicationCall.personal(): PersonalCatalog? = personalFor?.invoke(this) ?: personal?.takeIf { options.isLocal(this) }
 
+    /**
+     * Your own searches go through your YouTube Music account, when you're signed in and want
+     * that; everyone else's (and yours, if that fails) through the shared, anonymous one.
+     */
+    suspend fun <T : Any> ApplicationCall.asYou(mine: suspend PersonalCatalog.() -> T?, anonymous: suspend () -> T): T {
+        val you = personal()?.takeIf { it.searchWithAccount() && it.account() != null }
+        if (you != null) {
+            try {
+                you.mine()?.let { return it }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.warn("Searching with the YouTube Music account didn't work, searching without: {}", e.message)
+            }
+        }
+        return anonymous()
+    }
+
     /** The account this request proves (bearer host token), if any. */
     fun ApplicationCall.account(): AccountIdentity? {
         val token = bearerToken() ?: return null
@@ -226,12 +246,13 @@ fun Application.ytmpModule(
                 val query = call.request.queryParameters["q"]?.trim().orEmpty()
                 if (query.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing q")
                 val type = call.request.queryParameters["type"]?.let(::searchType) ?: SearchType.ALL
-                call.respond(search.search(query, type))
+                call.respond(call.asYou({ search(query, type) }) { search.search(query, type) })
             }
             get("/search/suggestions") {
                 // Typing goes on without them, so no source (or an empty box) is just no suggestions.
                 val query = call.request.queryParameters["q"].orEmpty()
-                call.respond(SuggestionsResponse(if (query.isBlank()) emptyList() else suggestions?.suggestions(query).orEmpty()))
+                if (query.isBlank()) return@get call.respond(SuggestionsResponse(emptyList()))
+                call.respond(SuggestionsResponse(call.asYou({ suggestions(query) }) { suggestions?.suggestions(query).orEmpty() }))
             }
             get("/similar") {
                 val songId = call.request.queryParameters["id"]?.trim().orEmpty()
@@ -272,8 +293,18 @@ fun Application.ytmpModule(
                 get("/youtube") {
                     val mine = call.personal()
                     call.respond(
-                        YoutubeAccountStatus(available = mine != null, account = mine?.account(), history = mine?.historySetting() ?: YoutubeHistory.SOLO),
+                        YoutubeAccountStatus(
+                            available = mine != null,
+                            account = mine?.account(),
+                            history = mine?.historySetting() ?: YoutubeHistory.SOLO,
+                            searchWithAccount = mine?.searchWithAccount() ?: true,
+                        ),
                     )
+                }
+                put("/youtube/search") {
+                    val owner = call.owner()
+                    owner.setSearchWithAccount(call.receive<YoutubeSearchSetting>().withAccount)
+                    call.respond(HttpStatusCode.NoContent)
                 }
                 put("/youtube/history") {
                     val owner = call.owner()

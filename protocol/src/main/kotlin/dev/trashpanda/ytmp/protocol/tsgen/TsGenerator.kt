@@ -33,6 +33,7 @@ import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.protocol.YoutubeHistorySetting
+import dev.trashpanda.ytmp.protocol.YoutubeSearchSetting
 import dev.trashpanda.ytmp.protocol.YoutubeSignInRequest
 import dev.trashpanda.ytmp.protocol.SyncedRoomsResponse
 import dev.trashpanda.ytmp.protocol.MovedRoomResponse
@@ -189,6 +190,7 @@ fun main(args: Array<String>) {
     generator.addRoot(HomePage.serializer().descriptor)
     generator.addRoot(YoutubeAccountStatus.serializer().descriptor)
     generator.addRoot(YoutubeHistorySetting.serializer().descriptor)
+    generator.addRoot(YoutubeSearchSetting.serializer().descriptor)
     generator.addRoot(YoutubeSignInRequest.serializer().descriptor)
     generator.addRoot(SyncedRoomsResponse.serializer().descriptor)
     generator.addRoot(MovedRoomResponse.serializer().descriptor)

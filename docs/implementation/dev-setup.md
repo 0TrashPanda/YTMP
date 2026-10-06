@@ -6,16 +6,20 @@ Practical decisions for starting development.
 
 | Topic | Decision |
 |-------|----------|
-| Android | **minSdk 33 (Android 13)**, targetSdk = latest. Everyone in the group has a recent phone. |
+| Android | **minSdk 30 (Android 11)**, targetSdk = latest. So older phones (friends' phones, the Galaxy A20e test phone) can join and host too. |
 | iOS | **Not supported.** iPhones can use the web UI, but background playback in Safari is unreliable and won't be worked around. |
 | Browsers | Recent Chrome, Firefox, Edge (and Safari as best effort) |
 | Server | **x86-64 Debian**, on Proxmox (VM or LXC with Docker), around an i5-7600. No ARM builds needed for now. |
 
-Why Android 13: it brings the permissions we need in their modern form
-(`READ_MEDIA_AUDIO` for local files, `POST_NOTIFICATIONS`, `NEARBY_WIFI_DEVICES` for
-LAN discovery without location permission), so there's no code for older Android.
-Android 14 and 15 add nothing that makes YTMP noticeably easier, so there's no reason to
-require them.
+Why Android 11 (was 13 until 2026-10): only a few things differ, each behind a version
+check, and Android lint (`NewApi`) flags every newer call at build time; the release build
+runs lint, so none slips through. What differs on 11 and 12:
+- No `POST_NOTIFICATIONS` permission to ask for (notifications just show).
+- `data_extraction_rules.xml` is ignored: `backup_rules.xml` repeats its rules (the YouTube
+  sign-in stays out of backups).
+- Before Android 14, `NsdManager` resolves one service at a time: Cast, Sonos and room
+  discovery share a queue (`NsdQueue`).
+- Future: local files will need `READ_EXTERNAL_STORAGE` below 13 instead of `READ_MEDIA_AUDIO`.
 
 ## Identity
 

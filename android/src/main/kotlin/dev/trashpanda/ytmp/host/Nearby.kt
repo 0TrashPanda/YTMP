@@ -73,11 +73,7 @@ class Nearby(context: Context) {
             override fun onStopDiscoveryFailed(serviceType: String, error: Int) = Unit
 
             override fun onServiceFound(info: NsdServiceInfo) {
-                @Suppress("DEPRECATION") // The replacement needs API 34; this works on 33+.
-                nsd.resolveService(info, object : NsdManager.ResolveListener {
-                    override fun onResolveFailed(info: NsdServiceInfo, error: Int) = Unit
-                    override fun onServiceResolved(info: NsdServiceInfo) = onResolved(info)
-                })
+                NsdQueue.resolve(nsd, info, ::onResolved)
             }
 
             override fun onServiceLost(info: NsdServiceInfo) {

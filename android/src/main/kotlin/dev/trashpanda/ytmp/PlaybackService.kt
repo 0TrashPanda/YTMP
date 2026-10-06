@@ -362,19 +362,19 @@ class PlaybackService : MediaSessionService() {
 
     /** Turns media controls (lock screen, notification, headphones) into room commands. */
     private class RoomPlayer(player: Player) : ForwardingPlayer(player) {
-        private val roomCommands = setOf(
+        private val roomCommands = Player.Commands.Builder().addAll(
             Player.COMMAND_PLAY_PAUSE,
             Player.COMMAND_SEEK_TO_NEXT,
             Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
             Player.COMMAND_SEEK_TO_PREVIOUS,
             Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
             Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
-        )
+        ).build()
 
         override fun getAvailableCommands(): Player.Commands =
-            super.getAvailableCommands().buildUpon().addAll(*roomCommands.toIntArray()).build()
+            super.getAvailableCommands().buildUpon().addAll(roomCommands).build()
 
-        override fun isCommandAvailable(command: Int): Boolean = command in roomCommands || super.isCommandAvailable(command)
+        override fun isCommandAvailable(command: Int): Boolean = roomCommands.contains(command) || super.isCommandAvailable(command)
 
         override fun play() {
             Log.d(TAG, "media session: play")

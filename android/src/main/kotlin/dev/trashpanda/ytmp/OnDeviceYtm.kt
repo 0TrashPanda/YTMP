@@ -96,6 +96,15 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("home", true)).toString())
     }
 
+    suspend fun personalSearch(query: String, type: SearchType): SearchPage = python {
+        val page = core.callAttr("search", query, type.wireName, 20, true)
+        ProtocolJson.decodeFromString(SearchPage.serializer(), json.callAttr("dumps", page).toString())
+    }
+
+    suspend fun personalSuggestions(query: String): List<String> = python {
+        core.callAttr("suggestions", query, true).asList().map { it.toString() }
+    }
+
     suspend fun library(): HomePage = python {
         ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("library")).toString())
     }

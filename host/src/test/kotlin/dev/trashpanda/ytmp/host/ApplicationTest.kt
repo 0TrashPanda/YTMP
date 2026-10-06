@@ -2,12 +2,14 @@ package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
+import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.HomeSection
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
+import dev.trashpanda.ytmp.protocol.YoutubeSearchSetting
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
 import dev.trashpanda.ytmp.protocol.LikeStatus
@@ -237,7 +239,7 @@ class ApplicationTest {
     }
 
     /** Phone mode. Requests with the "X-Remote" header count as coming from another device. */
-    private fun ApplicationTestBuilder.setupPhone(catalog: CatalogSource? = null, personal: PersonalCatalog? = null) {
+    private fun ApplicationTestBuilder.setupPhone(catalog: CatalogSource? = null, personal: PersonalCatalog? = null, suggestions: SearchSuggestions? = null) {
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
             ytmpModule(
@@ -251,6 +253,7 @@ class ApplicationTest {
                 ),
                 catalog = catalog,
                 personal = personal,
+                suggestions = suggestions,
             )
         }
     }
@@ -278,6 +281,51 @@ class ApplicationTest {
         override suspend fun addToPlaylist(playlistId: String, songIds: List<String>) { saved += playlistId to songIds }
         override suspend fun createPlaylist(title: String, songIds: List<String>) = "PLnew".also { saved += it to songIds }
         override suspend fun signOut() { account = null }
+
+        var searchWithAccount = true
+        var searchFails = false
+        override suspend fun searchWithAccount() = searchWithAccount
+        override suspend fun setSearchWithAccount(on: Boolean) { searchWithAccount = on }
+        override suspend fun search(query: String, type: SearchType): SearchPage {
+            if (searchFails) error("expired")
+            return SearchPage(listOf(SearchSection("Mine", type, emptyList())))
+        }
+        override suspend fun suggestions(query: String) = listOf("$query (mine)")
+    }
+
+    @Test
+    fun `the phone's owner searches with their YouTube Music account, guests without`() = testApplication {
+        val owner = Owner(YoutubeAccount("Jonah", "@jonah", null))
+        setupPhone(generalCatalog, owner, suggestions = { q -> listOf("$q (anyone)") })
+        val client = jsonClient()
+        suspend fun searchTitle(remote: Boolean = false) =
+            client.get("/api/search?q=daft") { if (remote) header("X-Remote", "1") }.body<SearchPage>().sections.single().title
+        suspend fun suggestion(remote: Boolean = false) =
+            client.get("/api/search/suggestions?q=daft") { if (remote) header("X-Remote", "1") }.body<SuggestionsResponse>().items.single()
+
+        // On by default.
+        assertEquals(true, client.get("/api/me/youtube").body<YoutubeAccountStatus>().searchWithAccount)
+        assertEquals("Mine", searchTitle())
+        assertEquals("daft (mine)", suggestion())
+        assertEquals("all", searchTitle(remote = true))
+        assertEquals("daft (anyone)", suggestion(remote = true))
+        assertEquals(HttpStatusCode.Forbidden, client.put("/api/me/youtube/search") { header("X-Remote", "1"); contentType(ContentType.Application.Json); setBody(YoutubeSearchSetting(false)) }.status)
+
+        // An expired sign-in searches without it.
+        owner.searchFails = true
+        assertEquals("all", searchTitle())
+        owner.searchFails = false
+
+        // Turned off.
+        assertEquals(HttpStatusCode.NoContent, client.put("/api/me/youtube/search") { contentType(ContentType.Application.Json); setBody(YoutubeSearchSetting(false)) }.status)
+        assertEquals(false, client.get("/api/me/youtube").body<YoutubeAccountStatus>().searchWithAccount)
+        assertEquals("all", searchTitle())
+        assertEquals("daft (anyone)", suggestion())
+
+        // On again, but signed out.
+        owner.searchWithAccount = true
+        owner.account = null
+        assertEquals("all", searchTitle())
     }
 
     @Test

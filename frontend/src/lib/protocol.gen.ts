@@ -831,10 +831,15 @@ export interface YoutubeAccountStatus {
   available: boolean;
   account: YoutubeAccount | null;
   history: YoutubeHistory;
+  searchWithAccount: boolean;
 }
 
 export interface YoutubeHistorySetting {
   history: YoutubeHistory;
+}
+
+export interface YoutubeSearchSetting {
+  withAccount: boolean;
 }
 
 export interface YoutubeSignInRequest {

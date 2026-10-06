@@ -20,7 +20,8 @@
         android:roundIcon="@drawable/ic_launcher"
         android:theme="@style/Theme.Ytmp"
         android:usesCleartextTraffic="true"
-        android:dataExtractionRules="@xml/data_extraction_rules">
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules">
 
         <activity
             android:name=".MainActivity"

@@ -27,7 +27,8 @@ import type {
 	YoutubeSignInRequest,
 	SyncedRoomsResponse,
 	MovedRoomResponse,
-	Song
+	Song,
+	YoutubeSearchSetting
 } from './protocol.gen';
 
 import { identity } from './account';
@@ -184,6 +185,10 @@ export async function setYoutubeHistory(history: YoutubeHistory): Promise<void> 
 	await request<null>('/api/me/youtube/history', { method: 'PUT', body: JSON.stringify({ history } satisfies YoutubeHistorySetting) });
 }
 
+export async function setYoutubeSearch(withAccount: boolean): Promise<void> {
+	await request<null>('/api/me/youtube/search', { method: 'PUT', body: JSON.stringify({ withAccount } satisfies YoutubeSearchSetting) });
+}
+
 /** On a server: keep this YouTube Music sign-in (cookies, or text that contains them) in your account. */
 export function signInToYoutube(cookie: string): Promise<YoutubeAccount> {
 	return request('/api/me/youtube', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cookie } satisfies YoutubeSignInRequest) });
@@ -246,9 +251,11 @@ export function forgetHome(): void {
 	refreshHome = true;
 }
 
-/** After signing in or out: the home page and your library change. */
+/** After signing in or out: the home page, your library and (with your account) search results change. */
 export function forgetPersonal(): void {
-	for (const key of [...cache.keys()]) if (key === 'home' || key.startsWith('me:')) cache.delete(key);
+	for (const key of [...cache.keys()]) {
+		if (key === 'home' || key.startsWith('me:') || key.startsWith('search:') || key.startsWith('suggest:')) cache.delete(key);
+	}
 }
 
 const pages = { artist: getArtist, album: getAlbum, playlist: getPlaylist, podcast: getPodcast };

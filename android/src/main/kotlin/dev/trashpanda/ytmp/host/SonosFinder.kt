@@ -22,17 +22,13 @@ class SonosFinder(context: Context, private val outputs: SonosOutputs) {
             }
 
             override fun onServiceFound(info: NsdServiceInfo) {
-                @Suppress("DEPRECATION") // The replacement needs API 34; this works on 33+.
-                nsd.resolveService(info, object : NsdManager.ResolveListener {
-                    override fun onResolveFailed(info: NsdServiceInfo, error: Int) = Unit
-                    override fun onServiceResolved(info: NsdServiceInfo) {
-                        @Suppress("DEPRECATION")
-                        val host = info.host?.hostAddress ?: return
-                        // Named after its room, read from the speaker itself.
-                        outputs.addHost(host)
-                        Log.d(TAG, "Found Sonos at $host")
-                    }
-                })
+                NsdQueue.resolve(nsd, info) { resolved ->
+                    @Suppress("DEPRECATION")
+                    val host = resolved.host?.hostAddress ?: return@resolve
+                    // Named after its room, read from the speaker itself.
+                    outputs.addHost(host)
+                    Log.d(TAG, "Found Sonos at $host")
+                }
             }
 
             override fun onServiceLost(info: NsdServiceInfo) = Unit

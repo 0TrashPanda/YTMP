@@ -65,12 +65,16 @@ phone's owner:
   to your YTM history, like YTM's own player does, so its suggestions learn from them. A
   setting in the profile menu: **Off**, **Solo rooms** (default), or **All rooms** on this
   phone (also what friends add in a party).
+- **Search with your account** ✅: your searches and the suggestions while typing go through
+  your YouTube Music account, so they fit your taste like in YTM. **On** by default; a switch
+  in the profile menu. Only your own searches: friends in your rooms search without it. If
+  the sign-in stops working, search carries on without it.
 - Signing out also forgets the sign-in page's session, so you can pick another account.
 
 ### YouTube Music on a server account ✅
 
 On a YTMP server you can connect YouTube Music to **your YTMP account**: then your Home,
-Library, likes, saving to playlists and the history setting work in rooms on that server, in
+Library, likes, saving to playlists, the history setting and searching with your account work in rooms on that server, in
 every browser where you're logged in. Only you see them.
 
 - **Sign in with the YTMP app**: the app opens Google's sign-in page (after asking whether to

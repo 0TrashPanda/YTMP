@@ -76,7 +76,7 @@ jobs:
           fi
           echo "$YTMP_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
           export YTMP_KEYSTORE="$RUNNER_TEMP/release.jks" YTMP_KEY_ALIAS=ytmp YTMP_KEY_PASSWORD="$YTMP_KEYSTORE_PASSWORD"
-          ./gradlew :android:assembleRelease
+          ./gradlew :android:lintRelease :android:assembleRelease
           mv android/build/outputs/apk/release/android-release.apk "ytmp-$YTMP_VERSION.apk"
           rm "$RUNNER_TEMP/release.jks"
 

@@ -10,7 +10,7 @@ Other platforms (Windows, macOS, desktop Linux) use YTMP **through the web
 browser**. **iOS is not supported**: iPhones can open the web UI, but playback in the
 background is unreliable in Safari and won't be worked around.
 
-The Android app needs **Android 13 or newer**. A native Linux app is a [future idea](future-ideas.md#native-linux-app).
+The Android app needs **Android 11 or newer**. A native Linux app is a [future idea](future-ideas.md#native-linux-app).
 
 ## Key properties
 

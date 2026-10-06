@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.content.pm.ApplicationInfo
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.webkit.ConsoleMessage
@@ -311,9 +312,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** The media notification (with the playback controls) needs this permission. */
+    /** The media notification (with the playback controls) needs this permission, from Android 13 on. */
     private fun askForNotifications() {
-        if (askedForNotifications) return
+        if (askedForNotifications || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         askedForNotifications = true
         if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)

@@ -175,6 +175,14 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
     def my_account(user: core.YtmCore = Depends(me)):
         return user.account()
 
+    @app.get("/me/search", dependencies=[Depends(check_key)])
+    def my_search(q: str, type: str = "all", limit: int = 20, user: core.YtmCore = Depends(me)):
+        return user.search(q, type=type, limit=min(max(limit, 1), 50), personal=True)
+
+    @app.get("/me/search/suggestions", dependencies=[Depends(check_key)])
+    def my_suggestions(q: str, user: core.YtmCore = Depends(me)):
+        return {"items": user.suggestions(q, personal=True)}
+
     @app.get("/me/home", dependencies=[Depends(check_key)])
     def my_home(user: core.YtmCore = Depends(me)):
         return user.home(personal=True)

@@ -12,6 +12,8 @@ import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
+import dev.trashpanda.ytmp.protocol.SearchPage
+import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -99,6 +101,14 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         requireSignedIn()
         ytm().addToHistory(songId)
     }
+
+    override suspend fun searchWithAccount(): Boolean = prefs.getBoolean("search", true)
+
+    override suspend fun setSearchWithAccount(on: Boolean) = prefs.edit().putBoolean("search", on).apply()
+
+    override suspend fun search(query: String, type: SearchType): SearchPage { requireSignedIn(); return ytm().personalSearch(query, type) }
+
+    override suspend fun suggestions(query: String): List<String> { requireSignedIn(); return ytm().personalSuggestions(query) }
 
     override suspend fun ownPlaylists(): List<PlaylistSummary> { requireSignedIn(); return ytm().ownPlaylists() }
 

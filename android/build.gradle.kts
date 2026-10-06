@@ -15,7 +15,7 @@ android {
 
     defaultConfig {
         applicationId = "dev.trashpanda.ytmp"
-        minSdk = 33
+        minSdk = 30
         targetSdk = 36
         versionName = versionNameFromEnv ?: "0.1.0"
         // 1.2.3 -> 10203, so every release counts higher than the one before.

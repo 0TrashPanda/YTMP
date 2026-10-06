@@ -54,6 +54,10 @@
 		['solo', 'Solo rooms'],
 		['all', 'All rooms']
 	];
+	const onOffOptions: [string, string][] = [
+		['off', 'Off'],
+		['on', 'On']
+	];
 	const backOptions: [BackLimit, string][] = [
 		['home', 'Home page'],
 		['rooms', 'Room list']
@@ -113,6 +117,13 @@
 				historyOptions,
 				youtube.history,
 				(v) => youtube.setHistory(v as YoutubeHistory).catch((e) => onToast(e instanceof Error ? e.message : "Couldn't change it"))
+			)}
+			{@render choice(
+				'Search with your account',
+				'Search results and suggestions fit your taste, like in YouTube Music. Only your own searches: friends in your rooms search without it.',
+				onOffOptions,
+				youtube.searchWithAccount ? 'on' : 'off',
+				(v) => youtube.setSearchWithAccount(v === 'on').catch((e) => onToast(e instanceof Error ? e.message : "Couldn't change it"))
 			)}
 			<button class="rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={signOut}>Sign out of YouTube Music</button>
 		{:else if youtube.available && youtube.onServer}
