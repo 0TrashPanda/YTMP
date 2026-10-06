@@ -179,8 +179,8 @@ data class YoutubeAccountStatus(
     val account: YoutubeAccount?,
     /** Which songs go into your YouTube Music history (so its suggestions learn from them). */
     val history: YoutubeHistory = YoutubeHistory.SOLO,
-    /** Your searches and suggestions go through this account (see [YoutubeSearchSetting]). */
-    val searchWithAccount: Boolean = true,
+    /** Search and radio go through this account (see [YoutubePersonalizeSetting]). */
+    val personalize: Boolean = true,
 )
 
 /** Which songs played on this phone go into its owner's YouTube Music history. */
@@ -210,13 +210,14 @@ data class YoutubeSignInRequest(val cookie: String)
 data class YoutubeHistorySetting(val history: YoutubeHistory)
 
 /**
- * `PUT /api/me/youtube/search`: whether your own searches (and the suggestions while typing)
- * go through your YouTube Music account, so they fit your taste like in YouTube Music. Others'
- * searches in your rooms never do.
+ * `PUT /api/me/youtube/personalize`: whether search and radio go through your YouTube Music
+ * account, so they fit your taste like in YouTube Music: your own searches (and the suggestions
+ * while typing) and Related, and the radio and autoplay of rooms that are yours. Others' searches
+ * in your rooms never do.
  */
 @Serializable
-@SerialName("YoutubeSearchSetting")
-data class YoutubeSearchSetting(val withAccount: Boolean)
+@SerialName("YoutubePersonalizeSetting")
+data class YoutubePersonalizeSetting(val on: Boolean)
 
 /** `GET`/`PUT /api/me/likes/{songId}`: whether you like a song (thumbs up) in YouTube Music. */
 @Serializable

@@ -7,6 +7,7 @@
 	import NowPlaying from '../../../lib/components/NowPlaying.svelte';
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
+	import Sidebar from '../../../lib/components/Sidebar.svelte';
 	import ProfileSheet from '../../../lib/components/ProfileSheet.svelte';
 	import SaveSheet from '../../../lib/components/SaveSheet.svelte';
 	import { youtube } from '../../../lib/youtube.svelte';
@@ -83,6 +84,7 @@
 	let saving = $state<Song | null>(null);
 
 	function pickSection(next: 'home' | 'library') {
+		closePlayer();
 		section = next;
 		browsing = false;
 		scroller?.scrollTo({ top: 0 });
@@ -350,7 +352,13 @@
 	</main>
 {:else}
 	<div class="flex h-full flex-col">
-		<div class="relative min-h-0 flex-1">
+		<div class="relative flex min-h-0 flex-1">
+			<Sidebar
+				section={browsing ? null : section}
+				onLogo={() => pickSection('home')}
+				onSection={pickSection}
+				onPlaylist={(p) => openPlaylist(p, true)}
+			/>
 			<!-- One scrolling page whose header slides away while scrolling down (phones). -->
 			<div
 				bind:this={scroller}
@@ -360,13 +368,14 @@
 				ontouchend={pullEnd}
 				ontouchcancel={pullEnd}
 				role="presentation"
-				class="h-full overflow-y-auto overscroll-y-contain"
+				class="h-full min-w-0 flex-1 overflow-y-auto overscroll-y-contain"
 			>
 				<header
-					class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:px-4 lg:translate-y-0
+					class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:h-14 sm:px-6 lg:translate-y-0
 						{headerHidden ? '-translate-y-full' : ''}"
 				>
-					<button class="text-xl font-black tracking-tight" title={browsing ? 'Home' : 'Back to where you were'} onclick={toggleHome}>
+					<!-- Desktop: the logo is on the left side (Sidebar), so search starts where the page does, like YTM. -->
+					<button class="text-xl font-black tracking-tight sm:hidden" title={browsing ? 'Home' : 'Back to where you were'} onclick={toggleHome}>
 						YT<span class="text-accent">MP</span>
 					</button>
 					<SearchBox {query} onopen={() => (headerHidden = false)} onsearch={searchFor} />
@@ -505,11 +514,22 @@
 		</div>
 
 		{#if player}
-			<PlayerBar {room} {player} {positionMs} {expanded} onExpand={(open) => (open ? openPlayer() : closePlayer())} onToast={toast} onSongMenu={currentMenu} />
+			<PlayerBar
+				{room}
+				{player}
+				{positionMs}
+				{expanded}
+				onExpand={(open) => (open ? openPlayer() : closePlayer())}
+				onToast={toast}
+				onSongMenu={currentMenu}
+				onArtist={openArtist}
+				onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
+				onPodcast={openPodcast}
+			/>
 		{/if}
 		{#if youtube.available}
-			<!-- Like YTM's bottom bar. -->
-			<nav class="flex shrink-0 bg-surface">
+			<!-- Like YTM's bottom bar, on phones (desktop: the Sidebar). -->
+			<nav class="flex shrink-0 bg-surface sm:hidden">
 				{#each [['home', 'Home'], ['library', 'Library']] as const as [value, label] (value)}
 					{@const active = section === value && !browsing}
 					<button class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs {active ? 'text-white' : 'text-muted'}" aria-current={active ? 'page' : undefined} onclick={() => pickSection(value)}>

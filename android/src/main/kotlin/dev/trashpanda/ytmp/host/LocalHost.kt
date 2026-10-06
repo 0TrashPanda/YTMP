@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.FinishedPlay
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.StreamResolver
+import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
@@ -70,6 +71,8 @@ class LocalHost(private val context: Context) {
             addToYoutubeHistory(play)
         },
         radio = cached,
+        // Every room here is the phone owner's, so radio goes through their YouTube Music.
+        ownerRadio = { _, seed -> youtube.personalized()?.radio(seed) },
         onRoomSaved = { sync.saved(it) },
         onRoomClosed = { sync.closed(it) },
     )

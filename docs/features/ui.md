@@ -47,7 +47,18 @@ Like YTM:
   (see below); *Related* is [find similar](history-and-recommendations.md#find-similar)
   for the current song. *Lyrics* comes later.
 - **Desktop** ✅: the player bar stays at the bottom (controls, the song, volume, Play
-  on, Play here, ˄ to open the full player); the full player opens above it.
+  on, Play here, ˄ to open the full player); the full player opens above it. Like YTM,
+  **clicking anywhere on the bar** (not on a button) opens or closes the full player, and
+  the song shows **Artist • Album • Year**; the artist and album open their page. A **like**
+  button sits next to the song. With the full player open, the song is only in the bar (the
+  full player shows the art and Up next / Related).
+- **Image quality** ✅ (profile menu, per device): **High** (default) loads sharp pictures, on
+  big screens bigger than YTM lists them (like YTM, Google's pictures are asked for at the
+  size shown, e.g. 1200 px album art in the desktop player); **Low** loads at most 300 px
+  pictures, to save data.
+- **Desktop layout** ✅, like YTM: a **left side** with the logo, Home, Library and (wide
+  screens) your playlists; narrower screens get YTM's mini version (icons with small
+  labels). No bottom bar on desktop, and the search box starts where the page does.
 - **Later: smoother swipe-down** of the full player. Now it only follows the finger and
   jumps closed (or back) on release; it should feel like YTM's: the player shrinks into
   the mini player as you drag, with momentum (a quick flick closes it), and an animated

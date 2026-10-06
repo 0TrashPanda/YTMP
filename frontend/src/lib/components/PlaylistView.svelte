@@ -1,5 +1,6 @@
 <script lang="ts">
 	// A playlist page (community or YouTube Music's own, or one of yours): its songs, in order.
+	import { thumbUrl } from '../images.svelte';
 	import { getPlaylist } from '../api';
 	import { formatTime } from '../format';
 	import type { PlaylistPage } from '../protocol.gen';
@@ -46,7 +47,7 @@
 	<header class="flex flex-col gap-5 px-2 sm:flex-row sm:items-end">
 		<div class="aspect-square w-48 shrink-0 overflow-hidden rounded-lg bg-raised shadow-2xl sm:w-56">
 			{#if playlist?.thumbnails.at(-1)}
-				<img src={playlist.thumbnails.at(-1)!.url} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+				<img src={thumbUrl(playlist.thumbnails, 544)} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
 			{/if}
 		</div>
 		<div class="min-w-0">

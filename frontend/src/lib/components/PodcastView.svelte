@@ -1,6 +1,7 @@
 <script lang="ts">
 	// A podcast page: what it's about, and its episodes (newest first). Tap an episode =
 	// play next; ⋮ or right-click = the song menu.
+	import { thumbUrl } from '../images.svelte';
 	import { getPodcast } from '../api';
 	import { formatTime } from '../format';
 	import type { Episode, PodcastPage } from '../protocol.gen';
@@ -63,7 +64,7 @@
 	<header class="flex flex-col gap-5 px-2 sm:flex-row sm:items-end">
 		<div class="aspect-square w-48 shrink-0 overflow-hidden rounded-lg bg-raised shadow-2xl sm:w-56">
 			{#if podcast?.thumbnails.at(-1)}
-				<img src={podcast.thumbnails.at(-1)!.url} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+				<img src={thumbUrl(podcast.thumbnails, 544)} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
 			{/if}
 		</div>
 		<div class="min-w-0">
@@ -101,7 +102,7 @@
 					<button class="flex min-w-0 flex-1 items-start gap-3 text-left" onclick={() => play(episode, false)} title="Play next">
 						<div class="aspect-video w-28 shrink-0 overflow-hidden rounded bg-raised sm:w-36">
 							{#if episode.song.thumbnails.at(-1)}
-								<img src={episode.song.thumbnails.at(-1)!.url} alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+								<img src={thumbUrl(episode.song.thumbnails, 160)} alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
 							{/if}
 						</div>
 						<div class="min-w-0 flex-1">

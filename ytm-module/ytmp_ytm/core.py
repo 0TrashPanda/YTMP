@@ -201,10 +201,14 @@ class YtmCore:
         ytm = self._signed_in() if personal else self._ytm
         return [s for s in ytm.get_search_suggestions(query) if isinstance(s, str)]
 
-    def radio(self, seed_id: str, limit: int = 25) -> list[dict]:
-        """YTM's radio for a song: similar songs, usually starting with the song itself."""
+    def radio(self, seed_id: str, limit: int = 25, personal: bool = False) -> list[dict]:
+        """YTM's radio for a song: similar songs, usually starting with the song itself.
+
+        With [personal], as the signed-in account (it fits its taste, like in YTM).
+        """
+        ytm = self._signed_in() if personal else self._ytm
         try:
-            playlist = self._ytm.get_watch_playlist(videoId=video_id(seed_id), radio=True, limit=limit)
+            playlist = ytm.get_watch_playlist(videoId=video_id(seed_id), radio=True, limit=limit)
         except Exception as e:  # ytmusicapi raises plain exceptions for unknown IDs
             raise NotFound(str(e)) from e
         return [song for t in playlist.get("tracks") or [] if (song := _song_from_watch(t))][:limit]

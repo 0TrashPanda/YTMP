@@ -101,6 +101,11 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         ProtocolJson.decodeFromString(SearchPage.serializer(), json.callAttr("dumps", page).toString())
     }
 
+    suspend fun personalRadio(seedSongId: String): List<Song> = python {
+        val results = core.callAttr("radio", seedSongId, 25, true)
+        ProtocolJson.decodeFromString(ListSerializer(Song.serializer()), json.callAttr("dumps", results).toString())
+    }
+
     suspend fun personalSuggestions(query: String): List<String> = python {
         core.callAttr("suggestions", query, true).asList().map { it.toString() }
     }

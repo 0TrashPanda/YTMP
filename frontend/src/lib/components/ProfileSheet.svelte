@@ -3,7 +3,8 @@
 	// and this phone's settings in the app.
 	import { nativeBridge } from '../native';
 	import type { YoutubeHistory } from '../protocol.gen';
-	import { saved, type BackLimit, type HeadphonesAction } from '../storage';
+	import { images, setImageQuality } from '../images.svelte';
+	import { saved, type BackLimit, type HeadphonesAction, type ImageQuality } from '../storage';
 	import { youtube } from '../youtube.svelte';
 	import Icon from './Icon.svelte';
 
@@ -57,6 +58,10 @@
 	const onOffOptions: [string, string][] = [
 		['off', 'Off'],
 		['on', 'On']
+	];
+	const qualityOptions: [ImageQuality, string][] = [
+		['high', 'High'],
+		['low', 'Low']
 	];
 	const backOptions: [BackLimit, string][] = [
 		['home', 'Home page'],
@@ -119,11 +124,11 @@
 				(v) => youtube.setHistory(v as YoutubeHistory).catch((e) => onToast(e instanceof Error ? e.message : "Couldn't change it"))
 			)}
 			{@render choice(
-				'Search with your account',
-				'Search results and suggestions fit your taste, like in YouTube Music. Only your own searches: friends in your rooms search without it.',
+				'Use your account for search and radio',
+				'Search, suggestions, radio and autoplay fit your taste, like in YouTube Music: your own searches, and the radio in your rooms. Friends\' searches never use it.',
 				onOffOptions,
-				youtube.searchWithAccount ? 'on' : 'off',
-				(v) => youtube.setSearchWithAccount(v === 'on').catch((e) => onToast(e instanceof Error ? e.message : "Couldn't change it"))
+				youtube.personalize ? 'on' : 'off',
+				(v) => youtube.setPersonalize(v === 'on').catch((e) => onToast(e instanceof Error ? e.message : "Couldn't change it"))
 			)}
 			<button class="rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={signOut}>Sign out of YouTube Music</button>
 		{:else if youtube.available && youtube.onServer}
@@ -181,9 +186,12 @@
 			</button>
 		{/if}
 
-		{#if nativeBridge}
-			<section class="flex flex-col gap-4 border-t border-line pt-4">
-				<h2 class="text-sm font-medium tracking-wide text-muted uppercase">On this phone</h2>
+		<section class="flex flex-col gap-4 border-t border-line pt-4">
+			<h2 class="text-sm font-medium tracking-wide text-muted uppercase">{nativeBridge ? 'On this phone' : 'On this device'}</h2>
+			{@render choice('Image quality', 'Low loads smaller pictures (album art, artists, playlists): less data, a bit less sharp.', qualityOptions, images.quality, (v) =>
+				setImageQuality(v as ImageQuality)
+			)}
+			{#if nativeBridge}
 				{@render choice('Back in a solo room', "Where the Back button stops once you're on Home.", backOptions, soloBack, (v) => {
 					soloBack = v as BackLimit;
 					saved.setBackLimit(true, soloBack);
@@ -203,7 +211,7 @@
 						window.dispatchEvent(new Event('ytmp:settings'));
 					}
 				)}
-			</section>
-		{/if}
+			{/if}
+		</section>
 	</div>
 </div>

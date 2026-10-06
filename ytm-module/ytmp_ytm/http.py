@@ -183,6 +183,10 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
     def my_suggestions(q: str, user: core.YtmCore = Depends(me)):
         return {"items": user.suggestions(q, personal=True)}
 
+    @app.get("/me/radio", dependencies=[Depends(check_key)])
+    def my_radio(seed: str, limit: int = 25, user: core.YtmCore = Depends(me)):
+        return {"items": user.radio(seed, limit=min(max(limit, 1), 50), personal=True), "next": None}
+
     @app.get("/me/home", dependencies=[Depends(check_key)])
     def my_home(user: core.YtmCore = Depends(me)):
         return user.home(personal=True)

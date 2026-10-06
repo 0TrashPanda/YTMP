@@ -2,7 +2,7 @@
 // happens in the app (android/.../YoutubeLoginActivity.kt), and the cookies stay there. On a
 // server it belongs to your YTMP account there: you sign in through the app, or paste the
 // cookies from a browser, and the server keeps them (server/.../YoutubeLinks.kt).
-import { forgetPersonal, getHost, getYoutubeAccount, setYoutubeHistory, setYoutubeSearch, signInToYoutube, signOutOfYoutube } from './api';
+import { forgetPersonal, getHost, getYoutubeAccount, setYoutubeHistory, setYoutubePersonalize, signInToYoutube, signOutOfYoutube } from './api';
 import { nativeBridge } from './native';
 import type { YoutubeAccount, YoutubeHistory } from './protocol.gen';
 
@@ -15,7 +15,7 @@ class YoutubeSignIn {
 	/** Which songs played here go into your YouTube Music history. */
 	history = $state<YoutubeHistory>('solo');
 	/** Your searches go through this account (personal results, like in YouTube Music). */
-	searchWithAccount = $state(true);
+	personalize = $state(true);
 	/** Changes with every sign-in or sign-out, to reload what depends on it. */
 	version = $state(0);
 	busy = $state(false);
@@ -32,7 +32,7 @@ class YoutubeSignIn {
 			this.available = status.available && (this.onServer || !!nativeBridge?.youtubeSignIn);
 			this.account = status.account;
 			this.history = status.history;
-			this.searchWithAccount = status.searchWithAccount;
+			this.personalize = status.personalize;
 		} catch {
 			// Offline, or an older host: no sign-in.
 		}
@@ -107,14 +107,14 @@ class YoutubeSignIn {
 		}
 	}
 
-	async setSearchWithAccount(on: boolean): Promise<void> {
-		const before = this.searchWithAccount;
-		this.searchWithAccount = on;
+	async setPersonalize(on: boolean): Promise<void> {
+		const before = this.personalize;
+		this.personalize = on;
 		try {
-			await setYoutubeSearch(on);
+			await setYoutubePersonalize(on);
 			forgetPersonal();
 		} catch (e) {
-			this.searchWithAccount = before;
+			this.personalize = before;
 			throw e;
 		}
 	}

@@ -28,7 +28,7 @@ import type {
 	SyncedRoomsResponse,
 	MovedRoomResponse,
 	Song,
-	YoutubeSearchSetting
+	YoutubePersonalizeSetting
 } from './protocol.gen';
 
 import { identity } from './account';
@@ -185,8 +185,8 @@ export async function setYoutubeHistory(history: YoutubeHistory): Promise<void> 
 	await request<null>('/api/me/youtube/history', { method: 'PUT', body: JSON.stringify({ history } satisfies YoutubeHistorySetting) });
 }
 
-export async function setYoutubeSearch(withAccount: boolean): Promise<void> {
-	await request<null>('/api/me/youtube/search', { method: 'PUT', body: JSON.stringify({ withAccount } satisfies YoutubeSearchSetting) });
+export async function setYoutubePersonalize(on: boolean): Promise<void> {
+	await request<null>('/api/me/youtube/personalize', { method: 'PUT', body: JSON.stringify({ on } satisfies YoutubePersonalizeSetting) });
 }
 
 /** On a server: keep this YouTube Music sign-in (cookies, or text that contains them) in your account. */

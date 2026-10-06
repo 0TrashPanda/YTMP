@@ -10,6 +10,7 @@ import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
+import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import io.ktor.http.HttpStatusCode
@@ -141,13 +142,15 @@ class YoutubeLinks(
 
         override suspend fun addToHistory(songId: String) = withCookie { module.addToMyHistory(it, songId) }
 
-        override suspend fun searchWithAccount(): Boolean = accounts.data(accountId, SEARCH) != "off"
+        override suspend fun personalize(): Boolean = accounts.data(accountId, PERSONALIZE) != "off"
 
-        override suspend fun setSearchWithAccount(on: Boolean) = accounts.setData(accountId, SEARCH, if (on) "on" else "off")
+        override suspend fun setPersonalize(on: Boolean) = accounts.setData(accountId, PERSONALIZE, if (on) "on" else "off")
 
         override suspend fun search(query: String, type: SearchType): SearchPage = withCookie { module.mySearch(it, query, type) }
 
         override suspend fun suggestions(query: String): List<String> = withCookie { module.mySuggestions(it, query) }
+
+        override suspend fun radio(seedSongId: String): List<Song> = withCookie { module.myRadio(it, seedSongId) }
     }
 
     private fun notSignedIn() = ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Not signed in to YouTube Music (or the sign-in expired)")
@@ -169,7 +172,7 @@ class YoutubeLinks(
         private val log = LoggerFactory.getLogger(YoutubeLinks::class.java)
         private const val COOKIE = "youtube_cookie"
         private const val HISTORY = "youtube_history"
-        private const val SEARCH = "youtube_search"
+        private const val PERSONALIZE = "youtube_personalize"
         private const val ACCOUNT_TTL_MS = 10 * 60_000L
 
         /** A skipped song counts as played after this long, like on YouTube. */

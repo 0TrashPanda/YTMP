@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.RoomInfo
 import dev.trashpanda.ytmp.protocol.RoomVisibility
+import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -60,6 +61,11 @@ class RoomManager(
     private val onPlayFinished: (FinishedPlay) -> Unit = {},
     /** YTM's radio, for Start radio and autoplay. */
     private val radio: RadioSource? = null,
+    /**
+     * The room owner's own radio (their YouTube Music account), by owner account (null: a room
+     * without one), when they have one and want it ([PersonalCatalog.personalized]). Null: the shared [radio].
+     */
+    private val ownerRadio: suspend (ownerAccount: String?, seedSongId: String) -> List<Song>? = { _, _ -> null },
     /** A room with an owner account was saved: its copy elsewhere can be updated (see [Room.syncId]). Must not block. */
     private val onRoomSaved: (SavedRoom) -> Unit = {},
     /** A room with an owner account was closed or expired here (not moved away). Must not block. */
@@ -87,7 +93,7 @@ class RoomManager(
         val store = store
         if (store != null) {
             val saved = runCatching { store.loadAll() }.onFailure { log.error("Couldn't load saved rooms", it) }.getOrDefault(emptyList())
-            for (s in saved) add(Room.restore(s, streams, scope, onInfoChanged = { roomChanged(s.code) }, clock = clock, radio = radio))
+            for (s in saved) add(Room.restore(s, streams, scope, onInfoChanged = { roomChanged(s.code) }, clock = clock, radio = radioFor(s.ownerAccount)))
             if (saved.isNotEmpty()) log.info("Restored {} room(s)", saved.size)
             refreshList()
             scope.launch(storeContext) { saveLoop(store) }
@@ -105,7 +111,7 @@ class RoomManager(
         while (true) {
             val code = newCode()
             val room = Room(
-                code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radio,
+                code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radioFor(ownerAccount),
                 onInfoChanged = { roomChanged(code) }, clock = clock,
             )
             if (add(room)) {
@@ -156,7 +162,7 @@ class RoomManager(
         val state = saved.copy(positionMs = position.coerceIn(0, length), lastActive = clock())
         var code = normalize(saved.code)
         while (true) {
-            val room = Room.restore(state, streams, scope, onInfoChanged = { roomChanged(code) }, radio = radio, clock = clock, code = code, epoch = epoch)
+            val room = Room.restore(state, streams, scope, onInfoChanged = { roomChanged(code) }, radio = radioFor(state.ownerAccount), clock = clock, code = code, epoch = epoch)
             if (add(room)) {
                 moved.remove(code)
                 roomChanged(code)
@@ -227,6 +233,21 @@ class RoomManager(
                 log.warn("Couldn't save room {}", code, e)
             }
             if (saved.syncId != null) onRoomSaved(saved)
+        }
+    }
+
+    /** A room's radio: its owner's own when there is one ([ownerRadio]), else (or when that fails) the shared one. */
+    private fun radioFor(ownerAccount: String?): RadioSource? {
+        val shared = radio ?: return null
+        return RadioSource { seed ->
+            try {
+                ownerRadio(ownerAccount, seed)?.let { return@RadioSource it }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.warn("The owner's radio didn't work, using the shared one: {}", e.message)
+            }
+            shared.radio(seed)
         }
     }
 

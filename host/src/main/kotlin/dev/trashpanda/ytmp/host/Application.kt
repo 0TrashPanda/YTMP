@@ -5,10 +5,11 @@ import dev.trashpanda.ytmp.core.Outbox
 import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
+import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import dev.trashpanda.ytmp.protocol.YoutubeHistorySetting
-import dev.trashpanda.ytmp.protocol.YoutubeSearchSetting
+import dev.trashpanda.ytmp.protocol.YoutubePersonalizeSetting
 import dev.trashpanda.ytmp.protocol.YoutubeSignInRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
@@ -162,11 +163,11 @@ fun Application.ytmpModule(
     fun ApplicationCall.personal(): PersonalCatalog? = personalFor?.invoke(this) ?: personal?.takeIf { options.isLocal(this) }
 
     /**
-     * Your own searches go through your YouTube Music account, when you're signed in and want
-     * that; everyone else's (and yours, if that fails) through the shared, anonymous one.
+     * Your own searches (and Related) go through your YouTube Music account, when you're signed
+     * in and want that; everyone else's (and yours, if that fails) through the shared, anonymous one.
      */
     suspend fun <T : Any> ApplicationCall.asYou(mine: suspend PersonalCatalog.() -> T?, anonymous: suspend () -> T): T {
-        val you = personal()?.takeIf { it.searchWithAccount() && it.account() != null }
+        val you = personal()?.personalized()
         if (you != null) {
             try {
                 you.mine()?.let { return it }
@@ -258,7 +259,7 @@ fun Application.ytmpModule(
                 val songId = call.request.queryParameters["id"]?.trim().orEmpty()
                 if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
                 val source = similar ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No radio source")
-                call.respond(SearchResponse(source.radio(songId).filter { it.id != songId }))
+                call.respond(SearchResponse(call.asYou({ radio(songId) }) { source.radio(songId) }.filter { it.id != songId }))
             }
             get("/artists/{id}") {
                 val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No artist pages here")
@@ -297,13 +298,13 @@ fun Application.ytmpModule(
                             available = mine != null,
                             account = mine?.account(),
                             history = mine?.historySetting() ?: YoutubeHistory.SOLO,
-                            searchWithAccount = mine?.searchWithAccount() ?: true,
+                            personalize = mine?.personalize() ?: true,
                         ),
                     )
                 }
-                put("/youtube/search") {
+                put("/youtube/personalize") {
                     val owner = call.owner()
-                    owner.setSearchWithAccount(call.receive<YoutubeSearchSetting>().withAccount)
+                    owner.setPersonalize(call.receive<YoutubePersonalizeSetting>().on)
                     call.respond(HttpStatusCode.NoContent)
                 }
                 put("/youtube/history") {

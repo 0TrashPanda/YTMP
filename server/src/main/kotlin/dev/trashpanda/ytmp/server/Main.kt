@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.core.RoomTimeouts
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
@@ -106,6 +107,8 @@ fun main(args: Array<String>) {
                 youtube.report(play, ::localAccount)
             },
             radio = cached,
+            // A room with an owner account of this server: radio through that account's YouTube Music.
+            ownerRadio = { owner, seed -> owner?.let(::localAccount)?.let(youtube::of)?.personalized()?.radio(seed) },
         )
         rooms.startCleanup()
         val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere)

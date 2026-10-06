@@ -1,3 +1,4 @@
+import { thumbUrl } from './images.svelte';
 import type { Song } from './protocol.gen';
 
 export function formatTime(ms: number): string {
@@ -12,8 +13,7 @@ export function artistNames(song: Song): string {
 	return song.artists.map((a) => a.name).join(', ') || song.podcast?.name || '';
 }
 
-/** The smallest thumbnail that is at least [size] px, or the largest one. */
+/** A song's picture for showing it [size] px wide (see [thumbUrl]). */
 export function artUrl(song: Song, size: number): string | null {
-	const sorted = [...song.thumbnails].sort((a, b) => a.width - b.width);
-	return (sorted.find((t) => t.width >= size) ?? sorted.at(-1))?.url ?? null;
+	return thumbUrl(song.thumbnails, size) ?? null;
 }

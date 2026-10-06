@@ -1,5 +1,10 @@
 <script lang="ts">
+	import { MediaQuery } from 'svelte/reactivity';
+	import { getAlbum, prefetch } from '../api';
 	import { artistNames, formatTime } from '../format';
+	import { likes } from '../likes.svelte';
+	import { youtube } from '../youtube.svelte';
+	import type { AlbumRef, ArtistRef, PodcastRef } from '../protocol.gen';
 	import type { RoomPlayer } from '../player.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -15,7 +20,10 @@
 		expanded,
 		onExpand,
 		onToast,
-		onSongMenu
+		onSongMenu,
+		onArtist,
+		onAlbum,
+		onPodcast
 	}: {
 		room: RoomConnection;
 		player: RoomPlayer;
@@ -27,6 +35,9 @@
 		onToast: (text: string) => void;
 		/** Right-click or ⋮ on the current song. */
 		onSongMenu: (event: MouseEvent) => void;
+		onArtist: (artist: ArtistRef) => void;
+		onAlbum: (album: AlbumRef) => void;
+		onPodcast: (podcast: PodcastRef) => void;
 	} = $props();
 
 	let showOutputs = $state(false);
@@ -35,11 +46,43 @@
 	const current = $derived(room.state?.nowPlaying ?? null);
 	const playback = $derived(room.state?.playback);
 	const duration = $derived(current?.item.song.durationMs ?? 0);
-	const loading = $derived(current !== null && current.streamUrl === null);
+	// A paused room may not have the stream yet (a restored room gets it on play): only loading while playing.
+	const loading = $derived(current !== null && current.streamUrl === null && !!playback?.playing);
 	const status = $derived(loading ? ' • loading…' : player.buffering ? ' • buffering…' : '');
 
 	// Phones: swipe the mini player up to open the full player (a tap opens it too).
 	let swipeStart: number | null = null;
+
+	// Desktop, like YTM: "Artist • Album • Year". Songs don't carry their year, so it comes
+	// from the album's page (remembered, so once per album).
+	const wide = new MediaQuery('min-width: 640px');
+	const albumId = $derived(current?.item.song.album?.id ?? null);
+	let year = $state<string | null>(null);
+	$effect(() => {
+		const id = albumId;
+		year = null;
+		if (!id || !wide.current) return;
+		let stale = false;
+		getAlbum(id)
+			.then((album) => {
+				if (!stale) year = album.year;
+			})
+			.catch(() => {}); // just no year
+		return () => (stale = true);
+	});
+
+	// Desktop: thumbs up next to the song, like YTM.
+	const songId = $derived(current?.item.song.id);
+	const liked = $derived(likes.get(songId));
+	$effect(() => {
+		if (songId && wide.current) likes.load(songId);
+	});
+
+	/** Desktop: a click anywhere on the bar that isn't on a button or link opens (or closes) the full player, like YTM. */
+	function barClick(event: MouseEvent) {
+		if ((event.target as Element).closest('button, a, input')) return;
+		if (current || expanded) onExpand(!expanded);
+	}
 </script>
 
 <footer class="relative z-40 border-line bg-surface sm:border-t">
@@ -87,7 +130,7 @@
 	<!-- Larger screens: controls left, the song in the middle (centered), outputs and "Play here" right. -->
 	<div class="hidden sm:block">
 		<Progress {room} {positionMs} />
-		<div class="grid h-18 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-4 px-4">
+		<div class="grid h-18 cursor-pointer grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-4 px-4" role="presentation" onclick={barClick}>
 			<div class="flex items-center justify-self-start">
 				<button class="rounded-full p-2 hover:bg-raised disabled:opacity-40" aria-label="Previous" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Previous' })}>
 					<Icon name="previous" />
@@ -117,15 +160,43 @@
 			</div>
 
 			<div class="flex max-w-xl min-w-0 items-center gap-3 justify-self-center" role="presentation" oncontextmenu={onSongMenu}>
-				<button class="flex min-w-0 items-center gap-3 text-left" disabled={!current} title={expanded ? undefined : 'Open the player'} onclick={() => onExpand(!expanded)}>
-					<Art song={current?.item.song ?? null} size={96} class="h-12 w-12" />
+				<div class="flex min-w-0 items-center gap-3" title={current ? `Added by ${current.item.addedByName}` : undefined}>
+					<Art song={current?.item.song ?? null} size={96} class="h-12 w-12 shrink-0" />
 					<div class="min-w-0">
 						<div class="truncate font-medium">{current?.item.song.title ?? 'Nothing playing'}</div>
-						<div class="truncate text-sm text-muted">
-							{#if current}{artistNames(current.item.song)}{status}{/if}
-						</div>
+						{#if current}
+							{@const song = current.item.song}
+							<div class="truncate text-sm text-muted">
+								{#if song.podcast}
+									{@const podcast = song.podcast}
+									<button class="hover:text-white hover:underline" onclick={() => onPodcast(podcast)} onpointerenter={() => prefetch('podcast', podcast.id)}>{podcast.name}</button>
+								{/if}
+								{#each song.artists as artist, i (i)}
+									{#if i > 0}{', '}{/if}<button class="hover:text-white hover:underline" onclick={() => onArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}
+										>{artist.name}</button
+									>
+								{/each}
+								{#if song.album}
+									{@const album = song.album}
+									• <button class="hover:text-white hover:underline" onclick={() => onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
+								{/if}
+								{#if year}• {year}{/if}{status}
+							</div>
+						{/if}
 					</div>
-				</button>
+				</div>
+				{#if current && youtube.account}
+					{@const id = current.item.song.id}
+					<button
+						class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-40 {liked ? 'text-white' : ''}"
+						disabled={liked === null}
+						aria-label={liked ? 'Remove like' : 'Like'}
+						aria-pressed={!!liked}
+						onclick={() => liked !== null && likes.set(id, !liked, onToast)}
+					>
+						<Icon name={liked ? 'liked' : 'like'} size={20} />
+					</button>
+				{/if}
 				{#if current}
 					<button
 						class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white"

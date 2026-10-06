@@ -2,6 +2,7 @@
 	// Search results with YTM's chips (all, songs, videos, albums, …), or "Find similar" for a
 	// song. Songs: tap = play next, ⋮ or right-click = song menu. Albums, artists and
 	// playlists open their page.
+	import { thumbUrl } from '../images.svelte';
 	import { search, similar } from '../api';
 	import { itemCard } from '../cards';
 	import { artistNames } from '../format';
@@ -111,7 +112,7 @@
 			return {
 				title: song.title,
 				subtitle: `${song.podcast ? 'Episode' : item.video ? 'Video' : 'Song'} • ${artistNames(song)}`,
-				art: song.thumbnails.at(-1)?.url,
+				art: thumbUrl(song.thumbnails, 400),
 				round: false,
 				open: () => playNext(song)
 			};

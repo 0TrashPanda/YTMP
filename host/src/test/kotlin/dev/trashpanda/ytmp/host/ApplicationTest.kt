@@ -9,7 +9,7 @@ import dev.trashpanda.ytmp.protocol.HomeSection
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
-import dev.trashpanda.ytmp.protocol.YoutubeSearchSetting
+import dev.trashpanda.ytmp.protocol.YoutubePersonalizeSetting
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
 import dev.trashpanda.ytmp.protocol.LikeStatus
@@ -282,10 +282,10 @@ class ApplicationTest {
         override suspend fun createPlaylist(title: String, songIds: List<String>) = "PLnew".also { saved += it to songIds }
         override suspend fun signOut() { account = null }
 
-        var searchWithAccount = true
+        var personalize = true
         var searchFails = false
-        override suspend fun searchWithAccount() = searchWithAccount
-        override suspend fun setSearchWithAccount(on: Boolean) { searchWithAccount = on }
+        override suspend fun personalize() = personalize
+        override suspend fun setPersonalize(on: Boolean) { personalize = on }
         override suspend fun search(query: String, type: SearchType): SearchPage {
             if (searchFails) error("expired")
             return SearchPage(listOf(SearchSection("Mine", type, emptyList())))
@@ -304,12 +304,12 @@ class ApplicationTest {
             client.get("/api/search/suggestions?q=daft") { if (remote) header("X-Remote", "1") }.body<SuggestionsResponse>().items.single()
 
         // On by default.
-        assertEquals(true, client.get("/api/me/youtube").body<YoutubeAccountStatus>().searchWithAccount)
+        assertEquals(true, client.get("/api/me/youtube").body<YoutubeAccountStatus>().personalize)
         assertEquals("Mine", searchTitle())
         assertEquals("daft (mine)", suggestion())
         assertEquals("all", searchTitle(remote = true))
         assertEquals("daft (anyone)", suggestion(remote = true))
-        assertEquals(HttpStatusCode.Forbidden, client.put("/api/me/youtube/search") { header("X-Remote", "1"); contentType(ContentType.Application.Json); setBody(YoutubeSearchSetting(false)) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.put("/api/me/youtube/personalize") { header("X-Remote", "1"); contentType(ContentType.Application.Json); setBody(YoutubePersonalizeSetting(false)) }.status)
 
         // An expired sign-in searches without it.
         owner.searchFails = true
@@ -317,13 +317,13 @@ class ApplicationTest {
         owner.searchFails = false
 
         // Turned off.
-        assertEquals(HttpStatusCode.NoContent, client.put("/api/me/youtube/search") { contentType(ContentType.Application.Json); setBody(YoutubeSearchSetting(false)) }.status)
-        assertEquals(false, client.get("/api/me/youtube").body<YoutubeAccountStatus>().searchWithAccount)
+        assertEquals(HttpStatusCode.NoContent, client.put("/api/me/youtube/personalize") { contentType(ContentType.Application.Json); setBody(YoutubePersonalizeSetting(false)) }.status)
+        assertEquals(false, client.get("/api/me/youtube").body<YoutubeAccountStatus>().personalize)
         assertEquals("all", searchTitle())
         assertEquals("daft (anyone)", suggestion())
 
         // On again, but signed out.
-        owner.searchWithAccount = true
+        owner.personalize = true
         owner.account = null
         assertEquals("all", searchTitle())
     }

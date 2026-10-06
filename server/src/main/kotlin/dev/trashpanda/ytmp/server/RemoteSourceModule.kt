@@ -152,6 +152,13 @@ class RemoteSourceModule(
             parameter("limit", 20)
         }.orThrow().body()
 
+    suspend fun myRadio(cookie: String, seedSongId: String): List<Song> =
+        client.get("$baseUrl/me/radio") {
+            me(cookie)
+            parameter("seed", seedSongId)
+            parameter("limit", 25)
+        }.orThrow().body<SearchResult>().items
+
     suspend fun mySuggestions(cookie: String, query: String): List<String> =
         client.get("$baseUrl/me/search/suggestions") {
             me(cookie)

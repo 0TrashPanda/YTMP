@@ -1,5 +1,6 @@
 <script lang="ts">
 	// "Save to playlist", like YTM's: your own YouTube Music playlists, or a new one.
+	import { thumbUrl } from '../images.svelte';
 	import { createPlaylist, getMyPlaylists, saveToPlaylist } from '../api';
 	import type { PlaylistSummary, Song } from '../protocol.gen';
 	import Art from './Art.svelte';
@@ -86,7 +87,7 @@
 				{#each playlists as playlist (playlist.id)}
 					<button class="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-raised disabled:opacity-50" disabled={busy} onclick={() => save(playlist)}>
 						<span class="h-10 w-10 shrink-0 overflow-hidden rounded bg-raised">
-							{#if playlist.thumbnails.at(-1)}<img src={playlist.thumbnails.at(-1)!.url} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />{/if}
+							{#if playlist.thumbnails.at(-1)}<img src={thumbUrl(playlist.thumbnails, 120)} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />{/if}
 						</span>
 						<span class="min-w-0 flex-1 truncate">{playlist.title}</span>
 					</button>

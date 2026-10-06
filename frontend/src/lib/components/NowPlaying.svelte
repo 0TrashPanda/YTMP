@@ -2,10 +2,11 @@
 	// The full player, like YTM's. Phones (and tablets): the whole screen, with the album art,
 	// the song, the position, the controls and where it plays; "Up next" and "Related" slide up
 	// over it. Swipe down (or the chevron, or Back) closes it. Desktop: above the player bar,
-	// which keeps the controls; the art on the left, Up next and Related on the right.
+	// which keeps the controls and the song; the art on the left, Up next and Related on the right.
 	import { fly } from 'svelte/transition';
 	import { MediaQuery } from 'svelte/reactivity';
-	import { getLiked, prefetch, setLiked } from '../api';
+	import { prefetch } from '../api';
+	import { likes } from '../likes.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { PageHandlers } from '../cards';
 	import type { RoomPlayer } from '../player.svelte';
@@ -46,35 +47,21 @@
 	const current = $derived(room.state?.nowPlaying ?? null);
 	const song = $derived(current?.item.song ?? null);
 	const playback = $derived(room.state?.playback);
-	const loading = $derived(current !== null && current.streamUrl === null);
+	// A paused room may not have the stream yet (a restored room gets it on play): only loading while playing.
+	const loading = $derived(current !== null && current.streamUrl === null && !!playback?.playing);
 
 	/** Desktop shows the tabs next to the art, always open. */
 	const wide = new MediaQuery('min-width: 1024px');
 	let tab = $state<'queue' | 'related'>('queue');
 
-	// Thumbs up, with your YouTube Music sign-in (the phone app).
-	let liked = $state<boolean | null>(null);
+	// Thumbs up, with your YouTube Music sign-in.
+	const liked = $derived(likes.get(song?.id));
 	$effect(() => {
-		const id = song?.id;
-		void youtube.version;
-		liked = null;
-		if (!id || !youtube.account) return;
-		getLiked(id)
-			.then((value) => song?.id === id && (liked = value))
-			.catch(() => {});
+		if (song?.id) likes.load(song.id);
 	});
 
-	async function toggleLike() {
-		if (!song || liked === null) return;
-		const next = !liked;
-		liked = next; // right away; back if it didn't work
-		try {
-			await setLiked(song.id, next);
-			onToast(next ? 'Added to Liked music' : 'Removed from Liked music');
-		} catch (e) {
-			liked = !next;
-			onToast(e instanceof Error ? e.message : "Couldn't change the like");
-		}
+	function toggleLike() {
+		if (song && liked !== null) likes.set(song.id, !liked, onToast);
 	}
 	/** Phones: Up next / Related slid up over the player. */
 	let sheet = $state(false);
@@ -204,7 +191,7 @@
 	</div>
 
 	<div class="flex min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,32rem)] lg:gap-8 lg:px-8 lg:pb-6">
-		<!-- The song: everything on phones, the art and title on desktop. -->
+		<!-- The song: everything on phones, only the art on desktop (the player bar has the rest, like YTM). -->
 		<div
 			class="flex min-h-0 min-w-0 flex-1 touch-pan-x flex-col items-center justify-center gap-5 px-6 pb-2"
 			role="presentation"
@@ -213,11 +200,12 @@
 			ontouchend={onTouchEnd}
 		>
 			<div class="flex min-h-0 w-full flex-1 items-center justify-center" role="presentation" oncontextmenu={onSongMenu}>
-				<Art {song} size={544} class="aspect-square max-h-full w-full max-w-[min(100%,36rem)] rounded-lg shadow-2xl" />
+				<!-- Desktop: as big as fits, now that the song is in the player bar. -->
+				<Art {song} size={1200} class="aspect-square max-h-full w-full max-w-[min(100%,36rem)] rounded-lg shadow-2xl lg:max-w-full" />
 			</div>
 
 			{#if song && current}
-				<div class="flex w-full max-w-[36rem] min-w-0 shrink-0 items-center gap-1" role="presentation" oncontextmenu={onSongMenu}>
+				<div class="flex w-full max-w-[36rem] min-w-0 shrink-0 items-center gap-1 lg:hidden" role="presentation" oncontextmenu={onSongMenu}>
 				<div class="min-w-0 flex-1">
 					<h1 class="truncate text-2xl font-bold">{song.title}</h1>
 					<p class="truncate text-muted">

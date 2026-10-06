@@ -1,5 +1,6 @@
 <script lang="ts">
 	// An artist page: top songs, albums and singles.
+	import { thumbUrl } from '../images.svelte';
 	import { getArtist } from '../api';
 	import type { AlbumSummary, ArtistPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -60,7 +61,7 @@
 	<header class="flex items-center gap-5 px-2">
 		<div class="h-28 w-28 shrink-0 overflow-hidden rounded-full bg-raised sm:h-40 sm:w-40">
 			{#if artist?.thumbnails.at(-1)}
-				<img src={artist.thumbnails.at(-1)!.url} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+				<img src={thumbUrl(artist.thumbnails, 400)} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
 			{/if}
 		</div>
 		<div class="min-w-0">

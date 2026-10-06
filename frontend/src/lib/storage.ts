@@ -24,6 +24,7 @@ export type BackLimit = 'home' | 'rooms';
 
 /** When headphones are unplugged or Bluetooth disconnects (the app). */
 export type HeadphonesAction = 'pause' | 'stop' | 'keep';
+export type ImageQuality = 'high' | 'low';
 
 function pick<T extends string>(key: string, options: readonly T[], fallback: T): T {
 	const value = read(key);
@@ -110,5 +111,12 @@ export const saved = {
 	},
 	set headphonesAction(action: HeadphonesAction) {
 		write('ytmp.headphones', action);
+	},
+	/** Sharp pictures, or small ones to save data (see images.svelte.ts). */
+	get imageQuality(): ImageQuality {
+		return pick('ytmp.imageQuality', ['high', 'low'], 'high');
+	},
+	set imageQuality(quality: ImageQuality) {
+		write('ytmp.imageQuality', quality);
 	}
 };

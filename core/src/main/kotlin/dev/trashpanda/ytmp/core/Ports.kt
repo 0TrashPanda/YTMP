@@ -106,17 +106,23 @@ interface PersonalCatalog {
     /** Tells YouTube Music you played this song, like its own player does. */
     suspend fun addToHistory(songId: String) {}
 
-    /** Whether your own searches go through this account (see [search]). On unless turned off. */
-    suspend fun searchWithAccount(): Boolean = true
+    /** Whether search and radio go through this account (see [search], [radio]). On unless turned off. */
+    suspend fun personalize(): Boolean = true
 
-    suspend fun setSearchWithAccount(on: Boolean) {}
+    suspend fun setPersonalize(on: Boolean) {}
 
     /** Searches as this account, so results fit its taste like in YouTube Music; null where that isn't possible. */
     suspend fun search(query: String, type: SearchType): SearchPage? = null
 
     /** Suggestions while typing, as this account; null where that isn't possible. */
     suspend fun suggestions(query: String): List<String>? = null
+
+    /** A radio from [seedSongId] as this account (it fits its taste); null where that isn't possible. */
+    suspend fun radio(seedSongId: String): List<Song>? = null
 }
+
+/** This account, if it's signed in and search and radio should go through it ([PersonalCatalog.personalize]). */
+suspend fun PersonalCatalog.personalized(): PersonalCatalog? = takeIf { personalize() && account() != null }
 
 /** A speaker or TV the host found, that rooms can play on. */
 data class OutputDevice(val id: String, val name: String, val kind: OutputKind)

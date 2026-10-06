@@ -50,6 +50,34 @@ class RadioTest {
     }
 
     @Test
+    fun `a room's radio comes from its owner's account, else the shared one`() = runTest {
+        val manager = RoomManager(
+            { "https://s/$it" }, backgroundScope, clock = { testScheduler.currentTime }, radio = radio,
+            ownerRadio = { owner, seed ->
+                when (owner) {
+                    "anna@test" -> listOf(song(seed), song("$seed-anna"))
+                    "broken@test" -> error("signed out")
+                    else -> null
+                }
+            },
+        )
+        suspend fun radioIn(owner: String?): List<String> {
+            val room = manager.create("Party", RoomVisibility.PUBLIC, ownerAccount = owner)
+            room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), {
+                messages += it
+                if (it is ServerMessage.Welcome) me = it.participantId
+            })
+            room.run(Command.StartRadio(song("a")))
+            runCurrent()
+            return room.state().autoplay.map { it.song.id }
+        }
+
+        assertEquals("a-anna", radioIn("anna@test").first())
+        assertEquals((1..10).map { "a-$it" }, radioIn(null))
+        assertEquals((1..10).map { "a-$it" }, radioIn("broken@test"))
+    }
+
+    @Test
     fun `start radio clears the queue, plays the song once and continues with its radio`() = runTest {
         val room = room()
         room.run(Command.AddSongs(listOf(song("x"), song("y")), QueuePosition.END))

@@ -18,7 +18,9 @@
 	// The song menu (docs/features/ui.md#song-menu): right-click a song, or its ⋮ button.
 	import { onMount, tick } from 'svelte';
 	import type { Command } from '../protocol.gen';
+	import { likes } from '../likes.svelte';
 	import type { RoomConnection } from '../room.svelte';
+	import { youtube } from '../youtube.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 
 	interface Props {
@@ -39,6 +41,8 @@
 	const item = $derived(target.item);
 	const place = $derived(target.place);
 	const queueLength = $derived(room.state?.queue.length ?? 0);
+	const liked = $derived(likes.get(song.id));
+	$effect(() => likes.load(song.id));
 	const ytmId = $derived(song.id.startsWith('ytm:') || song.id.startsWith('yt:') ? song.id.slice(song.id.indexOf(':') + 1) : null);
 
 	interface Entry {
@@ -99,11 +103,15 @@
 			list.push({ icon: 'similar', label: 'Find similar', run: () => (onFindSimilar(current), onClose()) });
 			list.push(null);
 		}
+		if (youtube.account) {
+			const current = song;
+			list.push({ icon: liked ? 'liked' : 'like', label: liked ? 'Remove like' : 'Like', run: () => (likes.set(current.id, !liked, onToast), onClose()) });
+		}
 		if (onSave) {
 			const current = song;
 			list.push({ icon: 'save', label: 'Save to playlist', run: () => (onSave(current), onClose()) });
-			list.push(null);
 		}
+		list.push(null);
 		if (song.podcast) {
 			const podcast = song.podcast;
 			list.push({ icon: 'podcast', label: `Go to ${podcast.name}`, run: () => (onPodcast(podcast), onClose()) });
