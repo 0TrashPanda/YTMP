@@ -165,6 +165,9 @@ class Room(
     private var resolveJob: Job? = null
     private var endJob: Job? = null
 
+    /** Songs in a row that couldn't load; after [MAX_FAILED_IN_A_ROW] the room pauses (likely no internet). */
+    private var failedInARow = 0
+
     /** Called (with the room locked, so it must not block) when a song finished playing. */
     @Volatile
     var onPlayFinished: ((FinishedPlay) -> Unit)? = null
@@ -1120,6 +1123,7 @@ class Room(
             val next = mutex.withLock {
                 if (current?.itemId != item.itemId) return@withLock null
                 stream.onSuccess {
+                    failedInARow = 0
                     exactDuration(item, it.durationMs)
                     streamUrl = it.url
                     anchorTime = clock()
@@ -1127,6 +1131,13 @@ class Room(
                     emitPlayback()
                 }.onFailure { e ->
                     if (e is CancellationException) throw e
+                    if (++failedInARow >= MAX_FAILED_IN_A_ROW) {
+                        // Probably no internet: don't skip through the whole queue, wait on this song.
+                        failedInARow = 0
+                        emit(Event.Notice("Couldn't load songs (no internet?). Paused: press play to try again."))
+                        pausePlayback()
+                        return@withLock null
+                    }
                     emit(Event.Notice("Couldn't play \"${item.song.title}\": ${e.message}"))
                     retireCurrent(QueueItemResult.SKIPPED)
                     playNextFromQueue()
@@ -1218,6 +1229,9 @@ class Room(
         const val END_GRACE_MS = 5_000L
         /** A stream length this close to the listed one is the same; no need to update it. */
         const val DURATION_TOLERANCE_MS = 1_500L
+
+        /** Songs that fail to load in a row before the room pauses instead of skipping on. */
+        const val MAX_FAILED_IN_A_ROW = 3
         /** Episodes resume from where they were left after this much... */
         const val RESUME_MIN_MS = 30_000L
         /** ...unless less than this was left. */

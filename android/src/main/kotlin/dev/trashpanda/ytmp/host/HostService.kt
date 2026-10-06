@@ -19,9 +19,9 @@ import dev.trashpanda.ytmp.YtmpApp
  * Keeps the phone hosting while it has public rooms or plays music: a foreground notification
  * so Android doesn't stop the app. Started and stopped by [YtmpApp]. Idle solo rooms don't need it.
  *
- * The locks cost battery, so they're only held while needed: a wake lock while a room plays
- * (songs must move on with the screen off, also when only speakers or friends listen), and a
- * Wi-Fi lock while a public room plays (friends' devices keep getting quick answers). An idle
+ * The locks cost battery, so they're only held while a room plays: a wake lock (songs must
+ * move on with the screen off, also when only speakers or friends listen) and a Wi-Fi lock
+ * (the next song must load: some phones drop Wi-Fi within a second in deep sleep). An idle
  * public room needs neither: a request from a friend wakes the phone by itself.
  */
 class HostService : Service() {
@@ -60,8 +60,10 @@ class HostService : Service() {
 
     private fun holdWifiLock(hold: Boolean) {
         if (hold && wifiLock == null) {
+            // High-performance, like ExoPlayer's: the low-latency lock only works with the screen on.
+            @Suppress("DEPRECATION")
             wifiLock = getSystemService(WifiManager::class.java)
-                .createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "ytmp:host").apply { acquire() }
+                .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ytmp:host").apply { acquire() }
         } else if (!hold) {
             wifiLock?.release()
             wifiLock = null

@@ -3,6 +3,8 @@ package dev.trashpanda.ytmp
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
+import android.net.wifi.WifiManager
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.OptIn
@@ -79,6 +81,21 @@ class PlaybackService : MediaSessionService() {
     /** The room's last play position and time, to see when someone seeks, pauses or plays. */
     private var lastAnchor: Triple<String?, Long, Long>? = null
 
+    /**
+     * The room plays here: stay awake and on Wi-Fi also between songs. ExoPlayer's own locks
+     * end with each song, and some phones (a Galaxy A20e) drop Wi-Fi within a second in deep
+     * sleep, so the next song could never load.
+     */
+    private lateinit var wakeLock: PowerManager.WakeLock
+    private lateinit var wifiLock: WifiManager.WifiLock
+
+    /**
+     * "Play here" is on and the room has a song, playing or paused: the player stays in the
+     * foreground. Between songs that keeps its network in deep sleep (Android cuts background
+     * apps off), and paused it stays on the lock screen to play again, like YTM.
+     */
+    private var keepForeground = false
+
     override fun onCreate() {
         super.onCreate()
         exo = ExoPlayer.Builder(this)
@@ -90,6 +107,9 @@ class PlaybackService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         exo.addListener(listener)
+        wakeLock = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ytmp:playback").apply { setReferenceCounted(false) }
+        @Suppress("DEPRECATION") // What ExoPlayer itself uses; the replacement only works with the screen on.
+        wifiLock = getSystemService(WifiManager::class.java).createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ytmp:playback").apply { setReferenceCounted(false) }
 
         val openApp = PendingIntent.getActivity(
             this,
@@ -123,6 +143,9 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = session
 
+    override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) =
+        super.onUpdateNotification(session, startInForegroundRequired || keepForeground)
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         // The web app (and with it the room connection) is gone, so playback can't follow the room anymore.
         exo.stop()
@@ -131,6 +154,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         if (PlaybackHub.followerCommands == follower::command) PlaybackHub.followerCommands = null
+        holdLocks(false)
         follower.close()
         scope.cancel()
         session.release()
@@ -190,6 +214,8 @@ class PlaybackService : MediaSessionService() {
         }
         lastTarget = target
         measuring.value = target != null && target.enabled && target.playing && target.item != null
+        holdLocks(measuring.value)
+        setKeepForeground(target != null && target.enabled && target.item != null)
         val item = target?.item
         val url = target?.let { if (useProxy) it.proxyUrl else it.streamUrl }
         if (target == null || !target.enabled || item == null || url == null) {
@@ -295,6 +321,23 @@ class PlaybackService : MediaSessionService() {
         settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
     }
 
+    private fun holdLocks(hold: Boolean) {
+        if (hold == wakeLock.isHeld) return
+        if (hold) {
+            wakeLock.acquire()
+            wifiLock.acquire()
+        } else {
+            wakeLock.release()
+            wifiLock.release()
+        }
+    }
+
+    private fun setKeepForeground(keep: Boolean) {
+        if (keep == keepForeground) return
+        keepForeground = keep
+        triggerNotificationUpdate()
+    }
+
     private fun expectedPosition(target: PlaybackTarget): Long =
         SyncCorrection.targetPosition(target, System.currentTimeMillis())
             .coerceAtMost(maxOf(0, target.item?.durationMs ?: 0))
@@ -355,6 +398,8 @@ class PlaybackService : MediaSessionService() {
         stoppedHere = true
         current = current?.copy(enabled = false)
         measuring.value = false
+        holdLocks(false)
+        setKeepForeground(false)
         exo.playWhenReady = false
         follower.command("""{"kind":"SetListening","on":false}""")
         PlaybackHub.status("stopped")

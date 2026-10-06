@@ -78,6 +78,22 @@ class RadioTest {
     }
 
     @Test
+    fun `without internet the room pauses after a few songs instead of skipping everything`() = runTest {
+        val room = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { throw Exception("Failed to resolve 'www.youtube.com'") }, backgroundScope, radio = radio) { testScheduler.currentTime }
+        room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Me", null, "owner"), {
+            messages += it
+            if (it is ServerMessage.Welcome) me = it.participantId
+        })
+        room.run(Command.AddSongs((1..10).map { song("s$it") }, QueuePosition.END))
+        runCurrent()
+
+        val state = room.state()
+        assertFalse(state.playback.playing)
+        assertEquals("s3", state.nowPlaying?.item?.song?.id) // two skipped, waiting on the third
+        assertEquals((4..10).map { "s$it" }, state.queue.map { it.song.id })
+    }
+
+    @Test
     fun `a playlist added to autoplay plays after the queue, then the radio goes on`() = runTest {
         val room = room()
         room.run(Command.AutoplaySongs(listOf(song("p1"), song("p2"), song("p3"))))

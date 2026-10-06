@@ -66,6 +66,14 @@ class RoomFollower {
     private var session: DefaultClientWebSocketSession? = null
     private var nextCommandId = 1
 
+    /**
+     * Play or Pause pressed while the connection was down (e.g. on the lock screen after a long
+     * pause, when the phone had dropped Wi-Fi): sent once it's back, if that's soon enough.
+     * Only these two, as sending them twice (the page may send it too) does no harm.
+     */
+    @Volatile
+    private var pending: Pair<String, Long>? = null
+
     /** Follows the room in [link], or stops following with null. */
     fun follow(link: RoomLink?) {
         if (link == this.link) return
@@ -79,14 +87,21 @@ class RoomFollower {
 
     /** Sends a room command (e.g. `{"kind":"Skip"}`). False when not connected. */
     fun command(json: String): Boolean {
-        val session = session ?: return false
-        if (_room.value == null) return false
+        val session = session
+        if (session == null || _room.value == null) {
+            if (link != null && (json.contains("\"Play\"") || json.contains("\"Pause\""))) pending = json to System.currentTimeMillis()
+            return false
+        }
+        return session.sendCommand(json)
+    }
+
+    private fun DefaultClientWebSocketSession.sendCommand(json: String): Boolean {
         val message = buildJsonObject {
             put("type", "command")
             put("id", "n${nextCommandId++}")
             put("command", Json.parseToJsonElement(json))
         }
-        return session.outgoing.trySend(Frame.Text(message.toString())).isSuccess
+        return outgoing.trySend(Frame.Text(message.toString())).isSuccess
     }
 
     fun close() {
@@ -146,6 +161,13 @@ class RoomFollower {
                         is ServerMessage.Welcome -> {
                             Log.d(TAG, "room ${link.code}: following")
                             onWelcome()
+                            pending?.let { (json, at) ->
+                                pending = null
+                                if (System.currentTimeMillis() - at < PENDING_MAX_AGE_MS) {
+                                    Log.d(TAG, "room ${link.code}: sending $json pressed while away")
+                                    sendCommand(json)
+                                }
+                            }
                             participantId = message.participantId
                             state = message.state
                             seq = message.seq
@@ -212,6 +234,7 @@ class RoomFollower {
 
     companion object {
         private const val TAG = "YtmpFollow"
+        private const val PENDING_MAX_AGE_MS = 15_000L
 
         /** Applies the events playback cares about; the rest only move [seq] along. */
         fun apply(s: RoomState, e: Event): RoomState = when (e) {

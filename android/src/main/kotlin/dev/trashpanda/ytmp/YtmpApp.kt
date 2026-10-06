@@ -43,8 +43,8 @@ class YtmpApp : Application() {
                     HostService.stop(this@YtmpApp)
                 } else {
                     val text = rooms.singleOrNull()?.let { "Hosting ${it.name} (${it.code})" } ?: "Hosting ${rooms.size} rooms"
-                    val wifi = playing.any { it.visibility == RoomVisibility.PUBLIC }
-                    runCatching { HostService.update(this@YtmpApp, text, wakeLock = playing.isNotEmpty(), wifiLock = wifi) }
+                    // Both while a room plays, also solo: the next song must load with the screen off.
+                    runCatching { HostService.update(this@YtmpApp, text, wakeLock = playing.isNotEmpty(), wifiLock = playing.isNotEmpty()) }
                 }
             }
         }

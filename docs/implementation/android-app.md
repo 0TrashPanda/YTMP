@@ -23,6 +23,14 @@
   go over it too. If it can't connect, the page's target is used as before.
 - Losing audio focus stops playback here at once and sends `SetListening off` over the
   player's own connection, since the page may be frozen.
+- **Between songs and while paused** (`PlaybackService`): while "Play here" is on and the room
+  has a song, the player stays in the foreground (`onUpdateNotification`), also paused, so it
+  stays on the lock screen and keeps network in deep sleep (Android cuts background apps off).
+  While the room plays it also holds its own wake and Wi-Fi lock (high-performance, like
+  ExoPlayer's): ExoPlayer's locks end with each song, and a Galaxy A20e (Android 11) dropped
+  Wi-Fi within a second in deep sleep, so the next song never loaded. Play/Pause pressed while
+  the room connection is down is sent when it's back (within 15 s). A room pauses after three
+  songs in a row fail to load, instead of skipping through the whole queue.
 - **Battery:** drift correction (`PlaybackService`) only runs while this phone plays. Alone,
   it measures every 250 ms right after a load or seek (to catch a slow start), then once a
   second, since only drift over 1.5 s matters then. The room page only ticks its progress
