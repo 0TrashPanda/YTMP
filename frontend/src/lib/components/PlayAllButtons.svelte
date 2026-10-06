@@ -1,5 +1,6 @@
 <script lang="ts">
-	// Play, Play next and Add to queue for a whole album or playlist.
+	// Play, Play next and Add to queue for a whole album or playlist. A playlist goes into
+	// autoplay instead of the queue ([toAutoplay]): it plays when the queue is empty.
 	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
@@ -8,6 +9,7 @@
 		room,
 		songs,
 		name,
+		toAutoplay = false,
 		onToast
 	}: {
 		room: RoomConnection;
@@ -15,8 +17,16 @@
 		songs: Song[] | null;
 		/** The album's or playlist's title, for the toasts. */
 		name: string;
+		/** "Add to autoplay" instead of "Add to queue" (playlists). */
+		toAutoplay?: boolean;
 		onToast: (text: string) => void;
 	} = $props();
+
+	async function addToAutoplay() {
+		if (!songs?.length) return;
+		const e = await room.run({ kind: 'AutoplaySongs', songs });
+		onToast(e ? e.message : `${name} plays when the queue is empty`);
+	}
 
 	async function addAll(position: 'next' | 'end') {
 		if (!songs?.length) return;
@@ -43,8 +53,15 @@
 		<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm hover:bg-line disabled:opacity-40" disabled={!songs?.length} onclick={() => addAll('next')}>
 			<Icon name="playNext" size={18} /> Play next
 		</button>
-		<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm hover:bg-line disabled:opacity-40" disabled={!songs?.length} onclick={() => addAll('end')}>
-			<Icon name="playlistAdd" size={18} /> Add to queue
+		{#if !toAutoplay || !room.can('autoplay_from_here')}
+			<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm hover:bg-line disabled:opacity-40" disabled={!songs?.length} onclick={() => addAll('end')}>
+				<Icon name="playlistAdd" size={18} /> Add to queue
+			</button>
+		{/if}
+	{/if}
+	{#if toAutoplay && room.can('autoplay_from_here')}
+		<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm hover:bg-line disabled:opacity-40" disabled={!songs?.length} onclick={addToAutoplay}>
+			<Icon name="autoplay" size={18} /> Add to autoplay
 		</button>
 	{/if}
 </div>

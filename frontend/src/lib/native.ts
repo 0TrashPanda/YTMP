@@ -20,6 +20,17 @@ export interface NativeBridge {
 	 * hands the page the cookies as onYoutubeCookie, to keep in your account there.
 	 */
 	youtubeCookie?(): void;
+	/**
+	 * Log in once (bridge version 4): your server's pages hand the app a login for the phone's
+	 * own pages (a host token JSON); the app only takes it from the server it's linked to.
+	 */
+	shareIdentity?(identityJson: string): void;
+	/** On the phone's own pages: the login handed over by [shareIdentity], once; null if none. */
+	takeIdentity?(): string | null;
+	/** On your server's pages (bridge version 4): the YouTube Music account the phone is signed in to (JSON YoutubeAccount), or null. */
+	phoneYoutubeAccount?(): string | null;
+	/** On your account server's pages (bridge version 4): asks you, then signs the phone in to YouTube Music with these cookies. */
+	useYoutubeCookie?(cookie: string): void;
 }
 
 /** Callbacks the app calls on the page. */

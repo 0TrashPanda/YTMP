@@ -249,6 +249,10 @@ class AccountService(
         }
     }
 
+    /** The account of the login session in `Authorization: Bearer` (this server's own pages), if any. Not a host token. */
+    suspend fun sessionAccount(call: ApplicationCall): Accounts.Account? =
+        call.bearerToken()?.let { token -> io { accounts.sessionAccount(token) } }
+
     private suspend fun ApplicationCall.account(): Accounts.Account {
         val token = bearerToken() ?: throw notLoggedIn()
         return io { accounts.sessionAccount(token) } ?: throw notLoggedIn()

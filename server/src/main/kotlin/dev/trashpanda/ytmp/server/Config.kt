@@ -37,6 +37,7 @@ data class Config(
                 ),
                 accounts = base.accounts.copy(
                     url = env["YTMP_URL"] ?: base.accounts.url,
+                    guests = env["YTMP_GUESTS"]?.toBooleanStrict() ?: base.accounts.guests,
                 ),
                 audio = base.audio.copy(
                     proxy = env["YTMP_AUDIO_PROXY"] ?: base.audio.proxy,
@@ -134,6 +135,8 @@ data class AccountsConfig(
     /** Whether new accounts keep a listening history until they turn it off. */
     @SerialName("tracking_default")
     val trackingDefault: Boolean = false,
+    /** Whether people without an account can use this server. False: only the login page works for them. */
+    val guests: Boolean = true,
 ) {
     fun signupMode(): SignupMode = SignupMode.valueOf(signup.uppercase())
 }

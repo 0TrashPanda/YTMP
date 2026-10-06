@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
-	import { identity, type Identity } from '../lib/account';
+	import { identity, logInOnce, type Identity } from '../lib/account';
 	import { closeRoom, createRoom, getHost, getRoom, getRoomsElsewhere, linkAuthServer, listRooms, moveRoomHere } from '../lib/api';
 	import Icon from '../lib/components/Icon.svelte';
 	import ProfileSheet from '../lib/components/ProfileSheet.svelte';
@@ -38,7 +38,7 @@
 	onMount(async () => {
 		try {
 			host = await getHost();
-			me = identity.get(host.authServers);
+			me = await logInOnce(host);
 			if (me) name = me.account.displayName;
 			if (onThisPhone) myRooms = await listRooms();
 			else if (host.kind === 'server') myRooms = await serverRooms();
@@ -280,206 +280,216 @@
 		<p class="mt-2 text-muted">One queue for everyone.</p>
 	</header>
 
-	{#if me}
-		<div class="flex items-center gap-3 rounded-xl bg-surface px-4 py-3 ring-1 ring-line">
-			<Icon name="person" size={20} class="text-muted" />
-			<div class="min-w-0 flex-1">
-				<p class="truncate font-medium">{me.account.displayName}</p>
-				<p class="truncate text-sm text-muted">{me.account.id}</p>
-			</div>
-			<button class="text-sm text-muted underline" onclick={logout}>Log out</button>
-		</div>
+	{#if host?.accountsOnly && !me}
+		<!-- An accounts-only server: nothing works without logging in. -->
+		<section class="flex flex-col gap-3 rounded-xl bg-surface p-5 text-center ring-1 ring-line">
+			<p>This server is for accounts only.</p>
+			{#each host.authServers as server (server.issuer)}
+				<a href={identity.loginUrl(server)} class="rounded-full bg-white py-3 font-medium text-black">Log in{host.authServers.length > 1 ? ` on ${server.issuer}` : ''}</a>
+			{/each}
+		</section>
 	{:else}
-		<label class="flex flex-col gap-2">
-			<span class="text-sm text-muted">Your name</span>
-			<input
-				class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
-				bind:value={name}
-				maxlength="32"
-				placeholder="What should others see?"
-				autocomplete="nickname"
-			/>
-		</label>
-		{#each host?.authServers ?? [] as server (server.issuer)}
-			<a href={identity.loginUrl(server)} class="-mt-3 text-center text-sm text-muted underline">
-				Or log in with your account on {server.issuer}
-			</a>
-		{/each}
-		{#if host?.authServers.length}
-			<label class="-mt-3 flex items-center justify-center gap-2 text-sm text-muted">
-				<input type="checkbox" class="accent-accent" bind:checked={hideFromHistory} />
-				Keep me out of others' listening history
-			</label>
-		{/if}
-	{/if}
-
-	{#if onThisPhone}
-		<!-- On the phone itself: host here, see your rooms, find rooms nearby. -->
-		<section class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line">
-			<h2 class="text-lg font-bold">Host a room on this phone</h2>
-			<input
-				class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
-				bind:value={roomName}
-				maxlength="64"
-				placeholder={defaultRoomName}
-			/>
-			<div class="grid grid-cols-2 gap-3">
-				<button
-					class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
-					disabled={busy || !validName}
-					onclick={() => hostRoom('private')}
-				>
-					<Icon name="headphones" />
-					<span class="font-medium">Solo</span>
-					<span class="text-xs text-muted">Just you</span>
-				</button>
-				<button
-					class="flex flex-col items-center gap-1 rounded-xl bg-accent p-3 disabled:opacity-40"
-					disabled={busy || !validName}
-					onclick={() => hostRoom('public')}
-				>
-					<Icon name="people" />
-					<span class="font-medium">Party</span>
-					<span class="text-xs text-white/80">Friends on this Wi-Fi join</span>
-				</button>
+		{#if me}
+			<div class="flex items-center gap-3 rounded-xl bg-surface px-4 py-3 ring-1 ring-line">
+				<Icon name="person" size={20} class="text-muted" />
+				<div class="min-w-0 flex-1">
+					<p class="truncate font-medium">{me.account.displayName}</p>
+					<p class="truncate text-sm text-muted">{me.account.id}</p>
+				</div>
+				<button class="text-sm text-muted underline" onclick={logout}>Log out</button>
 			</div>
-		</section>
-
-		<section class="flex flex-col gap-2 rounded-xl bg-surface p-4 ring-1 ring-line">
-			{#if host?.authServers.length && !editingAuth}
-				<p class="text-sm">
-					<span class="text-muted">Accounts:</span>
-					{host.authServers[0].issuer}
-					<button class="ml-1 text-muted underline" onclick={() => ((authUrl = host?.authServers[0].url ?? ''), (editingAuth = true))}>Change</button>
-					·
-					<button class="text-muted underline" disabled={busy} onclick={() => linkAccounts(null)}>Guests only</button>
-				</p>
-			{:else if editingAuth}
-				<form
-					class="flex gap-2"
-					onsubmit={(e) => {
-						e.preventDefault();
-						linkAccounts(authUrl.trim());
-					}}
-				>
-					<input
-						class="min-w-0 flex-1 rounded-lg bg-raised px-3 py-2 outline-none ring-white/40 focus:ring-2"
-						bind:value={authUrl}
-						placeholder="https://ytmp.example.com"
-						autocapitalize="none"
-						spellcheck="false"
-					/>
-					<button class="rounded-full bg-raised px-4 text-sm hover:bg-line disabled:opacity-40" disabled={busy || !authUrl.trim()}>Use</button>
-				</form>
-				<p class="text-xs text-muted">Friends can then join with their account on that YTMP server.</p>
-			{:else}
-				<p class="text-sm text-muted">
-					Only guests can join rooms on this phone.
-					<button class="underline" onclick={() => ((authUrl = nativeBridge?.serverUrl() ?? ''), (editingAuth = true))}>Use accounts from a YTMP server</button>
-				</p>
+		{:else}
+			<label class="flex flex-col gap-2">
+				<span class="text-sm text-muted">Your name</span>
+				<input
+					class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
+					bind:value={name}
+					maxlength="32"
+					placeholder="What should others see?"
+					autocomplete="nickname"
+				/>
+			</label>
+			{#each host?.authServers ?? [] as server (server.issuer)}
+				<a href={identity.loginUrl(server)} class="-mt-3 text-center text-sm text-muted underline">
+					Or log in with your account on {server.issuer}
+				</a>
+			{/each}
+			{#if host?.authServers.length}
+				<label class="-mt-3 flex items-center justify-center gap-2 text-sm text-muted">
+					<input type="checkbox" class="accent-accent" bind:checked={hideFromHistory} />
+					Keep me out of others' listening history
+				</label>
 			{/if}
-		</section>
+		{/if}
 
-		{@render roomList('Your rooms on this phone')}
-		{@render elsewhereList()}
-	{:else if host}
-		<form class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line" onsubmit={join}>
-			<h2 class="text-lg font-bold">Join a room</h2>
-			<input
-				class="rounded-lg bg-raised px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] uppercase outline-none ring-white/40 focus:ring-2"
-				bind:value={code}
-				maxlength="8"
-				placeholder="CODE"
-				autocapitalize="characters"
-				autocomplete="off"
-				spellcheck="false"
-			/>
-			<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy || !validName || !code.trim()}>
-				Join
-			</button>
-		</form>
-
-		{#if host.canCreateRooms}
+		{#if onThisPhone}
+			<!-- On the phone itself: host here, see your rooms, find rooms nearby. -->
 			<section class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line">
-				<h2 class="text-lg font-bold">Host a room</h2>
+				<h2 class="text-lg font-bold">Host a room on this phone</h2>
 				<input
 					class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
 					bind:value={roomName}
 					maxlength="64"
 					placeholder={defaultRoomName}
 				/>
-				{#if host.supportsPrivateRooms}
-					<div class="grid grid-cols-2 gap-3">
-						<button
-							class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
-							disabled={busy || !validName}
-							onclick={() => hostRoom('private')}
-						>
-							<Icon name="headphones" />
-							<span class="font-medium">Solo</span>
-							<span class="text-xs text-muted">{me ? 'Just you, on all your devices' : 'Just you, in this browser'}</span>
-						</button>
-						<button
-							class="flex flex-col items-center gap-1 rounded-xl bg-accent p-3 disabled:opacity-40"
-							disabled={busy || !validName}
-							onclick={() => hostRoom('public')}
-						>
-							<Icon name="people" />
-							<span class="font-medium">Party</span>
-							<span class="text-xs text-white/80">Friends join with the code</span>
-						</button>
-					</div>
-				{:else}
+				<div class="grid grid-cols-2 gap-3">
 					<button
-						class="rounded-full bg-accent py-3 font-medium disabled:opacity-40"
+						class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
+						disabled={busy || !validName}
+						onclick={() => hostRoom('private')}
+					>
+						<Icon name="headphones" />
+						<span class="font-medium">Solo</span>
+						<span class="text-xs text-muted">Just you</span>
+					</button>
+					<button
+						class="flex flex-col items-center gap-1 rounded-xl bg-accent p-3 disabled:opacity-40"
 						disabled={busy || !validName}
 						onclick={() => hostRoom('public')}
 					>
-						Host
+						<Icon name="people" />
+						<span class="font-medium">Party</span>
+						<span class="text-xs text-white/80">Friends on this Wi-Fi join</span>
 					</button>
+				</div>
+			</section>
+
+			<section class="flex flex-col gap-2 rounded-xl bg-surface p-4 ring-1 ring-line">
+				{#if host?.authServers.length && !editingAuth}
+					<p class="text-sm">
+						<span class="text-muted">Accounts:</span>
+						{host.authServers[0].issuer}
+						<button class="ml-1 text-muted underline" onclick={() => ((authUrl = host?.authServers[0].url ?? ''), (editingAuth = true))}>Change</button>
+						·
+						<button class="text-muted underline" disabled={busy} onclick={() => linkAccounts(null)}>Guests only</button>
+					</p>
+				{:else if editingAuth}
+					<form
+						class="flex gap-2"
+						onsubmit={(e) => {
+							e.preventDefault();
+							linkAccounts(authUrl.trim());
+						}}
+					>
+						<input
+							class="min-w-0 flex-1 rounded-lg bg-raised px-3 py-2 outline-none ring-white/40 focus:ring-2"
+							bind:value={authUrl}
+							placeholder="https://ytmp.example.com"
+							autocapitalize="none"
+							spellcheck="false"
+						/>
+						<button class="rounded-full bg-raised px-4 text-sm hover:bg-line disabled:opacity-40" disabled={busy || !authUrl.trim()}>Use</button>
+					</form>
+					<p class="text-xs text-muted">Friends can then join with their account on that YTMP server.</p>
+				{:else}
+					<p class="text-sm text-muted">
+						Only guests can join rooms on this phone.
+						<button class="underline" onclick={() => ((authUrl = nativeBridge?.serverUrl() ?? ''), (editingAuth = true))}>Use accounts from a YTMP server</button>
+					</p>
 				{/if}
 			</section>
+
+			{@render roomList('Your rooms on this phone')}
+			{@render elsewhereList()}
+		{:else if host}
+			<form class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line" onsubmit={join}>
+				<h2 class="text-lg font-bold">Join a room</h2>
+				<input
+					class="rounded-lg bg-raised px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] uppercase outline-none ring-white/40 focus:ring-2"
+					bind:value={code}
+					maxlength="8"
+					placeholder="CODE"
+					autocapitalize="characters"
+					autocomplete="off"
+					spellcheck="false"
+				/>
+				<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy || !validName || !code.trim()}>
+					Join
+				</button>
+			</form>
+
+			{#if host.canCreateRooms}
+				<section class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line">
+					<h2 class="text-lg font-bold">Host a room</h2>
+					<input
+						class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
+						bind:value={roomName}
+						maxlength="64"
+						placeholder={defaultRoomName}
+					/>
+					{#if host.supportsPrivateRooms}
+						<div class="grid grid-cols-2 gap-3">
+							<button
+								class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
+								disabled={busy || !validName}
+								onclick={() => hostRoom('private')}
+							>
+								<Icon name="headphones" />
+								<span class="font-medium">Solo</span>
+								<span class="text-xs text-muted">{me ? 'Just you, on all your devices' : 'Just you, in this browser'}</span>
+							</button>
+							<button
+								class="flex flex-col items-center gap-1 rounded-xl bg-accent p-3 disabled:opacity-40"
+								disabled={busy || !validName}
+								onclick={() => hostRoom('public')}
+							>
+								<Icon name="people" />
+								<span class="font-medium">Party</span>
+								<span class="text-xs text-white/80">Friends join with the code</span>
+							</button>
+						</div>
+					{:else}
+						<button
+							class="rounded-full bg-accent py-3 font-medium disabled:opacity-40"
+							disabled={busy || !validName}
+							onclick={() => hostRoom('public')}
+						>
+							Host
+						</button>
+					{/if}
+				</section>
+			{/if}
+
+			{@render roomList('Your rooms')}
+			{@render elsewhereList()}
 		{/if}
 
-		{@render roomList('Your rooms')}
-		{@render elsewhereList()}
-	{/if}
+		{#if nativeBridge}
+			<section class="flex flex-col gap-1">
+				<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">Nearby rooms</h2>
+				{#each nearby as room (room.url + room.code)}
+					<button
+						class="flex items-center gap-3 rounded-lg bg-surface px-3 py-3 text-left ring-1 ring-line disabled:opacity-40"
+						disabled={!validName}
+						onclick={() => joinNearby(room)}
+					>
+						<Icon name="people" size={20} class="text-muted" />
+						<span class="min-w-0 flex-1 truncate">{room.name}</span>
+						<span class="font-mono text-sm text-muted">{room.code}</span>
+					</button>
+				{:else}
+					<p class="px-1 text-sm text-muted">No rooms found on this Wi-Fi.</p>
+				{/each}
+			</section>
 
-	{#if nativeBridge}
-		<section class="flex flex-col gap-1">
-			<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">Nearby rooms</h2>
-			{#each nearby as room (room.url + room.code)}
-				<button
-					class="flex items-center gap-3 rounded-lg bg-surface px-3 py-3 text-left ring-1 ring-line disabled:opacity-40"
-					disabled={!validName}
-					onclick={() => joinNearby(room)}
-				>
-					<Icon name="people" size={20} class="text-muted" />
-					<span class="min-w-0 flex-1 truncate">{room.name}</span>
-					<span class="font-mono text-sm text-muted">{room.code}</span>
-				</button>
-			{:else}
-				<p class="px-1 text-sm text-muted">No rooms found on this Wi-Fi.</p>
-			{/each}
-		</section>
+			<p class="text-center text-sm text-muted">
+				{#if onThisPhone}
+					<button class="underline" onclick={() => nativeBridge?.openServer()}>Join a room on a server</button>
+					·
+					<button class="underline" onclick={() => nativeBridge?.changeServer()}>Change server</button>
+				{:else}
+					On {location.host} ·
+					<button class="underline" onclick={() => nativeBridge?.openHome()}>Back to this phone</button>
+				{/if}
+			</p>
+		{/if}
 
-		<p class="text-center text-sm text-muted">
-			{#if onThisPhone}
-				<button class="underline" onclick={() => nativeBridge?.openServer()}>Join a room on a server</button>
-				·
-				<button class="underline" onclick={() => nativeBridge?.changeServer()}>Change server</button>
-			{:else}
-				On {location.host} ·
-				<button class="underline" onclick={() => nativeBridge?.openHome()}>Back to this phone</button>
-			{/if}
-		</p>
-	{/if}
+		{#if host?.kind === 'server'}
+			<a href="/account" class="text-center text-sm text-muted underline">{me ? 'Your account' : 'Accounts on this server'}</a>
+		{/if}
 
-	{#if host?.kind === 'server'}
-		<a href="/account" class="text-center text-sm text-muted underline">{me ? 'Your account' : 'Accounts on this server'}</a>
-	{/if}
-
-	{#if error}
-		<p class="text-center text-accent">{error}</p>
+		{#if error}
+			<p class="text-center text-accent">{error}</p>
+		{/if}
 	{/if}
 </main>

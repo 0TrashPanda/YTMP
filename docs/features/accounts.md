@@ -88,9 +88,28 @@ every browser where you're logged in. Only you see them.
   its database) and only sends it to its YouTube Music module. Changing the module key
   means signing in again.
 - History on a server: **Off**, **Solo rooms** (your solo rooms), or **All rooms** you're in.
+- **One YouTube Music sign-in for both** ✅: in the app, a server page offers **"Use <name>
+  from this phone"** when the phone is signed in (one confirm, no Google page). The other way,
+  on the phone **"Use the one from your account on <server>"** takes the sign-in your server
+  account has (one confirm). The server only gives the sign-in to you, logged in on its own
+  pages; room hosts never get it.
 
 Later: removing songs from your playlists, dislike; using your sign-in in rooms on someone
 else's phone or server without giving that host your sign-in.
+
+## Log in once ✅
+
+- On a server, one login covers everything there: logging in on the account page also logs
+  you in for its rooms (and your name is filled in when you join a room).
+- In the app, logging in on your server's pages also logs in the phone's own pages, and the
+  other way round. A browser on another device logs in once itself.
+- Rooms on other people's hosts still ask first ("Join rooms on <host> as <name>?").
+
+## Accounts-only servers ✅
+
+A server setting (`accounts.guests = false`): without an account, people only see the login
+page. Joining or creating rooms, search and everything else needs an account (of this
+server, or a server it trusts). Speakers and TVs still get the audio.
 
 ## Creating an account
 

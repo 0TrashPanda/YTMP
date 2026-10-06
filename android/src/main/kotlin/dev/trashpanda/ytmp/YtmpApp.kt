@@ -25,6 +25,13 @@ class YtmpApp : Application() {
     /** The app is on screen (set by [MainActivity]). */
     val visible = MutableStateFlow(false)
 
+    /**
+     * A login for the phone's own pages, handed over by your server's pages (log in once, see
+     * MainActivity's bridge). Only in memory: it's a 30-day token.
+     */
+    @Volatile
+    var sharedIdentity: String? = null
+
     override fun onCreate() {
         super.onCreate()
         host = LocalHost(this).also { it.start() }

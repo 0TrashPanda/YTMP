@@ -23,7 +23,8 @@ MODULE_ID = "ytm"
 _PREFIXES = ("ytm:", "yt:")
 _LARGE_ART = 544
 _ARTIST_SONGS = 20
-_PLAYLIST_SONGS = 200
+# Public playlists can be huge; your own (Liked music too) are loaded whole.
+_PLAYLIST_SONGS = 1000
 _HOME_SECTIONS = 12
 _LIBRARY_ITEMS = 200
 _YTM_ORIGIN = "https://music.youtube.com"
@@ -276,7 +277,7 @@ class YtmCore:
         """A playlist with its songs: a public one, or with [personal] also the signed-in account's own (Liked music is "LM")."""
         ytm = self._signed_in() if personal else self._ytm
         try:
-            p = ytm.get_playlist(playlist_id, limit=_PLAYLIST_SONGS)
+            p = ytm.get_playlist(playlist_id, limit=None if personal else _PLAYLIST_SONGS)
         except Exception as e:
             raise NotFound(str(e)) from e
         author = p.get("author")

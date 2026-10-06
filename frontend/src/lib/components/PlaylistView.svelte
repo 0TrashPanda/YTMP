@@ -63,7 +63,7 @@
 					</button>
 				{/if}
 			{/if}
-			<PlayAllButtons {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} {onToast} />
+			<PlayAllButtons {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay {onToast} />
 		</div>
 	</header>
 

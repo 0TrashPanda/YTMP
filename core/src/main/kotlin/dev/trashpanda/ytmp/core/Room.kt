@@ -240,9 +240,10 @@ class Room(
     /**
      * Adds a second connection for a participant who is already here (see
      * [ClientMessage.Attach]). It gets everything the participant gets, but doesn't make
-     * them online or replace their connection. Returns the participant's id.
+     * them online or replace their connection. Returns the participant's id. [accountsOnly]:
+     * only for participants who joined with an account.
      */
-    suspend fun attach(message: ClientMessage.Attach, outbox: Outbox, local: Boolean = true): String? = mutex.withLock {
+    suspend fun attach(message: ClientMessage.Attach, outbox: Outbox, local: Boolean = true, accountsOnly: Boolean = false): String? = mutex.withLock {
         if (message.protocolVersion != PROTOCOL_VERSION) {
             outbox.send(ServerMessage.Rejected(RejectReason.VERSION_MISMATCH))
             return null
@@ -255,6 +256,10 @@ class Room(
         }
         if (visibility == RoomVisibility.PRIVATE && !local && !member.isOwner) {
             outbox.send(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM))
+            return null
+        }
+        if (accountsOnly && member.accountId == null) {
+            outbox.send(ServerMessage.Rejected(RejectReason.ACCOUNT_REQUIRED))
             return null
         }
         member.attached += outbox
@@ -538,6 +543,11 @@ class Room(
             is Command.AutoplayFromHere -> {
                 need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
                 autoplayFromHere(command.song, member.id, member.name)
+            }
+            is Command.AutoplaySongs -> {
+                need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
+                if (command.songs.isEmpty()) return invalid("No songs")
+                autoplaySongs(command.songs, member.id, member.name)
             }
             Command.Play -> {
                 need(member, Permission.PLAY_PAUSE)?.let { return it }
@@ -1025,6 +1035,22 @@ class Room(
                     playNextFromQueue()
                 }
             }
+        }
+    }
+
+    /** A playlist as the autoplay queue; when it runs low, the radio goes on from its last song. Called with [mutex] held. */
+    private fun autoplaySongs(songs: List<Song>, byId: String, byName: String) {
+        autoplayJob?.cancel()
+        startWhenAutoplayLoaded = false
+        autoplayDismissed = false
+        autoplaySeed = songs.first()
+        autoplayBy = byId to byName
+        autoplay.clear()
+        autoplay += songs.distinctBy { it.id }.map { radioItem(it, QueueItemOrigin.AUTOPLAY, autoplayBy) }
+        emitAutoplay()
+        if (current == null && queue.isEmpty()) {
+            wantPlaying = true
+            playNextFromQueue()
         }
     }
 

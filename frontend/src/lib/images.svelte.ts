@@ -1,13 +1,20 @@
 // Which size of each picture (album art, artists, playlists) to load, and this device's
-// "Image quality" setting: High looks sharp on big screens, Low saves data (and battery).
+// picture settings: "Image quality" (High looks sharp on big screens, Low saves data and
+// battery) and "Video pictures" (wide pictures cropped to the square, or whole; see Art.svelte).
 import type { Thumbnail } from './protocol.gen';
-import { saved, type ImageQuality } from './storage';
+import { saved, type ImageQuality, type VideoArt } from './storage';
 
-export const images = $state({ quality: saved.imageQuality });
+export const images = $state({ quality: saved.imageQuality, videoArt: saved.videoArt });
 
 export function setImageQuality(quality: ImageQuality): void {
 	images.quality = quality;
 	saved.imageQuality = quality;
+}
+
+/** Wide pictures (songs from a music video): cropped to a square, or shown whole with bars. */
+export function setVideoArt(videoArt: VideoArt): void {
+	images.videoArt = videoArt;
+	saved.videoArt = videoArt;
 }
 
 /** Low quality: no picture is loaded bigger than this (px). */

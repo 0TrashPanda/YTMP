@@ -26,7 +26,8 @@ const REJECT_MESSAGES: Record<RejectReason, string> = {
 	private_room: 'This is a solo room; only its owner can join.',
 	room_moved: 'This room moved to your other device.',
 	kicked: 'You were removed from this room. You can join again.',
-	banned: "You're banned from this room."
+	banned: "You're banned from this room.",
+	account_required: 'This server is for accounts only. Log in to join.'
 };
 
 /**

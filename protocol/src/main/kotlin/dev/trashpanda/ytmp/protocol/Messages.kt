@@ -122,6 +122,14 @@ sealed interface Command {
     @SerialName("AutoplayFromHere")
     data class AutoplayFromHere(val song: Song) : Command
 
+    /**
+     * "Add to autoplay" for a playlist: [songs] become the autoplay queue (they play when the
+     * queue is empty, after what people added), and the radio goes on after the last one.
+     */
+    @Serializable
+    @SerialName("AutoplaySongs")
+    data class AutoplaySongs(val songs: List<Song>) : Command
+
     /** Jump to an item in the queue, the autoplay queue or the history. */
     @Serializable
     @SerialName("JumpTo")
@@ -294,6 +302,9 @@ enum class RejectReason {
     @SerialName("kicked") KICKED,
 
     @SerialName("banned") BANNED,
+
+    /** This host is for accounts only: log in first. */
+    @SerialName("account_required") ACCOUNT_REQUIRED,
 }
 
 @Serializable

@@ -54,6 +54,14 @@
 	const wide = new MediaQuery('min-width: 1024px');
 	let tab = $state<'queue' | 'related'>('queue');
 
+	// Desktop: clicking the art plays or pauses, and shows which for a moment ([flash], a new object per click).
+	let flash = $state<{ icon: 'play' | 'pause' } | null>(null);
+	function artClick() {
+		const pausing = !!playback?.playing;
+		flash = { icon: pausing ? 'pause' : 'play' };
+		room.run({ kind: pausing ? 'Pause' : 'Play' });
+	}
+
 	// Thumbs up, with your YouTube Music sign-in.
 	const liked = $derived(likes.get(song?.id));
 	$effect(() => {
@@ -153,7 +161,7 @@
 {/snippet}
 
 <div
-	class="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-bg lg:absolute lg:z-30"
+	class="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-bg lg:absolute lg:top-14 lg:z-30"
 	style:transform={dragY ? `translateY(${dragY}px)` : undefined}
 	transition:fly={{ y: 600, duration: 250, opacity: 1 }}
 	role="dialog"
@@ -199,9 +207,29 @@
 			ontouchmove={(e) => swipeStart !== null && (dragY = Math.max(0, e.touches[0].clientY - swipeStart))}
 			ontouchend={onTouchEnd}
 		>
-			<div class="flex min-h-0 w-full flex-1 items-center justify-center" role="presentation" oncontextmenu={onSongMenu}>
-				<!-- Desktop: as big as fits, now that the song is in the player bar. -->
-				<Art {song} size={1200} class="aspect-square max-h-full w-full max-w-[min(100%,36rem)] rounded-lg shadow-2xl lg:max-w-full" />
+			<!-- Always square: as big as both the width and the height allow (desktop: no other limit, the song is in the player bar). -->
+			<div class="flex min-h-0 w-full flex-1 items-center justify-center [container-type:size]" role="presentation" oncontextmenu={onSongMenu}>
+				{#if wide.current}
+					<!-- Desktop, like YTM: click the art to play or pause. -->
+					<button
+						class="relative size-[min(100cqw,100cqh)] rounded-lg disabled:cursor-default"
+						disabled={!room.can('play_pause') || !song}
+						aria-label={playback?.playing ? 'Pause' : 'Play'}
+						onclick={artClick}
+					>
+						<Art {song} size={1200} class="h-full w-full rounded-lg shadow-2xl" />
+						<!-- What the click did, for a moment. -->
+						{#key flash}
+							{#if flash}
+								<span class="art-flash pointer-events-none absolute inset-0 m-auto grid size-24 place-items-center rounded-full bg-black/60">
+									<Icon name={flash.icon} size={56} />
+								</span>
+							{/if}
+						{/key}
+					</button>
+				{:else}
+					<Art {song} size={1200} class="size-[min(100cqw,100cqh,36rem)] rounded-lg shadow-2xl" />
+				{/if}
 			</div>
 
 			{#if song && current}

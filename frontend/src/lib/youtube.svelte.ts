@@ -3,6 +3,7 @@
 // server it belongs to your YTMP account there: you sign in through the app, or paste the
 // cookies from a browser, and the server keeps them (server/.../YoutubeLinks.kt).
 import { forgetPersonal, getHost, getYoutubeAccount, setYoutubeHistory, setYoutubePersonalize, signInToYoutube, signOutOfYoutube } from './api';
+import { identity } from './account';
 import { nativeBridge } from './native';
 import type { YoutubeAccount, YoutubeHistory } from './protocol.gen';
 
@@ -16,9 +17,27 @@ class YoutubeSignIn {
 	history = $state<YoutubeHistory>('solo');
 	/** Your searches go through this account (personal results, like in YouTube Music). */
 	personalize = $state(true);
+	/** On the phone: your linked YTMP server, if you're logged in there (its YouTube Music sign-in can be used here too). */
+	linkedServer = $state<string | null>(null);
 	/** Changes with every sign-in or sign-out, to reload what depends on it. */
 	version = $state(0);
 	busy = $state(false);
+
+	/** On a server, in the app: the YouTube Music account the phone is signed in to, to use it here too. */
+	get phoneAccount(): YoutubeAccount | null {
+		if (!this.onServer) return null;
+		try {
+			const json = nativeBridge?.phoneYoutubeAccount?.();
+			return json ? (JSON.parse(json) as YoutubeAccount) : null;
+		} catch {
+			return null;
+		}
+	}
+
+	/** On the phone: use the YouTube Music sign-in of your account on [linkedServer] (its page hands it to the app). */
+	useServerSignIn(): void {
+		if (this.linkedServer) location.href = `${this.linkedServer}/account/youtube-app`;
+	}
 
 	/** On a server: the app can sign in for you (bridge version 3). */
 	get canUseApp(): boolean {
@@ -29,6 +48,8 @@ class YoutubeSignIn {
 		try {
 			const [status, host] = await Promise.all([getYoutubeAccount(), getHost()]);
 			this.onServer = host.kind === 'server';
+			const server = host.authServers.find((s) => s.url)?.url ?? null;
+			this.linkedServer = !this.onServer && identity.get(host.authServers) ? server : null;
 			this.available = status.available && (this.onServer || !!nativeBridge?.youtubeSignIn);
 			this.account = status.account;
 			this.history = status.history;

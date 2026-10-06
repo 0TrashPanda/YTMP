@@ -61,6 +61,11 @@ export interface CommandAutoplayFromHere {
   song: Song;
 }
 
+export interface CommandAutoplaySongs {
+  kind: "AutoplaySongs";
+  songs: Song[];
+}
+
 export interface CommandBan {
   kind: "Ban";
   participantId: string;
@@ -222,6 +227,7 @@ export type Command =
   | CommandAddSongs
   | CommandAssignRole
   | CommandAutoplayFromHere
+  | CommandAutoplaySongs
   | CommandBan
   | CommandClearAutoplay
   | CommandClearQueue
@@ -482,7 +488,7 @@ export interface ServerMessagePong {
   hostTime: number;
 }
 
-export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "room_moved" | "private_room" | "kicked" | "banned";
+export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "room_moved" | "private_room" | "kicked" | "banned" | "account_required";
 
 export interface ServerMessageRejected {
   type: "rejected";
@@ -577,6 +583,7 @@ export interface HostInfo {
   canCreateRooms: boolean;
   supportsPrivateRooms: boolean;
   authServers: AuthServerRef[];
+  accountsOnly: boolean;
 }
 
 export interface RoomListResponse {

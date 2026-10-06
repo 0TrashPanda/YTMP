@@ -27,13 +27,13 @@
 	import { RoomConnection } from '../../../lib/room.svelte';
 	import { saved } from '../../../lib/storage';
 	import { nativeBridge } from '../../../lib/native';
-	import { identity } from '../../../lib/account';
+	import { identity, logInOnce, session } from '../../../lib/account';
 	import type { Participant } from '../../../lib/protocol.gen';
 
 	const code = page.params.code!.toUpperCase();
 
-	// Logged in: the host takes the name from the account.
-	const initialName = identity.stored?.account.displayName ?? saved.displayName;
+	// Logged in: the host takes the name from the account (also when logged in on this server's own pages).
+	const initialName = identity.stored?.account.displayName ?? session.current?.account.displayName ?? saved.displayName;
 	let name = $state(initialName);
 	let room = $state<RoomConnection | null>(null);
 	let player = $state<RoomPlayer | null>(null);
@@ -71,10 +71,17 @@
 		if (views.length === 0) browsing = false;
 	}
 
-	function toggleHome() {
-		if (browsing) browsing = false;
-		else if (section !== 'home') section = 'home';
-		else if (views.length) browsing = true;
+	/** The logo: always Home; on Home already, it loads new suggestions (like pulling down). */
+	function goHome() {
+		const onHome = !browsing && section === 'home' && !expanded;
+		closePlayer();
+		browsing = false;
+		section = 'home';
+		scroller?.scrollTo({ top: 0 });
+		if (onHome) {
+			forgetHome();
+			homeVersion++;
+		}
 	}
 
 	// Home and Library (the bottom bar, in the app with YouTube Music sign-in), under the pages above.
@@ -143,7 +150,11 @@
 		room.connect();
 		youtube.load();
 	}
-	if (initialName.trim()) start();
+	if (initialName.trim()) {
+		// Logged in on this server's pages, but not yet for its rooms: that first (log in once).
+		if (session.current) getHost().then(logInOnce).catch(() => {}).finally(start);
+		else start();
+	}
 
 	// Tick for the progress bar, only while it moves and can be seen: a hidden page that keeps
 	// redrawing costs battery on phones.
@@ -315,6 +326,12 @@
 {#if !room}
 	<main class="mx-auto flex min-h-full max-w-sm flex-col justify-center gap-4 px-4">
 		<h1 class="text-2xl font-bold">Join room <span class="font-mono">{code}</span></h1>
+		{#if host?.accountsOnly}
+			<p class="text-muted">This server is for accounts only.</p>
+			{#each host.authServers as server (server.issuer)}
+				<a href={identity.loginUrl(server)} class="rounded-full bg-white py-3 text-center font-medium text-black">Log in to join</a>
+			{/each}
+		{:else}
 		<form
 			class="flex flex-col gap-3"
 			onsubmit={(e) => {
@@ -339,10 +356,16 @@
 				Join
 			</button>
 		</form>
+		{/if}
 	</main>
 {:else if room.status === 'rejected'}
 	<main class="mx-auto flex min-h-full max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
 		<p class="text-lg">{room.rejectMessage}</p>
+		{#if host?.accountsOnly && !identity.stored}
+			{#each host.authServers as server (server.issuer)}
+				<a href={identity.loginUrl(server)} class="rounded-full bg-white px-6 py-3 font-medium text-black">Log in</a>
+			{/each}
+		{/if}
 		{#if room.movedTo}
 			<a href={room.movedTo} class="rounded-full bg-white px-6 py-3 font-medium text-black">Open it there</a>
 			<a href="/" class="text-sm text-muted underline">Back</a>
@@ -355,162 +378,165 @@
 		<div class="relative flex min-h-0 flex-1">
 			<Sidebar
 				section={browsing ? null : section}
-				onLogo={() => pickSection('home')}
+				onLogo={goHome}
 				onSection={pickSection}
 				onPlaylist={(p) => openPlaylist(p, true)}
 			/>
-			<!-- One scrolling page whose header slides away while scrolling down (phones). -->
-			<div
-				bind:this={scroller}
-				onscroll={onScroll}
-				ontouchstart={pullStartAt}
-				ontouchmove={pullMove}
-				ontouchend={pullEnd}
-				ontouchcancel={pullEnd}
-				role="presentation"
-				class="h-full min-w-0 flex-1 overflow-y-auto overscroll-y-contain"
-			>
-				<header
-					class="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:h-14 sm:px-6 lg:translate-y-0
-						{headerHidden ? '-translate-y-full' : ''}"
+			<!-- The page; desktop: the full player opens over it, below the top bar (search stays), and the left side stays, like YTM. -->
+			<div class="relative min-w-0 flex-1">
+				<!-- One scrolling page whose header slides away while scrolling down (phones). -->
+				<div
+					bind:this={scroller}
+					onscroll={onScroll}
+					ontouchstart={pullStartAt}
+					ontouchmove={pullMove}
+					ontouchend={pullEnd}
+					ontouchcancel={pullEnd}
+					role="presentation"
+					class="h-full overflow-y-auto overscroll-y-contain"
 				>
-					<!-- Desktop: the logo is on the left side (Sidebar), so search starts where the page does, like YTM. -->
-					<button class="text-xl font-black tracking-tight sm:hidden" title={browsing ? 'Home' : 'Back to where you were'} onclick={toggleHome}>
-						YT<span class="text-accent">MP</span>
-					</button>
-					<SearchBox {query} onopen={() => (headerHidden = false)} onsearch={searchFor} />
-					<div class="ml-auto flex items-center gap-2">
-						<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
-						<!-- Phones: centered in the header. -->
-						<button
-							class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line max-sm:absolute max-sm:left-1/2 max-sm:-translate-x-1/2"
-							onclick={() => (sharing = true)}
-							title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
-						>
-							{#if room.state?.room.visibility === 'private'}
-								<Icon name="headphones" size={16} class="text-muted" />
-							{/if}
-							{code}
-							<Icon name="share" size={16} class="text-muted" />
+					<header
+						class="sticky top-0 z-20 flex items-center gap-3 border-b lg:z-40 border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:h-14 sm:px-6 lg:translate-y-0
+							{headerHidden ? '-translate-y-full' : ''}"
+					>
+						<!-- Desktop: the logo is on the left side (Sidebar), so search starts where the page does, like YTM. -->
+						<button class="text-xl font-black tracking-tight sm:hidden" title="Home" onclick={goHome}>
+							YT<span class="text-accent">MP</span>
 						</button>
-						{#if !solo}
+						<SearchBox {query} onopen={() => (headerHidden = false)} onsearch={searchFor} />
+						<div class="ml-auto flex items-center gap-2">
+							<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
+							<!-- Phones: centered in the header. -->
 							<button
-								class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
-								aria-label="People in this room"
-								onclick={() => (settings = 'members')}
-								title={room.state?.participants
-									.filter((p: Participant) => p.online)
-									.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
-									.join(', ')}
+								class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line max-sm:absolute max-sm:left-1/2 max-sm:-translate-x-1/2"
+								onclick={() => (sharing = true)}
+								title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
 							>
-								<Icon name="people" size={20} />
-								<span class="hidden sm:inline">{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}</span>
+								{#if room.state?.room.visibility === 'private'}
+									<Icon name="headphones" size={16} class="text-muted" />
+								{/if}
+								{code}
+								<Icon name="share" size={16} class="text-muted" />
 							</button>
-						{/if}
-						<!-- Your account and the settings (YTM keeps them behind the avatar too). -->
-						<button class="shrink-0 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (accountOpen = true)}>
-							{#if youtube.account?.photoUrl}
-								<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-7 w-7 rounded-full" />
-							{:else}
-								<span class="grid h-7 w-7 place-items-center rounded-full bg-raised"><Icon name="person" size={20} class="text-muted" /></span>
+							{#if !solo}
+								<button
+									class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
+									aria-label="People in this room"
+									onclick={() => (settings = 'members')}
+									title={room.state?.participants
+										.filter((p: Participant) => p.online)
+										.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
+										.join(', ')}
+								>
+									<Icon name="people" size={20} />
+									<span class="hidden sm:inline">{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}</span>
+								</button>
 							{/if}
-						</button>
-					</div>
-				</header>
-
-				{#if room.status !== 'connected'}
-					<div class="bg-raised px-4 py-1 text-center text-sm text-muted">
-						{room.status === 'connecting' ? 'Connecting…' : 'Connection lost, reconnecting…'}
-					</div>
-				{/if}
-
-				{#if pull > 0}
-					<div class="flex justify-center overflow-hidden" style:height="{pull}px">
-						<span class="mt-auto mb-2 grid h-9 w-9 place-items-center rounded-full bg-raised shadow-lg" style:transform="rotate({pull * 4}deg)" style:opacity={Math.min(1, pull / PULL_TO_REFRESH)}>
-							<Icon name="replay" size={20} class={pull >= PULL_TO_REFRESH ? 'text-white' : 'text-muted'} />
-						</span>
-					</div>
-				{/if}
-				<main class="mx-auto w-full max-w-7xl p-3 sm:p-6">
-					{#if view}
-						{#if views.length > 1}
-							<button class="mb-2 flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted hover:bg-raised hover:text-white" onclick={back}>
-								<Icon name="back" size={20} />
-								Back
+							<!-- Your account and the settings (YTM keeps them behind the avatar too). -->
+							<button class="shrink-0 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (accountOpen = true)}>
+								{#if youtube.account?.photoUrl}
+									<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-7 w-7 rounded-full" />
+								{:else}
+									<span class="grid h-7 w-7 place-items-center rounded-full bg-raised"><Icon name="person" size={20} class="text-muted" /></span>
+								{/if}
 							</button>
-						{/if}
-						{#if view.kind === 'search'}
-							<SearchResults
-								{room}
-								query={view.query}
-								type={searchType}
-								onType={(t) => (searchType = t)}
-								onToast={toast}
-								onMenu={(target) => (menu = target)}
-								onArtist={openArtist}
-								onAlbum={(a) => openAlbum(a)}
-								onPlaylist={openPlaylist}
-								onPodcast={openPodcast}
-							/>
-						{:else if view.kind === 'similar'}
-							<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={(target) => (menu = target)} />
-						{:else if view.kind === 'artist'}
-							<ArtistView
-								{room}
-								id={view.id}
-								name={view.name}
-								onToast={toast}
-								onMenu={(target) => (menu = target)}
-								onAlbum={(a) => openAlbum({ id: a.id, name: a.title })}
-								onPlaylist={openPlaylist}
-							/>
-						{:else if view.kind === 'album'}
-							<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
-						{:else if view.kind === 'playlist'}
-							<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={(target) => (menu = target)} />
-						{:else if view.kind === 'podcast'}
-							<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
-						{/if}
-					{:else if section === 'library'}
-						<LibraryView
-							onToast={toast}
-							onArtist={openArtist}
-							onAlbum={(a) => openAlbum(a)}
-							onPlaylist={(p) => openPlaylist(p, true)}
-							onPodcast={openPodcast}
-						/>
-					{:else}
-						<!-- Signing in or out changes the suggestions. -->
-						{#key `${youtube.version}:${homeVersion}`}
-							<HomeView
-								{room}
-								onToast={toast}
-								onMenu={(target) => (menu = target)}
-								onArtist={openArtist}
-								onAlbum={(a) => openAlbum(a)}
-								onPlaylist={openPlaylist}
-								onPodcast={openPodcast}
-							/>
-						{/key}
-					{/if}
-				</main>
-			</div>
+						</div>
+					</header>
 
-			{#if expanded && player}
-				<NowPlaying
-					{room}
-					{player}
-					{positionMs}
-					onClose={closePlayer}
-					onToast={toast}
-					onMenu={(target) => (menu = target)}
-					onSongMenu={currentMenu}
-					onSave={(song) => (saving = song)}
-					onArtist={openArtist}
-					onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
-					onPodcast={openPodcast}
-				/>
-			{/if}
+					{#if room.status !== 'connected'}
+						<div class="bg-raised px-4 py-1 text-center text-sm text-muted">
+							{room.status === 'connecting' ? 'Connecting…' : 'Connection lost, reconnecting…'}
+						</div>
+					{/if}
+
+					{#if pull > 0}
+						<div class="flex justify-center overflow-hidden" style:height="{pull}px">
+							<span class="mt-auto mb-2 grid h-9 w-9 place-items-center rounded-full bg-raised shadow-lg" style:transform="rotate({pull * 4}deg)" style:opacity={Math.min(1, pull / PULL_TO_REFRESH)}>
+								<Icon name="replay" size={20} class={pull >= PULL_TO_REFRESH ? 'text-white' : 'text-muted'} />
+							</span>
+						</div>
+					{/if}
+					<main class="mx-auto w-full max-w-7xl p-3 sm:p-6">
+						{#if view}
+							{#if views.length > 1}
+								<button class="mb-2 flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted hover:bg-raised hover:text-white" onclick={back}>
+									<Icon name="back" size={20} />
+									Back
+								</button>
+							{/if}
+							{#if view.kind === 'search'}
+								<SearchResults
+									{room}
+									query={view.query}
+									type={searchType}
+									onType={(t) => (searchType = t)}
+									onToast={toast}
+									onMenu={(target) => (menu = target)}
+									onArtist={openArtist}
+									onAlbum={(a) => openAlbum(a)}
+									onPlaylist={openPlaylist}
+									onPodcast={openPodcast}
+								/>
+							{:else if view.kind === 'similar'}
+								<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={(target) => (menu = target)} />
+							{:else if view.kind === 'artist'}
+								<ArtistView
+									{room}
+									id={view.id}
+									name={view.name}
+									onToast={toast}
+									onMenu={(target) => (menu = target)}
+									onAlbum={(a) => openAlbum({ id: a.id, name: a.title })}
+									onPlaylist={openPlaylist}
+								/>
+							{:else if view.kind === 'album'}
+								<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
+							{:else if view.kind === 'playlist'}
+								<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={(target) => (menu = target)} />
+							{:else if view.kind === 'podcast'}
+								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
+							{/if}
+						{:else if section === 'library'}
+							<LibraryView
+								onToast={toast}
+								onArtist={openArtist}
+								onAlbum={(a) => openAlbum(a)}
+								onPlaylist={(p) => openPlaylist(p, true)}
+								onPodcast={openPodcast}
+							/>
+						{:else}
+							<!-- Signing in or out changes the suggestions. -->
+							{#key `${youtube.version}:${homeVersion}`}
+								<HomeView
+									{room}
+									onToast={toast}
+									onMenu={(target) => (menu = target)}
+									onArtist={openArtist}
+									onAlbum={(a) => openAlbum(a)}
+									onPlaylist={openPlaylist}
+									onPodcast={openPodcast}
+								/>
+							{/key}
+						{/if}
+					</main>
+				</div>
+
+				{#if expanded && player}
+					<NowPlaying
+						{room}
+						{player}
+						{positionMs}
+						onClose={closePlayer}
+						onToast={toast}
+						onMenu={(target) => (menu = target)}
+						onSongMenu={currentMenu}
+						onSave={(song) => (saving = song)}
+						onArtist={openArtist}
+						onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
+						onPodcast={openPodcast}
+					/>
+				{/if}
+			</div>
 		</div>
 
 		{#if player}

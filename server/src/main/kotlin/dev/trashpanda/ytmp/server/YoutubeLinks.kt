@@ -13,7 +13,12 @@ import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
+import dev.trashpanda.ytmp.protocol.YoutubeSignInRequest
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -72,6 +77,21 @@ class YoutubeLinks(
                     log.warn("Couldn't add a play to the YouTube Music history of {}: {}", listener.accountId, e.message)
                 }
             }
+        }
+    }
+
+    /**
+     * `GET /api/account/youtube/cookie`: your YouTube Music sign-in, to use it on your phone too
+     * (the app's page on this server hands it to the app). Only for a login session on this
+     * server's own pages ([sessionAccount]), never for a host token: hosts never get it.
+     */
+    fun routes(route: Route, sessionAccount: suspend (ApplicationCall) -> String?) = with(route) {
+        get("/account/youtube/cookie") {
+            val accountId = sessionAccount(call)
+                ?: throw ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Log in first")
+            val cookie = cookie(accountId)
+                ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Your account has no YouTube Music sign-in")
+            call.respond(YoutubeSignInRequest(cookie))
         }
     }
 

@@ -45,6 +45,9 @@ signup = "invite"
 trusted = []
 # Whether new accounts keep a listening history until they turn it off.
 tracking_default = false
+# Whether people without an account can use this server (join rooms, search, …). false: only
+# the login page works for them. YTMP_GUESTS overrides it.
+guests = true
 
 [rooms]
 # letters | digits | alnum

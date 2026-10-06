@@ -36,6 +36,7 @@ import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.SessionResponse
 import dev.trashpanda.ytmp.protocol.SignupMode
 import dev.trashpanda.ytmp.protocol.SignupRequest
+import dev.trashpanda.ytmp.protocol.YoutubeSignInRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -92,6 +93,33 @@ class AccountApiTest {
         contentType(ContentType.Application.Json)
         session?.let(::bearerAuth)
         setBody(body)
+    }
+
+    @Test
+    fun `your YouTube Music sign-in only comes back with your login session, never a host token`() = testApplication {
+        val db = Database.open(DatabaseConfig(path = Files.createTempDirectory("ytmp").resolve("ytmp.db").toString()))
+        val accounts = Accounts(db)
+        val key = accounts.signingKey()
+        val service = AccountService(accounts, "test.example", key, SignupMode.OPEN, History(db))
+        val auth = TrustedAuthServers(isOwnOrigin = { it == origin }).apply { trust(AuthServerRef(null, "test.example"), key.public) }
+        val youtube = YoutubeLinks(accounts, "module-key", RemoteSourceModule(HttpClient(), "http://unused", ""), CoroutineScope(SupervisorJob()))
+        application {
+            val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, { _, _ -> SearchPage(emptyList()) }, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = {
+                service.routes(this)
+                youtube.routes(this) { call -> service.sessionAccount(call)?.id }
+            })
+        }
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>()
+        val hostToken = client.postJson("/api/account/host-token", HostTokenRequest(origin), session = anna.sessionToken).body<HostTokenResponse>().token
+        suspend fun cookieWith(token: String?) = client.get("/api/account/youtube/cookie") { token?.let(::bearerAuth) }
+
+        assertEquals(HttpStatusCode.NotFound, cookieWith(anna.sessionToken).status) // nothing stored yet
+        accounts.setData(accounts.find("anna")!!.id, "youtube_cookie", youtube.encrypt("SID=1; __Secure-3PAPISID=x"))
+        assertEquals("SID=1; __Secure-3PAPISID=x", cookieWith(anna.sessionToken).body<YoutubeSignInRequest>().cookie)
+        assertEquals(HttpStatusCode.Unauthorized, cookieWith(hostToken).status)
+        assertEquals(HttpStatusCode.Unauthorized, cookieWith(null).status)
     }
 
     @Test

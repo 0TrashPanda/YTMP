@@ -3,8 +3,8 @@
 	// and this phone's settings in the app.
 	import { nativeBridge } from '../native';
 	import type { YoutubeHistory } from '../protocol.gen';
-	import { images, setImageQuality } from '../images.svelte';
-	import { saved, type BackLimit, type HeadphonesAction, type ImageQuality } from '../storage';
+	import { images, setImageQuality, setVideoArt } from '../images.svelte';
+	import { saved, type BackLimit, type HeadphonesAction, type ImageQuality, type VideoArt } from '../storage';
 	import { youtube } from '../youtube.svelte';
 	import Icon from './Icon.svelte';
 
@@ -62,6 +62,10 @@
 	const qualityOptions: [ImageQuality, string][] = [
 		['high', 'High'],
 		['low', 'Low']
+	];
+	const videoArtOptions: [VideoArt, string][] = [
+		['crop', 'Crop'],
+		['fit', 'Fit']
 	];
 	const backOptions: [BackLimit, string][] = [
 		['home', 'Home page'],
@@ -138,8 +142,9 @@
 				server keeps the sign-in (encrypted); only you can use it.
 			</p>
 			{#if youtube.canUseApp}
+				{@const phone = youtube.phoneAccount}
 				<button class="rounded-full bg-white py-2.5 font-medium text-black disabled:opacity-50" disabled={youtube.busy} onclick={signIn}>
-					{youtube.busy ? 'Signing in…' : 'Sign in with the YTMP app'}
+					{youtube.busy ? 'Signing in…' : phone ? `Use ${phone.name} from this phone` : 'Sign in with the YTMP app'}
 				</button>
 			{/if}
 			{#if !pasting}
@@ -168,7 +173,16 @@
 				Sign in to see your playlists, liked songs and podcasts, and get your own suggestions on Home. You sign in on Google's own page; YTMP never sees your password,
 				and the sign-in stays on this phone.
 			</p>
-			<button class="rounded-full bg-white py-2.5 font-medium text-black disabled:opacity-50" disabled={youtube.busy} onclick={signIn}>
+			{#if youtube.linkedServer}
+				<button class="rounded-full bg-white py-2.5 font-medium text-black" onclick={() => youtube.useServerSignIn()}>
+					Use the one from your account on {new URL(youtube.linkedServer).host}
+				</button>
+			{/if}
+			<button
+				class="rounded-full py-2.5 font-medium disabled:opacity-50 {youtube.linkedServer ? 'bg-raised hover:bg-line' : 'bg-white text-black'}"
+				disabled={youtube.busy}
+				onclick={signIn}
+			>
 				{youtube.busy ? 'Signing in…' : 'Sign in with YouTube Music'}
 			</button>
 		{:else if youtube.onServer}
@@ -190,6 +204,13 @@
 			<h2 class="text-sm font-medium tracking-wide text-muted uppercase">{nativeBridge ? 'On this phone' : 'On this device'}</h2>
 			{@render choice('Image quality', 'Low loads smaller pictures (album art, artists, playlists): less data, a bit less sharp.', qualityOptions, images.quality, (v) =>
 				setImageQuality(v as ImageQuality)
+			)}
+			{@render choice(
+				'Video pictures',
+				'Songs from a music video only have a wide picture. Crop fills the square (like YouTube Music); Fit shows all of it, with bars.',
+				videoArtOptions,
+				images.videoArt,
+				(v) => setVideoArt(v as VideoArt)
 			)}
 			{#if nativeBridge}
 				{@render choice('Back in a solo room', "Where the Back button stops once you're on Home.", backOptions, soloBack, (v) => {

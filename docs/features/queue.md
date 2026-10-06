@@ -122,3 +122,10 @@ Room settings, **all off by default**:
 - **Max songs per person** in the queue at the same time
 - **Max song length** (for example no 1-hour mixes)
 - **No recent repeats**: block songs that were played in the last X minutes
+
+## Playlists into autoplay ✅
+
+On a playlist's page, **Add to autoplay** (instead of *Add to queue*) makes the playlist the
+autoplay queue: it plays when the queue is empty, so songs people add still go first, and the
+radio goes on after its last song. Albums keep *Add to queue*. Your own playlists (Liked music
+too) load whole; public playlists up to 1000 songs.

@@ -78,6 +78,33 @@ class RadioTest {
     }
 
     @Test
+    fun `a playlist added to autoplay plays after the queue, then the radio goes on`() = runTest {
+        val room = room()
+        room.run(Command.AutoplaySongs(listOf(song("p1"), song("p2"), song("p3"))))
+        runCurrent()
+        // Nothing was playing: it starts.
+        var state = room.state()
+        assertEquals("p1", state.nowPlaying?.item?.song?.id)
+        assertEquals(listOf("p2", "p3"), state.autoplay.map { it.song.id }.take(2))
+
+        // Songs people add still go first.
+        room.run(Command.AddSongs(listOf(song("x")), QueuePosition.END))
+        runCurrent()
+        advanceTimeBy(60_001)
+        runCurrent()
+        state = room.state()
+        assertEquals("x", state.nowPlaying?.item?.song?.id)
+        assertEquals("p2", state.autoplay.first().song.id)
+
+        // Then the rest of the playlist, and a radio from its last song after it.
+        advanceTimeBy(60_001 * 2)
+        runCurrent()
+        state = room.state()
+        assertEquals("p3", state.nowPlaying?.item?.song?.id)
+        assertTrue(state.autoplay.isNotEmpty() && state.autoplay.all { it.song.id.startsWith("p3-") })
+    }
+
+    @Test
     fun `start radio clears the queue, plays the song once and continues with its radio`() = runTest {
         val room = room()
         room.run(Command.AddSongs(listOf(song("x"), song("y")), QueuePosition.END))

@@ -43,6 +43,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.application.install
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.plugins.calllogging.CallLogging
@@ -112,7 +113,15 @@ data class HostOptions(
     val mayProxyAudio: (ApplicationCall) -> Boolean = { true },
     /** An account token was accepted (a phone keeps the latest, to sync the account's rooms). */
     val onAccountToken: (token: String, account: AccountIdentity) -> Unit = { _, _ -> },
+    /**
+     * No guests: the API (but logging in and audio for speakers) and rooms need an account
+     * of [auth]. A server setting (`accounts.guests = false`).
+     */
+    val accountsOnly: Boolean = false,
 )
+
+/** What works without an account on an accounts-only host: what's needed to log in, and audio (speakers can't log in). */
+private val OPEN_WITHOUT_ACCOUNT = listOf("/api/host", "/api/auth/", "/api/account", "/api/admin/", "/api/audio/")
 
 fun isLoopback(call: ApplicationCall): Boolean {
     val address = call.request.origin.remoteAddress
@@ -190,8 +199,19 @@ fun Application.ytmpModule(
     fun ApplicationCall.owns(room: Room) =
         request.header(OWNER_TOKEN_HEADER) == room.ownerToken || (room.ownerAccount != null && account()?.id == room.ownerAccount)
 
+    /** Accounts-only hosts: everything in /api but [OPEN_WITHOUT_ACCOUNT] needs an account. */
+    val accountsOnly = createRouteScopedPlugin("AccountsOnly") {
+        onCall { call ->
+            val path = call.request.path()
+            if (OPEN_WITHOUT_ACCOUNT.none { path == it || path.startsWith(it) } && call.account() == null) {
+                throw ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Log in to use this server")
+            }
+        }
+    }
+
     routing {
         route("/api") {
+            if (options.accountsOnly) install(accountsOnly)
             get("/host") {
                 call.respond(
                     HostInfo(
@@ -200,6 +220,7 @@ fun Application.ytmpModule(
                         canCreateRooms = call.mayManageRooms(),
                         supportsPrivateRooms = options.supportsPrivateRooms,
                         authServers = options.auth.servers(),
+                        accountsOnly = options.accountsOnly,
                     ),
                 )
             }
@@ -387,12 +408,17 @@ fun Application.ytmpModule(
                 return@webSocket
             }
             val participantId = if (first is ClientMessage.Attach) {
-                room.attach(first, outbox, local = options.isLocal(call))
+                room.attach(first, outbox, local = options.isLocal(call), accountsOnly = options.accountsOnly)
             } else {
                 val hello = first as ClientMessage.Hello
                 val account = hello.accountToken?.let { token -> options.auth.verify(token)?.also { options.onAccountToken(token, it) } }
                 if (hello.accountToken != null && account == null) log.info("Room {}: account token not accepted, joining as a guest", room.code)
-                room.join(hello, outbox, local = options.isLocal(call), account = account)
+                if (account == null && options.accountsOnly) {
+                    outbox.send(ServerMessage.Rejected(RejectReason.ACCOUNT_REQUIRED))
+                    null
+                } else {
+                    room.join(hello, outbox, local = options.isLocal(call), account = account)
+                }
             }
             if (participantId == null) {
                 outgoing.close()

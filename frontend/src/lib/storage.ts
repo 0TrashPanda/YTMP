@@ -25,6 +25,7 @@ export type BackLimit = 'home' | 'rooms';
 /** When headphones are unplugged or Bluetooth disconnects (the app). */
 export type HeadphonesAction = 'pause' | 'stop' | 'keep';
 export type ImageQuality = 'high' | 'low';
+export type VideoArt = 'crop' | 'fit';
 
 function pick<T extends string>(key: string, options: readonly T[], fallback: T): T {
 	const value = read(key);
@@ -118,5 +119,12 @@ export const saved = {
 	},
 	set imageQuality(quality: ImageQuality) {
 		write('ytmp.imageQuality', quality);
+	},
+	/** Wide (video) pictures: crop to the square like YTM, or fit whole (see images.svelte.ts). */
+	get videoArt(): VideoArt {
+		return pick('ytmp.videoArt', ['crop', 'fit'], 'crop');
+	},
+	set videoArt(value: VideoArt) {
+		write('ytmp.videoArt', value);
 	}
 };

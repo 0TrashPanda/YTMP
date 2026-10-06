@@ -11,6 +11,7 @@ import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
+import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
@@ -42,12 +43,27 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         get() = prefs.getString("cookie", null)
         set(value) = prefs.edit().putString("cookie", value).apply()
 
+    /** Who's signed in, remembered so the app can say so without starting Python. */
+    private var savedAccount: YoutubeAccount?
+        get() = prefs.getString("account", null)?.let { runCatching { ProtocolJson.decodeFromString(YoutubeAccount.serializer(), it) }.getOrNull() }
+        set(value) = prefs.edit().putString("account", value?.let { ProtocolJson.encodeToString(YoutubeAccount.serializer(), it) }).apply()
+
+    /**
+     * The sign-in, to use it on your server account too (see MainActivity's `youtubeCookie`):
+     * the account and its cookies, or null when signed out.
+     */
+    fun shareable(): Pair<YoutubeAccount, String>? {
+        val account = savedAccount ?: return null
+        return account to (cookie ?: return null)
+    }
+
     /** Signs in with the cookies from [YoutubeLoginActivity]; throws [SourceException] when they don't work. */
     override suspend fun signIn(cookie: String): YoutubeAccount = lock.withLock {
         val account = ytm().signIn(cookie)
         this.cookie = cookie
         loaded = cookie
         current = account
+        savedAccount = account
         forget()
         account
     }
@@ -56,6 +72,7 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         cookie = null
         loaded = null
         current = null
+        savedAccount = null
         forget()
         ytm().signOut()
         // Also out of the sign-in page, so signing in again can pick another account. Nothing
@@ -138,12 +155,14 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
             ytm().signIn(saved).also {
                 loaded = saved
                 current = it
+                savedAccount = it
             }
         } catch (e: NotSignedInException) {
             // Signed out elsewhere, or the cookies expired: sign in again in the app.
             // (Other errors, like being offline, keep the sign-in for next time.)
             Log.w(TAG, "YouTube Music sign-in no longer works: ${e.message}")
             cookie = null
+            savedAccount = null
             null
         }
     }

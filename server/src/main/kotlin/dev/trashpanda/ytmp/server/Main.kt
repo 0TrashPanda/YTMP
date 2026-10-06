@@ -91,7 +91,7 @@ fun main(args: Array<String>) {
         auth.trust(AuthServerRef(url = null, issuer = issuer), key.public)
         trustServers(auth, config.accounts.trusted, ownIssuer = issuer)
         if (ownUrl == null) log.warn("accounts.url (YTMP_URL) is not set: account logins only work on this machine's own addresses")
-        log.info("Accounts: {} (sign-up: {})", issuer, config.accounts.signup)
+        log.info("Accounts: {} (sign-up: {}{})", issuer, config.accounts.signup, if (config.accounts.guests) "" else ", accounts only")
 
         val plays = PlayReporter(auth, this)
         val youtube = YoutubeLinks(accounts, config.ytm.key, ytm, this)
@@ -129,10 +129,12 @@ fun main(args: Array<String>) {
                 // same machine, every visitor comes from localhost. Solo rooms go by owner.
                 isLocal = { false },
                 mayProxyAudio = audioProxy::allows,
+                accountsOnly = !config.accounts.guests,
             ),
             extraApi = {
                 service.routes(this)
                 hub.routes(this)
+                youtube.routes(this) { call -> service.sessionAccount(call)?.id }
             },
             similar = cached,
             catalog = cached,

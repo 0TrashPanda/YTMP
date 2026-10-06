@@ -2,12 +2,14 @@ package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
+import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.HomeSection
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
+import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.protocol.YoutubePersonalizeSetting
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
@@ -53,6 +55,7 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.response.respondText
@@ -88,6 +91,39 @@ class ApplicationTest {
 
     private suspend fun DefaultClientWebSocketSession.receiveMessage(): ServerMessage =
         ProtocolJson.decodeFromString(ServerMessage.serializer(), (incoming.receive() as Frame.Text).readText())
+
+    @Test
+    fun `an accounts-only host lets nobody in without an account`() = testApplication {
+        val auth = object : HostAuth {
+            override fun servers() = listOf(AuthServerRef("https://accounts.example", "accounts.example"))
+            override fun verify(token: String) = if (token == "anna") AccountIdentity("anna@accounts.example", "Anna") else null
+        }
+        application {
+            val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = true))
+        }
+        val client = jsonClient()
+        fun io.ktor.client.request.HttpRequestBuilder.asAnna() = header(HttpHeaders.Authorization, "Bearer anna")
+
+        // What's needed to log in still works, and says it's accounts only.
+        assertEquals(true, client.get("/api/host").body<HostInfo>().accountsOnly)
+        // Everything else needs an account.
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/search?q=daft").status)
+        assertEquals(HttpStatusCode.Unauthorized, client.post("/api/rooms") { contentType(ContentType.Application.Json); setBody(CreateRoomRequest("Party")) }.status)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/search?q=daft") { header(HttpHeaders.Authorization, "Bearer nobody") }.status)
+        assertEquals(HttpStatusCode.OK, client.get("/api/search?q=daft") { asAnna() }.status)
+        val created = client.post("/api/rooms") { asAnna(); contentType(ContentType.Application.Json); setBody(CreateRoomRequest("Party")) }.body<CreateRoomResponse>()
+
+        // Joining: a guest is turned away, an account gets in.
+        client.webSocket("/ws") {
+            sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Guest", null, null))
+            assertEquals(RejectReason.ACCOUNT_REQUIRED, assertIs<ServerMessage.Rejected>(receiveMessage()).reason)
+        }
+        client.webSocket("/ws") {
+            sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Anna", null, created.ownerToken, accountToken = "anna"))
+            assertEquals("anna@accounts.example", assertIs<ServerMessage.Welcome>(receiveMessage()).accountId)
+        }
+    }
 
     @Test
     fun `create a room, join it and add a song`() = testApplication {

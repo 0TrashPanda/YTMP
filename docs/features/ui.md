@@ -51,11 +51,19 @@ Like YTM:
   **clicking anywhere on the bar** (not on a button) opens or closes the full player, and
   the song shows **Artist • Album • Year**; the artist and album open their page. A **like**
   button sits next to the song. With the full player open, the song is only in the bar (the
-  full player shows the art and Up next / Related).
+  full player shows the art and Up next / Related), the top bar (search) and the left side
+  stay, and **clicking the
+  art plays or pauses**, like YTM (a play or pause icon pops up on the art for a moment). The art is always square and never cut off at the top or
+  bottom, as big as the space allows.
 - **Image quality** ✅ (profile menu, per device): **High** (default) loads sharp pictures, on
   big screens bigger than YTM lists them (like YTM, Google's pictures are asked for at the
   size shown, e.g. 1200 px album art in the desktop player); **Low** loads at most 300 px
   pictures, to save data.
+- **Video pictures** ✅ (profile menu, per device): songs from a music video only have a
+  wide picture. **Crop** (default, like YTM) fills the square; **Fit** shows all of it, with
+  bars above and below.
+- **The logo** ✅ always goes to Home (closing the full player); on Home already, it loads new
+  suggestions, like pulling down.
 - **Desktop layout** ✅, like YTM: a **left side** with the logo, Home, Library and (wide
   screens) your playlists; narrower screens get YTM's mini version (icons with small
   labels). No bottom bar on desktop, and the search box starts where the page does.

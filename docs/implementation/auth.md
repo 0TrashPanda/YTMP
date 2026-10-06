@@ -101,3 +101,36 @@ checkbox (`hello.hideFromHistory`).
 Known limits: a host holding your token could add made-up plays to your history; and if the
 auth server can't be reached when a song ends (a phone without internet), that play is lost
 (no retry queue yet).
+
+### Log in once
+
+- **Server pages** (`logInOnce` in `frontend/src/lib/account.ts`): with a login session on the
+  server's own pages but no identity (or one for another account, or close to expiring), the
+  page asks `/api/account/host-token` for its own origin, without `/connect`.
+- **In the app**: that page also gets a host token for the phone's own pages
+  (`http://127.0.0.1:8765`) and hands it to the app (bridge v4 `shareIdentity`, at most every
+  12 h per session). The app only takes it from the linked auth server's pages, keeps it in
+  memory, and the phone's pages pick it up once (`takeIdentity`, only on the phone's own
+  origin; `identity.takeFromApp` in the layout). The other way needs nothing new: logging in on
+  the phone's page goes through the server's `/connect` in the same WebView, which keeps the
+  session there.
+
+### Accounts only
+
+`accounts.guests = false` (`YTMP_GUESTS`) → `HostOptions.accountsOnly`: a route-scoped plugin
+answers 401 for every `/api` call without a valid host token, except `/api/host`,
+`/api/auth/*`, `/api/account*`, `/api/admin/*` and `/api/audio/*` (Cast and Sonos fetch audio
+without logging in; `[audio] proxy` still applies). `hello` without an accepted account token,
+and `attach` for a participant without an account, get `Rejected(account_required)`.
+`HostInfo.accountsOnly` makes the pages show only a login.
+
+### YouTube Music sign-in on phone and server
+
+- Phone → server: bridge `youtubeCookie` (only on your server's pages) offers the phone's own
+  sign-in (`PhoneYoutubeAccount.shareable`) before Google's page; `phoneYoutubeAccount` lets the
+  page say whose.
+- Server → phone: `GET /api/account/youtube/cookie` returns the stored sign-in for a **login
+  session only** (`AccountService.sessionAccount`), never for a host token, so hosts can't get
+  it. The page `/account/youtube-app` (opened from the phone's profile menu or Library) hands it
+  to the app with bridge `useYoutubeCookie`, which only accepts it from the linked auth server's
+  pages and asks before signing in.

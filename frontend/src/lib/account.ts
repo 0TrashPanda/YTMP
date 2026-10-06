@@ -6,6 +6,7 @@
 //   origin, handed over by /connect in the URL fragment. It goes into the room hello.
 
 import { ApiRequestError } from './api';
+import { nativeBridge } from './native';
 import type {
 	AccountInfo,
 	AccountSettings,
@@ -14,10 +15,12 @@ import type {
 	ApiError,
 	AuthServerInfo,
 	AuthServerRef,
+	HostInfo,
 	HostTokenResponse,
 	InviteResponse,
 	RoleTemplate,
-	SessionResponse
+	SessionResponse,
+	YoutubeSignInRequest
 } from './protocol.gen';
 
 function read<T>(key: string): T | null {
@@ -92,6 +95,8 @@ export const authServer = {
 		session.current = await call<SessionResponse>('/api/account/password', { currentPassword, newPassword });
 	},
 	hostToken: (origin: string) => call<HostTokenResponse>('/api/account/host-token', { origin }),
+	/** Your YouTube Music sign-in kept in this account (only with a login here), to use it on your phone too. */
+	youtubeCookie: async () => (await call<YoutubeSignInRequest>('/api/account/youtube/cookie')).cookie,
 
 	roleTemplate: () => call<RoleTemplate>('/api/account/role-template'),
 	saveRoleTemplate: (template: RoleTemplate) => call<RoleTemplate>('/api/account/role-template', template, 'PUT'),
@@ -159,6 +164,18 @@ export const identity = {
 		write('ytmp.identity', null);
 	},
 
+	/** In the app, on the phone's own pages: takes a login that your server's pages handed over (see [logInOnce]). */
+	takeFromApp(): void {
+		const shared = nativeBridge?.takeIdentity?.();
+		if (!shared) return;
+		try {
+			const value = JSON.parse(shared) as Identity;
+			if (value.token && value.account && value.expiresAt > Date.now()) write('ytmp.identity', value);
+		} catch {
+			// Broken; ignore.
+		}
+	},
+
 	/** Takes an identity that /connect put in the URL fragment, and removes it from the URL. */
 	takeFromUrl(): void {
 		if (!location.hash.startsWith(`#${FRAGMENT}`)) return;
@@ -177,6 +194,52 @@ export const identity = {
 		return `${base}/connect?return=${encodeURIComponent(location.href)}`;
 	}
 };
+
+// --- log in once ---------------------------------------------------------------------------
+
+/** The app's own pages (the phone's built-in host, android/.../LocalHost.kt). */
+const APP_HOME_ORIGIN = 'http://127.0.0.1:8765';
+
+/** An identity this close to running out is renewed. */
+const RENEW_MS = 7 * 24 * 3600_000;
+
+/** How often the app gets a fresh login from this server's pages. */
+const SHARE_EVERY_MS = 12 * 3600_000;
+
+/**
+ * Log in once (docs/features/accounts.md#log-in-once). On a server's own pages, a login there
+ * (a session, e.g. from /account) is also your identity for its rooms, without /connect. In the
+ * app, it's also handed to the phone's own pages. Returns your identity on this host.
+ */
+export async function logInOnce(host: HostInfo): Promise<Identity | null> {
+	let mine = identity.get(host.authServers);
+	const current = session.current;
+	if (host.kind !== 'server' || !current) return mine;
+	if (!mine || mine.account.id !== current.account.id || mine.expiresAt - Date.now() < RENEW_MS) {
+		try {
+			mine = await authServer.hostToken(location.origin);
+			write('ytmp.identity', mine);
+		} catch {
+			// Logged out meanwhile, or offline: as before.
+		}
+	}
+	void shareWithApp();
+	return mine;
+}
+
+/** In the app: gives the phone's own pages a login too (the app only takes it from your linked server). */
+async function shareWithApp(): Promise<void> {
+	const current = session.current;
+	if (!nativeBridge?.shareIdentity || !current) return;
+	const last = read<{ session: string; at: number }>('ytmp.sharedWithApp');
+	if (last && last.session === current.sessionToken && Date.now() - last.at < SHARE_EVERY_MS) return;
+	try {
+		nativeBridge.shareIdentity(JSON.stringify(await authServer.hostToken(APP_HOME_ORIGIN)));
+		write('ytmp.sharedWithApp', { session: current.sessionToken, at: Date.now() });
+	} catch {
+		// Next time.
+	}
+}
 
 /** On /connect: sends [token] back to the page at [returnUrl]. */
 export function returnWithIdentity(returnUrl: string, token: HostTokenResponse): void {

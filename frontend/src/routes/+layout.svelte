@@ -3,8 +3,9 @@
 	import favicon from '../lib/assets/favicon.svg';
 	import { identity } from '../lib/account';
 
-	// Coming back from logging in on an auth server (/connect)?
+	// Coming back from logging in on an auth server (/connect), or (the app) logged in on your server's pages?
 	identity.takeFromUrl();
+	identity.takeFromApp();
 
 	let { children } = $props();
 </script>

@@ -35,8 +35,17 @@
 			<Icon name="library" size={56} class="text-muted" />
 			<h2 class="text-xl font-bold">Your playlists and podcasts</h2>
 			<p class="max-w-sm text-muted">Sign in to YouTube Music to see your playlists, liked songs and podcasts here, and get your own suggestions on Home.</p>
-			<button class="rounded-full bg-white px-6 py-2.5 font-medium text-black disabled:opacity-50" disabled={youtube.busy} onclick={signIn}>
-				{youtube.busy ? 'Signing in…' : 'Sign in'}
+			{#if youtube.linkedServer}
+				<button class="rounded-full bg-white px-6 py-2.5 font-medium text-black" onclick={() => youtube.useServerSignIn()}>
+					Use the one from your account on {new URL(youtube.linkedServer).host}
+				</button>
+			{/if}
+			<button
+				class="rounded-full px-6 py-2.5 font-medium disabled:opacity-50 {youtube.linkedServer ? 'bg-raised hover:bg-line' : 'bg-white text-black'}"
+				disabled={youtube.busy}
+				onclick={signIn}
+			>
+				{youtube.busy ? 'Signing in…' : youtube.phoneAccount ? `Use ${youtube.phoneAccount.name} from this phone` : 'Sign in'}
 			</button>
 		</div>
 	{:else if error}

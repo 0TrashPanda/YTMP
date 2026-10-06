@@ -33,6 +33,8 @@ import com.google.common.util.concurrent.ListenableFuture
 import dev.trashpanda.ytmp.host.LocalHost
 import dev.trashpanda.ytmp.host.NearbyRoom
 import dev.trashpanda.ytmp.host.SourceException
+import dev.trashpanda.ytmp.protocol.YoutubeAccount
+import dev.trashpanda.ytmp.protocol.ProtocolJson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
@@ -85,6 +87,10 @@ class MainActivity : ComponentActivity() {
     private val assets by lazy {
         WebViewAssetLoader.Builder().addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this)).build()
     }
+
+    /** The page shown now (the bridge runs off the main thread, where the WebView can't be asked). */
+    @Volatile
+    private var currentUrl: Uri? = null
 
     private var server: String?
         get() = prefs.getString("server", null)
@@ -221,6 +227,9 @@ class MainActivity : ComponentActivity() {
         return uri.host == auth.host && uri.port == auth.port
     }
 
+    /** A YTMP server you use: the account server the phone is linked to, or the configured server. */
+    private fun isYourServer(uri: Uri): Boolean = isAuthServer(uri) || isServerUrl(uri)
+
     private fun isPrivateAddress(host: String?): Boolean {
         val parts = host?.split('.')?.mapNotNull(String::toIntOrNull)?.takeIf { it.size == 4 } ?: return false
         return parts[0] == 10 || (parts[0] == 172 && parts[1] in 16..31) || (parts[0] == 192 && parts[1] == 168)
@@ -232,6 +241,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private inner class Client : WebViewClient() {
+        override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+            currentUrl = url?.let(Uri::parse)
+        }
+
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
             assets.shouldInterceptRequest(request.url)
 
@@ -283,26 +296,89 @@ class MainActivity : ComponentActivity() {
         fun nearbyRooms(): String = json.encodeToString(ListSerializer(NearbyRoom.serializer()), app.nearby.rooms.value)
 
         /**
-         * For a server's page: after you confirm, opens YouTube Music's sign-in and gives the
-         * page the cookies (`onYoutubeCookie`), to keep in your account on that server.
+         * For a server's page: after you confirm, gives the page the YouTube Music sign-in this
+         * phone has, or opens YouTube Music's sign-in for another account; the page gets the
+         * cookies (`onYoutubeCookie`), to keep in your account on that server. Only for your
+         * server's pages.
          */
         @JavascriptInterface
         fun youtubeCookie() = runOnUiThread {
-            val host = Uri.parse(webView.url ?: "").host ?: "this server"
-            AlertDialog.Builder(this@MainActivity)
-                .setTitle("Sign in to YouTube Music for $host?")
-                .setMessage("Your YouTube Music sign-in will be kept in your YTMP account on $host, so your Home, Library and likes work there in any browser. Only sign in on servers you trust.")
-                .setPositiveButton("Sign in") { _, _ -> youtubeCookieLogin.launch(Intent(this@MainActivity, YoutubeLoginActivity::class.java)) }
-                .setNegativeButton("Cancel") { _, _ ->
-                    js("window.__ytmpNative && window.__ytmpNative.onYoutubeCookie && window.__ytmpNative.onYoutubeCookie(null, null)")
+            val noAnswer = "window.__ytmpNative && window.__ytmpNative.onYoutubeCookie && window.__ytmpNative.onYoutubeCookie(null, null)"
+            if (currentUrl?.let(::isYourServer) != true) {
+                js(noAnswer)
+                return@runOnUiThread
+            }
+            val host = currentUrl?.host ?: "this server"
+            val phone = app.host.youtube.shareable()
+            val dialog = AlertDialog.Builder(this@MainActivity)
+                .setTitle(if (phone != null) "Use YouTube Music as ${phone.first.name} on $host?" else "Sign in to YouTube Music for $host?")
+                .setMessage("Your YouTube Music sign-in will be kept in your YTMP account on $host, so your Home, Library and likes work there in any browser. Only do this on servers you trust.")
+                .setNegativeButton("Cancel") { _, _ -> js(noAnswer) }
+                .setOnCancelListener { js(noAnswer) }
+            if (phone != null) {
+                dialog.setPositiveButton("Use ${phone.first.name}") { _, _ ->
+                    js("window.__ytmpNative && window.__ytmpNative.onYoutubeCookie && window.__ytmpNative.onYoutubeCookie(${JSONObject.quote(phone.second)}, null)")
                 }
-                .setOnCancelListener { js("window.__ytmpNative && window.__ytmpNative.onYoutubeCookie && window.__ytmpNative.onYoutubeCookie(null, null)") }
+                dialog.setNeutralButton("Another account") { _, _ -> youtubeCookieLogin.launch(Intent(this@MainActivity, YoutubeLoginActivity::class.java)) }
+            } else {
+                dialog.setPositiveButton("Sign in") { _, _ -> youtubeCookieLogin.launch(Intent(this@MainActivity, YoutubeLoginActivity::class.java)) }
+            }
+            dialog.show()
+        }
+
+        /** For your server's pages: the YouTube Music account this phone is signed in to (JSON), to offer it there; null if none. */
+        @JavascriptInterface
+        fun phoneYoutubeAccount(): String? {
+            if (currentUrl?.let(::isYourServer) != true) return null
+            val account = app.host.youtube.shareable()?.first ?: return null
+            return ProtocolJson.encodeToString(YoutubeAccount.serializer(), account)
+        }
+
+        /**
+         * From your account server's page (`/account/youtube-app`): the YouTube Music sign-in
+         * kept in your account there, for this phone too. Signs in after you confirm, then goes
+         * back to the phone's own pages.
+         */
+        @JavascriptInterface
+        fun useYoutubeCookie(cookie: String) = runOnUiThread {
+            val from = currentUrl?.takeIf(::isAuthServer) ?: return@runOnUiThread
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("Use YouTube Music on this phone?")
+                .setMessage("This phone signs in to YouTube Music with the sign-in from your account on ${from.host}.")
+                .setPositiveButton("Use it") { _, _ ->
+                    lifecycleScope.launch {
+                        try {
+                            app.host.youtube.signIn(cookie)
+                            openHome()
+                        } catch (e: SourceException) {
+                            AlertDialog.Builder(this@MainActivity).setMessage("That didn't work: ${e.message}").setPositiveButton("OK", null).show()
+                        }
+                    }
+                }
+                .setNegativeButton("Cancel") { _, _ -> openHome() }
                 .show()
         }
 
         /** Opens YouTube Music's sign-in; the page hears back through `onYoutubeSignIn`. */
         @JavascriptInterface
         fun youtubeSignIn() = runOnUiThread { youtubeLogin.launch(Intent(this@MainActivity, YoutubeLoginActivity::class.java)) }
+
+        /**
+         * Log in once: your server's pages hand over a login (host token JSON) for the phone's own
+         * pages. Only taken from the server the phone is linked to, else any page could log you
+         * in as someone else.
+         */
+        @JavascriptInterface
+        fun shareIdentity(identityJson: String) {
+            if (currentUrl?.let(::isAuthServer) == true) app.sharedIdentity = identityJson
+        }
+
+        /** On the phone's own pages: the login from [shareIdentity], once. */
+        @JavascriptInterface
+        fun takeIdentity(): String? {
+            if (currentUrl?.let(::isLocalHost) != true) return null
+            return app.sharedIdentity.also { app.sharedIdentity = null }
+        }
 
         @JavascriptInterface
         fun playback(targetJson: String) {
@@ -322,6 +398,6 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 3
+        const val BRIDGE_VERSION = 4
     }
 }
