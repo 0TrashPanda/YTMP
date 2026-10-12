@@ -7,6 +7,9 @@ import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.ItemList
+import dev.trashpanda.ytmp.protocol.Migrant
+import dev.trashpanda.ytmp.protocol.MigrationMode
+import dev.trashpanda.ytmp.protocol.MigrationOffer
 import dev.trashpanda.ytmp.protocol.NowPlaying
 import dev.trashpanda.ytmp.protocol.OutputInfo
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
@@ -20,6 +23,7 @@ import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.RejectReason
 import dev.trashpanda.ytmp.protocol.Role
 import dev.trashpanda.ytmp.protocol.RoleTemplate
+import dev.trashpanda.ytmp.protocol.RoomClone
 import dev.trashpanda.ytmp.protocol.RoomInfo
 import dev.trashpanda.ytmp.protocol.RoomSettings
 import dev.trashpanda.ytmp.protocol.RoomState
@@ -47,12 +51,12 @@ import org.slf4j.LoggerFactory
 class Room(
     val code: String,
     name: String,
-    val ownerToken: String,
+    ownerToken: String,
     visibility: RoomVisibility,
     private val streams: StreamResolver,
     private val scope: CoroutineScope,
-    /** The account that created the room: it is the owner on any device. */
-    val ownerAccount: String? = null,
+    /** The account that owns the room: it is the owner on any device. */
+    ownerAccount: String? = null,
     /** The roles the room starts with (the creator's template, or the defaults). */
     template: RoleTemplate = DefaultRoles.template,
     /** Similar songs, for Start radio and the autoplay queue. Null: no radio. */
@@ -61,13 +65,35 @@ class Room(
      * The same room on all the owner's hosts (docs/features/room-sync.md): only rooms with an
      * owner account have one.
      */
-    val syncId: String? = ownerAccount?.let { Ids.token() },
+    syncId: String? = ownerAccount?.let { Ids.token() },
     /** Goes up every time the room moves to another host; the highest one is the real room. */
-    val epoch: Int = 0,
+    epoch: Int = 0,
     /** Called when the room's [info] changes, e.g. it was made public. */
     private val onInfoChanged: () -> Unit = {},
+    /**
+     * The room got an owner with another account (or none): it's no longer the old owner's
+     * room on their other devices ([oldSyncId]). Called with the room locked, must not block.
+     */
+    private val onOwnerChanged: (oldAccount: String?, oldSyncId: String?) -> Unit = { _, _ -> },
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
+    /** Proves the owner (given to whoever created the room, and to a new owner). Changes when the owner does. */
+    @Volatile
+    var ownerToken: String = ownerToken
+        private set
+
+    @Volatile
+    var ownerAccount: String? = ownerAccount
+        private set
+
+    @Volatile
+    var syncId: String? = syncId
+        private set
+
+    @Volatile
+    var epoch: Int = epoch
+        private set
+
     @Volatile
     var visibility: RoomVisibility = visibility
         private set
@@ -92,7 +118,15 @@ class Room(
         var deny: Set<Permission> = emptySet(),
         var accountToken: String? = null,
         var hideFromHistory: Boolean = false,
+        /** When they joined; the longest here gets the room when its owner leaves. */
+        val joinedAt: Long = 0,
     ) {
+        /** Only for them: proves who they were in a clone of this room ([Migrant]). */
+        val migrationKey: String by lazy { Ids.sha256("ytmp-migrate:$token") }
+
+        /** Shown to everyone: recognises them in a clone, without giving away [migrationKey]. */
+        val tag: String by lazy { Ids.sha256(migrationKey) }
+
         /** Extra connections for this participant (see [attach]). */
         val attached = LinkedHashSet<Outbox>()
 
@@ -117,7 +151,7 @@ class Room(
 
         fun toParticipant() = Participant(
             id, name, isOwner, online = online, listening = listening, accountId = accountId,
-            roleId = roleId, allow = allow.sorted(), deny = deny.sorted(),
+            roleId = roleId, allow = allow.sorted(), deny = deny.sorted(), tag = tag,
         )
     }
 
@@ -147,8 +181,22 @@ class Room(
 
     /** Ranked, highest first. */
     private val roles = ArrayList<Role>()
+    @Volatile
     private var settings: RoomSettings
     private val bans = ArrayList<Ban>()
+
+    /** People from the room this one is a clone of, until they come ([Migrant]). */
+    private val migrants = ArrayList<Migrant>()
+
+    /** An invite to another room (see [Command.SendMigration]). */
+    private var migration: MigrationOffer? = null
+
+    /** Nobody who runs the room has been here for a while (see [checkAdminless]). */
+    private var adminless = false
+    private var adminSeenAt = clock()
+
+    /** Never deleted for being empty. */
+    val alwaysOn: Boolean get() = settings.alwaysOn
 
     init {
         val start = Permissions.sanitize(template)
@@ -219,17 +267,24 @@ class Room(
             return null
         }
         val returning = members.values.firstOrNull { it.token == hello.guestToken }
+        // Moved here from the room this is a clone of: their role (and id, so their songs are theirs) comes along.
+        val migrant = if (returning == null) hello.migrationKey?.let { key -> Ids.sha256(key).let { tag -> migrants.firstOrNull { it.tag == tag } } } else null
+        if (migrant != null) migrants.remove(migrant)
         val member = returning ?: Member(
-            id = Ids.short(),
+            id = migrant?.id?.takeIf { it.isNotBlank() && it !in members } ?: Ids.short(),
             token = Ids.token(),
             name = name,
             isOwner = isOwner,
             outbox = null,
             roleId = when {
                 isOwner -> roles.first().id
+                migrant != null && roles.any { it.id == migrant.roleId } -> migrant.roleId
                 account != null -> settings.defaultAccountRole
                 else -> settings.defaultGuestRole
             },
+            allow = migrant?.allow?.toSet().orEmpty(),
+            deny = migrant?.deny?.toSet().orEmpty(),
+            joinedAt = clock(),
         ).also { members[it.id] = it }
 
         member.outbox?.takeIf { it !== outbox }?.send(ServerMessage.Rejected(RejectReason.REPLACED))
@@ -243,8 +298,13 @@ class Room(
         member.offlineSince = null
         lastActive = clock()
 
-        outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = account?.id))
+        outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = account?.id, migrationKey = member.migrationKey))
         emit(if (returning == null) Event.ParticipantJoined(member.toParticipant()) else Event.ParticipantUpdated(member.toParticipant()))
+        if (adminless && isAdmin(member)) {
+            adminless = false
+            adminSeenAt = clock()
+            emit(Event.AdminlessChanged(false))
+        }
         member.id
     }
 
@@ -274,7 +334,7 @@ class Room(
             return null
         }
         member.attached += outbox
-        outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = member.accountId))
+        outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = member.accountId, migrationKey = member.migrationKey))
         member.id
     }
 
@@ -334,7 +394,7 @@ class Room(
             name = name,
             ownerToken = ownerToken,
             visibility = visibility,
-            members = members.values.map { SavedMember(it.id, it.token, it.name, it.isOwner, it.accountId, it.roleId, it.allow.sorted(), it.deny.sorted()) },
+            members = members.values.map { SavedMember(it.id, it.token, it.name, it.isOwner, it.accountId, it.roleId, it.allow.sorted(), it.deny.sorted(), it.joinedAt) },
             queue = queue.toList(),
             history = history.takeLast(SAVED_HISTORY),
             current = current,
@@ -353,6 +413,8 @@ class Room(
             epoch = epoch,
             savedAt = clock(),
             playing = wantPlaying && current != null,
+            migrants = migrants.toList(),
+            migration = migration,
         )
     }
 
@@ -378,8 +440,10 @@ class Room(
             val restored = Permissions.sanitize(RoleTemplate(upgraded, saved.settings))
             roles.clear()
             roles += restored.roles
-            settings = restored.settings.copy(openElsewhere = saved.settings.openElsewhere)
+            settings = restored.settings.copy(openElsewhere = saved.settings.openElsewhere, alwaysOn = saved.settings.alwaysOn)
         }
+        migrants += saved.migrants
+        migration = saved.migration
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay += saved.autoplay
         autoplaySeed = saved.autoplaySeed
@@ -390,7 +454,7 @@ class Room(
                 ?: if (m.isOwner) roles.first().id else if (m.accountId != null) settings.defaultAccountRole else settings.defaultGuestRole
             members[m.id] = Member(
                 m.id, m.token, m.name, m.isOwner, outbox = null, roleId = roleId, accountId = m.accountId,
-                offlineSince = now, allow = m.allow.toSet(), deny = m.deny.toSet(),
+                offlineSince = now, allow = m.allow.toSet(), deny = m.deny.toSet(), joinedAt = m.joinedAt,
             )
         }
         queue += saved.queue
@@ -629,6 +693,30 @@ class Room(
                     onInfoChanged()
                 }
             }
+            is Command.ChangeOwner -> {
+                if (!member.isOwner) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "Only the owner can hand the room over")
+                val target = members[command.participantId] ?: return notFoundPerson()
+                if (target === member) return invalid("You're the owner already")
+                changeOwner(target)
+            }
+            is Command.LeaveRoom -> return leave(member, command.newOwnerId, command.stayOwner)
+            is Command.SendMigration -> {
+                need(member, Permission.SEND_MIGRATION)?.let { return it }
+                val target = command.target
+                if (!target.url.startsWith("http://") && !target.url.startsWith("https://") || target.url.length > MAX_URL_LENGTH) return invalid("Not a room link")
+                if (target.code.isBlank() || target.code.length > 16 || target.name.length > 64) return invalid("Not a room")
+                if (target.code.equals(code, ignoreCase = true) && target.url.contains("/room/$code")) return invalid("That's this room")
+                migration = MigrationOffer(target.copy(name = target.name.trim()), command.mode, member.name)
+                emit(Event.MigrationChanged(migration))
+                if (command.mode == MigrationMode.FORCED) moveEveryone(member, target.url)
+            }
+            Command.CancelMigration -> {
+                need(member, Permission.SEND_MIGRATION)?.let { return it }
+                if (migration != null) {
+                    migration = null
+                    emit(Event.MigrationChanged(null))
+                }
+            }
             is Command.Kick, is Command.Ban, is Command.Unban, is Command.AssignRole, is Command.SetParticipantPermissions,
             is Command.CreateRole, is Command.UpdateRole, is Command.DeleteRole, is Command.MoveRole, is Command.UpdateSettings,
             -> return manage(member, command)
@@ -740,6 +828,7 @@ class Room(
                     defaultGuestRole = command.defaultGuestRole ?: settings.defaultGuestRole,
                     defaultAccountRole = command.defaultAccountRole ?: settings.defaultAccountRole,
                     autoplay = command.autoplay ?: settings.autoplay,
+                    alwaysOn = command.alwaysOn ?: settings.alwaysOn,
                 )
                 if (updated != settings) {
                     val autoplayChanged = updated.autoplay != settings.autoplay
@@ -754,6 +843,108 @@ class Room(
             else -> Unit
         }
         return null
+    }
+
+    // --- owner, leaving, moving everyone ----------------------------------------------
+
+    /** Makes [target] the owner. Whoever was owner keeps the top role. Called with [mutex] held. */
+    private fun changeOwner(target: Member) {
+        val oldAccount = ownerAccount
+        val oldSyncId = syncId
+        for (m in members.values) {
+            if (m.isOwner && m !== target) {
+                m.isOwner = false
+                m.roleId = roles.first().id
+                emit(Event.ParticipantUpdated(m.toParticipant()))
+            }
+        }
+        target.isOwner = true
+        target.roleId = roles.first().id
+        // The old owner's token (kept by their browser) and account don't make them the owner any more.
+        ownerToken = Ids.token()
+        ownerAccount = target.accountId
+        if (ownerAccount != oldAccount) {
+            // Someone else's room now: not the old owner's on their other devices.
+            syncId = ownerAccount?.let { Ids.token() }
+            epoch = 0
+            onOwnerChanged(oldAccount, oldSyncId)
+        }
+        emit(Event.ParticipantUpdated(target.toParticipant()))
+        target.send(ServerMessage.OwnerToken(ownerToken))
+        emit(Event.Notice("${target.name} is the owner now"))
+        log.info("Room {}: {} is the owner now", code, target.name)
+        onInfoChanged()
+    }
+
+    /**
+     * [member] leaves for good. The owner of a party room hands it over first (unless they
+     * [stayOwner]): to [newOwnerId], or to whoever has the top role and has been here the
+     * longest (if anyone).
+     */
+    private fun leave(member: Member, newOwnerId: String?, stayOwner: Boolean): ErrorInfo? {
+        if (member.isOwner && visibility == RoomVisibility.PUBLIC && !stayOwner) {
+            val chosen = newOwnerId?.let { members[it] ?: return notFoundPerson() }?.takeIf { it !== member }
+            val next = chosen ?: members.values
+                .filter { it !== member && !it.isOwner && it.online && it.roleId == roles.first().id }
+                .minByOrNull { it.joinedAt }
+            if (next != null) changeOwner(next)
+        }
+        members.remove(member.id)
+        member.dropAttached(RejectReason.LEFT)
+        member.outbox = null
+        emit(Event.ParticipantLeft(member.id))
+        return null
+    }
+
+    /** Forced migration: everyone but [sender] is sent to [url] and leaves; the music stops here. */
+    private fun moveEveryone(sender: Member, url: String) {
+        pausePlayback()
+        for (m in members.values.filter { it !== sender }) {
+            members.remove(m.id)
+            val message = ServerMessage.Rejected(RejectReason.MIGRATED, movedTo = url)
+            m.outbox?.send(message)
+            m.outbox = null
+            m.dropAttached(RejectReason.MIGRATED)
+            emit(Event.ParticipantLeft(m.id))
+        }
+    }
+
+    /** Runs the room: the owner, or someone with the top role. */
+    private fun isAdmin(member: Member) = member.isOwner || member.roleId == roles.firstOrNull()?.id
+
+    /**
+     * Marks a party room as [RoomState.adminless] when nobody who runs it has been connected
+     * for [afterMs], so people know they can clone it. Called now and then by the host.
+     */
+    suspend fun checkAdminless(afterMs: Long) = mutex.withLock {
+        val now = clock()
+        if (members.values.any { it.online && isAdmin(it) }) adminSeenAt = now
+        val value = visibility == RoomVisibility.PUBLIC && now - adminSeenAt > afterMs
+        if (value != adminless) {
+            adminless = value
+            emit(Event.AdminlessChanged(value))
+        }
+    }
+
+    /** A new room starts as a copy of another one ([clone]). Only before anyone can join. */
+    internal fun startFrom(clone: RoomClone) {
+        val cloneSettings = clone.settings
+        if (clone.roles.isNotEmpty() && cloneSettings != null) {
+            val copied = Permissions.sanitize(RoleTemplate(clone.roles, cloneSettings))
+            roles.clear()
+            roles += copied.roles
+            settings = copied.settings
+        }
+        queue += clone.queue.take(MAX_CLONE_QUEUE)
+        history += clone.history.takeLast(SAVED_HISTORY)
+        autoplay += clone.autoplay.take(MAX_CLONE_QUEUE)
+        autoplaySeed = clone.autoplaySeed
+        val now = clock()
+        current = clone.current
+        currentStartedAt = now
+        positionAtAnchor = clone.positionMs.coerceAtLeast(0)
+        anchorTime = now
+        migrants += clone.migrants.filter { it.tag.isNotBlank() }.distinctBy { it.tag }.take(MAX_MIGRANTS)
     }
 
     private fun can(member: Member, permission: Permission): Boolean =
@@ -1222,6 +1413,8 @@ class Room(
         bans = banInfos(),
         autoplay = autoplay.toList(),
         autoplaySeed = autoplaySeed,
+        migration = migration,
+        adminless = adminless,
     )
 
     private fun newItem(song: Song, member: Member) =
@@ -1241,6 +1434,10 @@ class Room(
     companion object {
         private val log = LoggerFactory.getLogger(Room::class.java)
         const val MAX_NAME_LENGTH = 32
+        const val MAX_URL_LENGTH = 300
+        /** A clone's queue (and autoplay queue) keeps at most this many songs. */
+        const val MAX_CLONE_QUEUE = 1000
+        const val MAX_MIGRANTS = 200
         const val PREVIOUS_RESTART_MS = 3_000L
         const val SNAPSHOT_HISTORY = 200
         const val SAVED_HISTORY = 500
@@ -1267,6 +1464,7 @@ class Room(
             streams: StreamResolver,
             scope: CoroutineScope,
             onInfoChanged: () -> Unit = {},
+            onOwnerChanged: (oldAccount: String?, oldSyncId: String?) -> Unit = { _, _ -> },
             radio: RadioSource? = null,
             /** The code here, when it's not [SavedRoom.code] (a room that moved here, whose code was taken). */
             code: String = saved.code,
@@ -1274,7 +1472,8 @@ class Room(
             epoch: Int = saved.epoch,
             clock: () -> Long = System::currentTimeMillis,
         ) = Room(
-            code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, radio = radio, onInfoChanged = onInfoChanged, clock = clock,
+            code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, radio = radio,
+            onInfoChanged = onInfoChanged, onOwnerChanged = onOwnerChanged, clock = clock,
             // Rooms saved before syncing get their ID now.
             syncId = saved.syncId ?: saved.ownerAccount?.let { Ids.token() },
             epoch = epoch,

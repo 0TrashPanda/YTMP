@@ -20,6 +20,7 @@
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
+	import CloneSheet from '../../../lib/components/CloneSheet.svelte';
 	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
 	import { forgetHome, getHost } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
@@ -31,6 +32,20 @@
 	import type { Participant } from '../../../lib/protocol.gen';
 
 	const code = page.params.code!.toUpperCase();
+
+	// A link from cloning or a move to this room: #owner=… (I made it: the proof), #migrate=…
+	// (my key from the old room, to get my role back) and #name=… (my name there, for a page that
+	// doesn't know me yet). Read once, then gone from the address bar.
+	let arrivingWithKey: string | null = null;
+	if (location.hash.length > 1) {
+		const fragment = new URLSearchParams(location.hash.slice(1));
+		const owner = fragment.get('owner');
+		if (owner) saved.setOwnerToken(code, owner);
+		arrivingWithKey = fragment.get('migrate');
+		const nameThere = fragment.get('name')?.trim();
+		if (nameThere && !saved.displayName.trim()) saved.displayName = nameThere.slice(0, 32);
+		if (owner || arrivingWithKey || nameThere) history.replaceState(history.state, '', location.pathname + location.search);
+	}
 
 	// Logged in: the host takes the name from the account (also when logged in on this server's own pages).
 	const initialName = identity.stored?.account.displayName ?? session.current?.account.displayName ?? saved.displayName;
@@ -145,7 +160,7 @@
 
 	function start() {
 		if (!identity.stored) saved.displayName = name.trim();
-		room = new RoomConnection(code, name.trim());
+		room = new RoomConnection(code, name.trim(), arrivingWithKey);
 		player = createPlayer(room);
 		room.connect();
 		youtube.load();
@@ -312,6 +327,16 @@
 	}
 
 	let sharing = $state(false);
+	let cloning = $state(false);
+	/** The invite to another room was closed here (it stays for the others). */
+	let migrationDismissed = $state<string | null>(null);
+
+	// Everyone was moved to another room: follow, with my role.
+	$effect(() => {
+		if (room?.status === 'rejected' && room.rejectReason === 'migrated' && room.movedTo) {
+			location.href = room.migrationLink(room.movedTo);
+		}
+	});
 	let settings = $state<'list' | 'members' | null>(null);
 	let host = $state<HostInfo | null>(null);
 	getHost().then((h) => (host = h)).catch(() => {});
@@ -446,6 +471,28 @@
 					{#if room.status !== 'connected'}
 						<div class="bg-raised px-4 py-1 text-center text-sm text-muted">
 							{room.status === 'connecting' ? 'Connecting…' : 'Connection lost, reconnecting…'}
+							<!-- The host may be gone (a phone that left): this page still has the queue. -->
+							{#if room.status === 'reconnecting' && room.state && room.can('clone_room')}
+								<button class="ml-1 text-white underline" onclick={() => (cloning = true)}>Keep the queue: clone it</button>
+							{/if}
+						</div>
+					{/if}
+					{#if room.state?.migration && room.state.migration.target.code !== code && migrationDismissed !== room.state.migration.target.url}
+						{@const offer = room.state.migration}
+						<div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-accent/90 px-4 py-2 text-center text-sm">
+							<span>{offer.fromName} moved the party to <strong>{offer.target.name}</strong>.</span>
+							<a class="rounded-full bg-white px-3 py-1 font-medium text-black" href={room.migrationLink(offer.target.url)}>Go there</a>
+							<button class="underline" onclick={() => (migrationDismissed = offer.target.url)}>Stay here</button>
+							{#if room.can('send_migration')}
+								<button class="underline" onclick={() => room?.run({ kind: 'CancelMigration' })}>Take back</button>
+							{/if}
+						</div>
+					{:else if room.state?.adminless && !room.me?.isOwner}
+						<div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-raised px-4 py-2 text-center text-sm">
+							<span>Nobody who runs this room is here.</span>
+							{#if room.can('clone_room')}
+								<button class="underline" onclick={() => (cloning = true)}>Clone it to keep the queue going</button>
+							{/if}
 						</div>
 					{/if}
 
@@ -586,7 +633,20 @@
 	{/if}
 
 	{#if settings && room.state}
-		<RoomSettings {room} start={settings} onClose={() => (settings = null)} />
+		<RoomSettings
+			{room}
+			{host}
+			start={settings}
+			onClose={() => (settings = null)}
+			onClone={() => {
+				settings = null;
+				cloning = true;
+			}}
+		/>
+	{/if}
+
+	{#if cloning && room.state}
+		<CloneSheet {room} {host} onClose={() => (cloning = false)} onToast={toast} />
 	{/if}
 
 	{#if accountOpen}
@@ -603,7 +663,18 @@
 	{/if}
 
 	{#if sharing}
-		<ShareSheet {room} {host} onClose={() => (sharing = false)} onToast={toast} />
+		<ShareSheet
+			{room}
+			{host}
+			onClose={() => (sharing = false)}
+			onToast={toast}
+			onClone={room.can('clone_room')
+				? () => {
+						sharing = false;
+						cloning = true;
+					}
+				: undefined}
+		/>
 	{/if}
 
 	<div class="pointer-events-none fixed inset-x-0 bottom-28 z-50 flex flex-col items-center gap-2 px-4">

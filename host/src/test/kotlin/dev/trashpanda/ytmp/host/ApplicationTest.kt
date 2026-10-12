@@ -24,6 +24,8 @@ import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
+import dev.trashpanda.ytmp.protocol.QueueItem
+import dev.trashpanda.ytmp.protocol.RoomClone
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.HostInfo
 import dev.trashpanda.ytmp.protocol.HostKind
@@ -154,6 +156,29 @@ class ApplicationTest {
             val owner = events.filterIsInstance<Event.ParticipantJoined>().single().participant
             assertEquals(true, owner.isOwner)
             assertEquals("https://stream/ytm:abc", events.filterIsInstance<Event.StreamReady>().single().streamUrl)
+        }
+    }
+
+    @Test
+    fun `a clone starts with the copied queue and comes with its link`() = testApplication {
+        setup()
+        val client = jsonClient()
+        val queued = QueueItem("i1", song, "p1", "Ben", 0, null)
+        val clone = RoomClone(queue = listOf(queued), history = emptyList(), current = queued.copy(itemId = "i0"), positionMs = 42_000)
+
+        val created = client.post("/api/rooms") {
+            contentType(ContentType.Application.Json)
+            setBody(CreateRoomRequest("Party (copy)", clone = clone))
+        }.body<CreateRoomResponse>()
+
+        assertEquals("http://localhost/room/${created.code}", created.url)
+        client.webSocket("/ws") {
+            sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Anna", null, created.ownerToken))
+            val welcome = assertIs<ServerMessage.Welcome>(receiveMessage())
+            assertEquals(listOf("i1"), welcome.state.queue.map { it.itemId })
+            assertEquals("i0", welcome.state.nowPlaying?.item?.itemId)
+            assertEquals(false, welcome.state.playback.playing)
+            assertEquals(42_000, welcome.state.playback.positionMs)
         }
     }
 

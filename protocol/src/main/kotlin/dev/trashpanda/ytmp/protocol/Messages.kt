@@ -25,6 +25,8 @@ sealed interface ClientMessage {
         val accountToken: String? = null,
         /** Don't name me in other people's listening history. */
         val hideFromHistory: Boolean = false,
+        /** Moved here from another room: the key from there, to get your role back ([Migrant]). */
+        val migrationKey: String? = null,
     ) : ClientMessage
 
     /**
@@ -178,6 +180,30 @@ sealed interface Command {
     @SerialName("SetOpenElsewhere")
     data class SetOpenElsewhere(val mode: RoomOpenMode?) : Command
 
+    /** Owner only. Hands the room to someone else; you keep the top role. */
+    @Serializable
+    @SerialName("ChangeOwner")
+    data class ChangeOwner(val participantId: String) : Command
+
+    /**
+     * You leave the room for good (your songs stay). The owner of a party room hands it to
+     * [newOwnerId], or, when null, to whoever has the top role and has been here the longest;
+     * with [stayOwner] to nobody (they stay the owner and can come back).
+     */
+    @Serializable
+    @SerialName("LeaveRoom")
+    data class LeaveRoom(val newOwnerId: String? = null, val stayOwner: Boolean = false) : Command
+
+    /** Invites everyone to [target] (a clone of this room), or moves them all there ([MigrationMode.FORCED]). */
+    @Serializable
+    @SerialName("SendMigration")
+    data class SendMigration(val target: MigrationTarget, val mode: MigrationMode) : Command
+
+    /** Takes back an invite from [SendMigration]. */
+    @Serializable
+    @SerialName("CancelMigration")
+    data object CancelMigration : Command
+
     // --- people & roles (see Roles.kt) ---
 
     /** Removes someone; they can rejoin right away. */
@@ -231,6 +257,7 @@ sealed interface Command {
         val defaultGuestRole: String? = null,
         val defaultAccountRole: String? = null,
         val autoplay: Boolean? = null,
+        val alwaysOn: Boolean? = null,
     ) : Command
 }
 
@@ -246,13 +273,20 @@ sealed interface ServerMessage {
         val state: RoomState,
         /** The account the participant joined with, or null if they joined as a guest (also when the token wasn't accepted). */
         val accountId: String? = null,
+        /** Only for you: brings your role along to a clone of this room ([ClientMessage.Hello.migrationKey]). */
+        val migrationKey: String? = null,
     ) : ServerMessage
+
+    /** You're the room's owner now: keep this, it proves it (like the one from creating a room). */
+    @Serializable
+    @SerialName("owner_token")
+    data class OwnerToken(val ownerToken: String) : ServerMessage
 
     @Serializable
     @SerialName("rejected")
     data class Rejected(
         val reason: RejectReason,
-        /** [RejectReason.ROOM_MOVED]: where the room is now, e.g. `https://ytmp.example.com/room/ABCD`. */
+        /** [RejectReason.ROOM_MOVED], [RejectReason.MIGRATED]: where to go now, e.g. `https://ytmp.example.com/room/ABCD`. */
         val movedTo: String? = null,
     ) : ServerMessage
 
@@ -305,6 +339,12 @@ enum class RejectReason {
 
     /** This host is for accounts only: log in first. */
     @SerialName("account_required") ACCOUNT_REQUIRED,
+
+    /** You left the room (another of your connections did). */
+    @SerialName("left") LEFT,
+
+    /** Everyone was moved to another room ([ServerMessage.Rejected.movedTo]). */
+    @SerialName("migrated") MIGRATED,
 }
 
 @Serializable
@@ -412,6 +452,16 @@ sealed interface Event {
     @Serializable
     @SerialName("Notice")
     data class Notice(val message: String) : Event
+
+    /** Someone invited everyone to another room, or took it back (null). */
+    @Serializable
+    @SerialName("MigrationChanged")
+    data class MigrationChanged(val migration: MigrationOffer?) : Event
+
+    /** [RoomState.adminless] changed. */
+    @Serializable
+    @SerialName("AdminlessChanged")
+    data class AdminlessChanged(val adminless: Boolean) : Event
 }
 
 /** JSON settings shared by host and tests. Defaults are always encoded, so TS fields are never missing. */

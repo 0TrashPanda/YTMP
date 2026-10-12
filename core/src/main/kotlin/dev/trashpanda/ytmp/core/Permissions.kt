@@ -8,7 +8,7 @@ import dev.trashpanda.ytmp.protocol.RoomSettings
 
 /** Roles a room starts with when its creator has no template. See docs/features/room-management.md. */
 object DefaultRoles {
-    private val listener = listOf(ADD_SONGS, REMOVE_OWN, PLAY_PAUSE, SKIP, LISTEN_LOCALLY)
+    private val listener = listOf(ADD_SONGS, REMOVE_OWN, PLAY_PAUSE, SKIP, LISTEN_LOCALLY, CLONE_ROOM)
     private val dj = listener + listOf(PLAY_NOW, REORDER, REMOVE_OTHERS, SEEK, CHANGE_OUTPUTS, OUTPUT_VOLUME, START_RADIO, AUTOPLAY_FROM_HERE)
 
     val template = RoleTemplate(
@@ -47,7 +47,10 @@ object Permissions {
     }
 
     /** What rooms and templates saved without a list of known permissions knew: everything before radio. */
-    val BEFORE_RADIO: Set<Permission> = Permission.entries.toSet() - setOf(START_RADIO, AUTOPLAY_FROM_HERE)
+    val BEFORE_RADIO: Set<Permission> = setOf(
+        ADD_SONGS, PLAY_NOW, REMOVE_OWN, REMOVE_OTHERS, REORDER, PLAY_PAUSE, SKIP, SEEK, LISTEN_LOCALLY,
+        CHANGE_OUTPUTS, OUTPUT_VOLUME, KICK, BAN, ASSIGN_ROLES, EDIT_ROLES, CHANGE_SETTINGS,
+    )
 
     /**
      * Gives roles the permissions added since they were saved (when only [known] existed):

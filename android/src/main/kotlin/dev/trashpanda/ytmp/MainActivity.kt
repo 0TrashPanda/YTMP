@@ -30,6 +30,9 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.lifecycle.lifecycleScope
 import com.google.common.util.concurrent.ListenableFuture
 import dev.trashpanda.ytmp.host.LocalHost
+import dev.trashpanda.ytmp.host.createFor
+import dev.trashpanda.ytmp.protocol.CreateRoomRequest
+import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.host.NearbyRoom
 import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
@@ -413,6 +416,26 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        /**
+         * Clones a room onto this phone (bridge version 6): [requestJson] is a CreateRoomRequest
+         * with the copy. Answers a CreateRoomResponse (its `url` is the room's link on the local
+         * network), or `{"error": …}`. The page then opens the room on the phone's own host.
+         */
+        @JavascriptInterface
+        fun cloneRoom(requestJson: String): String {
+            if (currentUrl?.let(::isAppPage) != true) return ERROR_NOT_HERE
+            return try {
+                val request = json.decodeFromString(CreateRoomRequest.serializer(), requestJson)
+                val host = app.host
+                val room = host.rooms.createFor(request, ownerAccount = null, template = null, supportsPrivateRooms = true)
+                val url = (host.lanUrl() ?: "http://127.0.0.1:${LocalHost.PORT}") + "/room/${room.code}"
+                json.encodeToString(CreateRoomResponse.serializer(), CreateRoomResponse(room.code, room.ownerToken, url))
+            } catch (e: Exception) {
+                Log.w("YtmpClone", "Couldn't clone the room here", e)
+                JSONObject().put("error", e.message ?: "Couldn't make the room").toString()
+            }
+        }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -431,6 +454,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 5
+        const val BRIDGE_VERSION = 6
+        private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

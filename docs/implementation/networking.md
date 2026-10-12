@@ -68,13 +68,8 @@ Built (`RoomTimeouts` in `core/.../RoomManager.kt`):
 | Public room with nobody connected → deleted | **1 hour** |
 | Solo room on a phone, or owned by an account | Never deleted automatically, only when closed |
 | Solo room of a guest on a server, nobody connected → deleted | **30 days** |
+| Party room on a server without its owner or a top-role person connected → everyone is told they can clone it | **5 minutes** |
+| "Always on" room (a setting, servers) | Never deleted |
 | Client disconnects → their guest identity (name, role, songs) is kept for | **15 minutes** (recognised by their guest token) |
-
-Planned:
-
-| Setting | Default |
-|---------|---------|
-| No admin connected → prompt participants to clone the room | **5 minutes** |
-| "Always on" room | Never deleted |
 
 Not configurable in `ytmp.toml` yet.

@@ -37,6 +37,11 @@ export interface NativeBridge {
 	checkForUpdates?(): void;
 	/** Opens the share sheet with the app's log files, to report a problem (bridge version 5). */
 	shareLogs?(): void;
+	/**
+	 * Clones a room onto this phone (bridge version 6): a CreateRoomRequest as JSON. Answers a
+	 * CreateRoomResponse as JSON (`url`: its link on the local network), or `{ error }`.
+	 */
+	cloneRoom?(requestJson: string): string;
 }
 
 /** Callbacks the app calls on the page. */

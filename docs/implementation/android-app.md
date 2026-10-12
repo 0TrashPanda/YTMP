@@ -70,6 +70,11 @@
   must load). An idle public room holds neither: a friend's request wakes the phone.
 - Chromecast and Sonos discovery (`CastFinder`, `SonosFinder`) run while the app is on screen,
   or while a public room plays; devices found earlier stay in the list.
+- **Cloning onto the phone** (bridge `cloneRoom`, version 6): from another host's page in the
+  app, the page hands over a copy of the room; the app makes it on its own host and the page
+  opens it there (`http://127.0.0.1:8765/room/CODE#owner=…`). From the phone's own page onto
+  your server: `POST /api/rooms/clone-to-server`, forwarded with your host token (`RoomSync`).
+  See [room lifecycle](../features/room-lifecycle.md#cloning-a-room).
 - **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
   account holders of that server can join its rooms (see [auth](auth.md)). The WebView keeps
   that server's pages in the app, for logging in.

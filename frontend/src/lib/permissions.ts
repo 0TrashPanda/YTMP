@@ -59,7 +59,11 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
 	},
 	{
 		name: 'Room',
-		permissions: [{ id: 'change_settings', name: 'Manage Room', description: "Allows changing the room's name and the role new people get." }]
+		permissions: [
+			{ id: 'change_settings', name: 'Manage Room', description: "Allows changing the room's name, the role new people get, and autoplay." },
+			{ id: 'clone_room', name: 'Clone Room', description: 'Allows making a copy of the room (queue, history, roles) somewhere else, to keep listening there.' },
+			{ id: 'send_migration', name: 'Move Everyone', description: 'Allows inviting everyone to another room, or moving them all there.' }
+		]
 	}
 ];
 

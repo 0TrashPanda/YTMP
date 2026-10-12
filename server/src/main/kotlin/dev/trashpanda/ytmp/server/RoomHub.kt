@@ -6,6 +6,9 @@ import dev.trashpanda.ytmp.core.SavedRoom
 import dev.trashpanda.ytmp.host.AccountTokens
 import dev.trashpanda.ytmp.host.ApiException
 import dev.trashpanda.ytmp.host.bearerToken
+import dev.trashpanda.ytmp.host.createFor
+import dev.trashpanda.ytmp.protocol.CreateRoomRequest
+import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.MovedRoomResponse
@@ -179,6 +182,12 @@ class RoomHub(
         post("/auth/rooms/heartbeat") {
             val me = call.owner()
             call.respond(heartbeat(me.account(), call.receive<RoomHeartbeatRequest>()))
+        }
+        // A phone clones a room onto this server, for its owner here (docs/features/room-lifecycle.md#cloning-a-room).
+        post("/auth/rooms/clone") {
+            val me = call.owner()
+            val room = rooms.createFor(call.receive<CreateRoomRequest>(), me.account(), template = null, supportsPrivateRooms = true)
+            call.respond(CreateRoomResponse(room.code, room.ownerToken, url = roomUrl(serverHome, room.code)))
         }
         post("/auth/rooms/{syncId}/take") {
             val me = call.owner()

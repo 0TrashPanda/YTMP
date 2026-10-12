@@ -11,11 +11,18 @@ import kotlinx.serialization.Serializable
 data class CreateRoomRequest(
     val name: String,
     val visibility: RoomVisibility = RoomVisibility.PUBLIC,
+    /** Start as a copy of another room (cloning). */
+    val clone: RoomClone? = null,
 )
 
 @Serializable
 @SerialName("CreateRoomResponse")
-data class CreateRoomResponse(val code: String, val ownerToken: String)
+data class CreateRoomResponse(
+    val code: String,
+    val ownerToken: String,
+    /** The room's link for other devices, when the host knows its address. */
+    val url: String? = null,
+)
 
 /** `GET /api/search?q=` */
 @Serializable

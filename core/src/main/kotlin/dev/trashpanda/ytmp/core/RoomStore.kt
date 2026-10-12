@@ -1,6 +1,8 @@
 package dev.trashpanda.ytmp.core
 
 import dev.trashpanda.ytmp.protocol.BanInfo
+import dev.trashpanda.ytmp.protocol.Migrant
+import dev.trashpanda.ytmp.protocol.MigrationOffer
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.Role
@@ -53,6 +55,9 @@ data class SavedRoom(
     /** When it was saved, and whether it was playing then: a room that moves continues from there. */
     val savedAt: Long = 0,
     val playing: Boolean = false,
+    /** People from the room this is a clone of who haven't come yet. */
+    val migrants: List<Migrant> = emptyList(),
+    val migration: MigrationOffer? = null,
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 
@@ -72,6 +77,7 @@ data class SavedMember(
     val roleId: String? = null,
     val allow: List<Permission> = emptyList(),
     val deny: List<Permission> = emptyList(),
+    val joinedAt: Long = 0,
 )
 
 @Serializable

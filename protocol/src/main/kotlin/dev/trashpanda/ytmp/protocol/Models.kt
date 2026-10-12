@@ -97,6 +97,11 @@ data class Participant(
     /** Per-person overrides on top of the role. */
     val allow: List<Permission> = emptyList(),
     val deny: List<Permission> = emptyList(),
+    /**
+     * Recognises this person in a clone of the room ([Migrant.tag]): a hash of their own
+     * migration key ([ServerMessage.Welcome.migrationKey]), which only they get.
+     */
+    val tag: String = "",
 )
 
 @Serializable
@@ -173,4 +178,69 @@ data class RoomState(
     val autoplay: List<QueueItem> = emptyList(),
     /** The song the autoplay queue is a radio of, or null. */
     val autoplaySeed: Song? = null,
+    /** Someone invited everyone to another room (a clone), or null. */
+    val migration: MigrationOffer? = null,
+    /** Nobody who runs the room (the owner, or someone with the top role) has been here for a while. */
+    val adminless: Boolean = false,
+)
+
+/** A room people can be moved to, e.g. a clone of this one. */
+@Serializable
+@SerialName("MigrationTarget")
+data class MigrationTarget(
+    /** Its link, e.g. `https://ytmp.example.com/room/ABCD`. */
+    val url: String,
+    val code: String,
+    val name: String,
+)
+
+@Serializable
+@SerialName("MigrationMode")
+enum class MigrationMode {
+    /** Everyone sees a message and can follow. */
+    @SerialName("invite") INVITE,
+
+    /** Everyone is moved; this room empties. */
+    @SerialName("forced") FORCED,
+}
+
+@Serializable
+@SerialName("MigrationOffer")
+data class MigrationOffer(
+    val target: MigrationTarget,
+    val mode: MigrationMode,
+    /** Who sent it. */
+    val fromName: String,
+)
+
+/**
+ * Someone from the room a clone was made of: whoever comes with the key behind [tag] gets
+ * this name, role and id back (so their songs are still theirs).
+ */
+@Serializable
+@SerialName("Migrant")
+data class Migrant(
+    val tag: String,
+    /** Their participant id in the old room. */
+    val id: String,
+    val name: String,
+    val roleId: String,
+    val accountId: String? = null,
+    val allow: List<Permission> = emptyList(),
+    val deny: List<Permission> = emptyList(),
+)
+
+/** What a clone starts with: a copy of another room, as its page saw it. */
+@Serializable
+@SerialName("RoomClone")
+data class RoomClone(
+    val queue: List<QueueItem>,
+    val history: List<QueueItem>,
+    val current: QueueItem? = null,
+    val positionMs: Long = 0,
+    val autoplay: List<QueueItem> = emptyList(),
+    val autoplaySeed: Song? = null,
+    val roles: List<Role> = emptyList(),
+    val settings: RoomSettings? = null,
+    val migrants: List<Migrant> = emptyList(),
 )

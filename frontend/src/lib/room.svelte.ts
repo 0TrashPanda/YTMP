@@ -27,7 +27,9 @@ const REJECT_MESSAGES: Record<RejectReason, string> = {
 	room_moved: 'This room moved to your other device.',
 	kicked: 'You were removed from this room. You can join again.',
 	banned: "You're banned from this room.",
-	account_required: 'This server is for accounts only. Log in to join.'
+	account_required: 'This server is for accounts only. Log in to join.',
+	left: 'You left this room.',
+	migrated: 'Everyone moved to another room.'
 };
 
 /**
@@ -39,8 +41,11 @@ export class RoomConnection {
 	state = $state<RoomState | null>(null);
 	participantId = $state<string | null>(null);
 	rejectMessage = $state<string | null>(null);
-	/** The room moved to another of its owner's hosts: its link there, if known. */
+	/** The room moved to another of its owner's hosts, or everyone was moved to another room: the link, if known. */
 	movedTo = $state<string | null>(null);
+	rejectReason = $state<RejectReason | null>(null);
+	/** Only mine: takes my role along to a clone of this room (see [migrationLink]). */
+	migrationKey: string | null = null;
 	notices = $state<{ id: number; text: string }[]>([]);
 
 	/** Host clock minus our clock, in ms. */
@@ -60,8 +65,15 @@ export class RoomConnection {
 
 	constructor(
 		readonly roomCode: string,
-		private readonly name: string
+		private readonly name: string,
+		/** Moved here from another room: the key from there, to get my role back (sent until I'm in). */
+		private arrivingWithKey: string | null = null
 	) {}
+
+	/** A link to [url] (a clone of this room) that takes my role along. */
+	migrationLink(url: string): string {
+		return this.migrationKey ? `${url}#migrate=${encodeURIComponent(this.migrationKey)}` : url;
+	}
 
 	get me() {
 		return this.state?.participants.find((p) => p.id === this.participantId) ?? null;
@@ -109,7 +121,8 @@ export class RoomConnection {
 				guestToken: saved.guestToken(this.roomCode),
 				ownerToken: saved.ownerToken(this.roomCode),
 				accountToken,
-				hideFromHistory: saved.hideFromHistory
+				hideFromHistory: saved.hideFromHistory,
+				migrationKey: this.arrivingWithKey
 			});
 		};
 		socket.onmessage = (event) => this.receive(JSON.parse(event.data) as ServerMessage);
@@ -159,6 +172,8 @@ export class RoomConnection {
 		switch (message.type) {
 			case 'welcome':
 				saved.setGuestToken(this.roomCode, message.guestToken);
+				this.arrivingWithKey = null;
+				this.migrationKey = message.migrationKey;
 				this.participantId = message.participantId;
 				this.state = message.state;
 				if (this.sentAccountToken && !message.accountId) {
@@ -196,8 +211,13 @@ export class RoomConnection {
 				break;
 			case 'rejected':
 				this.status = 'rejected';
-				this.rejectMessage = REJECT_MESSAGES[message.reason];
+				this.rejectReason = message.reason;
+				this.rejectMessage = REJECT_MESSAGES[message.reason] ?? 'You were disconnected from this room.';
 				this.movedTo = message.movedTo ?? null;
+				break;
+			case 'owner_token':
+				// I'm the owner now: keep the proof, like after creating a room.
+				saved.setOwnerToken(this.roomCode, message.ownerToken);
 				break;
 		}
 	}
@@ -269,6 +289,12 @@ export class RoomConnection {
 				break;
 			case 'Notice':
 				this.addNotice(e.message);
+				break;
+			case 'MigrationChanged':
+				s.migration = e.migration;
+				break;
+			case 'AdminlessChanged':
+				s.adminless = e.adminless;
 				break;
 			default: {
 				// A new event kind that isn't handled here is a type error.

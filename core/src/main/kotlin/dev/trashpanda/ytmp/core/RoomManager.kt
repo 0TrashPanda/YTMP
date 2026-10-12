@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp.core
 
 import kotlinx.coroutines.CoroutineScope
 import dev.trashpanda.ytmp.protocol.RoleTemplate
+import dev.trashpanda.ytmp.protocol.RoomClone
 import dev.trashpanda.ytmp.protocol.RoomInfo
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.Song
@@ -41,6 +42,11 @@ data class RoomTimeouts(
      * deleted after this long. Null: kept until closed (phones; account owners can always find theirs).
      */
     val guestSoloRoom: Duration? = null,
+    /**
+     * A party room where nobody who runs it (owner, top role) has been connected this long
+     * tells everyone they can clone it. Null: never (phones: the room goes when the phone does).
+     */
+    val adminless: Duration? = null,
     val checkInterval: Duration = 1.minutes,
 )
 
@@ -70,6 +76,8 @@ class RoomManager(
     private val onRoomSaved: (SavedRoom) -> Unit = {},
     /** A room with an owner account was closed or expired here (not moved away). Must not block. */
     private val onRoomClosed: (Room) -> Unit = {},
+    /** A room is no longer [account]'s (it got another owner): its copy under [syncId] can go. Must not block. */
+    private val onRoomDisowned: (account: String, syncId: String) -> Unit = { _, _ -> },
 ) {
     private val rooms = ConcurrentHashMap<String, Room>()
     private val random = SecureRandom()
@@ -93,7 +101,14 @@ class RoomManager(
         val store = store
         if (store != null) {
             val saved = runCatching { store.loadAll() }.onFailure { log.error("Couldn't load saved rooms", it) }.getOrDefault(emptyList())
-            for (s in saved) add(Room.restore(s, streams, scope, onInfoChanged = { roomChanged(s.code) }, clock = clock, radio = radioFor(s.ownerAccount)))
+            for (s in saved) {
+                lateinit var room: Room
+                room = Room.restore(
+                    s, streams, scope, onInfoChanged = { roomChanged(s.code) }, onOwnerChanged = ::disowned, clock = clock,
+                    radio = radioFor { room.ownerAccount },
+                )
+                add(room)
+            }
             if (saved.isNotEmpty()) log.info("Restored {} room(s)", saved.size)
             refreshList()
             scope.launch(storeContext) { saveLoop(store) }
@@ -107,13 +122,22 @@ class RoomManager(
      * Creates a room. [ownerAccount] (`username@issuer`) is the owner on any device it logs in
      * from; [template] is their role template (default roles if null).
      */
-    fun create(name: String, visibility: RoomVisibility = RoomVisibility.PUBLIC, ownerAccount: String? = null, template: RoleTemplate? = null): Room {
+    fun create(
+        name: String,
+        visibility: RoomVisibility = RoomVisibility.PUBLIC,
+        ownerAccount: String? = null,
+        template: RoleTemplate? = null,
+        /** Start as a copy of another room. */
+        clone: RoomClone? = null,
+    ): Room {
         while (true) {
             val code = newCode()
-            val room = Room(
-                code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radioFor(ownerAccount),
-                onInfoChanged = { roomChanged(code) }, clock = clock,
+            lateinit var room: Room
+            room = Room(
+                code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radioFor { room.ownerAccount },
+                onInfoChanged = { roomChanged(code) }, onOwnerChanged = ::disowned, clock = clock,
             )
+            if (clone != null) room.startFrom(clone)
             if (add(room)) {
                 roomChanged(code)
                 return room
@@ -162,7 +186,11 @@ class RoomManager(
         val state = saved.copy(positionMs = position.coerceIn(0, length), lastActive = clock())
         var code = normalize(saved.code)
         while (true) {
-            val room = Room.restore(state, streams, scope, onInfoChanged = { roomChanged(code) }, radio = radioFor(state.ownerAccount), clock = clock, code = code, epoch = epoch)
+            lateinit var room: Room
+            room = Room.restore(
+                state, streams, scope, onInfoChanged = { roomChanged(code) }, onOwnerChanged = ::disowned, radio = radioFor { room.ownerAccount },
+                clock = clock, code = code, epoch = epoch,
+            )
             if (add(room)) {
                 moved.remove(code)
                 roomChanged(code)
@@ -236,12 +264,19 @@ class RoomManager(
         }
     }
 
-    /** A room's radio: its owner's own when there is one ([ownerRadio]), else (or when that fails) the shared one. */
-    private fun radioFor(ownerAccount: String?): RadioSource? {
+    private fun disowned(oldAccount: String?, oldSyncId: String?) {
+        if (oldAccount != null && oldSyncId != null) onRoomDisowned(oldAccount, oldSyncId)
+    }
+
+    /**
+     * A room's radio: its owner's own when there is one ([ownerRadio]), else (or when that
+     * fails) the shared one. [owner] is asked each time: the owner can change.
+     */
+    private fun radioFor(owner: () -> String?): RadioSource? {
         val shared = radio ?: return null
         return RadioSource { seed ->
             try {
-                ownerRadio(ownerAccount, seed)?.let { return@RadioSource it }
+                ownerRadio(owner(), seed)?.let { return@RadioSource it }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -265,7 +300,9 @@ class RoomManager(
             for (room in rooms.values) {
                 val nobodyOnline = room.cleanup(timeouts.participantOffline.inWholeMilliseconds)
                 val idle = clock() - room.lastActive
+                timeouts.adminless?.let { room.checkAdminless(it.inWholeMilliseconds) }
                 val expired = when {
+                    room.alwaysOn -> false
                     room.visibility == RoomVisibility.PUBLIC -> idle > timeouts.emptyRoom.inWholeMilliseconds
                     room.ownerAccount == null -> timeouts.guestSoloRoom?.let { idle > it.inWholeMilliseconds } ?: false
                     else -> false

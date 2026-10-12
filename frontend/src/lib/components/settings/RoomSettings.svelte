@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { DEFAULT_ROLE_COLOR, rank } from '../../permissions';
-	import type { Command, Participant, Permission, Role, RoomOpenMode } from '../../protocol.gen';
+	import type { Command, HostInfo, Participant, Permission, Role, RoomOpenMode } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
 	import MemberPermissions from './MemberPermissions.svelte';
 	import RoleEditor from './RoleEditor.svelte';
@@ -13,7 +13,21 @@
 
 	type Section = 'overview' | 'roles' | 'members' | 'bans';
 	/** [start]: the section to open; 'list' opens the list of sections on phones (desktop shows the first one next to it). */
-	let { room, start = 'members', onClose }: { room: RoomConnection; start?: Section | 'list'; onClose: () => void } = $props();
+	let {
+		room,
+		host = null,
+		start = 'members',
+		onClose,
+		onClone
+	}: {
+		room: RoomConnection;
+		/** Where the room is hosted (a server can keep rooms always on). */
+		host?: HostInfo | null;
+		start?: Section | 'list';
+		onClose: () => void;
+		/** Opens "Clone room". */
+		onClone?: () => void;
+	} = $props();
 
 	const rs = $derived(room.state!);
 	const roles = $derived(rs.roles);
@@ -61,21 +75,55 @@
 	let guestRole = $state('');
 	let accountRole = $state('');
 	let autoplay = $state(true);
+	let alwaysOn = $state(false);
 	let overviewBusy = $state(false);
 	function resetOverview() {
 		name = rs.room.name;
 		guestRole = rs.settings.defaultGuestRole;
 		accountRole = rs.settings.defaultAccountRole;
 		autoplay = rs.settings.autoplay;
+		alwaysOn = rs.settings.alwaysOn;
 	}
 	resetOverview();
 	const overviewDirty = $derived(
-		name.trim() !== rs.room.name || guestRole !== rs.settings.defaultGuestRole || accountRole !== rs.settings.defaultAccountRole || autoplay !== rs.settings.autoplay
+		name.trim() !== rs.room.name ||
+			guestRole !== rs.settings.defaultGuestRole ||
+			accountRole !== rs.settings.defaultAccountRole ||
+			autoplay !== rs.settings.autoplay ||
+			alwaysOn !== rs.settings.alwaysOn
 	);
 	async function saveOverview() {
 		overviewBusy = true;
-		await run({ kind: 'UpdateSettings', name: name.trim(), defaultGuestRole: guestRole, defaultAccountRole: accountRole, autoplay });
+		await run({ kind: 'UpdateSettings', name: name.trim(), defaultGuestRole: guestRole, defaultAccountRole: accountRole, autoplay, alwaysOn });
 		overviewBusy = false;
+	}
+
+	// --- owner and leaving ---
+	async function makeOwner(person: Participant) {
+		menuFor = null;
+		if (!confirm(`Make ${person.name} the owner of this room? You keep the top role, but they can take it from you.`)) return;
+		await run({ kind: 'ChangeOwner', participantId: person.id });
+	}
+
+	/** The owner of a party room picks who takes over first; everyone else just leaves. */
+	let leaving = $state(false);
+	const others = $derived(rs.participants.filter((p) => p.id !== me?.id));
+	/** Like the host picks when you don't: the top role, here, the longest (the list is in the order people came). */
+	const suggestedOwner = $derived(others.find((p) => p.online && p.roleId === roles[0]?.id) ?? null);
+	let nextOwner = $state('');
+	function startLeaving() {
+		if (me?.isOwner && rs.room.visibility === 'public' && others.length) {
+			nextOwner = suggestedOwner?.id ?? '';
+			leaving = true;
+		} else {
+			// A solo room, or nobody else here: it stays mine.
+			leave(null, true);
+		}
+	}
+	/** [newOwnerId]: who takes over; null with [stayOwner]: nobody, I can come back as the owner. */
+	async function leave(newOwnerId: string | null, stayOwner = false) {
+		await room.run({ kind: 'LeaveRoom', newOwnerId, stayOwner });
+		goto('/');
 	}
 
 	function onKey(event: KeyboardEvent) {
@@ -102,11 +150,14 @@
 				</button>
 			{/each}
 			<div class="mx-2.5 my-2 h-px bg-d-line"></div>
+			{#if onClone && room.can('clone_room')}
+				<button class="rounded px-2.5 py-1.5 text-left text-base font-medium text-d-muted hover:bg-d-hover hover:text-d-text" onclick={onClone}>Clone Room</button>
+			{/if}
 			<button class="rounded px-2.5 py-1.5 text-left text-base font-medium text-d-muted hover:bg-d-hover hover:text-d-text" onclick={onClose}>Close</button>
-			<!-- Like Discord's "Leave Server". You can come back with the code, as yourself. -->
+			<!-- Like Discord's "Leave Server". You can come back with the code, but as someone new. -->
 			<button
 				class="flex items-center justify-between rounded px-2.5 py-1.5 text-left text-base font-medium text-[#f23f43] hover:bg-d-red/10"
-				onclick={() => goto('/')}
+				onclick={startLeaving}
 			>
 				Leave Room
 				<svg viewBox="0 0 24 24" class="h-4 w-4"><path fill="currentColor" d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3zm6.6 4.4L15.2 8.8 17.4 11H9v2h8.4l-2.2 2.2 1.4 1.4L21.2 12z" /></svg>
@@ -153,6 +204,16 @@
 						</div>
 						<Switch checked={autoplay} label="Autoplay" onchange={(on) => (autoplay = on)} />
 					</div>
+					{#if host?.kind === 'server' && rs.room.visibility === 'public'}
+						<div class="my-6 h-px bg-d-line"></div>
+						<div class="flex items-center gap-4">
+							<div class="min-w-0 flex-1">
+								<h3 class="text-base font-semibold text-d-head">Always on</h3>
+								<p class="text-sm text-d-muted">Keep the room on the server when everyone has left, so it's there next time. Otherwise it goes after an hour without anyone in it.</p>
+							</div>
+							<Switch checked={alwaysOn} label="Always on" onchange={(on) => (alwaysOn = on)} />
+						</div>
+					{/if}
 					{#if me?.isOwner && me.accountId}
 						<!-- Rooms of an account live on one of its hosts and can move (docs/features/room-sync.md). -->
 						<div class="my-6 h-px bg-d-line"></div>
@@ -242,7 +303,7 @@
 								{/if}
 							</div>
 							<div class="w-8">
-								{#if manageable && (room.can('kick') || room.can('ban') || room.can('assign_roles'))}
+								{#if (manageable && (room.can('kick') || room.can('ban') || room.can('assign_roles'))) || (me?.isOwner && person.id !== me.id)}
 									<button
 										class="rounded p-1 text-d-muted hover:bg-d-active hover:text-d-head"
 										aria-label="More for {person.name}"
@@ -254,15 +315,18 @@
 							</div>
 							{#if menuFor === person.id}
 								<div class="absolute top-11 right-2 z-10 flex w-48 flex-col rounded bg-d-bar p-1.5 shadow-xl">
-									{#if room.can('assign_roles')}
+									{#if me?.isOwner && person.id !== me.id}
+										<button class="rounded px-2 py-1.5 text-left text-sm hover:bg-d-blurple hover:text-white" onclick={() => makeOwner(person)}>Make Owner</button>
+									{/if}
+									{#if manageable && room.can('assign_roles')}
 										<button class="rounded px-2 py-1.5 text-left text-sm hover:bg-d-blurple hover:text-white" onclick={() => ((permissionsFor = person), (menuFor = null))}>Permissions</button>
 									{/if}
-									{#if room.can('kick')}
+									{#if manageable && room.can('kick')}
 										<button class="rounded px-2 py-1.5 text-left text-sm text-[#f23f43] hover:bg-d-red hover:text-white" onclick={() => ((menuFor = null), run({ kind: 'Kick', participantId: person.id }))}>
 											Kick {person.name}
 										</button>
 									{/if}
-									{#if room.can('ban')}
+									{#if manageable && room.can('ban')}
 										<button
 											class="rounded px-2 py-1.5 text-left text-sm text-[#f23f43] hover:bg-d-red hover:text-white"
 											onclick={() => {
@@ -308,6 +372,25 @@
 		</div>
 	</div>
 </div>
+
+{#if leaving}
+	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" role="presentation" onclick={() => (leaving = false)}>
+		<div class="w-full max-w-md rounded-lg bg-d-bg p-5 text-d-text shadow-xl" role="dialog" aria-label="Leave room" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.key === 'Escape' && (leaving = false)}>
+			<h2 class="mb-2 text-xl font-semibold text-d-head">Leave '{rs.room.name}'</h2>
+			<p class="mb-4 text-sm text-d-muted">You're the owner. Who runs the room after you? They can change the settings, roles and who's in it.</p>
+			<select class={input} bind:value={nextOwner}>
+				{#each others as person (person.id)}
+					<option value={person.id}>{person.name}{person.online ? '' : ' (away)'}{person.roleId === roles[0]?.id ? ` · ${roles[0].name}` : ''}</option>
+				{/each}
+				<option value="">Nobody: I stay the owner and can come back</option>
+			</select>
+			<div class="mt-5 flex justify-end gap-2">
+				<button class="rounded px-4 py-2 text-sm font-medium hover:underline" onclick={() => (leaving = false)}>Cancel</button>
+				<button class="rounded bg-d-red px-4 py-2 text-sm font-medium text-white" onclick={() => leave(nextOwner || null, !nextOwner)}>Leave Room</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 {#if permissionsFor}
 	{@const current = rs.participants.find((p) => p.id === permissionsFor!.id)}

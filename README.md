@@ -35,6 +35,8 @@ Music, without Premium, and not tied to a single music service.
 - One shared queue: add, play next, drag to reorder, swipe to remove, jump to any song,
   clear. Played songs stay above the current one; autoplay songs below.
 - Everyone who listens stays in sync, with a per-device sync adjustment (for Bluetooth).
+- Hand a room to someone else, clone it (here, onto your phone or onto your server), and
+  invite or move everyone to the clone, keeping their roles. Server rooms can be always on.
 
 **Finding music** (through YouTube Music, no Premium needed)
 - Home with YouTube Music's suggestions (quick picks, new releases, mixes).
@@ -75,7 +77,6 @@ Music, without Premium, and not tied to a single music service.
 
 ## What's next
 
-- Handing a room to someone else, cloning a room, moving people to a new room
 - Dealing with YouTube's "confirm you're not a bot" block
 - Using your YouTube Music sign-in in rooms on someone else's phone or server
 - New podcast episodes on Home, playback speed, played marks

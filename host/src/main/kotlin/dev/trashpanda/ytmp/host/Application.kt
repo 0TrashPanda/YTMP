@@ -18,6 +18,7 @@ import dev.trashpanda.ytmp.protocol.MyPlaylists
 import dev.trashpanda.ytmp.protocol.SaveSongsRequest
 import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.protocol.ApiError
@@ -261,18 +262,16 @@ fun Application.ytmpModule(
             post("/rooms") {
                 if (!call.mayManageRooms()) throw forbidden()
                 val request = call.receive<CreateRoomRequest>()
-                val name = request.name.trim()
-                if (name.isEmpty() || name.length > 64) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Room name must be 1-64 characters")
-                if (request.visibility == RoomVisibility.PRIVATE && !options.supportsPrivateRooms) {
-                    throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Solo rooms aren't supported here")
-                }
                 val token = call.bearerToken()
                 val account = call.account()
-                // The creator's own roles, if they saved a template to their account.
-                val template = if (account != null && token != null) options.auth.roleTemplate(token) else null
-                val room = rooms.create(name, request.visibility, ownerAccount = account?.id, template = template)
-                log.info("Created room {} ({}, {}{})", room.code, room.name, room.visibility, account?.let { ", owner ${it.id}" } ?: "")
-                call.respond(CreateRoomResponse(room.code, room.ownerToken))
+                // The creator's own roles, if they saved a template to their account (a clone keeps the room's).
+                val template = if (account != null && token != null && request.clone == null) options.auth.roleTemplate(token) else null
+                val room = rooms.createFor(request, account?.id, template, options.supportsPrivateRooms)
+                val base = options.shareUrl() ?: call.request.origin.let { o ->
+                    val defaultPort = (o.scheme == "https" && o.serverPort == 443) || (o.scheme == "http" && o.serverPort == 80)
+                    "${o.scheme}://${o.serverHost}${if (defaultPort) "" else ":${o.serverPort}"}"
+                }
+                call.respond(CreateRoomResponse(room.code, room.ownerToken, url = "$base/room/${room.code}"))
             }
             get("/rooms/{code}") {
                 val room = rooms[call.parameters["code"]!!]
@@ -526,3 +525,21 @@ private fun decode(frame: Frame.Text): ClientMessage? =
     runCatching { ProtocolJson.decodeFromString(ClientMessage.serializer(), frame.readText()) }
         .onFailure { log.debug("Ignoring bad message: {}", it.message) }
         .getOrNull()
+
+/**
+ * Creates a room for [request] (also a clone of another room), owned by [ownerAccount] if
+ * set. Throws [ApiException] for a request that can't be done here.
+ */
+fun RoomManager.createFor(request: CreateRoomRequest, ownerAccount: String?, template: RoleTemplate?, supportsPrivateRooms: Boolean): Room {
+    val name = request.name.trim()
+    if (name.isEmpty() || name.length > 64) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Room name must be 1-64 characters")
+    if (request.visibility == RoomVisibility.PRIVATE && !supportsPrivateRooms) {
+        throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Solo rooms aren't supported here")
+    }
+    val room = create(name, request.visibility, ownerAccount = ownerAccount, template = template, clone = request.clone)
+    LoggerFactory.getLogger("dev.trashpanda.ytmp.host.Application").info(
+        "Created room {} ({}, {}{}{})", room.code, room.name, room.visibility, ownerAccount?.let { ", owner $it" } ?: "",
+        request.clone?.let { ", a clone with ${it.queue.size} songs queued" } ?: "",
+    )
+    return room
+}

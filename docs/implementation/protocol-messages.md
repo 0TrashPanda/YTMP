@@ -35,10 +35,11 @@ generated from them.
 
 | Direction | Message | Content |
 |-----------|---------|---------|
-| → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`, `accountToken` ✅ (a host token, see [auth](auth.md)), `hideFromHistory` ✅ (keep me out of others' listening history) |
+| → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`, `accountToken` ✅ (a host token, see [auth](auth.md)), `hideFromHistory` ✅ (keep me out of others' listening history), `migrationKey` ✅ (moved here from another room: see *Clones* below) |
 | → | `attach` ✅ | Instead of `hello`: `protocolVersion`, `roomCode`, `guestToken`. A **second connection for a participant who is already in the room**: it gets the same `welcome` and events and may send `command`s and `ping`s as them, but doesn't replace their connection or change whether they're online. Kicks, bans and cleanup end it (`rejected`: `kicked`/`banned`); an unknown token gets `kicked`. Used by the Android app's player, see [android-app](android-app.md) |
-| ← | `welcome` ✅ | `participantId`, `guestToken`, `seq`, `state` (the snapshot), `accountId` ✅ (null when joined as a guest, also when the token wasn't accepted) |
-| ← | `rejected` ✅ | `reason`: `room_not_found`, `version_mismatch`, `invalid_name`, `replaced` (the same guest connected again elsewhere), `room_moved` (the room moved to another of the owner's hosts, see [room sync](room-sync.md)), `private_room` (a solo room, only for the hosting device), `kicked`, `banned`, `account_required` (the host only lets in accounts). Later maybe: `untrusted_auth_server` |
+| ← | `welcome` ✅ | `participantId`, `guestToken`, `seq`, `state` (the snapshot), `accountId` ✅ (null when joined as a guest, also when the token wasn't accepted), `migrationKey` ✅ (only yours) |
+| ← | `owner_token` ✅ | `ownerToken`: you're the owner now (keep it, like the one from creating the room) |
+| ← | `rejected` ✅ | `reason`: `room_not_found`, `version_mismatch`, `invalid_name`, `replaced` (the same guest connected again elsewhere), `room_moved` (the room moved to another of the owner's hosts, see [room sync](room-sync.md)), `private_room` (a solo room, only for the hosting device), `kicked`, `banned`, `account_required` (the host only lets in accounts), `left` (you left, from another connection), `migrated` (everyone was moved; `movedTo` is the new room). Later maybe: `untrusted_auth_server` |
 | ⇄ | `ping` / `pong` ✅ | `clientTime` / `clientTime, hostTime`, for clock sync |
 
 ## Snapshot (`RoomState`)
@@ -127,10 +128,25 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 | `UpdateSettings` ✅ (name, default roles, autoplay) | partial `settings` (later also ordering, access, limits, vote to skip, always on, …) | Change settings |
 | `SetVisibility` ✅ | `visibility: "public" \| "solo"` | Owner only |
 | `SetOpenElsewhere` ✅ | `mode` (ask / move / move if away) or null for the account's setting, see [room sync](room-sync.md) | Owner only |
-| `ChangeOwner` | `participantId` | Owner only |
-| `CloneRoom` | `visibility: "public" \| "solo"` | Clone room. The result has the new room's code. |
-| `SendMigration` | `targetRoom`, `mode: "invite" \| "forced"` | Send migration message |
-| `CloseRoom` | – | Owner only |
+| `ChangeOwner` ✅ | `participantId` | Owner only |
+| `LeaveRoom` ✅ | `newOwnerId?`, `stayOwner` (the owner of a party room: who takes over; null = the longest-present person with the top role) | – |
+| `SendMigration` ✅ | `target: { url, code, name }`, `mode: "invite" \| "forced"` | Move everyone |
+| `CancelMigration` ✅ | – | Move everyone |
+| `CloseRoom` | – | Owner only (now `DELETE /api/rooms/{code}`) |
+
+Cloning isn't a command: the page sends what it has (`RoomClone`: queue, history, current
+song and position, autoplay, roles, settings, and `migrants`) to the place the clone goes,
+`POST /api/rooms` with `clone`, and gets the new room's code, owner token and `url`. From the
+phone's own page to your server: `POST /api/rooms/clone-to-server` (the phone forwards it to
+`POST /api/auth/rooms/clone` with your host token). Onto the phone from another host's page in
+the app: bridge `cloneRoom` (version 6).
+
+**Clones and roles.** Every participant has a public `tag` (in `Participant`), a hash of their
+private `migrationKey` (in their `welcome`; itself a hash of their guest token). A clone lists
+the old room's people as `migrants` (tag, old id, name, role, overrides). Joining the clone with
+`hello.migrationKey` whose hash matches a tag gives that person's role, overrides and old id
+back (so `addedBy` still points at them), once. Links carry the key in the fragment
+(`#migrate=…`, also `#owner=…` and `#name=…`), which never reaches a server.
 | `request_snapshot` ✅ | – (a message type, not a command) | – |
 
 ## Events (host → client)
@@ -159,8 +175,8 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 | `RoomUpdated` ✅ | `room` (name, visibility, owner, …) | everyone |
 | `RolesChanged` ✅ | `roles` (all, ranked) | everyone |
 | `BansChanged` ✅ | `bans` | everyone |
-| `OwnerChanged` | `participantId` | everyone |
-| `MigrationOffered` | `targetRoom`, `mode`, `from` | everyone |
-| `AdminlessPrompt` | – (no admin for 5 min: "you can clone this room") | everyone |
+| `OwnerChanged` (done as two `ParticipantUpdated` ✅ and a `Notice`) | – | everyone |
+| `MigrationChanged` ✅ | `migration: { target, mode, fromName }` or null (also in the snapshot) | everyone |
+| `AdminlessChanged` ✅ | `adminless` (no owner or top-role person here for 5 min, servers; also in the snapshot) | everyone |
 | `RoomClosing` | `reason` | everyone |
 | `YourSongIsNext` | `item` | the person who added it (if they turned it on) |

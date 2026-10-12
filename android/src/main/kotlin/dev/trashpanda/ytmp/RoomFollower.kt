@@ -14,6 +14,7 @@ import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
+import kotlinx.serialization.SerializationException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -156,7 +157,18 @@ class RoomFollower {
             try {
                 for (frame in incoming) {
                     val text = (frame as? Frame.Text)?.readText() ?: continue
-                    when (val message = ProtocolJson.decodeFromString(ServerMessage.serializer(), text)) {
+                    // A newer host may send messages this app doesn't know yet: get the whole state instead.
+                    val message = try {
+                        ProtocolJson.decodeFromString(ServerMessage.serializer(), text)
+                    } catch (e: SerializationException) {
+                        Log.d(TAG, "room ${link.code}: skipping a message this app doesn't know: ${e.message?.take(120)}")
+                        if (state != null && !waitingForSnapshot) {
+                            waitingForSnapshot = true
+                            send(ClientMessage.RequestSnapshot)
+                        }
+                        continue
+                    }
+                    when (message) {
                         is ServerMessage.Welcome -> {
                             Log.d(TAG, "room ${link.code}: following")
                             onWelcome()
@@ -214,6 +226,7 @@ class RoomFollower {
                             }
                         }
                         is ServerMessage.Result -> message.error?.let { Log.w(TAG, "room ${link.code}: command ${message.id}: ${it.message}") }
+                        is ServerMessage.OwnerToken -> Unit
                         is ServerMessage.Rejected -> {
                             Log.d(TAG, "room ${link.code}: rejected (${message.reason})")
                             rejected = true

@@ -75,6 +75,7 @@ class LocalHost(private val context: Context) {
         ownerRadio = { _, seed -> youtube.personalized()?.radio(seed) },
         onRoomSaved = { sync.saved(it) },
         onRoomClosed = { sync.closed(it) },
+        onRoomDisowned = { account, syncId -> sync.closed(account, syncId) },
     )
 
     /** Your rooms here and on your server (docs/features/room-sync.md). */
@@ -126,6 +127,7 @@ class LocalHost(private val context: Context) {
                 extraApi = {
                     authLink.routes(this)
                     sync.routes(this)
+                    sync.cloneRoute(this)
                 },
                 similar = cached,
                 catalog = cached,

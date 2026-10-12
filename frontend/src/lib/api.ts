@@ -28,7 +28,8 @@ import type {
 	SyncedRoomsResponse,
 	MovedRoomResponse,
 	Song,
-	YoutubePersonalizeSetting
+	YoutubePersonalizeSetting,
+	RoomClone
 } from './protocol.gen';
 
 import { identity } from './account';
@@ -53,10 +54,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** [accountToken] makes your account the owner, on every device you log in on. */
-export function createRoom(name: string, visibility: RoomVisibility = 'public', accountToken: string | null = null): Promise<CreateRoomResponse> {
+export function createRoom(
+	name: string,
+	visibility: RoomVisibility = 'public',
+	accountToken: string | null = null,
+	clone: RoomClone | null = null
+): Promise<CreateRoomResponse> {
 	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 	if (accountToken) headers['Authorization'] = `Bearer ${accountToken}`;
-	return request('/api/rooms', { method: 'POST', headers, body: JSON.stringify({ name, visibility }) });
+	return request('/api/rooms', { method: 'POST', headers, body: JSON.stringify({ name, visibility, clone }) });
+}
+
+/** On the phone's own page: clone a room onto your server (the phone forwards it, with your login). */
+export function cloneToServer(name: string, visibility: RoomVisibility, clone: RoomClone, accountToken: string): Promise<CreateRoomResponse> {
+	return request('/api/rooms/clone-to-server', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accountToken}` },
+		body: JSON.stringify({ name, visibility, clone })
+	});
 }
 
 /** On the phone: use a YTMP server for accounts, or none (null). */

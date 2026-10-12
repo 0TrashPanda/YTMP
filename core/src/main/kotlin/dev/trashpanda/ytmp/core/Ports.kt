@@ -158,6 +158,10 @@ internal object Ids {
 
     fun token() = random(32)
 
+    /** SHA-256 as hex. */
+    fun sha256(text: String): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
+
     private fun random(length: Int) = buildString(length) {
         repeat(length) { append(ALPHABET[random.nextInt(ALPHABET.length)]) }
     }

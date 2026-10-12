@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.SavedRoom
+import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.MovedRoomResponse
@@ -22,6 +23,7 @@ import dev.trashpanda.ytmp.protocol.SyncedRoomsResponse
 import dev.trashpanda.ytmp.protocol.TakeRoomRequest
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -124,11 +126,15 @@ class RoomSync(
 
     /** A room was closed here (not moved): the server forgets its copy. */
     fun closed(room: Room) {
-        val account = room.ownerAccount ?: return
+        closed(room.ownerAccount ?: return, room.syncId ?: return)
+    }
+
+    /** The room [syncId] is no longer [account]'s here (closed, or it got another owner): the server forgets its copy. */
+    fun closed(account: String, syncId: String) {
         val server = serverFor(account) ?: return
         val token = token(account) ?: return
-        room.syncId?.let { sent.remove(it) }
-        scope.launch { call("DELETE", "$server/api/auth/rooms/${room.syncId}?host=$hostId", token, null) }
+        sent.remove(syncId)
+        scope.launch { call("DELETE", "$server/api/auth/rooms/$syncId?host=$hostId", token, null) }
     }
 
     /** Tells each account's server this phone is up, and closes rooms that moved away. */
@@ -181,6 +187,26 @@ class RoomSync(
             val snapshot = ProtocolJson.decodeFromString(RoomSnapshot.serializer(), body)
             val room = rooms().adopt(SavedRoom.fromJson(snapshot.room), snapshot.epoch)
             call.respond(MovedRoomResponse(room.code))
+        }
+    }
+
+    /**
+     * Clones a room onto your server (from the phone's own page, logged in): `POST
+     * /api/rooms/clone-to-server` with a [CreateRoomRequest]; the answer is the server's.
+     */
+    fun cloneRoute(route: Route) = with(route) {
+        post("/rooms/clone-to-server") {
+            if (!isLoopback(call)) throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Only the hosting device can do this")
+            val token = call.bearerToken() ?: throw ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Log in first")
+            val account = authLink.auth.verify(token) ?: throw ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Log in first")
+            remember(token, account)
+            val server = serverFor(account.id) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No server linked")
+            val request = call.receiveText()
+            val (status, body) = call("POST", "$server/api/auth/rooms/clone", token, request)
+                ?: throw ApiException(HttpStatusCode.BadGateway, ErrorCode.INVALID, "Can't reach $server")
+            if (status != 200) throw ApiException(HttpStatusCode.BadGateway, ErrorCode.INVALID, errorMessage(body) ?: "$server answered $status")
+            val created = ProtocolJson.decodeFromString(CreateRoomResponse.serializer(), body)
+            call.respond(created.copy(url = created.url ?: "${server.trimEnd('/')}/room/${created.code}"))
         }
     }
 

@@ -103,7 +103,8 @@ fun main(args: Array<String>) {
         val rooms = RoomManager(
             ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = outputs, store = JdbcRoomStore(db),
             // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
-            timeouts = RoomTimeouts(guestSoloRoom = 30.days),
+            // Party rooms whose admins are all gone for 5 minutes tell the others they can clone them.
+            timeouts = RoomTimeouts(guestSoloRoom = 30.days, adminless = 5.minutes),
             onPlayFinished = { play ->
                 plays.report(play)
                 youtube.report(play, ::localAccount)

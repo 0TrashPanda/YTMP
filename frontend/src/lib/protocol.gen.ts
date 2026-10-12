@@ -71,6 +71,15 @@ export interface CommandBan {
   participantId: string;
 }
 
+export interface CommandCancelMigration {
+  kind: "CancelMigration";
+}
+
+export interface CommandChangeOwner {
+  kind: "ChangeOwner";
+  participantId: string;
+}
+
 export interface CommandClearAutoplay {
   kind: "ClearAutoplay";
 }
@@ -79,7 +88,7 @@ export interface CommandClearQueue {
   kind: "ClearQueue";
 }
 
-export type Permission = "add_songs" | "play_now" | "remove_own" | "remove_others" | "reorder" | "start_radio" | "autoplay_from_here" | "play_pause" | "skip" | "seek" | "listen_locally" | "change_outputs" | "output_volume" | "kick" | "ban" | "assign_roles" | "edit_roles" | "change_settings";
+export type Permission = "add_songs" | "play_now" | "remove_own" | "remove_others" | "reorder" | "start_radio" | "autoplay_from_here" | "play_pause" | "skip" | "seek" | "listen_locally" | "change_outputs" | "output_volume" | "kick" | "ban" | "assign_roles" | "edit_roles" | "change_settings" | "clone_room" | "send_migration";
 
 export interface CommandCreateRole {
   kind: "CreateRole";
@@ -101,6 +110,12 @@ export interface CommandJumpTo {
 export interface CommandKick {
   kind: "Kick";
   participantId: string;
+}
+
+export interface CommandLeaveRoom {
+  kind: "LeaveRoom";
+  newOwnerId: string | null;
+  stayOwner: boolean;
 }
 
 export type ItemList = "history" | "queue" | "autoplay";
@@ -149,6 +164,20 @@ export interface CommandRemoveQueueItem {
 export interface CommandSeek {
   kind: "Seek";
   positionMs: number;
+}
+
+export interface MigrationTarget {
+  url: string;
+  code: string;
+  name: string;
+}
+
+export type MigrationMode = "invite" | "forced";
+
+export interface CommandSendMigration {
+  kind: "SendMigration";
+  target: MigrationTarget;
+  mode: MigrationMode;
 }
 
 export interface CommandSetListening {
@@ -221,6 +250,7 @@ export interface CommandUpdateSettings {
   defaultGuestRole: string | null;
   defaultAccountRole: string | null;
   autoplay: boolean | null;
+  alwaysOn: boolean | null;
 }
 
 export type Command =
@@ -229,12 +259,15 @@ export type Command =
   | CommandAutoplayFromHere
   | CommandAutoplaySongs
   | CommandBan
+  | CommandCancelMigration
+  | CommandChangeOwner
   | CommandClearAutoplay
   | CommandClearQueue
   | CommandCreateRole
   | CommandDeleteRole
   | CommandJumpTo
   | CommandKick
+  | CommandLeaveRoom
   | CommandMoveItem
   | CommandMoveQueueItem
   | CommandMoveRole
@@ -244,6 +277,7 @@ export type Command =
   | CommandPrevious
   | CommandRemoveQueueItem
   | CommandSeek
+  | CommandSendMigration
   | CommandSetListening
   | CommandSetOpenElsewhere
   | CommandSetOutput
@@ -271,6 +305,7 @@ export interface ClientMessageHello {
   ownerToken: string | null;
   accountToken: string | null;
   hideFromHistory: boolean;
+  migrationKey: string | null;
 }
 
 export interface ClientMessagePing {
@@ -288,6 +323,11 @@ export type ClientMessage =
   | ClientMessageHello
   | ClientMessagePing
   | ClientMessageRequestSnapshot;
+
+export interface EventAdminlessChanged {
+  kind: "AdminlessChanged";
+  adminless: boolean;
+}
 
 export type QueueItemResult = "played" | "skipped";
 
@@ -335,6 +375,17 @@ export interface EventHistoryReplaced {
   items: QueueItem[];
 }
 
+export interface MigrationOffer {
+  target: MigrationTarget;
+  mode: MigrationMode;
+  fromName: string;
+}
+
+export interface EventMigrationChanged {
+  kind: "MigrationChanged";
+  migration: MigrationOffer | null;
+}
+
 export interface EventNotice {
   kind: "Notice";
   message: string;
@@ -370,6 +421,7 @@ export interface Participant {
   roleId: string;
   allow: Permission[];
   deny: Permission[];
+  tag: string;
 }
 
 export interface EventParticipantJoined {
@@ -441,6 +493,7 @@ export interface RoomSettings {
   defaultAccountRole: string;
   autoplay: boolean;
   openElsewhere: RoomOpenMode | null;
+  alwaysOn: boolean;
 }
 
 export interface EventSettingsChanged {
@@ -455,11 +508,13 @@ export interface EventStreamReady {
 }
 
 export type Event =
+  | EventAdminlessChanged
   | EventAutoplayChanged
   | EventBansChanged
   | EventHistoryAppended
   | EventHistoryItemRemoved
   | EventHistoryReplaced
+  | EventMigrationChanged
   | EventNotice
   | EventNowPlayingChanged
   | EventOutputsChanged
@@ -482,13 +537,18 @@ export interface ServerMessageEvent {
   event: Event;
 }
 
+export interface ServerMessageOwnerToken {
+  type: "owner_token";
+  ownerToken: string;
+}
+
 export interface ServerMessagePong {
   type: "pong";
   clientTime: number;
   hostTime: number;
 }
 
-export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "room_moved" | "private_room" | "kicked" | "banned" | "account_required";
+export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "room_moved" | "private_room" | "kicked" | "banned" | "account_required" | "left" | "migrated";
 
 export interface ServerMessageRejected {
   type: "rejected";
@@ -527,6 +587,8 @@ export interface RoomState {
   bans: BanInfo[];
   autoplay: QueueItem[];
   autoplaySeed: Song | null;
+  migration: MigrationOffer | null;
+  adminless: boolean;
 }
 
 export interface ServerMessageSnapshot {
@@ -542,24 +604,50 @@ export interface ServerMessageWelcome {
   seq: number;
   state: RoomState;
   accountId: string | null;
+  migrationKey: string | null;
 }
 
 export type ServerMessage =
   | ServerMessageEvent
+  | ServerMessageOwnerToken
   | ServerMessagePong
   | ServerMessageRejected
   | ServerMessageResult
   | ServerMessageSnapshot
   | ServerMessageWelcome;
 
+export interface Migrant {
+  tag: string;
+  id: string;
+  name: string;
+  roleId: string;
+  accountId: string | null;
+  allow: Permission[];
+  deny: Permission[];
+}
+
+export interface RoomClone {
+  queue: QueueItem[];
+  history: QueueItem[];
+  current: QueueItem | null;
+  positionMs: number;
+  autoplay: QueueItem[];
+  autoplaySeed: Song | null;
+  roles: Role[];
+  settings: RoomSettings | null;
+  migrants: Migrant[];
+}
+
 export interface CreateRoomRequest {
   name: string;
   visibility: RoomVisibility;
+  clone: RoomClone | null;
 }
 
 export interface CreateRoomResponse {
   code: string;
   ownerToken: string;
+  url: string | null;
 }
 
 export interface SearchResponse {

@@ -38,6 +38,10 @@ enum class Permission {
 
     // Room
     @SerialName("change_settings") CHANGE_SETTINGS,
+    /** Making a copy of the room somewhere else (it's a hint for the page: everyone sees the queue anyway). */
+    @SerialName("clone_room") CLONE_ROOM,
+    /** Inviting (or moving) everyone in the room to another room, e.g. a clone. */
+    @SerialName("send_migration") SEND_MIGRATION,
 }
 
 /** A named set of permissions. Roles are ranked: earlier in the list is higher. */
@@ -62,6 +66,8 @@ data class RoomSettings(
     val autoplay: Boolean = true,
     /** Opening this room on another of the owner's hosts; null: the owner's account setting. */
     val openElsewhere: RoomOpenMode? = null,
+    /** Never deleted for being empty (a room on a server that's always there). Not in templates. */
+    val alwaysOn: Boolean = false,
 )
 
 /** The roles a room starts with. Saved to an account, so every room you create gets yours. */

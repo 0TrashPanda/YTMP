@@ -50,7 +50,7 @@ role has *Display*, *Permissions* and *Manage Members* tabs, and an unsaved-chan
 | **Listening** | Play audio on own device |
 | **Speakers** | Change speakers · Speaker volume |
 | **People** | Kick · Ban / unban · Manage members (give roles, own permissions) · Manage roles |
-| **Room** | Manage room (name, default roles) |
+| **Room** | Manage room (name, default roles, autoplay, always on) · Clone room · Move everyone (invite or move everyone to a clone) |
 
 Rooms and role templates remember which permissions existed when they were saved. When
 YTMP gets new permissions, roles that had every permission (Admin) get them all, and
@@ -59,7 +59,8 @@ alone.
 
 Default roles: **Admin** (everything), **DJ** (Listener + play now, reorder, remove others'
 songs, seek, speakers and volume, start radio, autoplay from here) and **Listener** (add songs, remove own songs, play/pause,
-skip, play on own device). New guests and account holders get *Listener*.
+skip, play on own device, clone room). New guests and account holders get *Listener*. Only
+Admin can *Move everyone*.
 
 ### All planned permissions
 
@@ -99,8 +100,10 @@ Roles exist on **two levels**:
 
 ## Room settings
 
-Built: name, visibility (owner), default roles, autoplay, and where the room opens from
-your other devices (owner, see [room sync](room-sync.md)). The rest is planned.
+Built: name, visibility (owner), default roles, autoplay, "always on" (servers), and where
+the room opens from your other devices (owner, see [room sync](room-sync.md)). The rest is
+planned. The owner hands the room over with *Make Owner* (see
+[room lifecycle](room-lifecycle.md#changing-the-owner)).
 
 - **Room name**: shown in the room bar and in LAN discovery. The default is the
   creator's name + "'s room" (for example `Jonah's room`), and it can be edited.

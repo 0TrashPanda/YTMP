@@ -3,22 +3,33 @@
 A room does not live forever on one device. This page covers what happens when people
 leave, and how a room (or its queue) can move to another place.
 
-> Status: built are restarts (rooms come back paused), timeouts, and moving your own rooms
-> between your phone and server ([room sync](room-sync.md)). Not built yet: changing the
-> owner, the no-admin prompt, "always on", cloning and migration.
+> Status: ✅ built: changing the owner, leaving, the no-admin prompt and "always on" (servers),
+> cloning (here, onto your phone, or onto your server) and moving people to a clone (invite or
+> forced), restarts, and moving your own rooms between phone and server
+> ([room sync](room-sync.md)). Not built: transfer of someone else's room, a local copy that
+> survives closing the page.
 
 ## Changing the owner
 
-Before leaving, the **owner** can **hand the room over to another participant**. That
-participant becomes the owner and the room continues as normal. The room code and
-host stay the same.
+The **owner** can **hand the room over to another participant** at any time (*Make Owner* in
+the person's menu under *Members*). That participant becomes the owner and the room
+continues as normal. The room code and host stay the same. The old owner keeps the **top
+role** (Admin), but the new owner outranks them. The new owner's device gets proof of
+ownership, like the device that created the room.
 
-If the owner **leaves without passing the room on**, ownership goes automatically to the
-**admin who has been in the room the longest**. If there are no other admins, see
-*When the admin leaves* below.
+**Leave Room** (room settings) really leaves: you're gone from the list and your songs stay.
+Coming back with the code makes you someone new. When the **owner** of a party room leaves,
+they pick who takes over (the dialog suggests the person with the top role who has been here
+longest), or **Nobody**: they stay the owner and can come back. Only Leave Room hands a room
+over: an owner whose phone sleeps or loses Wi-Fi keeps the room. In a solo room, leaving
+never hands it over.
 
-On a phone-hosted room, the phone stays the host. If the old owner's phone leaves, the
-room still ends (see below).
+A room with an owner account that gets an owner with another account (or a guest) stops
+being the old owner's on their other devices ([room sync](room-sync.md)), and starts being the
+new owner's. Its radio then uses the new owner's YouTube Music sign-in where there is one.
+
+On a phone-hosted room, the phone stays the host. If the phone leaves, the room still ends
+(see below).
 
 ## When the admin leaves
 
@@ -29,18 +40,16 @@ What happens depends on where the room is hosted.
 The room's data lives on the server, so the room **keeps existing** when the admin
 disconnects. Participants can stay connected.
 
-The room **keeps playing** while it has no admin. If the room has **no admin** for a
-set amount of time:
+The room **keeps playing** while it has no admin (the owner, or someone with the top role).
+If a party room has **no admin** connected for **5 minutes**:
 
-1. Everyone still in the room is **prompted that they can clone the room**.
-2. When there is no admin **and** everyone has left, the room is **deleted after a
-   timeout**.
-3. A room can be configured to **never be deleted** ("always on"), for example a
-   permanent room on a home server.
+1. Everyone still in the room sees *Nobody who runs this room is here*, with **Clone it to
+   keep the queue going**. It goes away when an admin is back.
+2. When everyone has left, the room is **deleted after 1 hour**.
+3. A room can be set to **never be deleted** (**Always on** in the room's Overview, servers
+   only), for example a permanent room on a home server.
 
-Defaults: prompt after **5 minutes** without an admin, delete after **1 hour** without
-an admin and without participants. Both are configurable (see
-[networking](../implementation/networking.md#default-timeouts)).
+See [networking](../implementation/networking.md#default-timeouts) for all timeouts.
 
 ### Phone-hosted room
 
@@ -51,24 +60,35 @@ keeps its rooms, public and solo, and brings them back with the same code, queue
 and participants. Playback comes back **paused** where it was. Friends' devices reconnect on
 their own. A public room is still deleted after the usual timeout without anyone connected.
 
-To avoid losing the queue, **clients using the app** keep a local copy of the room's
-queue (they receive it anyway to display it). When the host disappears, they can
-still **clone the room** from that local copy. Browser clients do not keep a copy.
+To avoid losing the queue, every page in the room has a copy of it (it gets it anyway to
+show it). When the host disappears, the page shows *Connection lost* with **Keep the queue:
+clone it**, which works from that copy, as long as the page stays open. (Planned: keeping
+the copy after the page closes.)
 
 > Later idea: a **phone → server migration**, where a phone-hosted room is moved to an
 > online server so it survives the phone leaving.
 
 ## Cloning a room
 
-Any participant (if permitted) can **clone a room** to their own device, either a
-browser or an Android app. The clone is a **new, independent room** with a **new room
-code**, owned by the person who cloned it.
+Anyone with the *Clone Room* permission (everyone, in the default roles) can **clone a
+room**: **Clone Room** in the room settings, *Clone this room somewhere else* in the share
+sheet, or the banners above. The clone is a **new, independent room** with a **new room
+code**, owned by the person who cloned it. It starts with this room's queue, what played
+(the last 200 songs), the autoplay queue, the roles and settings, and the current song
+**paused** where the room was. The old room stays as it is.
 
-The clone can be:
+Where it goes is picked each time, from what this page can reach:
 
-- **Public**: others can join it.
-- **Private / solo**: for example to keep listening to the rest of the party's queue
-  at home after the party.
+| Where | When |
+|-------|------|
+| **This server** | On a server's pages (anyone who may create rooms there) |
+| **This phone** | In the app, on any other host's page (a server, or a friend's phone) |
+| **Your server** | On the phone's own pages, logged in, with the phone linked to your server |
+| (the phone itself) | On the phone's own pages |
+
+And whether it's a **party** or a **solo** room, for example to keep listening to the rest of
+the party's queue at home afterwards. A friend's browser on someone's phone can't make rooms
+there; it's told to open YTMP on their own phone or a server.
 
 Use cases:
 
@@ -79,19 +99,19 @@ Use cases:
 
 ## Migration
 
-After a room is cloned, the person who made the clone can choose to show a
-**migration message** in the old room, inviting participants to move to the new one.
-Whether this is allowed depends on permissions in the old room.
-
-Variants:
+While cloning, someone with the *Move Everyone* permission (Admin, in the default roles) can
+bring the others along:
 
 | Variant | Behaviour |
 |---------|-----------|
-| No migration | The old room is not notified. |
-| Invite | Participants of the old room get a message and can choose to follow. |
-| Forced | All participants are moved to the new room. Anyone who **refuses leaves** the room. |
+| Don't tell them | The old room is not notified. |
+| Invite | Everyone in the old room sees *<name> moved the party to <room>* with **Go there** and **Stay here**. People with the permission can **take it back**. Who joins later sees it too. |
+| Move everyone | Everyone is sent to the new room right away (their page opens it), and the music stops in the old one. The old room stays, empty, until it times out. |
 
-Participants **keep their role** when they migrate to the new room.
+Participants **keep their role**, their own permissions and their place in the new room:
+each person's page has a private key from the old room that the new room checks against a
+fingerprint in the copy, once. Songs they added stay theirs (so *Remove own songs* works).
+Someone who only knows another person's name can't take their role.
 
 ## Transfer
 
