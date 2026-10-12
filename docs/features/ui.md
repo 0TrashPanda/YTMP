@@ -76,6 +76,8 @@ Like YTM:
   jumps closed (or back) on release; it should feel like YTM's: the player shrinks into
   the mini player as you drag, with momentum (a quick flick closes it), and an animated
   spring back when you let go too early.
+- **Volume sliders** ✅ (player bar, *Play on*, speakers): **scrolling** over one moves it
+  2% per wheel notch, finer than YTM's jumps.
 - **Play on** ✅ lists **this device** first (on/off, its volume and its sync
   adjustment), then the speakers and TVs the host found.
 
@@ -180,7 +182,9 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - In *Up next*, **hold** a song (or right-click it) for its menu; with a mouse a ⋮ also shows
   on hover. **Swipe a song left** to remove it, like YTM (the menu has *Remove* too,
   also for the current song: the next one plays).
-- There is no *Move* action: songs are moved by **dragging** them in *Up next*. Played
+- There is no *Move* action: songs are moved by **dragging** them in *Up next*. The song
+  stays under the pointer while the list scrolls (the mouse wheel, or holding it near the
+  top or bottom edge, which scrolls the list). Played
   songs, upcoming songs and autoplay songs are one list: any of them can be dragged
   anywhere in it. A played song dragged below the current one plays again; an autoplay
   song dragged into the queue becomes yours.

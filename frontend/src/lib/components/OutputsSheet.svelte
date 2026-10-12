@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { wheelAdjust } from '../wheel';
 	// "Play on": this device (with its sync adjustment and volume) and the speakers and TVs the host found.
 	import { MediaQuery } from 'svelte/reactivity';
 	import type { RoomPlayer } from '../player.svelte';
@@ -67,6 +68,7 @@
 						step="0.01"
 						value={player.volume}
 						aria-label="Volume"
+						use:wheelAdjust
 						oninput={(e) => player.setVolume(Number(e.currentTarget.value))}
 					/>
 				{/if}
@@ -85,6 +87,7 @@
 							step="10"
 							value={player.syncOffsetMs}
 							aria-label="Sync adjustment in milliseconds"
+							use:wheelAdjust={10}
 							oninput={(e) => player.setSyncOffset(Number(e.currentTarget.value))}
 						/>
 						<button class="rounded-full bg-surface px-3 py-1 hover:bg-line" onclick={() => nudgeSync(10)}>Earlier</button>
@@ -122,6 +125,7 @@
 						value={output.volume}
 						disabled={!room.can('output_volume')}
 						aria-label="Volume of {output.name}"
+						use:wheelAdjust
 						onchange={(e) => setVolume(output.id, Number(e.currentTarget.value))}
 					/>
 				{/if}

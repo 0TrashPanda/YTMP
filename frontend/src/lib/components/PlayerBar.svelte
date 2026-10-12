@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { wheelAdjust } from '../wheel';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { getAlbum, prefetch } from '../api';
 	import { artistNames, formatTime } from '../format';
@@ -221,6 +222,7 @@
 						step="0.01"
 						value={player.volume}
 						aria-label="Volume"
+						use:wheelAdjust
 						oninput={(e) => player.setVolume(Number(e.currentTarget.value))}
 					/>
 				{/if}

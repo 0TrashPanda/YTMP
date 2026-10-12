@@ -31,6 +31,13 @@ new owner's. Its radio then uses the new owner's YouTube Music sign-in where the
 On a phone-hosted room, the phone stays the host. If the phone leaves, the room still ends
 (see below).
 
+## When everyone has gone
+
+When nobody is connected to a room any more, the music **pauses** after a minute (a reload
+or a short network drop isn't leaving); when the last person taps *Leave Room*, right away.
+Not when it plays on speakers or a TV: people may still be listening there. Anyone who comes
+back presses play.
+
 ## When the admin leaves
 
 What happens depends on where the room is hosted.

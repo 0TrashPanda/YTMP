@@ -220,6 +220,8 @@ class Room(
 
     private var resolveJob: Job? = null
     private var endJob: Job? = null
+    /** Pauses the music a while after the last person went (see [pauseWhenEveryoneGone]). */
+    private var emptyJob: Job? = null
 
     /** Songs in a row that couldn't load; after [MAX_FAILED_IN_A_ROW] the room pauses (likely no internet). */
     private var failedInARow = 0
@@ -297,6 +299,7 @@ class Room(
         member.isOwner = member.isOwner || isOwner
         member.offlineSince = null
         lastActive = clock()
+        emptyJob?.cancel()
 
         outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = account?.id, migrationKey = member.migrationKey))
         emit(if (returning == null) Event.ParticipantJoined(member.toParticipant()) else Event.ParticipantUpdated(member.toParticipant()))
@@ -334,6 +337,7 @@ class Room(
             return null
         }
         member.attached += outbox
+        emptyJob?.cancel()
         outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = member.accountId, migrationKey = member.migrationKey))
         member.id
     }
@@ -350,6 +354,26 @@ class Room(
         member.listening = false
         member.offlineSince = clock()
         emit(Event.ParticipantUpdated(member.toParticipant()))
+        pauseWhenEveryoneGone(EVERYONE_GONE_PAUSE_MS)
+    }
+
+    /**
+     * Nobody is here any more: the music pauses after [afterMs] (a reload or a short network
+     * drop isn't leaving), unless it plays on speakers or a TV (people may be listening there).
+     * Called with [mutex] held.
+     */
+    private fun pauseWhenEveryoneGone(afterMs: Long) {
+        emptyJob?.cancel()
+        if (!wantPlaying || members.values.any { it.online } || activeOutputs.isNotEmpty()) return
+        emptyJob = scope.launch {
+            delay(afterMs)
+            mutex.withLock {
+                if (wantPlaying && members.values.none { it.online } && activeOutputs.isEmpty()) {
+                    log.info("Room {}: everyone left, pausing", code)
+                    pausePlayback()
+                }
+            }
+        }
     }
 
     /** Handles a message from [from], one of [participantId]'s connections (by default their main one). */
@@ -468,6 +492,7 @@ class Room(
     }
 
     fun close() {
+        emptyJob?.cancel()
         autoplayJob?.cancel()
         resolveJob?.cancel()
         endJob?.cancel()
@@ -893,6 +918,8 @@ class Room(
         member.dropAttached(RejectReason.LEFT)
         member.outbox = null
         emit(Event.ParticipantLeft(member.id))
+        // The last one out: no need to wait.
+        pauseWhenEveryoneGone(0)
         return null
     }
 
@@ -1438,6 +1465,8 @@ class Room(
         /** A clone's queue (and autoplay queue) keeps at most this many songs. */
         const val MAX_CLONE_QUEUE = 1000
         const val MAX_MIGRANTS = 200
+        /** Everyone gone this long: the music pauses. */
+        const val EVERYONE_GONE_PAUSE_MS = 60_000L
         const val PREVIOUS_RESTART_MS = 3_000L
         const val SNAPSHOT_HISTORY = 200
         const val SAVED_HISTORY = 500

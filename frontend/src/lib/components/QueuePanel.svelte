@@ -53,8 +53,16 @@
 
 	// --- dragging --------------------------------------------------------------------------
 
-	/** `mids`: the middle of every slot when the drag started, to find where the song lands. */
-	let drag = $state<{ from: number; startY: number; offset: number; mids: number[]; height: number } | null>(null);
+	/**
+	 * `mids`: the middle of every slot when the drag started, to find where the song lands.
+	 * The song follows the pointer also while the list scrolls (the wheel, or near its top or
+	 * bottom edge): `offset` counts both.
+	 */
+	let drag = $state<{ from: number; startY: number; startScroll: number; pointerY: number; offset: number; mids: number[]; height: number } | null>(
+		null
+	);
+	/** Scrolls the list while the pointer is near its top or bottom edge. */
+	let edgeScroll = 0;
 
 	/** Where the dragged song lands, as an index in the list without it. */
 	const drop = $derived.by(() => {
@@ -70,13 +78,41 @@
 		drag = {
 			from: index,
 			startY: event.clientY,
+			startScroll: list?.scrollTop ?? 0,
+			pointerY: event.clientY,
 			offset: 0,
 			mids: elements.map((el) => el.offsetTop + el.offsetHeight / 2),
 			height: elements[index]?.offsetHeight ?? 64
 		};
+		cancelAnimationFrame(edgeScroll);
+		edgeScroll = requestAnimationFrame(scrollNearEdges);
+	}
+
+	function moveDrag(event: PointerEvent) {
+		if (!drag) return;
+		drag.pointerY = event.clientY;
+		follow();
+	}
+
+	/** Where the dragged song is: under the pointer, in the list's own coordinates. */
+	function follow() {
+		if (drag) drag.offset = drag.pointerY - drag.startY + ((list?.scrollTop ?? 0) - drag.startScroll);
+	}
+
+	/** Near the top or bottom edge of the list, it scrolls (faster the closer), like YouTube Music. */
+	function scrollNearEdges() {
+		if (!drag || !list) return;
+		const box = list.getBoundingClientRect();
+		const zone = Math.min(64, box.height / 4);
+		const above = box.top + zone - drag.pointerY;
+		const below = drag.pointerY - (box.bottom - zone);
+		const speed = above > 0 ? -Math.min(above, zone) / 6 : below > 0 ? Math.min(below, zone) / 6 : 0;
+		if (speed) list.scrollTop += speed;
+		edgeScroll = requestAnimationFrame(scrollNearEdges);
 	}
 
 	function endDrag() {
+		cancelAnimationFrame(edgeScroll);
 		const d = drag;
 		const p = drop;
 		drag = null;
@@ -199,7 +235,7 @@
 			{/if}
 		</div>
 	{/if}
-	<div bind:this={list} class="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">
+	<div bind:this={list} onscroll={follow} class="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">
 		{#each slots as slot, index (slot.key)}
 			{@const dragging = drag?.from === index}
 			{#if slot.kind === 'header'}
@@ -274,9 +310,12 @@
 								class="cursor-grab touch-none rounded-full p-1.5 text-muted hover:text-white active:cursor-grabbing"
 								aria-label="Drag to move"
 								onpointerdown={(e) => startDrag(e, index)}
-								onpointermove={(e) => drag && (drag.offset = e.clientY - drag.startY)}
+								onpointermove={moveDrag}
 								onpointerup={endDrag}
-								onpointercancel={() => (drag = null)}
+								onpointercancel={() => {
+									cancelAnimationFrame(edgeScroll);
+									drag = null;
+								}}
 							>
 								<Icon name="drag" size={18} />
 							</button>

@@ -33,6 +33,9 @@ import kotlin.test.assertTrue
 class RoomLifecycleTest {
     private fun song(n: Int) = Song("ytm:song$n", "Song $n", listOf(ArtistRef(null, "Artist")), null, 60_000, emptyList())
 
+    /** Plays longer than these tests wait. */
+    private fun longSong() = Song("ytm:long", "Long", listOf(ArtistRef(null, "Artist")), null, 3_600_000, emptyList())
+
     private class Client : Outbox {
         val messages = mutableListOf<ServerMessage>()
         val welcome get() = messages.filterIsInstance<ServerMessage.Welcome>().last()
@@ -301,6 +304,52 @@ class RoomLifecycleTest {
         // The owner is back.
         room.join("Anna", owner = true, guestToken = anna.welcome.guestToken)
         assertEquals(false, ben.events.filterIsInstance<Event.AdminlessChanged>().last().adminless)
+    }
+
+    @Test
+    fun `the music pauses a minute after everyone went`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.AddSongs(listOf(longSong()), QueuePosition.END))
+        runCurrent()
+        room.disconnect(anna.id, anna)
+
+        // A reload: back within the minute, still playing.
+        advanceTimeBy(30_000)
+        room.join("Anna", owner = true, guestToken = anna.welcome.guestToken).also { room.disconnect(it.id, it) }
+        advanceTimeBy(50_000)
+        assertTrue(room.save().playing)
+
+        advanceTimeBy(20_000)
+        assertFalse(room.save().playing)
+    }
+
+    @Test
+    fun `the last one to leave pauses the music at once`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.AddSongs(listOf(longSong()), QueuePosition.END))
+        runCurrent()
+
+        room.run(anna, Command.LeaveRoom(stayOwner = true))
+        runCurrent()
+
+        assertFalse(room.save().playing)
+    }
+
+    @Test
+    fun `music on a speaker keeps playing when everyone went`() = runTest {
+        val room = newRoom()
+        room.setAvailableOutputs(listOf(OutputDevice("kitchen", "Kitchen", dev.trashpanda.ytmp.protocol.OutputKind.SONOS)))
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.AddSongs(listOf(longSong()), QueuePosition.END))
+        room.run(anna, Command.SetOutput("kitchen", true))
+        runCurrent()
+
+        room.disconnect(anna.id, anna)
+        advanceTimeBy(5 * 60_000L)
+
+        assertTrue(room.save().playing)
     }
 
     @Test
