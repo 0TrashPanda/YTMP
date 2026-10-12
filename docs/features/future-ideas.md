@@ -104,3 +104,12 @@ into YTMP:
 - Speakers and devices run a **Snapcast client** (snapclient), and Snapcast keeps them in sync
   to within about a millisecond, including each device's own output delay.
 - YTMP keeps doing what it's good at (the shared queue); Snapcast does the precise playback.
+
+## Settings screen overhaul
+
+Settings grew piece by piece and are now spread over the avatar menu (YouTube Music
+sign-in, this device, the app), the room settings (Discord style) and the share sheet. Redo
+them as one clear settings screen, with the things people use most up front and rare,
+lasting actions further in. For example: *Sign out of YouTube Music* is front and centre in
+the avatar menu, while *Leave Room* is tucked away at the bottom of the room settings; that
+should be the other way round.
