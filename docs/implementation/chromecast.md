@@ -43,6 +43,15 @@ simulated device (`host/src/test/.../FakeCastDevice.kt`).
 - Both proxies fetch YouTube in 1 MB ranged pieces: Cast devices ask without a range, and
   YouTube throttles un-ranged requests.
 
+## Another app takes the device
+
+Casting another app (Spotify, YouTube, …) closes our media player and the connection. When the
+driver reconnects to a device this room played on (`resuming`, or after loading a song in this
+session), it first asks the receiver which apps run: another app than the Default Media
+Receiver (or the idle backdrop) means it was taken over, so it doesn't launch again and calls
+`Room.outputTakenOver`. Switching the output off forgets that, so switching it on again takes
+the device.
+
 ## Sync
 
 The Chromecast plays on its own clock, with a few seconds of buffering. It's controlled

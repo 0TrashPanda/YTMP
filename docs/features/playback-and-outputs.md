@@ -41,6 +41,11 @@ host or a home server can use them, a server in a datacenter can't.
 
 Changing host outputs is a permission (see [room management](room-management.md#permissions)).
 
+When **another app takes a speaker or TV** (someone plays Spotify on the Sonos, or casts to
+the TV), the room lets go of it: it's switched off in the room, everyone sees *"Kitchen is
+playing something else now"*, and the room doesn't take it back at the next song (it also
+doesn't stop the other app). Switching it on again in *Play on* takes it back.
+
 Implementation: [implementation/playback-sync.md](../implementation/playback-sync.md).
 
 ## Audio

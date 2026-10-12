@@ -24,6 +24,13 @@ discovery = true
 devices = ["192.168.68.100"]   # named after their Sonos room
 ```
 
+## Another app takes the speaker
+
+Each check reads the speaker's `TrackURI`. Once a song has settled, a URI that isn't the
+host's `/api/audio/…` (e.g. `x-sonos-spotify:…`) means another app took it: the driver drops
+its session without `Stop` and calls `Room.outputTakenOver`, which switches the output off in
+the room with a notice.
+
 ## Not yet
 
 - **Groups**: commands go to the speaker itself. A speaker that's part of a Sonos group

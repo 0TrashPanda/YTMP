@@ -76,19 +76,31 @@ class CastOutputs(
         val changed = Channel<Unit>(Channel.CONFLATED)
         room.addChangeListener { changed.trySend(Unit) }
         val sessions = HashMap<String, CastSession>()
+        // Devices this room has played on: when another app runs there later, it took them over.
+        val playedOn = HashSet<String>()
         try {
             while (true) {
                 // React to changes right away, and check the devices regularly anyway.
                 withTimeoutOrNull(SYNC_INTERVAL_MS) { changed.receive() }
                 val view = room.view()
                 for (id in sessions.keys - view.activeOutputs.keys) sessions.remove(id)?.stop()
+                // Switched off here: turning it on again takes it, also from another app.
+                playedOn.retainAll(view.activeOutputs.keys)
                 for ((id, volume) in view.activeOutputs) {
                     val device = known.value[id] ?: continue
-                    val session = sessions.getOrPut(id) { CastSession(device) }
+                    val session = sessions.getOrPut(id) { CastSession(device, resuming = id in playedOn) }
                     try {
                         session.sync(view, volume, report = room::notice, skipped = room::outputSkipped) { actual -> room.reportOutputVolume(id, actual) }
+                        if (session.loadedSomething) playedOn += id
                     } catch (e: CancellationException) {
                         throw e
+                    } catch (e: OutputTakenOver) {
+                        // Leave it be: the other app is playing.
+                        log.info("Cast device {}: {}", device.name, e.message)
+                        session.close()
+                        sessions.remove(id)
+                        playedOn -= id
+                        room.outputTakenOver(id)
                     } catch (e: Exception) {
                         log.warn("Cast device {} failed", device.name, e)
                         session.close()
@@ -102,7 +114,14 @@ class CastOutputs(
     }
 
     /** One room playing on one Cast device. */
-    private inner class CastSession(private val device: CastDeviceAddress) {
+    private inner class CastSession(
+        private val device: CastDeviceAddress,
+        /** This room played here before (the connection dropped): don't take it from another app. */
+        private val resuming: Boolean = false,
+    ) {
+        /** A song was loaded on the device in this session. */
+        var loadedSomething = false
+
         private var channel: CastChannel? = null
         private var player: CastMediaPlayer? = null
         private var loadedItemId: String? = null
@@ -152,6 +171,7 @@ class CastOutputs(
             val expected = view.positionAt(now)
             if (item.itemId != loadedItemId) {
                 load(player, item, view, expected, report)
+                loadedSomething = true
                 return
             }
             if (failed || status == null) return
@@ -247,6 +267,11 @@ class CastOutputs(
             close()
             val channel = CastChannel.open(device.host, device.port).also { channel = it }
             val player = CastMediaPlayer(channel).also { player = it }
+            if (resuming || loadedSomething) {
+                // Our player was closed: if another app runs there now (someone cast to it), it's theirs.
+                val other = player.receiverStatus().runningAppIds.firstOrNull { it != CastMediaPlayer.DEFAULT_MEDIA_RECEIVER && it != BACKDROP_APP }
+                if (other != null) throw OutputTakenOver("another app took it ($other)")
+            }
             // Follow volume changes made elsewhere (the device's buttons or app), so the room's
             // slider shows the real volume.
             volumeWatcher = scope.launch {
@@ -290,3 +315,6 @@ class CastOutputs(
         private const val MAX_DRIFT_MS = 2_000L
     }
 }
+
+/** The Cast device's idle screen (photos), not an app someone is using. */
+private const val BACKDROP_APP = "E8C28D3C"

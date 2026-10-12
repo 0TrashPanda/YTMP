@@ -67,6 +67,37 @@ class CastOutputsTest {
     }
 
     @Test
+    fun `when another app is cast to the device, the room lets go of it`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        FakeCastDevice().use { device ->
+            val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
+            casts.add(CastDeviceAddress("cast:fake", "Fake TV", "127.0.0.1", device.port))
+            val rooms = RoomManager({ "https://stream/$it" }, scope, outputs = casts.devices)
+            casts.attach(rooms)
+            val room = rooms.create("Party")
+            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { })!!
+            suspend fun run(command: Command) = room.handle(me, ClientMessage.CommandMessage("c", command))
+            run(Command.AddSongs(listOf(song, song.copy(id = "ytm:def", title = "Next")), QueuePosition.END))
+            eventually { casts.devices.value.isNotEmpty() }
+            run(Command.SetOutput("cast:fake", active = true))
+            eventually { "QUEUE_LOAD" in device.types(CastChannel.NS_MEDIA) }
+            val launches = device.types(CastChannel.NS_RECEIVER).count { it == "LAUNCH" }
+
+            device.takenOverBy("CC32E753") // Spotify
+            eventually { "cast:fake" !in room.view().activeOutputs }
+            run(Command.Skip)
+            kotlinx.coroutines.delay(3_000)
+            // Not launched again over Spotify.
+            assertEquals(launches, device.types(CastChannel.NS_RECEIVER).count { it == "LAUNCH" })
+
+            // Turned on again by hand: then it does take it.
+            run(Command.SetOutput("cast:fake", active = true))
+            eventually { device.types(CastChannel.NS_RECEIVER).count { it == "LAUNCH" } > launches }
+        }
+        scope.cancel()
+    }
+
+    @Test
     fun `next and previous on the device itself move the room along`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         FakeCastDevice().use { device ->

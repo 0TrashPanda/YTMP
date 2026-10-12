@@ -104,6 +104,11 @@ class SonosOutputs(
                         session.sync(view, volume, report = room::notice) { actual -> room.reportOutputVolume(id, actual) }
                     } catch (e: CancellationException) {
                         throw e
+                    } catch (e: OutputTakenOver) {
+                        // Leave it be: no stop, the other app is playing.
+                        log.info("Sonos {}: {}", device.name, e.message)
+                        sessions.remove(id)
+                        room.outputTakenOver(id)
                     } catch (e: Exception) {
                         log.warn("Sonos {} failed: {}", device.name, e.message)
                         session.failedAt = System.currentTimeMillis()
@@ -178,6 +183,9 @@ class SonosOutputs(
             if (failed) return
 
             val status = player.status()
+            // Playing something that isn't ours (Spotify, the Sonos app, …): someone else took it.
+            val uri = status.trackUri
+            if (now >= settledAt && !uri.isNullOrEmpty() && "/api/audio/" !in uri) throw OutputTakenOver("another app took it ($uri)")
             when {
                 view.playing && status.state in setOf("PAUSED_PLAYBACK", "STOPPED") && now >= settledAt -> {
                     // Stopped mid-song (a hiccup, or someone pressed pause on the speaker): the room says play.

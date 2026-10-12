@@ -531,6 +531,19 @@ class Room(
         }
     }
 
+    /**
+     * A speaker or TV started playing something else (another app, like Spotify, took it):
+     * the room lets go of it instead of taking it back at the next song.
+     */
+    suspend fun outputTakenOver(outputId: String) = mutex.withLock {
+        if (outputId !in activeOutputs) return@withLock
+        activeOutputs.remove(outputId)
+        val name = availableOutputs.firstOrNull { it.id == outputId }?.name ?: "A speaker"
+        log.info("Room {}: {} plays something else now, letting go of it", code, name)
+        emit(Event.OutputsChanged(outputInfos()))
+        emit(Event.Notice("$name is playing something else now, so this room stopped playing there"))
+    }
+
     /** Tells everyone in the room about a problem, e.g. a speaker that couldn't play a song. */
     suspend fun notice(message: String) = mutex.withLock { emit(Event.Notice(message)) }
 

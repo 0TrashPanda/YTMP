@@ -27,6 +27,22 @@ class FakeCastDevice : AutoCloseable {
     @Volatile var currentTime = 0.0
     @Volatile var volume = 0.5
     @Volatile private var appRunning = false
+    /** Another app (Spotify, YouTube, …) runs instead of the media player. */
+    @Volatile private var otherApp: String? = null
+
+    private fun appsJson(): String = listOfNotNull(
+        """{"appId":"CC1AD845","transportId":"web-1","sessionId":"s-1"}""".takeIf { appRunning },
+        otherApp?.let { """{"appId":"$it","transportId":"other-1","sessionId":"s-2"}""" },
+    ).joinToString(",", "[", "]")
+
+    /** Someone casts another app to the device: our media player stops, and senders' connections drop. */
+    fun takenOverBy(appId: String) {
+        otherApp = appId
+        appRunning = false
+        playerState = "IDLE"
+        for (output in connections) runCatching { output.close() }
+        connections.clear()
+    }
     @Volatile var contentId: String? = null
 
     /** URLs with this prefix fail to load (like a link the device can't use). */
@@ -89,7 +105,7 @@ class FakeCastDevice : AutoCloseable {
     /** Someone changed the volume on the device itself: tell connected senders, like a real device. */
     fun changeVolumeExternally(level: Double) {
         volume = level
-        val apps = if (appRunning) """[{"appId":"CC1AD845","transportId":"web-1","sessionId":"s-1"}]""" else "[]"
+        val apps = appsJson()
         val status = """{"type":"RECEIVER_STATUS","requestId":0,"status":{"volume":{"level":$level,"muted":false},"applications":$apps}}"""
         for (output in connections) {
             synchronized(output) {
@@ -135,11 +151,14 @@ class FakeCastDevice : AutoCloseable {
         return when (namespace) {
             CastChannel.NS_RECEIVER -> {
                 when (type) {
-                    "LAUNCH" -> appRunning = true
+                    "LAUNCH" -> {
+                        appRunning = true
+                        otherApp = null
+                    }
                     "STOP" -> appRunning = false
                     "SET_VOLUME" -> request["volume"]!!.jsonObject["level"]!!.jsonPrimitive.doubleOrNull?.let { volume = it }
                 }
-                val apps = if (appRunning) """[{"appId":"CC1AD845","transportId":"web-1","sessionId":"s-1"}]""" else "[]"
+                val apps = appsJson()
                 """{"type":"RECEIVER_STATUS","requestId":$id,"status":{"volume":{"level":$volume,"muted":false},"applications":$apps}}"""
             }
             CastChannel.NS_MEDIA -> {
