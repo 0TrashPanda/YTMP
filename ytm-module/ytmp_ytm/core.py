@@ -303,13 +303,18 @@ class YtmCore:
         except Exception as e:
             raise NotFound(str(e)) from e
         author = p.get("author")
+        tracks = [(t, s) for t in p.get("tracks") or [] if (s := _song_from_search(t))]
+        owned = bool(personal and p.get("owned"))
         return {
             "id": playlist_id,
             "title": p.get("title") or "",
             "author": (author.get("name") if isinstance(author, dict) else author) or None,
             "description": p.get("description"),
             "thumbnails": _thumbnails(p.get("thumbnails") or []),
-            "songs": [s for t in p.get("tracks") or [] if (s := _song_from_search(t))],
+            "songs": [s for _, s in tracks],
+            "owned": owned,
+            # Each song's place in your own playlist, for removing and moving it.
+            "itemIds": [t.get("setVideoId") or "" for t, _ in tracks] if owned else [],
         }
 
     def podcast(self, podcast_id: str) -> dict:
@@ -333,14 +338,48 @@ class YtmCore:
             ],
         }
 
-    def liked(self, song_id: str) -> bool:
-        """Whether the signed-in account likes this song (thumbs up)."""
+    def rating(self, song_id: str) -> str:
+        """The signed-in account's thumbs on this song: "like", "dislike" or "none"."""
         vid = video_id(song_id)
         tracks = self._signed_in().get_watch_playlist(videoId=vid, limit=1).get("tracks") or []
-        return any(t.get("videoId") == vid and t.get("likeStatus") == "LIKE" for t in tracks[:1])
+        status = next((t.get("likeStatus") for t in tracks[:1] if t.get("videoId") == vid), None)
+        return {"LIKE": "like", "DISLIKE": "dislike"}.get(status or "", "none")
+
+    def set_rating(self, song_id: str, rating: str) -> None:
+        status = {"like": LikeStatus.LIKE, "dislike": LikeStatus.DISLIKE}.get(rating, LikeStatus.INDIFFERENT)
+        self._signed_in().rate_song(video_id(song_id), status)
+
+    def liked(self, song_id: str) -> bool:
+        """Whether the signed-in account likes this song (thumbs up)."""
+        return self.rating(song_id) == "like"
 
     def set_liked(self, song_id: str, liked: bool) -> None:
-        self._signed_in().rate_song(video_id(song_id), LikeStatus.LIKE if liked else LikeStatus.INDIFFERENT)
+        self.set_rating(song_id, "like" if liked else "none")
+
+    # Your own playlists: items are songs with their place in the playlist ({songId, itemId}).
+
+    def remove_from_playlist(self, playlist_id: str, items: list[dict]) -> None:
+        videos = [{"videoId": video_id(str(i["songId"])), "setVideoId": str(i["itemId"])} for i in items if i.get("itemId")]
+        if not videos:
+            return
+        if self._signed_in().remove_playlist_items(playlist_id, videos) != "STATUS_SUCCEEDED":
+            raise Unavailable("Couldn't remove it from the playlist")
+
+    def move_in_playlist(self, playlist_id: str, item_id: str, before_item_id: str | None) -> None:
+        move = (item_id, before_item_id) if before_item_id else item_id
+        if self._signed_in().edit_playlist(playlist_id, moveItem=move) != "STATUS_SUCCEEDED":
+            raise Unavailable("Couldn't move it")
+
+    def rename_playlist(self, playlist_id: str, title: str) -> None:
+        title = title.replace("<", "").replace(">", "").strip()
+        if not title:
+            raise Unavailable("A playlist needs a name")
+        if self._signed_in().edit_playlist(playlist_id, title=title) != "STATUS_SUCCEEDED":
+            raise Unavailable("Couldn't rename the playlist")
+
+    def delete_playlist(self, playlist_id: str) -> None:
+        if self._signed_in().delete_playlist(playlist_id) != "STATUS_SUCCEEDED":
+            raise Unavailable("Couldn't delete the playlist")
 
     def add_to_history(self, song_id: str) -> None:
         """Tells YouTube Music the signed-in account played this song (its history, and so its suggestions)."""

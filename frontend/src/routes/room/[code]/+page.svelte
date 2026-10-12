@@ -598,7 +598,7 @@
 							{:else if view.kind === 'album'}
 								<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
 							{:else if view.kind === 'playlist'}
-								<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={(target) => (menu = target)} />
+								<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={(target) => (menu = target)} onGone={back} />
 							{:else if view.kind === 'podcast'}
 								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
 							{/if}

@@ -8,6 +8,8 @@
 		song: Song;
 		item?: QueueItem;
 		place: SongPlace;
+		/** The song is in one of your own playlists (or Liked music), shown there: it can be removed. */
+		playlist?: { id: string; itemId: string | null; likedMusic: boolean; onRemoved: () => void };
 		/** Where to show the menu (the click or the ⋮ button). */
 		x: number;
 		y: number;
@@ -18,6 +20,7 @@
 	// The song menu (docs/features/ui.md#song-menu): right-click a song, or its ⋮ button.
 	import { onMount, tick } from 'svelte';
 	import type { Command } from '../protocol.gen';
+	import { removeFromPlaylist } from '../api';
 	import { likes } from '../likes.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import { youtube } from '../youtube.svelte';
@@ -42,6 +45,7 @@
 	const place = $derived(target.place);
 	const queueLength = $derived(room.state?.queue.length ?? 0);
 	const liked = $derived(likes.get(song.id));
+	const rating = $derived(likes.rating(song.id));
 	$effect(() => likes.load(song.id));
 	const ytmId = $derived(song.id.startsWith('ytm:') || song.id.startsWith('yt:') ? song.id.slice(song.id.indexOf(':') + 1) : null);
 
@@ -105,7 +109,51 @@
 		}
 		if (youtube.account) {
 			const current = song;
+			const wasCurrent = place === 'current';
 			list.push({ icon: liked ? 'liked' : 'like', label: liked ? 'Remove like' : 'Like', run: () => (likes.set(current.id, !liked, onToast), onClose()) });
+			list.push({
+				icon: rating === 'dislike' ? 'disliked' : 'dislike',
+				label: rating === 'dislike' ? 'Remove dislike' : 'Dislike',
+				run: async () => {
+					onClose();
+					const disliking = rating !== 'dislike';
+					// Like YouTube Music: a disliked song that's playing is skipped (if you may).
+					if ((await likes.rate(current.id, disliking ? 'dislike' : 'none', onToast)) && disliking && wasCurrent && room.can('skip')) {
+						await room.run({ kind: 'Skip' });
+					}
+				}
+			});
+		}
+		if (target.playlist) {
+			const { id, itemId, likedMusic, onRemoved } = target.playlist;
+			const current = song;
+			if (likedMusic) {
+				list.push({
+					icon: 'remove',
+					label: 'Remove from Liked music',
+					danger: true,
+					run: async () => {
+						onClose();
+						if (await likes.rate(current.id, 'none', onToast)) onRemoved();
+					}
+				});
+			} else if (itemId) {
+				list.push({
+					icon: 'remove',
+					label: 'Remove from this playlist',
+					danger: true,
+					run: async () => {
+						onClose();
+						try {
+							await removeFromPlaylist(id, [{ songId: current.id, itemId }]);
+							onToast(`Removed "${current.title}" from the playlist`);
+							onRemoved();
+						} catch (e) {
+							onToast(e instanceof Error ? e.message : "Couldn't remove it");
+						}
+					}
+				});
+			}
 		}
 		if (onSave) {
 			const current = song;

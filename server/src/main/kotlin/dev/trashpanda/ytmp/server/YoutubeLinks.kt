@@ -6,6 +6,8 @@ import dev.trashpanda.ytmp.host.ApiException
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.PlaylistItemRef
+import dev.trashpanda.ytmp.protocol.LikeStatus
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.SearchPage
@@ -146,9 +148,22 @@ class YoutubeLinks(
 
         override suspend fun playlist(id: String): PlaylistPage = withCookie { module.myPlaylist(it, id) }
 
-        override suspend fun liked(songId: String): Boolean = withCookie { module.myLike(it, songId) }
+        override suspend fun liked(songId: String): Boolean = rating(songId).liked
 
-        override suspend fun setLiked(songId: String, liked: Boolean) = withCookie { module.setMyLike(it, songId, liked) }
+        override suspend fun setLiked(songId: String, liked: Boolean) = setRating(songId, LikeStatus(liked))
+
+        override suspend fun rating(songId: String): LikeStatus = withCookie { module.myRating(it, songId) }
+
+        override suspend fun setRating(songId: String, rating: LikeStatus) = withCookie { module.setMyRating(it, songId, rating) }
+
+        override suspend fun removeFromPlaylist(playlistId: String, items: List<PlaylistItemRef>) = withCookie { module.removeFromMyPlaylist(it, playlistId, items) }
+
+        override suspend fun movePlaylistItem(playlistId: String, itemId: String, beforeItemId: String?) =
+            withCookie { module.moveInMyPlaylist(it, playlistId, itemId, beforeItemId) }
+
+        override suspend fun renamePlaylist(playlistId: String, title: String) = withCookie { module.renameMyPlaylist(it, playlistId, title) }
+
+        override suspend fun deletePlaylist(playlistId: String) = withCookie { module.deleteMyPlaylist(it, playlistId) }
 
         override suspend fun ownPlaylists(): List<PlaylistSummary> = withCookie { module.myPlaylists(it) }
 

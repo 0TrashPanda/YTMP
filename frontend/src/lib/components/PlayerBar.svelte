@@ -75,6 +75,13 @@
 	// Desktop: thumbs up next to the song, like YTM.
 	const songId = $derived(current?.item.song.id);
 	const liked = $derived(likes.get(songId));
+	const rating = $derived(likes.rating(songId));
+	/** Thumbs down; like YouTube Music, the song is skipped too (if you may skip). */
+	async function toggleDislike(id: string) {
+		if (rating === null) return;
+		const disliking = rating !== 'dislike';
+		if ((await likes.rate(id, disliking ? 'dislike' : 'none', onToast)) && disliking && room.can('skip')) await room.run({ kind: 'Skip' });
+	}
 	$effect(() => {
 		if (songId && wide.current) likes.load(songId);
 	});
@@ -188,6 +195,15 @@
 				</div>
 				{#if current && youtube.account}
 					{@const id = current.item.song.id}
+					<button
+						class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-40 {rating === 'dislike' ? 'text-white' : ''}"
+						disabled={rating === null}
+						aria-label={rating === 'dislike' ? 'Remove dislike' : 'Dislike'}
+						aria-pressed={rating === 'dislike'}
+						onclick={() => toggleDislike(id)}
+					>
+						<Icon name={rating === 'dislike' ? 'disliked' : 'dislike'} size={20} />
+					</button>
 					<button
 						class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-40 {liked ? 'text-white' : ''}"
 						disabled={liked === null}

@@ -1,18 +1,29 @@
-// Thumbs up in YouTube Music, shared by the full player, the player bar and the song menu so
-// they always agree. Needs your YouTube Music sign-in.
+// Your thumbs in YouTube Music (up: Liked music; down: fewer songs like it), shared by the full
+// player, the player bar and the song menu so they always agree. Needs your YouTube Music sign-in.
 import { SvelteMap } from 'svelte/reactivity';
-import { getLiked, setLiked } from './api';
+import { getRating, setRating } from './api';
+import type { LikeStatus } from './protocol.gen';
 import { youtube } from './youtube.svelte';
 
+export type Rating = 'like' | 'dislike' | 'none';
+
+const toRating = (s: LikeStatus): Rating => (s.liked ? 'like' : s.disliked ? 'dislike' : 'none');
+
 class Likes {
-	#known = new SvelteMap<string, boolean>();
+	#known = new SvelteMap<string, Rating>();
 	#asked = new Set<string>();
 	#version = 0;
 
-	/** Whether you like [songId]; null while not known (see [load]) or signed out. */
-	get(songId: string | undefined): boolean | null {
+	/** Your thumbs on [songId]; null while not known (see [load]) or signed out. */
+	rating(songId: string | undefined): Rating | null {
 		if (!songId || !youtube.account) return null;
 		return this.#known.get(songId) ?? null;
+	}
+
+	/** Whether you like [songId]; null while not known. */
+	get(songId: string | undefined): boolean | null {
+		const rating = this.rating(songId);
+		return rating === null ? null : rating === 'like';
 	}
 
 	/** Looks [songId] up, once per sign-in. Call it from an effect. */
@@ -24,23 +35,38 @@ class Likes {
 		}
 		if (!youtube.account || this.#asked.has(songId)) return;
 		this.#asked.add(songId);
-		getLiked(songId)
-			.then((liked) => this.#known.set(songId, liked))
+		getRating(songId)
+			.then((s) => this.#known.set(songId, toRating(s)))
 			.catch(() => this.#asked.delete(songId));
 	}
 
-	/** Likes or unlikes [songId] right away (back if it didn't work), and says so with [onToast]. */
-	async set(songId: string, liked: boolean, onToast: (text: string) => void): Promise<void> {
+	/** Thumbs up, down or neither on [songId], right away (back if it didn't work), and says so with [onToast]. */
+	async rate(songId: string, rating: Rating, onToast: (text: string) => void): Promise<boolean> {
 		const before = this.#known.get(songId);
-		this.#known.set(songId, liked);
+		this.#known.set(songId, rating);
 		try {
-			await setLiked(songId, liked);
-			onToast(liked ? 'Added to Liked music' : 'Removed from Liked music');
+			await setRating(songId, { liked: rating === 'like', disliked: rating === 'dislike' });
+			onToast(
+				rating === 'like'
+					? 'Added to Liked music'
+					: rating === 'dislike'
+						? "Disliked: YouTube Music suggests fewer songs like it"
+						: before === 'like'
+							? 'Removed from Liked music'
+							: 'Dislike removed'
+			);
+			return true;
 		} catch (e) {
 			if (before === undefined) this.#known.delete(songId);
 			else this.#known.set(songId, before);
-			onToast(e instanceof Error ? e.message : "Couldn't change the like");
+			onToast(e instanceof Error ? e.message : "Couldn't change it");
+			return false;
 		}
+	}
+
+	/** Likes or unlikes [songId]. */
+	set(songId: string, liked: boolean, onToast: (text: string) => void): Promise<boolean> {
+		return this.rate(songId, liked ? 'like' : 'none', onToast);
 	}
 }
 

@@ -29,7 +29,11 @@ import type {
 	MovedRoomResponse,
 	Song,
 	YoutubePersonalizeSetting,
-	RoomClone
+	RoomClone,
+	PlaylistItemRef,
+	RemovePlaylistItemsRequest,
+	MovePlaylistItemRequest,
+	RenamePlaylistRequest
 } from './protocol.gen';
 
 import { identity } from './account';
@@ -219,18 +223,55 @@ export function getLibrary(): Promise<HomePage> {
 	return cached('me:library', () => request('/api/me/library'));
 }
 
-/** Whether you like a song (thumbs up) in YouTube Music. */
-export async function getLiked(songId: string): Promise<boolean> {
-	return (await request<LikeStatus>(`/api/me/likes/${encodeURIComponent(songId)}`)).liked;
+/** Your thumbs on a song in YouTube Music: up (liked), down (disliked), or neither. */
+export function getRating(songId: string): Promise<LikeStatus> {
+	return request<LikeStatus>(`/api/me/likes/${encodeURIComponent(songId)}`);
 }
 
-export async function setLiked(songId: string, liked: boolean): Promise<void> {
+export async function setRating(songId: string, rating: LikeStatus): Promise<void> {
 	await request<null>(`/api/me/likes/${encodeURIComponent(songId)}`, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ liked } satisfies LikeStatus)
+		body: JSON.stringify(rating satisfies LikeStatus)
 	});
 	cache.delete('me:playlist:LM');
+}
+
+// Your own playlists (PlaylistPage.owned): remove songs, move one, rename, delete.
+
+export async function removeFromPlaylist(playlistId: string, items: PlaylistItemRef[]): Promise<void> {
+	await request<null>(`/api/me/playlists/${encodeURIComponent(playlistId)}/remove`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ items } satisfies RemovePlaylistItemsRequest)
+	});
+	cache.delete(`me:playlist:${playlistId}`);
+}
+
+/** [itemId] goes right before [beforeItemId] (null: to the end). */
+export async function movePlaylistItem(playlistId: string, itemId: string, beforeItemId: string | null): Promise<void> {
+	await request<null>(`/api/me/playlists/${encodeURIComponent(playlistId)}/move`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ itemId, beforeItemId } satisfies MovePlaylistItemRequest)
+	});
+	cache.delete(`me:playlist:${playlistId}`);
+}
+
+export async function renamePlaylist(playlistId: string, title: string): Promise<void> {
+	await request<null>(`/api/me/playlists/${encodeURIComponent(playlistId)}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ title } satisfies RenamePlaylistRequest)
+	});
+	cache.delete(`me:playlist:${playlistId}`);
+	cache.delete('me:library');
+}
+
+export async function deletePlaylist(playlistId: string): Promise<void> {
+	await request<null>(`/api/me/playlists/${encodeURIComponent(playlistId)}`, { method: 'DELETE' });
+	cache.delete(`me:playlist:${playlistId}`);
+	cache.delete('me:library');
 }
 
 /** Your own playlists, to save songs to. */

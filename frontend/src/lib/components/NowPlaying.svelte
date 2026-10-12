@@ -71,6 +71,14 @@
 	function toggleLike() {
 		if (song && liked !== null) likes.set(song.id, !liked, onToast);
 	}
+
+	// Thumbs down: like YouTube Music, the song is skipped too (if you may skip).
+	const rating = $derived(likes.rating(song?.id));
+	async function toggleDislike() {
+		if (!song || rating === null) return;
+		const disliking = rating !== 'dislike';
+		if ((await likes.rate(song.id, disliking ? 'dislike' : 'none', onToast)) && disliking && room.can('skip')) await room.run({ kind: 'Skip' });
+	}
 	/** Phones: Up next / Related slid up over the player. */
 	let sheet = $state(false);
 	let tabsSwipe: { x: number; y: number } | null = null;
@@ -255,6 +263,15 @@
 				</div>
 				{#if youtube.account}
 					{@const shown = song}
+					<button
+						class="shrink-0 rounded-full p-2.5 hover:bg-white/10 disabled:opacity-40"
+						disabled={rating === null}
+						aria-label={rating === 'dislike' ? 'Remove dislike' : 'Dislike'}
+						aria-pressed={rating === 'dislike'}
+						onclick={toggleDislike}
+					>
+						<Icon name={rating === 'dislike' ? 'disliked' : 'dislike'} size={26} />
+					</button>
 					<button
 						class="shrink-0 rounded-full p-2.5 hover:bg-white/10 disabled:opacity-40"
 						disabled={liked === null}

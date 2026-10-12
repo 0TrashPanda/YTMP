@@ -14,6 +14,9 @@ import dev.trashpanda.ytmp.protocol.YoutubeSignInRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
 import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.RenamePlaylistRequest
+import dev.trashpanda.ytmp.protocol.MovePlaylistItemRequest
+import dev.trashpanda.ytmp.protocol.RemovePlaylistItemsRequest
 import dev.trashpanda.ytmp.protocol.MyPlaylists
 import dev.trashpanda.ytmp.protocol.SaveSongsRequest
 import dev.trashpanda.ytmp.core.Room
@@ -415,10 +418,34 @@ fun Application.ytmpModule(
                     owner.addToPlaylist(call.parameters["id"]!!, call.receive<SaveSongsRequest>().songIds)
                     call.respond(HttpStatusCode.NoContent)
                 }
-                get("/likes/{songId}") { call.respond(LikeStatus(call.owner().liked(call.parameters["songId"]!!))) }
+                // Your own playlists: remove songs, move one, rename, delete.
+                post("/playlists/{id}/remove") {
+                    val owner = call.owner()
+                    owner.removeFromPlaylist(call.parameters["id"]!!, call.receive<RemovePlaylistItemsRequest>().items)
+                    call.respond(HttpStatusCode.NoContent)
+                }
+                post("/playlists/{id}/move") {
+                    val owner = call.owner()
+                    val request = call.receive<MovePlaylistItemRequest>()
+                    owner.movePlaylistItem(call.parameters["id"]!!, request.itemId, request.beforeItemId)
+                    call.respond(HttpStatusCode.NoContent)
+                }
+                put("/playlists/{id}") {
+                    val owner = call.owner()
+                    val title = call.receive<RenamePlaylistRequest>().title.trim()
+                    if (title.isEmpty() || title.length > 150) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Playlist name must be 1-150 characters")
+                    owner.renamePlaylist(call.parameters["id"]!!, title)
+                    call.respond(HttpStatusCode.NoContent)
+                }
+                delete("/playlists/{id}") {
+                    call.owner().deletePlaylist(call.parameters["id"]!!)
+                    call.respond(HttpStatusCode.NoContent)
+                }
+                get("/likes/{songId}") { call.respond(call.owner().rating(call.parameters["songId"]!!)) }
                 put("/likes/{songId}") {
                     val owner = call.owner()
-                    owner.setLiked(call.parameters["songId"]!!, call.receive<LikeStatus>().liked)
+                    val rating = call.receive<LikeStatus>()
+                    owner.setRating(call.parameters["songId"]!!, rating.copy(disliked = rating.disliked && !rating.liked))
                     call.respond(HttpStatusCode.NoContent)
                 }
             }

@@ -10,6 +10,7 @@ import dev.trashpanda.ytmp.protocol.Song
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
@@ -17,6 +18,10 @@ import io.ktor.client.request.setBody
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
 import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.RenamePlaylistRequest
+import dev.trashpanda.ytmp.protocol.MovePlaylistItemRequest
+import dev.trashpanda.ytmp.protocol.RemovePlaylistItemsRequest
+import dev.trashpanda.ytmp.protocol.PlaylistItemRef
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.SaveSongsRequest
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
@@ -191,11 +196,27 @@ class RemoteSourceModule(
         client.post("$baseUrl/me/playlists/${id.encodeURLPathPart()}/songs") { me(cookie, SaveSongsRequest(songIds)) }.orThrow()
     }
 
-    suspend fun myLike(cookie: String, songId: String): Boolean =
-        client.get("$baseUrl/me/likes/${songId.encodeURLPathPart()}") { me(cookie) }.orThrow().body<LikeStatus>().liked
+    suspend fun myRating(cookie: String, songId: String): LikeStatus =
+        client.get("$baseUrl/me/likes/${songId.encodeURLPathPart()}") { me(cookie) }.orThrow().body()
 
-    suspend fun setMyLike(cookie: String, songId: String, liked: Boolean) {
-        client.put("$baseUrl/me/likes/${songId.encodeURLPathPart()}") { me(cookie, LikeStatus(liked)) }.orThrow()
+    suspend fun setMyRating(cookie: String, songId: String, rating: LikeStatus) {
+        client.put("$baseUrl/me/likes/${songId.encodeURLPathPart()}") { me(cookie, rating) }.orThrow()
+    }
+
+    suspend fun removeFromMyPlaylist(cookie: String, id: String, items: List<PlaylistItemRef>) {
+        client.post("$baseUrl/me/playlists/${id.encodeURLPathPart()}/remove") { me(cookie, RemovePlaylistItemsRequest(items)) }.orThrow()
+    }
+
+    suspend fun moveInMyPlaylist(cookie: String, id: String, itemId: String, beforeItemId: String?) {
+        client.post("$baseUrl/me/playlists/${id.encodeURLPathPart()}/move") { me(cookie, MovePlaylistItemRequest(itemId, beforeItemId)) }.orThrow()
+    }
+
+    suspend fun renameMyPlaylist(cookie: String, id: String, title: String) {
+        client.put("$baseUrl/me/playlists/${id.encodeURLPathPart()}") { me(cookie, RenamePlaylistRequest(title)) }.orThrow()
+    }
+
+    suspend fun deleteMyPlaylist(cookie: String, id: String) {
+        client.delete("$baseUrl/me/playlists/${id.encodeURLPathPart()}") { me(cookie) }.orThrow()
     }
 
     suspend fun addToMyHistory(cookie: String, songId: String) {

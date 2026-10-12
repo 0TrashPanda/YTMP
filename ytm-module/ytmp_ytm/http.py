@@ -237,14 +237,36 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         user.add_to_playlist(playlist_id, list(body.get("songIds") or []))
         return {"ok": True}
 
+    @app.post("/me/playlists/{playlist_id}/remove", dependencies=[Depends(check_key)])
+    def my_playlist_remove(playlist_id: str, body: dict, user: core.YtmCore = Depends(me)):
+        user.remove_from_playlist(playlist_id, [i for i in body.get("items") or [] if isinstance(i, dict)])
+        return {"ok": True}
+
+    @app.post("/me/playlists/{playlist_id}/move", dependencies=[Depends(check_key)])
+    def my_playlist_move(playlist_id: str, body: dict, user: core.YtmCore = Depends(me)):
+        user.move_in_playlist(playlist_id, str(body.get("itemId") or ""), body.get("beforeItemId") or None)
+        return {"ok": True}
+
+    @app.put("/me/playlists/{playlist_id}", dependencies=[Depends(check_key)])
+    def my_playlist_rename(playlist_id: str, body: dict, user: core.YtmCore = Depends(me)):
+        user.rename_playlist(playlist_id, str(body.get("title") or ""))
+        return {"ok": True}
+
+    @app.delete("/me/playlists/{playlist_id}", dependencies=[Depends(check_key)])
+    def my_playlist_delete(playlist_id: str, user: core.YtmCore = Depends(me)):
+        user.delete_playlist(playlist_id)
+        return {"ok": True}
+
     @app.get("/me/likes/{song_id}", dependencies=[Depends(check_key)])
     def my_like(song_id: str, user: core.YtmCore = Depends(me)):
-        return {"liked": user.liked(song_id)}
+        rating = user.rating(song_id)
+        return {"liked": rating == "like", "disliked": rating == "dislike"}
 
     @app.put("/me/likes/{song_id}", dependencies=[Depends(check_key)])
     def my_like_set(song_id: str, body: dict, user: core.YtmCore = Depends(me)):
-        user.set_liked(song_id, bool(body.get("liked")))
-        return {"liked": bool(body.get("liked"))}
+        liked, disliked = bool(body.get("liked")), bool(body.get("disliked"))
+        user.set_rating(song_id, "like" if liked else "dislike" if disliked else "none")
+        return {"liked": liked, "disliked": disliked and not liked}
 
     @app.post("/me/history/{song_id}", dependencies=[Depends(check_key)])
     def my_history_add(song_id: str, user: core.YtmCore = Depends(me)):

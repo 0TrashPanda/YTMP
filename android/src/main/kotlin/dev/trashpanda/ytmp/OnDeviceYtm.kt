@@ -6,6 +6,8 @@ import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
+import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.PlaylistItemRef
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
@@ -14,6 +16,7 @@ import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.wireName
+import com.chaquo.python.Kwarg
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
@@ -141,9 +144,28 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id, true)).toString())
     }
 
-    suspend fun liked(songId: String): Boolean = python { core.callAttr("liked", songId).toBoolean() }
+    suspend fun rating(songId: String): LikeStatus = python {
+        val rating = core.callAttr("rating", songId).toString()
+        LikeStatus(liked = rating == "like", disliked = rating == "dislike")
+    }
 
-    suspend fun setLiked(songId: String, liked: Boolean) = python { core.callAttr("set_liked", songId, liked); Unit }
+    suspend fun setRating(songId: String, rating: LikeStatus) = python {
+        core.callAttr("set_rating", songId, if (rating.liked) "like" else if (rating.disliked) "dislike" else "none"); Unit
+    }
+
+    suspend fun removeFromPlaylist(playlistId: String, items: List<PlaylistItemRef>) = python {
+        val list = python.builtins.callAttr("list")
+        for (item in items) list.callAttr("append", python.builtins.callAttr("dict", Kwarg("songId", item.songId), Kwarg("itemId", item.itemId)))
+        core.callAttr("remove_from_playlist", playlistId, list); Unit
+    }
+
+    suspend fun movePlaylistItem(playlistId: String, itemId: String, beforeItemId: String?) = python {
+        core.callAttr("move_in_playlist", playlistId, itemId, beforeItemId); Unit
+    }
+
+    suspend fun renamePlaylist(playlistId: String, title: String) = python { core.callAttr("rename_playlist", playlistId, title); Unit }
+
+    suspend fun deletePlaylist(playlistId: String) = python { core.callAttr("delete_playlist", playlistId); Unit }
 
     suspend fun addToHistory(songId: String) = python { core.callAttr("add_to_history", songId); Unit }
 

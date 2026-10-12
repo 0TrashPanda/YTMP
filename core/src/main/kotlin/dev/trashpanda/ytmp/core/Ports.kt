@@ -1,5 +1,7 @@
 package dev.trashpanda.ytmp.core
 
+import dev.trashpanda.ytmp.protocol.PlaylistItemRef
+import dev.trashpanda.ytmp.protocol.LikeStatus
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.OutputKind
@@ -80,6 +82,22 @@ interface PersonalCatalog {
     suspend fun liked(songId: String): Boolean
 
     suspend fun setLiked(songId: String, liked: Boolean)
+
+    /** Thumbs up or down (or neither). */
+    suspend fun rating(songId: String): LikeStatus = LikeStatus(liked(songId))
+
+    suspend fun setRating(songId: String, rating: LikeStatus) = setLiked(songId, rating.liked)
+
+    // Your own playlists ([PlaylistPage.owned]).
+
+    suspend fun removeFromPlaylist(playlistId: String, items: List<PlaylistItemRef>): Unit = throw UnsupportedOperationException("Not here")
+
+    /** [itemId] goes right before [beforeItemId] (null: to the end). */
+    suspend fun movePlaylistItem(playlistId: String, itemId: String, beforeItemId: String?): Unit = throw UnsupportedOperationException("Not here")
+
+    suspend fun renamePlaylist(playlistId: String, title: String): Unit = throw UnsupportedOperationException("Not here")
+
+    suspend fun deletePlaylist(playlistId: String): Unit = throw UnsupportedOperationException("Not here")
 
     /** Your own playlists, to save songs to. */
     suspend fun ownPlaylists(): List<PlaylistSummary>

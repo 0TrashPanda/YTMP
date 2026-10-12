@@ -10,6 +10,8 @@ import dev.trashpanda.ytmp.OnDeviceYtm
 import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.PlaylistItemRef
+import dev.trashpanda.ytmp.protocol.LikeStatus
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
@@ -94,20 +96,50 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
 
     override suspend fun playlist(id: String): PlaylistPage = playlists.get(id) { requireSignedIn(); ytm().personalPlaylist(id) }
 
-    // Likes are looked up per song (the one playing) and remembered; changing one updates it.
-    private val likes = TtlCache<String, Boolean>(500, 30.minutes, System::currentTimeMillis)
-    private val likesChanged = mutableMapOf<String, Boolean>()
+    // Thumbs are looked up per song (the one playing) and remembered; changing one updates it.
+    private val ratings = TtlCache<String, LikeStatus>(500, 30.minutes, System::currentTimeMillis)
+    private val ratingsChanged = mutableMapOf<String, LikeStatus>()
 
-    override suspend fun liked(songId: String): Boolean {
-        synchronized(likesChanged) { likesChanged[songId] }?.let { return it }
-        return likes.get(songId) { requireSignedIn(); ytm().liked(songId) }
+    override suspend fun liked(songId: String): Boolean = rating(songId).liked
+
+    override suspend fun setLiked(songId: String, liked: Boolean) = setRating(songId, LikeStatus(liked))
+
+    override suspend fun rating(songId: String): LikeStatus {
+        synchronized(ratingsChanged) { ratingsChanged[songId] }?.let { return it }
+        return ratings.get(songId) { requireSignedIn(); ytm().rating(songId) }
     }
 
-    override suspend fun setLiked(songId: String, liked: Boolean) {
+    override suspend fun setRating(songId: String, rating: LikeStatus) {
         requireSignedIn()
-        ytm().setLiked(songId, liked)
-        synchronized(likesChanged) { likesChanged[songId] = liked }
+        ytm().setRating(songId, rating)
+        synchronized(ratingsChanged) { ratingsChanged[songId] = rating }
         playlists.clear() // Liked music changed
+    }
+
+    override suspend fun removeFromPlaylist(playlistId: String, items: List<PlaylistItemRef>) {
+        requireSignedIn()
+        ytm().removeFromPlaylist(playlistId, items)
+        playlists.clear()
+    }
+
+    override suspend fun movePlaylistItem(playlistId: String, itemId: String, beforeItemId: String?) {
+        requireSignedIn()
+        ytm().movePlaylistItem(playlistId, itemId, beforeItemId)
+        playlists.clear()
+    }
+
+    override suspend fun renamePlaylist(playlistId: String, title: String) {
+        requireSignedIn()
+        ytm().renamePlaylist(playlistId, title)
+        playlists.clear()
+        libraries.clear()
+    }
+
+    override suspend fun deletePlaylist(playlistId: String) {
+        requireSignedIn()
+        ytm().deletePlaylist(playlistId)
+        playlists.clear()
+        libraries.clear()
     }
 
     override suspend fun historySetting(): YoutubeHistory =
@@ -168,8 +200,8 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
     }
 
     private fun forget() {
-        likes.clear()
-        synchronized(likesChanged) { likesChanged.clear() }
+        ratings.clear()
+        synchronized(ratingsChanged) { ratingsChanged.clear() }
         homes.clear()
         libraries.clear()
         playlists.clear()

@@ -41,6 +41,11 @@ import dev.trashpanda.ytmp.protocol.LikeStatus
 import dev.trashpanda.ytmp.protocol.MyPlaylists
 import dev.trashpanda.ytmp.protocol.SaveSongsRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
+import dev.trashpanda.ytmp.protocol.PlaylistItemRef
+import dev.trashpanda.ytmp.protocol.RemovePlaylistItemsRequest
+import dev.trashpanda.ytmp.protocol.MovePlaylistItemRequest
+import dev.trashpanda.ytmp.protocol.RenamePlaylistRequest
+import dev.trashpanda.ytmp.protocol.RoomPasswordRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
 import dev.trashpanda.ytmp.protocol.SuggestionsResponse
 import dev.trashpanda.ytmp.protocol.ServerMessage
@@ -198,6 +203,11 @@ fun main(args: Array<String>) {
     generator.addRoot(MyPlaylists.serializer().descriptor)
     generator.addRoot(SaveSongsRequest.serializer().descriptor)
     generator.addRoot(CreatePlaylistRequest.serializer().descriptor)
+    generator.addRoot(PlaylistItemRef.serializer().descriptor)
+    generator.addRoot(RemovePlaylistItemsRequest.serializer().descriptor)
+    generator.addRoot(MovePlaylistItemRequest.serializer().descriptor)
+    generator.addRoot(RenamePlaylistRequest.serializer().descriptor)
+    generator.addRoot(RoomPasswordRequest.serializer().descriptor)
     generator.addRoot(CreatePlaylistResponse.serializer().descriptor)
     generator.addRoot(SuggestionsResponse.serializer().descriptor)
     out.parentFile.mkdirs()

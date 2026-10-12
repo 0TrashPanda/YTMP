@@ -843,6 +843,8 @@ export interface PlaylistPage {
   description: string | null;
   thumbnails: Thumbnail[];
   songs: Song[];
+  owned: boolean;
+  itemIds: string[];
 }
 
 export type SearchType = "all" | "songs" | "videos" | "albums" | "artists" | "community_playlists" | "featured_playlists" | "podcasts" | "episodes";
@@ -982,6 +984,7 @@ export interface MovedRoomResponse {
 
 export interface LikeStatus {
   liked: boolean;
+  disliked: boolean;
 }
 
 export interface PlaylistSummary {
@@ -1001,6 +1004,28 @@ export interface SaveSongsRequest {
 export interface CreatePlaylistRequest {
   title: string;
   songIds: string[];
+}
+
+export interface PlaylistItemRef {
+  songId: string;
+  itemId: string;
+}
+
+export interface RemovePlaylistItemsRequest {
+  items: PlaylistItemRef[];
+}
+
+export interface MovePlaylistItemRequest {
+  itemId: string;
+  beforeItemId: string | null;
+}
+
+export interface RenamePlaylistRequest {
+  title: string;
+}
+
+export interface RoomPasswordRequest {
+  password: string | null;
 }
 
 export interface CreatePlaylistResponse {

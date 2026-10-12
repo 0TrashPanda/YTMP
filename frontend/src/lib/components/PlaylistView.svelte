@@ -1,7 +1,8 @@
 <script lang="ts">
 	// A playlist page (community or YouTube Music's own, or one of yours): its songs, in order.
 	import { thumbUrl } from '../images.svelte';
-	import { getPlaylist } from '../api';
+	import { deletePlaylist, getPlaylist, movePlaylistItem, renamePlaylist } from '../api';
+	import Icon from './Icon.svelte';
 	import { formatTime } from '../format';
 	import type { PlaylistPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -15,7 +16,8 @@
 		title,
 		personal = false,
 		onToast,
-		onMenu
+		onMenu,
+		onGone
 	}: {
 		room: RoomConnection;
 		id: string;
@@ -25,20 +27,78 @@
 		title: string;
 		onToast: (text: string) => void;
 		onMenu: (target: MenuTarget) => void;
+		/** The playlist was deleted: leave its page. */
+		onGone?: () => void;
 	} = $props();
 
 	let playlist = $state<PlaylistPage | null>(null);
 	let error = $state<string | null>(null);
 	let showDescription = $state(false);
 
+	let version = $state(0);
 	$effect(() => {
 		const playlistId = id;
-		playlist = null;
+		void version;
 		error = null;
 		getPlaylist(playlistId, personal)
 			.then((p) => playlistId === id && (playlist = p))
 			.catch((e) => (error = e instanceof Error ? e.message : "Couldn't load the playlist"));
 	});
+	$effect(() => {
+		void id;
+		playlist = null;
+	});
+	/** Load it again (after removing a song). */
+	const reload = () => version++;
+
+	// Your own playlists: move songs, rename, delete. Liked music: remove (unlike).
+	const likedMusic = $derived(personal && id === 'LM');
+	const editable = $derived(!!playlist?.owned);
+	let menuOpen = $state(false);
+	let renaming = $state<string | null>(null);
+
+	async function move(from: number, to: number) {
+		const p = playlist;
+		if (!p) return;
+		const songs = [...p.songs];
+		const items = [...p.itemIds];
+		const [song] = songs.splice(from, 1);
+		const [itemId] = items.splice(from, 1);
+		songs.splice(to, 0, song);
+		items.splice(to, 0, itemId);
+		playlist = { ...p, songs, itemIds: items };
+		try {
+			await movePlaylistItem(p.id, itemId, items[to + 1] || null);
+		} catch (e) {
+			onToast(e instanceof Error ? e.message : "Couldn't move it");
+			reload();
+		}
+	}
+
+	async function rename() {
+		const title = renaming?.trim();
+		renaming = null;
+		if (!playlist || !title || title === playlist.title) return;
+		try {
+			await renamePlaylist(playlist.id, title);
+			playlist = { ...playlist, title };
+			onToast('Playlist renamed');
+		} catch (e) {
+			onToast(e instanceof Error ? e.message : "Couldn't rename it");
+		}
+	}
+
+	async function remove() {
+		menuOpen = false;
+		if (!playlist || !confirm(`Delete the playlist "${playlist.title}"? This can't be undone.`)) return;
+		try {
+			await deletePlaylist(playlist.id);
+			onToast('Playlist deleted');
+			onGone?.();
+		} catch (e) {
+			onToast(e instanceof Error ? e.message : "Couldn't delete it");
+		}
+	}
 
 	const total = $derived(playlist?.songs.reduce((sum, s) => sum + s.durationMs, 0) ?? 0);
 </script>
@@ -52,7 +112,41 @@
 		</div>
 		<div class="min-w-0">
 			<p class="text-xs font-medium tracking-wide text-muted uppercase">Playlist</p>
-			<h1 class="text-3xl font-black break-words sm:text-4xl">{playlist?.title ?? title}</h1>
+			{#if renaming !== null}
+				<form
+					onsubmit={(e) => {
+						e.preventDefault();
+						rename();
+					}}
+				>
+					<!-- svelte-ignore a11y_autofocus -->
+					<input
+						class="w-full rounded-lg bg-raised px-3 py-1 text-3xl font-black outline-none ring-white/40 focus:ring-2"
+						bind:value={renaming}
+						maxlength="150"
+						autofocus
+						onblur={rename}
+						onkeydown={(e) => e.key === 'Escape' && (renaming = null)}
+					/>
+				</form>
+			{:else}
+				<div class="flex items-start gap-2">
+					<h1 class="text-3xl font-black break-words sm:text-4xl">{playlist?.title ?? title}</h1>
+					{#if editable}
+						<div class="relative mt-1">
+							<button class="rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label="Playlist options" onclick={() => (menuOpen = !menuOpen)}>
+								<Icon name="more" />
+							</button>
+							{#if menuOpen}
+								<div class="absolute top-10 left-0 z-20 flex w-44 flex-col rounded-lg bg-surface p-1.5 shadow-xl ring-1 ring-line">
+									<button class="rounded px-3 py-2 text-left text-sm hover:bg-raised" onclick={() => ((renaming = playlist?.title ?? ''), (menuOpen = false))}>Rename</button>
+									<button class="rounded px-3 py-2 text-left text-sm text-accent hover:bg-raised" onclick={remove}>Delete playlist</button>
+								</div>
+							{/if}
+						</div>
+					{/if}
+				</div>
+			{/if}
 			{#if playlist}
 				<p class="mt-1 text-muted">
 					{#if playlist.author}<span class="font-medium text-white">{playlist.author}</span> • {/if}{playlist.songs.length} songs • {formatTime(total)}
@@ -75,7 +169,14 @@
 		<p class="px-2 text-muted">This playlist has no songs that can be played.</p>
 	{:else}
 		<section class="flex flex-col gap-1">
-			<SongList {room} songs={playlist.songs} {onToast} {onMenu} />
+			<SongList
+				{room}
+				songs={playlist.songs}
+				playlist={editable || likedMusic ? { id: playlist.id, itemIds: playlist.itemIds, likedMusic, onChanged: reload } : undefined}
+				onMove={editable ? move : undefined}
+				{onToast}
+				{onMenu}
+			/>
 		</section>
 	{/if}
 </div>

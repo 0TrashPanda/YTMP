@@ -57,7 +57,31 @@ data class PlaylistPage(
     val description: String?,
     val thumbnails: List<Thumbnail>,
     val songs: List<Song>,
+    /** One of your own playlists: you can remove, move and rename (`/api/me/playlists/{id}`). */
+    val owned: Boolean = false,
+    /** For [owned] playlists: each song's place in it, in the same order as [songs] ("" if unknown). */
+    val itemIds: List<String> = emptyList(),
 )
+
+/** A song in one of your playlists ([PlaylistPage.itemIds]). */
+@Serializable
+@SerialName("PlaylistItemRef")
+data class PlaylistItemRef(val songId: String, val itemId: String)
+
+/** `POST /api/me/playlists/{id}/remove` */
+@Serializable
+@SerialName("RemovePlaylistItemsRequest")
+data class RemovePlaylistItemsRequest(val items: List<PlaylistItemRef>)
+
+/** `POST /api/me/playlists/{id}/move`: [itemId] goes right before [beforeItemId] (null: to the end). */
+@Serializable
+@SerialName("MovePlaylistItemRequest")
+data class MovePlaylistItemRequest(val itemId: String, val beforeItemId: String?)
+
+/** `PUT /api/me/playlists/{id}` */
+@Serializable
+@SerialName("RenamePlaylistRequest")
+data class RenamePlaylistRequest(val title: String)
 
 /** A podcast (`GET /api/podcasts/{id}`): its newest episodes first. */
 @Serializable
@@ -222,7 +246,12 @@ data class YoutubePersonalizeSetting(val on: Boolean)
 /** `GET`/`PUT /api/me/likes/{songId}`: whether you like a song (thumbs up) in YouTube Music. */
 @Serializable
 @SerialName("LikeStatus")
-data class LikeStatus(val liked: Boolean)
+data class LikeStatus(
+    /** Thumbs up. */
+    val liked: Boolean,
+    /** Thumbs down (never both). */
+    val disliked: Boolean = false,
+)
 
 /** One of your own playlists, to save songs to. */
 @Serializable

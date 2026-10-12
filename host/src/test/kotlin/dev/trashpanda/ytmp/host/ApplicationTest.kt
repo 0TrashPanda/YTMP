@@ -15,6 +15,10 @@ import dev.trashpanda.ytmp.protocol.YoutubePersonalizeSetting
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
 import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.RenamePlaylistRequest
+import dev.trashpanda.ytmp.protocol.MovePlaylistItemRequest
+import dev.trashpanda.ytmp.protocol.RemovePlaylistItemsRequest
+import dev.trashpanda.ytmp.protocol.PlaylistItemRef
 import dev.trashpanda.ytmp.protocol.MyPlaylists
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.SaveSongsRequest
@@ -358,6 +362,18 @@ class ApplicationTest {
         override suspend fun createPlaylist(title: String, songIds: List<String>) = "PLnew".also { saved += it to songIds }
         override suspend fun signOut() { account = null }
 
+        val ratings = mutableMapOf<String, LikeStatus>()
+        val edits = mutableListOf<String>()
+        override suspend fun rating(songId: String) = ratings[songId] ?: LikeStatus(songId in liked)
+        override suspend fun setRating(songId: String, rating: LikeStatus) {
+            ratings[songId] = rating
+            if (rating.liked) liked += songId else liked -= songId
+        }
+        override suspend fun removeFromPlaylist(playlistId: String, items: List<PlaylistItemRef>) { edits += "remove $playlistId ${items.joinToString { it.itemId }}" }
+        override suspend fun movePlaylistItem(playlistId: String, itemId: String, beforeItemId: String?) { edits += "move $playlistId $itemId before $beforeItemId" }
+        override suspend fun renamePlaylist(playlistId: String, title: String) { edits += "rename $playlistId $title" }
+        override suspend fun deletePlaylist(playlistId: String) { edits += "delete $playlistId" }
+
         var personalize = true
         var searchFails = false
         override suspend fun personalize() = personalize
@@ -402,6 +418,29 @@ class ApplicationTest {
         owner.personalize = true
         owner.account = null
         assertEquals("all", searchTitle())
+    }
+
+    @Test
+    fun `dislikes, and editing your own playlists`() = testApplication {
+        val owner = Owner(YoutubeAccount("Jonah", "@jonah", null))
+        setupPhone(generalCatalog, owner)
+        val client = jsonClient()
+        fun json(b: io.ktor.client.request.HttpRequestBuilder) = b.contentType(ContentType.Application.Json)
+
+        assertEquals(HttpStatusCode.NoContent, client.put("/api/me/likes/ytm:abc") { json(this); setBody(LikeStatus(liked = false, disliked = true)) }.status)
+        assertEquals(LikeStatus(liked = false, disliked = true), client.get("/api/me/likes/ytm:abc").body<LikeStatus>())
+        // Never both.
+        client.put("/api/me/likes/ytm:abc") { json(this); setBody(LikeStatus(liked = true, disliked = true)) }
+        assertEquals(LikeStatus(liked = true, disliked = false), client.get("/api/me/likes/ytm:abc").body<LikeStatus>())
+
+        client.post("/api/me/playlists/PLmine/remove") { json(this); setBody(RemovePlaylistItemsRequest(listOf(PlaylistItemRef("ytm:abc", "S1")))) }
+        client.post("/api/me/playlists/PLmine/move") { json(this); setBody(MovePlaylistItemRequest("S2", null)) }
+        client.put("/api/me/playlists/PLmine") { json(this); setBody(RenamePlaylistRequest("  New  ")) }
+        client.delete("/api/me/playlists/PLmine")
+        assertEquals(listOf("remove PLmine S1", "move PLmine S2 before null", "rename PLmine New", "delete PLmine"), owner.edits)
+        assertEquals(HttpStatusCode.BadRequest, client.put("/api/me/playlists/PLmine") { json(this); setBody(RenamePlaylistRequest(" ")) }.status)
+        // Not for guests on the phone.
+        assertEquals(HttpStatusCode.Forbidden, client.delete("/api/me/playlists/PLmine") { header("X-Remote", "1") }.status)
     }
 
     @Test

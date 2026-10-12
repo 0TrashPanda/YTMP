@@ -258,3 +258,73 @@ def test_likes_and_saving_with_an_account():
     ytm.add_to_playlist("PLmine", ["ytm:abc"])
     with pytest.raises(core.Unavailable, match="Already"):
         ytm.add_to_playlist("PLmine", ["ytm:dupe"])
+
+
+class _PlaylistUser:
+    """A signed-in YTMusic, as far as playlists and ratings go."""
+
+    def __init__(self):
+        self.calls = []
+
+    def get_playlist(self, playlist_id, limit=None):
+        track = lambda vid, set_id: {"videoId": vid, "title": vid, "artists": [{"name": "A", "id": None}], "setVideoId": set_id, "duration_seconds": 100}
+        return {"title": "Mine", "owned": True, "tracks": [track("aaaaaaaaaaa", "S1"), track("bbbbbbbbbbb", "S2")]}
+
+    def get_watch_playlist(self, videoId, limit):
+        return {"tracks": [{"videoId": videoId, "likeStatus": "DISLIKE"}]}
+
+    def rate_song(self, vid, status):
+        self.calls.append(("rate", vid, status))
+
+    def remove_playlist_items(self, pid, videos):
+        self.calls.append(("remove", pid, videos))
+        return "STATUS_SUCCEEDED"
+
+    def edit_playlist(self, pid, title=None, moveItem=None):
+        self.calls.append(("edit", pid, title, moveItem))
+        return "STATUS_SUCCEEDED"
+
+    def delete_playlist(self, pid):
+        self.calls.append(("delete", pid))
+        return "STATUS_SUCCEEDED"
+
+
+def _signed_in_core(monkeypatch):
+    ytm = core.YtmCore.__new__(core.YtmCore)
+    user = _PlaylistUser()
+    monkeypatch.setattr(ytm, "_signed_in", lambda: user, raising=False)
+    ytm._ytm = user
+    return ytm, user
+
+
+def test_own_playlists_come_with_their_items(monkeypatch):
+    ytm, _ = _signed_in_core(monkeypatch)
+    page = ytm.playlist("PLmine", personal=True)
+    assert page["owned"] is True
+    assert page["itemIds"] == ["S1", "S2"]
+    assert [s["id"] for s in page["songs"]] == ["ytm:aaaaaaaaaaa", "ytm:bbbbbbbbbbb"]
+
+
+def test_editing_an_own_playlist(monkeypatch):
+    ytm, user = _signed_in_core(monkeypatch)
+    ytm.remove_from_playlist("PLmine", [{"songId": "ytm:aaaaaaaaaaa", "itemId": "S1"}])
+    ytm.move_in_playlist("PLmine", "S2", "S1")
+    ytm.move_in_playlist("PLmine", "S1", None)
+    ytm.rename_playlist("PLmine", " New <name> ")
+    ytm.delete_playlist("PLmine")
+    assert user.calls == [
+        ("remove", "PLmine", [{"videoId": "aaaaaaaaaaa", "setVideoId": "S1"}]),
+        ("edit", "PLmine", None, ("S2", "S1")),
+        ("edit", "PLmine", None, "S1"),
+        ("edit", "PLmine", "New name", None),
+        ("delete", "PLmine"),
+    ]
+
+
+def test_dislikes(monkeypatch):
+    ytm, user = _signed_in_core(monkeypatch)
+    assert ytm.rating("ytm:aaaaaaaaaaa") == "dislike"
+    assert ytm.liked("ytm:aaaaaaaaaaa") is False
+    ytm.set_rating("ytm:aaaaaaaaaaa", "dislike")
+    ytm.set_rating("ytm:aaaaaaaaaaa", "none")
+    assert [c[2].name for c in user.calls] == ["DISLIKE", "INDIFFERENT"]
