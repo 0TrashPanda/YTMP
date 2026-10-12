@@ -1,6 +1,5 @@
 package dev.trashpanda.ytmp
 
-import android.util.Log
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.NowPlaying

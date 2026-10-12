@@ -116,6 +116,7 @@ dependencies {
     implementation(libs.ktor.client.cio)
     // Sends the shared code's slf4j logs (host, Cast driver) to logcat.
     implementation(libs.logback.android)
+    implementation(libs.slf4j.api)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
     implementation(libs.androidx.webkit)

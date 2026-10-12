@@ -19,6 +19,7 @@ data class Config(
     val database: DatabaseConfig = DatabaseConfig(),
     val accounts: AccountsConfig = AccountsConfig(),
     val audio: AudioConfig = AudioConfig(),
+    val logs: LogsConfig = LogsConfig(),
 ) {
     companion object {
         private val toml = Toml(TomlInputConfig(ignoreUnknownNames = true))
@@ -41,6 +42,10 @@ data class Config(
                 ),
                 audio = base.audio.copy(
                     proxy = env["YTMP_AUDIO_PROXY"] ?: base.audio.proxy,
+                ),
+                logs = base.logs.copy(
+                    dir = env["YTMP_LOG_DIR"] ?: base.logs.dir,
+                    level = env["YTMP_LOG_LEVEL"] ?: base.logs.level,
                 ),
                 database = base.database.copy(
                     type = env["YTMP_DB_TYPE"] ?: base.database.type,
@@ -94,6 +99,21 @@ data class AudioConfig(
 ) {
     fun proxyMode(): AudioProxyMode = AudioProxyMode.parse(proxy)
 }
+
+/** Log files (see server/src/main/resources/logback.xml); the log also goes to the console. */
+@Serializable
+data class LogsConfig(
+    /** Folder for the log files. Empty: console only. */
+    val dir: String = "logs",
+    /** info, or debug for more detail. */
+    val level: String = "info",
+    /** Days of logs to keep. */
+    @SerialName("keep_days")
+    val keepDays: Int = 14,
+    /** All log files together stay below this many MB; the oldest go first. */
+    @SerialName("max_mb")
+    val maxMb: Int = 100,
+)
 
 @Serializable
 data class SonosConfig(

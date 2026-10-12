@@ -1,3 +1,8 @@
+<!--
+  Logcat, and log files in the app's files folder (logs/) that clean up after themselves:
+  a file per day, split at 2 MB, kept 7 days and never more than 20 MB together.
+  "Send logs" in the app's settings shares them (LogFiles.kt).
+-->
 <configuration>
     <appender name="logcat" class="ch.qos.logback.classic.android.LogcatAppender">
         <tagEncoder>
@@ -7,7 +12,28 @@
             <pattern>%logger{20}: %msg</pattern>
         </encoder>
     </appender>
+    <appender name="file" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${DATA_DIR}/logs/ytmp.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${DATA_DIR}/logs/ytmp.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>2MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>20MB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{30} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <!-- Writing the file off the thread that logs (the player's, the main thread). -->
+    <appender name="async-file" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="file" />
+    </appender>
+    <logger name="dev.trashpanda.ytmp" level="DEBUG" />
+    <logger name="dev.trashpanda.ytmp.YtmpWeb" level="INFO" />
+    <logger name="ytmp_ytm" level="INFO" />
     <root level="INFO">
         <appender-ref ref="logcat" />
+        <appender-ref ref="async-file" />
     </root>
 </configuration>

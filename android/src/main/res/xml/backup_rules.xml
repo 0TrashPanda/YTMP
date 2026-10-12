@@ -2,4 +2,5 @@
 <!-- Android 11 and older ignore data_extraction_rules.xml: the same rule, for them. -->
 <full-backup-content>
     <exclude domain="sharedpref" path="youtube.xml" />
+    <exclude domain="file" path="logs/" />
 </full-backup-content>

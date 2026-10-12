@@ -26,6 +26,20 @@ import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
+import org.slf4j.LoggerFactory
+
+/** Where the Python module's log (yt-dlp included) goes: the app's log (Python logging levels). */
+class PythonLog {
+    fun log(level: Int, name: String, message: String) {
+        val logger = LoggerFactory.getLogger(name)
+        when {
+            level >= 40 -> logger.error(message)
+            level >= 30 -> logger.warn(message)
+            level >= 20 -> logger.info(message)
+            else -> logger.debug(message)
+        }
+    }
+}
 
 /** The YouTube Music sign-in doesn't work (any more): signed out elsewhere, or the cookies expired. */
 class NotSignedInException(message: String) : SourceException(message)
@@ -46,6 +60,7 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         if (!Python.isStarted()) Python.start(AndroidPlatform(context.applicationContext))
         python = Python.getInstance()
         json = python.getModule("json")
+        python.getModule("ytmp_ytm.core").callAttr("log_to", PythonLog())
     }
 
     override suspend fun search(query: String, type: SearchType): SearchPage = python {

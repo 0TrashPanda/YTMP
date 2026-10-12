@@ -28,6 +28,7 @@ RUN useradd --system ytmp && mkdir -p /var/lib/ytmp && chown ytmp /var/lib/ytmp
 USER ytmp
 ENV YTMP_CONFIG=/config/ytmp.toml
 ENV YTMP_DB_PATH=/var/lib/ytmp/ytmp.db
+ENV YTMP_LOG_DIR=/var/lib/ytmp/logs
 VOLUME /var/lib/ytmp
 EXPOSE 8080
 ENTRYPOINT ["/app/bin/server"]

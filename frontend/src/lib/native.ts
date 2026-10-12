@@ -31,6 +31,12 @@ export interface NativeBridge {
 	phoneYoutubeAccount?(): string | null;
 	/** On your account server's pages (bridge version 4): asks you, then signs the phone in to YouTube Music with these cookies. */
 	useYoutubeCookie?(cookie: string): void;
+	/** This app's version, e.g. "0.5.2" (bridge version 5). */
+	appVersion?(): string;
+	/** Looks for a new version of the app; the app shows what it found (bridge version 5). */
+	checkForUpdates?(): void;
+	/** Opens the share sheet with the app's log files, to report a problem (bridge version 5). */
+	shareLogs?(): void;
 }
 
 /** Callbacks the app calls on the page. */

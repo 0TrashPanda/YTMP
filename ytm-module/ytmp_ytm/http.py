@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import secrets
 import threading
+import time
 from collections import OrderedDict
 from contextlib import asynccontextmanager
 
@@ -19,6 +21,10 @@ from . import core
 
 API_VERSION = 1
 VERSION = "0.1.0"
+
+log = logging.getLogger("ytmp_ytm.http")
+# A chunk from YouTube taking longer than this is what a listener hears as buffering.
+_SLOW_CHUNK_S = 5.0
 
 
 def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
@@ -36,11 +42,13 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
             raise _ApiError(401, "unauthorized", "Missing or wrong module key")
 
     @app.exception_handler(core.Unavailable)
-    async def unavailable(_: Request, e: core.Unavailable):
+    async def unavailable(request: Request, e: core.Unavailable):
+        log.warning("%s: unavailable: %s", request.url.path, e)
         return _error(422, "unavailable", str(e))
 
     @app.exception_handler(core.NotFound)
-    async def not_found(_: Request, e: core.NotFound):
+    async def not_found(request: Request, e: core.NotFound):
+        log.info("%s: not found: %s", request.url.path, e)
         return _error(404, "not_found", str(e))
 
     @app.exception_handler(core.NotSignedIn)
@@ -48,7 +56,9 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         return _error(401, "not_signed_in", str(e))
 
     @app.exception_handler(_ApiError)
-    async def api_error(_: Request, e: _ApiError):
+    async def api_error(request: Request, e: _ApiError):
+        if e.status >= 500:
+            log.warning("%s: %s", request.url.path, e.message)
         return _error(e.status, e.code, e.message)
 
     @app.get("/health")
@@ -115,6 +125,8 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         first = await fetch(info, start, min(end, start + core.CHUNK_SIZE - 1))
         if first.status_code == 403:
             # The cached URL went bad before its expiry; get a fresh one and try once more.
+            log.warning("audio %s: YouTube answered 403 for the cached link (%d min before it expires), resolving again",
+                        song_id, (info.expires_at - time.time()) // 60)
             await first.aclose()
             info = await run_in_threadpool(ytm.stream, song_id, True)
             first = await fetch(info, start, min(end, start + core.CHUNK_SIZE - 1))
@@ -123,25 +135,38 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
             raise _ApiError(416, "invalid", "Range not satisfiable")
         if first.status_code >= 400:
             await first.aclose()
-            raise _ApiError(502, "upstream_error", f"YouTube answered {first.status_code}")
+            # Don't keep a link YouTube refuses: the next request resolves it again.
+            ytm.forget_stream(song_id)
+            raise _ApiError(502, "upstream_error", f"YouTube answered {first.status_code} for {song_id}")
 
         total = core.total_size(first.headers.get("content-range"))
         end = min(end, total - 1) if total else end
+        log.debug("audio %s: bytes %d-%s of %s", song_id, start, end if total else "", total)
 
         async def body():
             response = first
             position = start
+            chunk_started = time.monotonic()
             try:
                 while True:
                     async for chunk in response.aiter_raw():
                         position += len(chunk)
                         yield chunk
                     await response.aclose()
+                    took = time.monotonic() - chunk_started
+                    if took > _SLOW_CHUNK_S:
+                        log.warning("audio %s: a 1 MB piece took %.1f s (at byte %d)", song_id, took, position)
                     if total is None or position > end:
                         return
+                    chunk_started = time.monotonic()
                     response = await fetch(info, position, min(end, position + core.CHUNK_SIZE - 1))
                     if response.status_code >= 400:
+                        log.warning("audio %s: YouTube answered %d at byte %d of %s, the stream stops here",
+                                    song_id, response.status_code, position, total)
+                        ytm.forget_stream(song_id)
                         return
+            except httpx.HTTPError as e:
+                log.warning("audio %s: fetching from YouTube failed at byte %d of %s: %r", song_id, position, total, e)
             finally:
                 await response.aclose()
 
@@ -243,6 +268,12 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=os.environ.get("YTMP_YTM_LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)-5s %(name)s - %(message)s",
+    )
+    # httpx logs every request with its whole URL (YouTube's links hold the server's IP address).
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     ytm = core.YtmCore(
         language=os.environ.get("YTMP_YTM_LANGUAGE", "en"),
         location=os.environ.get("YTMP_YTM_LOCATION", "BE"),
@@ -253,6 +284,9 @@ def main() -> None:
         app,
         host=os.environ.get("YTMP_YTM_HOST", "127.0.0.1"),
         port=int(os.environ.get("YTMP_YTM_PORT", "8401")),
+        # Every search and page would be a line; problems are logged by the module itself.
+        access_log=False,
+        log_config=None,
     )
 
 

@@ -48,8 +48,12 @@ import io.ktor.http.headersOf
 import io.ktor.http.isSuccess
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
+
+private val log = LoggerFactory.getLogger(RemoteSourceModule::class.java)
 
 /**
  * Talks to a source module that runs as a separate program, over the module HTTP API
@@ -121,7 +125,15 @@ class RemoteSourceModule(
         client.prepareGet("$baseUrl/songs/${songId.encodeURLPathPart()}/audio") {
             auth()
             if (range != null) header(HttpHeaders.Range, range)
-        }.execute { response -> call.respond(ProxiedAudio(response, response.bodyAsChannel())) }
+        }.execute { response ->
+            if (response.status.isSuccess()) {
+                call.respond(ProxiedAudio(response, response.bodyAsChannel()))
+            } else {
+                val error = response.bodyAsText()
+                log.warn("audio {}: the module answered {}: {}", songId, response.status.value, error.take(300))
+                call.respondText(error, response.contentType(), response.status)
+            }
+        }
     }
 
     private class ProxiedAudio(response: HttpResponse, private val body: ByteReadChannel) : OutgoingContent.ReadChannelContent() {

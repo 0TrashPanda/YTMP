@@ -1,6 +1,6 @@
 package dev.trashpanda.ytmp.host
 
-import android.util.Log
+import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -30,6 +30,7 @@ class OnDeviceAudioProxy(
         var first = open(source, start, minOf(requestedEnd, start + CHUNK_SIZE - 1))
         if (first.responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
             // The cached URL went bad before its expiry; get a fresh one and try once more.
+            Log.w(TAG, "audio $songId: YouTube answered 403 for the cached link, resolving again")
             first.disconnect()
             source = stream(songId, true)
             first = open(source, start, minOf(requestedEnd, start + CHUNK_SIZE - 1))
@@ -37,6 +38,7 @@ class OnDeviceAudioProxy(
         val status = first.responseCode
         if (status >= 400) {
             first.disconnect()
+            Log.w(TAG, "audio $songId: YouTube answered $status (bytes $start-)")
             throw SourceException("YouTube answered $status")
         }
         val total = ByteRange.totalSize(first.getHeaderField("Content-Range"))
@@ -51,13 +53,20 @@ class OnDeviceAudioProxy(
         ) {
             var connection = first
             var position = start
+            var pieceStarted = System.nanoTime()
             try {
                 while (true) {
                     position += connection.inputStream.use { it.copyTo(this) }
                     connection.disconnect()
+                    val took = (System.nanoTime() - pieceStarted) / 1_000_000
+                    if (took > SLOW_PIECE_MS) Log.w(TAG, "audio $songId: a 1 MB piece took $took ms (at byte $position)")
                     if (total == null || position > end) break
+                    pieceStarted = System.nanoTime()
                     connection = open(source, position, minOf(end, position + CHUNK_SIZE - 1))
-                    if (connection.responseCode >= 400) break
+                    if (connection.responseCode >= 400) {
+                        Log.w(TAG, "audio $songId: YouTube answered ${connection.responseCode} at byte $position of $total, the stream stops here")
+                        break
+                    }
                 }
             } catch (e: Exception) {
                 // Usually the listener stopped or skipped; nothing to report.
@@ -79,6 +88,8 @@ class OnDeviceAudioProxy(
     private companion object {
         const val TAG = "YtmpAudio"
         const val CHUNK_SIZE = 1024L * 1024
+        /** A piece taking longer than this (ms) is what a listener hears as buffering. */
+        const val SLOW_PIECE_MS = 5000L
     }
 }
 

@@ -3,7 +3,7 @@ package dev.trashpanda.ytmp.host
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
-import android.util.Log
+import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.RoomInfo
 import dev.trashpanda.ytmp.protocol.RoomVisibility

@@ -102,7 +102,27 @@ inside the WebView.
 
 In the browser, the frontend plays audio itself with HTML audio / the Web Audio API.
 
-## App updates
+## App updates ✅
 
-The app checks **GitHub Releases** for new versions, downloads the APK, and asks
-Android to install it (needs the *install unknown apps* permission).
+`Updates.kt`: at app start (once per process, not in debug builds: they're signed with
+another key) the app asks the GitHub API for the releases (pre-releases included: every 0.x
+is one) and compares the newest one with an APK to its own version code (`1.2.3` →
+`10203`, as in `android/build.gradle.kts`). A newer one is offered in a dialog with the
+release notes (without their Install part); *Skip this version* is remembered. Update
+downloads the APK into the cache (`updates/`) with a progress dialog and opens Android's
+installer through the FileProvider (`REQUEST_INSTALL_PACKAGES`; Android asks once to allow
+installs from YTMP). The settings call it through the bridge (version 5: `appVersion`,
+`checkForUpdates`).
+
+## Logs ✅
+
+- `assets/logback.xml`: logcat, plus files in `files/logs/` (a file per day, split at 2 MB,
+  7 days, at most 20 MB), not in backups. The app's own lines go through `Log.kt` (slf4j,
+  same API as `android.util.Log`), the shared code logs through slf4j, and the Python
+  module's `logging` is sent there too (`core.log_to` → `PythonLog`), yt-dlp included.
+- The player logs each song it loads (direct or through the host, link host and expiry, never
+  the whole URL), player errors with their cause, and buffering longer than 3 s. Errors and
+  long buffering in rooms on another host are also sent to that host (`HostReport`,
+  `POST /api/log`), so the server's log shows what listeners hear.
+- *Send logs* (bridge `shareLogs`) puts all files in one text file with the app version and
+  phone at the top, and opens the share sheet.

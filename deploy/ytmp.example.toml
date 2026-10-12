@@ -49,6 +49,16 @@ tracking_default = false
 # the login page works for them. YTMP_GUESTS overrides it.
 guests = true
 
+[logs]
+# Log files, besides the console. They're cleaned up by themselves: a file per day, deleted
+# after keep_days, and all together never more than max_mb (the oldest go first).
+# Empty dir = console only. The Docker image uses /var/lib/ytmp/logs. YTMP_LOG_DIR overrides it.
+dir = "logs"
+# info | debug. YTMP_LOG_LEVEL overrides it.
+level = "info"
+keep_days = 14
+max_mb = 100
+
 [rooms]
 # letters | digits | alnum
 code_style = "letters"

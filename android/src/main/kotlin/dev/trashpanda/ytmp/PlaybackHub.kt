@@ -1,6 +1,5 @@
 package dev.trashpanda.ytmp
 
-import android.util.Log
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable

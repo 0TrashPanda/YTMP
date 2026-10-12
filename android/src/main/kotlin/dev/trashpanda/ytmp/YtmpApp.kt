@@ -32,8 +32,12 @@ class YtmpApp : Application() {
     @Volatile
     var sharedIdentity: String? = null
 
+    /** Looked for a new version since the app started (see [Updates]). */
+    var checkedForUpdate = false
+
     override fun onCreate() {
         super.onCreate()
+        Log.i("YtmpApp", "YTMP ${Updates.installedVersion(this)} starting")
         host = LocalHost(this).also { it.start() }
         nearby = Nearby(this)
         scope.launch { host.rooms.list.collect { nearby.announce(it) } }

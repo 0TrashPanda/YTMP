@@ -9,7 +9,6 @@ import android.net.Uri
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
@@ -35,7 +34,9 @@ import dev.trashpanda.ytmp.host.NearbyRoom
 import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -112,7 +113,10 @@ class MainActivity : ComponentActivity() {
             webViewClient = Client()
             webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(message: ConsoleMessage): Boolean {
-                    Log.d("YtmpWeb", "${message.messageLevel()}: ${message.message()} (${message.sourceId()}:${message.lineNumber()})")
+                    val line = "${message.messageLevel()}: ${message.message()} (${message.sourceId()}:${message.lineNumber()})"
+                    // The page's warnings and errors go to the log files too.
+                    if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR || message.messageLevel() == ConsoleMessage.MessageLevel.WARNING) Log.i("YtmpWeb", line)
+                    else Log.d("YtmpWeb", line)
                     return true
                 }
             }
@@ -135,6 +139,12 @@ class MainActivity : ComponentActivity() {
             savedInstanceState != null -> webView.restoreState(savedInstanceState)
             intent.hasExtra("server") -> openServer()
             else -> openHome()
+        }
+
+        // A new version: asked once per app start (not when the screen is only recreated).
+        if (!app.checkedForUpdate) {
+            app.checkedForUpdate = true
+            Updates.checkOnStart(this, lifecycleScope)
         }
 
         // The page decides first (closing a sheet, going back a page in a room, see
@@ -380,6 +390,29 @@ class MainActivity : ComponentActivity() {
             return app.sharedIdentity.also { app.sharedIdentity = null }
         }
 
+        /** This app's version, e.g. "0.5.2" (bridge version 5). */
+        @JavascriptInterface
+        fun appVersion(): String = Updates.installedVersion(this@MainActivity)
+
+        /** Looks for a new version on GitHub; the app shows what it found (bridge version 5). */
+        @JavascriptInterface
+        fun checkForUpdates() = runOnUiThread {
+            if (currentUrl?.let(::isAppPage) == true) Updates.checkNow(this@MainActivity, lifecycleScope)
+        }
+
+        /** Shares the app's log files, to report a problem (bridge version 5). */
+        @JavascriptInterface
+        fun shareLogs() = runOnUiThread {
+            if (currentUrl?.let(::isAppPage) != true) return@runOnUiThread
+            lifecycleScope.launch {
+                val chooser = withContext(Dispatchers.IO) { runCatching { LogFiles.share(this@MainActivity) } }
+                chooser.onSuccess(::startActivity).onFailure {
+                    Log.w("YtmpLogs", "Couldn't share the logs", it)
+                    AlertDialog.Builder(this@MainActivity).setMessage("Couldn't collect the logs: ${it.message}").setPositiveButton("OK", null).show()
+                }
+            }
+        }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -398,6 +431,6 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 4
+        const val BRIDGE_VERSION = 5
     }
 }

@@ -51,8 +51,10 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.header
+import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import io.ktor.server.request.receive
+import kotlinx.serialization.Serializable
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondFile
@@ -88,6 +90,25 @@ class ApiException(val status: HttpStatusCode, val code: ErrorCode, message: Str
 
 /** Thrown by a source when it can't do what was asked (e.g. YouTube refused). */
 open class SourceException(message: String) : Exception(message)
+
+@Serializable
+private data class ClientLogReport(val message: String, val room: String? = null)
+
+private const val CLIENT_LOG_MAX_LENGTH = 500
+
+/** At most [perMinute] client reports per address a minute, so a broken page can't fill the log. */
+private class ClientLogLimit(private val perMinute: Int) {
+    private val counts = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Int>>()
+
+    fun allow(address: String): Boolean {
+        val minute = System.currentTimeMillis() / 60_000
+        if (counts.size > 1000) counts.clear()
+        val (at, count) = counts.compute(address) { _, old -> if (old == null || old.first != minute) minute to 1 else minute to old.second + 1 }!!
+        return at == minute && count <= perMinute
+    }
+}
+
+private val clientLogLimit = ClientLogLimit(perMinute = 20)
 
 /** Streams a song's audio through the host, for clients whose direct stream URL doesn't work. */
 fun interface AudioProxy {
@@ -157,11 +178,15 @@ fun Application.ytmpModule(
     }
     install(CallLogging) {
         level = Level.INFO
-        filter { it.request.path().startsWith("/api") }
+        // Client reports are logged themselves.
+        filter { it.request.path().startsWith("/api") && it.request.path() != "/api/log" }
+        // Plain text: the log also goes to files.
+        disableDefaultColors()
     }
     install(StatusPages) {
         exception<ApiException> { call, e -> call.respond(e.status, ApiError(ErrorInfo(e.code, e.message ?: ""))) }
         exception<SourceException> { call, e ->
+            log.warn("{} {}: {}", call.request.httpMethod.value, call.request.path(), e.message)
             call.respond(HttpStatusCode.BadGateway, ApiError(ErrorInfo(ErrorCode.INVALID, e.message ?: "Source error")))
         }
     }
@@ -370,10 +395,26 @@ fun Application.ytmpModule(
             }
             get("/audio/{songId}") {
                 val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")
+                val songId = call.parameters["songId"]!!
+                val range = call.request.header(HttpHeaders.Range)
                 if (!options.mayProxyAudio(call)) {
+                    log.info("audio {}: not streamed to {} (outside the network)", songId, call.request.origin.remoteAddress)
                     throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "This server doesn't stream audio to devices outside its network")
                 }
-                proxy.respond(call, call.parameters["songId"]!!, call.request.header(HttpHeaders.Range))
+                log.debug("audio {}: through the host for {} ({})", songId, call.request.origin.remoteAddress, range ?: "whole file")
+                proxy.respond(call, songId, range)
+            }
+            // Players in browsers report problems (a link that stopped working, long buffering)
+            // here, so they end up in the host's log next to what the host saw.
+            post("/log") {
+                val from = call.request.origin.remoteAddress
+                val report = runCatching { call.receive<ClientLogReport>() }.getOrNull()
+                    ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Expected {\"message\": …}")
+                if (clientLogLimit.allow(from)) {
+                    val text = report.message.replace(Regex("\\s+"), " ").take(CLIENT_LOG_MAX_LENGTH)
+                    log.info("client {}{}: {}", from, report.room?.take(12)?.let { " in $it" }.orEmpty(), text)
+                }
+                call.respond(HttpStatusCode.NoContent)
             }
             extraApi()
         }

@@ -36,4 +36,8 @@ The Android app needs **Android 11 or newer**. A native Linux app is a [future i
 - **Offline**: without internet, downloaded songs and local files can still be played,
   in a solo room or in a room on the local network.
 - **App updates**: the app is distributed through GitHub Releases, so it **checks for new
-  versions itself** and offers to download and install them.
+  versions itself** when it starts and offers to download and install them (Update / Later /
+  Skip this version). The settings (avatar → App) show the version and have **Check for
+  updates**. ✅
+- **Logs**: the app keeps a log of the last 7 days (at most 20 MB, deleted by itself);
+  **Send logs** in the settings shares it, to report a problem. ✅

@@ -21,5 +21,9 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
+# Logs and IDE build output
+logs/
+*/bin/
+
 # Android
 local.properties

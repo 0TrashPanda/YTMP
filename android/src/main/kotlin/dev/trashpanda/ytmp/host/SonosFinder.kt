@@ -3,7 +3,7 @@ package dev.trashpanda.ytmp.host
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
-import android.util.Log
+import dev.trashpanda.ytmp.Log
 
 /** Finds Sonos speakers (`_sonos._tcp`) on the network and adds them to [outputs]. */
 class SonosFinder(context: Context, private val outputs: SonosOutputs) {

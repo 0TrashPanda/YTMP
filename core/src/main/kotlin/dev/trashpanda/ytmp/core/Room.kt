@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.CopyOnWriteArrayList
+import org.slf4j.LoggerFactory
 
 /**
  * One room: participants, the queue, the history and the playback clock.
@@ -95,6 +96,13 @@ class Room(
         /** Extra connections for this participant (see [attach]). */
         val attached = LinkedHashSet<Outbox>()
 
+        /**
+         * Connected: the main connection, or an attached one. The app's player keeps its own
+         * connection while Android freezes the page (and the page's connection times out): the
+         * phone still plays, so it's still here and listening.
+         */
+        val online: Boolean get() = outbox != null || attached.isNotEmpty()
+
         /** Sends to the participant's connection and to all its attached ones. */
         fun send(message: ServerMessage) {
             outbox?.send(message)
@@ -108,7 +116,7 @@ class Room(
         }
 
         fun toParticipant() = Participant(
-            id, name, isOwner, online = outbox != null, listening = listening, accountId = accountId,
+            id, name, isOwner, online = online, listening = listening, accountId = accountId,
             roleId = roleId, allow = allow.sorted(), deny = deny.sorted(),
         )
     }
@@ -272,12 +280,15 @@ class Room(
 
     suspend fun disconnect(participantId: String, outbox: Outbox) = mutex.withLock {
         val member = members[participantId] ?: return@withLock
-        if (member.attached.remove(outbox)) return@withLock
-        if (member.outbox !== outbox) return@withLock
-        member.outbox = null
+        if (!member.attached.remove(outbox)) {
+            if (member.outbox !== outbox) return@withLock
+            member.outbox = null
+        }
+        lastActive = clock()
+        // Still connected another way (the app's player while its page is frozen): still here.
+        if (member.online) return@withLock
         member.listening = false
         member.offlineSince = clock()
-        lastActive = clock()
         emit(Event.ParticipantUpdated(member.toParticipant()))
     }
 
@@ -310,7 +321,7 @@ class Room(
             member.dropAttached(RejectReason.KICKED)
             emit(Event.ParticipantLeft(member.id))
         }
-        members.values.none { it.outbox != null }
+        members.values.none { it.online }
     }
 
     /** Pauses playback, e.g. when the phone stops hosting. */
@@ -329,7 +340,7 @@ class Room(
             current = current,
             positionMs = position(),
             // Someone connected right now counts as activity, so the room isn't deleted as stale on restore.
-            lastActive = if (members.values.any { it.outbox != null }) clock() else lastActive,
+            lastActive = if (members.values.any { it.online }) clock() else lastActive,
             ownerAccount = ownerAccount,
             roles = roles.toList(),
             settings = settings,
@@ -921,7 +932,7 @@ class Room(
         // Only songs that actually played count for the listening history.
         if (streamUrl != null) {
             val heard = if (result == QueueItemResult.PLAYED) item.song.durationMs else position()
-            val listeners = members.values.filter { it.outbox != null }.map {
+            val listeners = members.values.filter { it.online }.map {
                 FinishedPlay.Listener(it.id, it.name, it.accountId, it.accountToken, it.hideFromHistory)
             }
             onPlayFinished?.invoke(FinishedPlay(item, currentStartedAt, heard, result == QueueItemResult.SKIPPED, code, name, listeners, visibility))
@@ -1119,7 +1130,11 @@ class Room(
     private fun resolve(item: QueueItem) {
         resolveJob?.cancel()
         resolveJob = scope.launch {
+            val started = System.nanoTime()
             val stream = runCatching { streams.resolve(item.song.id) }
+            val took = (System.nanoTime() - started) / 1_000_000
+            stream.onSuccess { log.info("Room {}: {} \"{}\" ready in {} ms", code, item.song.id, item.song.title, took) }
+                .onFailure { if (it !is CancellationException) log.warn("Room {}: {} \"{}\" can't play after {} ms: {}", code, item.song.id, item.song.title, took, it.message) }
             val next = mutex.withLock {
                 if (current?.itemId != item.itemId) return@withLock null
                 stream.onSuccess {
@@ -1145,7 +1160,10 @@ class Room(
                 queue.firstOrNull()
             }
             // Warm up the next song so it starts quickly.
-            if (next != null) runCatching { streams.resolveStream(next.song.id) }
+            if (next != null) {
+                runCatching { streams.resolveStream(next.song.id) }
+                    .onFailure { if (it !is CancellationException) log.info("Room {}: warming up the next song {} failed: {}", code, next.song.id, it.message) }
+            }
         }
     }
 
@@ -1221,6 +1239,7 @@ class Room(
     private fun notFound() = ErrorInfo(ErrorCode.NOT_FOUND, "Not in the queue")
 
     companion object {
+        private val log = LoggerFactory.getLogger(Room::class.java)
         const val MAX_NAME_LENGTH = 32
         const val PREVIOUS_RESTART_MS = 3_000L
         const val SNAPSHOT_HISTORY = 200

@@ -11,6 +11,17 @@ Feature description: [features/sources.md](../features/sources.md#youtube-music-
 - Optional **local cache** of audio for frequently played songs, for faster start and
   fewer requests to YouTube.
 
+## Logging
+
+Python `logging` under `ytmp_ytm` (the HTTP service: console, level `YTMP_YTM_LOG_LEVEL`;
+on the phone: the app's log, see [android-app](android-app.md#logs-)). Each stream lookup
+logs its time, format, link host and expiry. yt-dlp gets a logger per lookup (`_YdlLog`):
+its warnings are logged right away (the same one at most once an hour), its steps are kept
+and only logged when the lookup fails or takes longer than 8 s. The audio proxy logs 403s
+and the fresh lookup after one, links YouTube refuses (dropped from the cache), pieces
+slower than 5 s, and streams that break off. httpx and uvicorn's access log stay quiet
+(YouTube links contain the server's IP address).
+
 ## Linking a YouTube account
 
 **Phone app (done):** `YoutubeLoginActivity` shows Google's sign-in in a WebView (without

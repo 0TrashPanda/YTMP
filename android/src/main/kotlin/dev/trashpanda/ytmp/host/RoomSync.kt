@@ -3,7 +3,7 @@ package dev.trashpanda.ytmp.host
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
-import android.util.Log
+import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager

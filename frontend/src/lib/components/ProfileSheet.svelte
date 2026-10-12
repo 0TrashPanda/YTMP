@@ -234,5 +234,25 @@
 				)}
 			{/if}
 		</section>
+
+		{#if nativeBridge?.appVersion}
+			<section class="flex flex-col gap-3 border-t border-line pt-4">
+				<h2 class="text-sm font-medium tracking-wide text-muted uppercase">App</h2>
+				<div class="flex items-center gap-3">
+					<div class="flex-1">
+						<p class="text-sm font-medium">Version</p>
+						<p class="text-xs text-muted">YTMP {nativeBridge.appVersion()}</p>
+					</div>
+					<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => nativeBridge?.checkForUpdates?.()}>Check for updates</button>
+				</div>
+				<div class="flex items-center gap-3">
+					<div class="flex-1">
+						<p class="text-sm font-medium">Logs</p>
+						<p class="text-xs text-muted">The last 7 days of what the app did, to send when something goes wrong. Song names and rooms, no passwords.</p>
+					</div>
+					<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => nativeBridge?.shareLogs?.()}>Send logs</button>
+				</div>
+			</section>
+		{/if}
 	</div>
 </div>

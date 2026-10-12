@@ -265,6 +265,14 @@ export function prefetch(kind: keyof typeof pages, id: string): void {
 	pages[kind](id).catch(() => {});
 }
 
+/**
+ * Tells the host about a playback problem on this device (a link that stopped working, long
+ * buffering), for its log. Best effort: never fails.
+ */
+export function reportProblem(message: string, room?: string): void {
+	fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, room }), keepalive: true }).catch(() => {});
+}
+
 /** Audio streamed through the host, for when the direct stream URL doesn't work. */
 export function proxiedAudioUrl(songId: string): string {
 	return `/api/audio/${encodeURIComponent(songId)}`;

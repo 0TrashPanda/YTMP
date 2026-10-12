@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Files the app hands to other apps: shared logs, and a downloaded update for the installer. -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+    <cache-path name="updates" path="updates/" />
+</paths>

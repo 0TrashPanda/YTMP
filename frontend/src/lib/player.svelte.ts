@@ -1,4 +1,4 @@
-import { proxiedAudioUrl } from './api';
+import { proxiedAudioUrl, reportProblem } from './api';
 import { artUrl, artistNames } from './format';
 import { nativeBridge, type NativeBridge } from './native';
 import type { RoomConnection } from './room.svelte';
@@ -25,6 +25,10 @@ export interface RoomPlayer {
 	destroy(): void;
 }
 
+/** Buffering this long (ms) is reported to the host. */
+const LONG_BUFFERING_MS = 3000;
+const MEDIA_ERRORS: Record<number, string> = { 1: 'aborted', 2: 'network error', 3: 'decode error', 4: 'not supported (link refused?)' };
+
 export function createPlayer(room: RoomConnection): RoomPlayer {
 	return nativeBridge ? new NativePlayer(room, nativeBridge) : new WebPlayer(room);
 }
@@ -47,12 +51,22 @@ class WebPlayer implements RoomPlayer {
 	private useProxy = false;
 	private loadedItemId: string | null = null;
 	private timer: ReturnType<typeof setInterval> | undefined;
+	/** When the current wait for data started (performance.now()), to report long buffering. */
+	private waitingSince: number | null = null;
 
 	constructor(private readonly room: RoomConnection) {
 		this.audio.preload = 'auto';
 		this.audio.volume = this.volume;
-		this.audio.addEventListener('waiting', () => (this.buffering = true));
-		this.audio.addEventListener('playing', () => (this.buffering = false));
+		this.audio.addEventListener('waiting', () => {
+			this.buffering = true;
+			this.waitingSince ??= performance.now();
+		});
+		this.audio.addEventListener('playing', () => {
+			this.buffering = false;
+			this.reportBuffering();
+		});
+		// Paused while waiting: that time isn't buffering.
+		this.audio.addEventListener('pause', () => (this.waitingSince = null));
 		this.audio.addEventListener('canplay', () => this.sync());
 		this.audio.addEventListener('error', () => this.onError());
 	}
@@ -180,9 +194,30 @@ class WebPlayer implements RoomPlayer {
 		});
 	}
 
+	/** Buffering long enough to hear goes to the host's log, to find out where streams get slow. */
+	private reportBuffering(): void {
+		const since = this.waitingSince;
+		this.waitingSince = null;
+		if (since === null || !this.enabled) return;
+		const ms = performance.now() - since;
+		const song = this.room.state?.nowPlaying?.item.song;
+		if (ms < LONG_BUFFERING_MS || !song) return;
+		reportProblem(
+			`browser buffered ${(ms / 1000).toFixed(1)} s at ${Math.round(this.audio.currentTime)} s in ${song.id} (${this.useProxy ? 'through the host' : 'direct link'})`,
+			this.room.roomCode
+		);
+	}
+
 	private onError(): void {
 		const now = this.room.state?.nowPlaying;
 		if (!this.enabled || !now) return;
+		const error = this.audio.error;
+		reportProblem(
+			`browser can't play ${now.item.song.id} ${this.useProxy ? 'through the host' : 'from the direct link'}: ` +
+				`${MEDIA_ERRORS[error?.code ?? 0] ?? 'unknown error'}${error?.message ? ` (${error.message})` : ''} at ${Math.round(this.audio.currentTime)} s` +
+				(this.useProxy ? '' : ', switching to the host'),
+			this.room.roomCode
+		);
 		if (!this.useProxy) {
 			// The direct URL is probably tied to the host's IP; stream through the host instead.
 			this.useProxy = true;

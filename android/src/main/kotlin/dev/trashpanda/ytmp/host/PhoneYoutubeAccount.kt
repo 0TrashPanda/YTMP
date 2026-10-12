@@ -3,7 +3,7 @@ package dev.trashpanda.ytmp.host
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import dev.trashpanda.ytmp.Log
 import android.webkit.CookieManager
 import dev.trashpanda.ytmp.NotSignedInException
 import dev.trashpanda.ytmp.OnDeviceYtm

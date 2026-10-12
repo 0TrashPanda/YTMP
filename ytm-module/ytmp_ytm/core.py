@@ -7,6 +7,7 @@ See docs/implementation/module-api.md.
 from __future__ import annotations
 
 import copy
+import logging
 import re
 import threading
 import time
@@ -58,6 +59,28 @@ _ALL_LIMITS = {
 _YTM_AUTHOR = "YouTube Music"
 # Re-resolve stream URLs this long before YouTube says they expire.
 _EXPIRY_MARGIN_S = 10 * 60
+# A stream lookup taking longer than this gets yt-dlp's steps in the log, like a failed one.
+_SLOW_RESOLVE_S = 8.0
+
+log = logging.getLogger("ytmp_ytm")
+
+
+def log_to(sink) -> None:
+    """Sends this module's log to [sink].log(level, logger name, text): on Android, the app's log (Chaquopy)."""
+
+    class _Handler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            try:
+                text = record.getMessage()
+                if record.exc_info:
+                    text += "\n" + logging.Formatter().formatException(record.exc_info)
+                sink.log(record.levelno, record.name, text)
+            except Exception:
+                pass
+
+    log.addHandler(_Handler())
+    log.setLevel(logging.INFO)
+    log.propagate = False
 
 
 class NotFound(Exception):
@@ -106,8 +129,6 @@ class YtmCore:
         self._ytm = YTMusic(language=language, location=location)
         self._ydl_opts = {
             "format": "bestaudio[ext=m4a]/bestaudio",
-            "quiet": True,
-            "no_warnings": True,
             "noplaylist": True,
         }
         if js_runtime:
@@ -119,6 +140,7 @@ class YtmCore:
         # The signed-in YouTube Music account (the phone owner's), next to the anonymous one
         # that everything shared (search, rooms) keeps using.
         self._user: YTMusic | None = None
+        log.info("yt-dlp %s, ytmusicapi %s", yt_dlp.version.__version__, _version("ytmusicapi"))
 
     def sign_in(self, cookie: str) -> dict:
         """Uses the cookies of a signed-in music.youtube.com session for personal pages.
@@ -373,11 +395,17 @@ class YtmCore:
         if cached and cached.expires_at - _EXPIRY_MARGIN_S > time.time():
             return cached
 
+        steps = _YdlLog(vid)
+        started = time.monotonic()
         try:
-            with yt_dlp.YoutubeDL(self._ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(dict(self._ydl_opts, logger=steps)) as ydl:
                 info = ydl.extract_info(f"https://music.youtube.com/watch?v={vid}", download=False)
         except yt_dlp.utils.DownloadError as e:
+            log.warning("stream %s: yt-dlp failed after %.1f s: %s\n%s", vid, time.monotonic() - started, e, steps.text())
             raise Unavailable(_clean_error(str(e))) from e
+        except Exception:
+            log.exception("stream %s: yt-dlp crashed after %.1f s\n%s", vid, time.monotonic() - started, steps.text())
+            raise
 
         url = info["url"]
         expires = urllib.parse.parse_qs(urllib.parse.urlparse(url).query).get("expire", [None])[0]
@@ -389,9 +417,74 @@ class YtmCore:
             duration_ms=int(info["duration"] * 1000) if info.get("duration") else None,
             http_headers=dict(info.get("http_headers") or {}),
         )
+        took = time.monotonic() - started
+        log.info(
+            "stream %s: %s in %.1f s, format %s (%s, %s kbps), host %s, expires in %d min%s",
+            vid, "re-resolved" if fresh else "resolved", took, info.get("format_id"), info.get("ext"),
+            round(info["abr"]) if info.get("abr") else "?", urllib.parse.urlparse(url).hostname,
+            (stream.expires_at - time.time()) // 60, f"\n{steps.text()}" if took > _SLOW_RESOLVE_S else "",
+        )
         with self._lock:
             self._streams[vid] = stream
         return stream
+
+    def forget_stream(self, song_id: str) -> None:
+        """Drops a cached stream URL that stopped working, so the next lookup resolves it again."""
+        with self._lock:
+            self._streams.pop(video_id(song_id), None)
+
+
+_REPEAT_WARNING_S = 3600
+_warned: dict[str, float] = {}
+_warned_lock = threading.Lock()
+
+
+class _YdlLog:
+    """yt-dlp's logger for one lookup: warnings go to the log right away; its steps are kept,
+    and only logged when the lookup fails or is slow (they'd fill the log otherwise)."""
+
+    _MAX_STEPS = 60
+
+    def __init__(self, vid: str):
+        self._vid = vid
+        self._steps: list[str] = []
+        self._started = time.monotonic()
+
+    def _keep(self, message: str) -> None:
+        if len(self._steps) < self._MAX_STEPS:
+            self._steps.append(f"  +{time.monotonic() - self._started:5.1f}s {message}")
+
+    def debug(self, message: str) -> None:
+        self._keep(message)
+
+    def info(self, message: str) -> None:
+        self._keep(message)
+
+    def warning(self, message: str) -> None:
+        self._keep(f"WARNING: {message}")
+        # The same warning comes with every lookup (like the missing JavaScript runtime): once an hour is enough.
+        key = message.replace(self._vid, "<id>")
+        now = time.monotonic()
+        with _warned_lock:
+            if now - _warned.get(key, -_REPEAT_WARNING_S) < _REPEAT_WARNING_S:
+                return
+            _warned[key] = now
+        log.warning("stream %s: yt-dlp: %s", self._vid, message)
+
+    def error(self, message: str) -> None:
+        # The DownloadError that follows is logged with all steps.
+        self._keep(message)
+
+    def text(self) -> str:
+        return "\n".join(self._steps) or "  (yt-dlp said nothing)"
+
+
+def _version(package: str) -> str:
+    try:
+        from importlib.metadata import version
+        return version(package)
+    except Exception:
+        return "?"
 
 
 def _song_from_search(r: dict) -> dict | None:

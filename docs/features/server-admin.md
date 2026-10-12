@@ -24,3 +24,15 @@ by hand:
   an outdated yt-dlp breaks playback. The admin page shows the current version and
   allows a manual update.
 - The admin page shows when a new YTMP release is available on GitHub.
+
+## Logs ✅
+
+The server logs to the console and to log files that clean up after themselves: a file per
+day, kept 14 days and never more than 100 MB together (both settings in `[logs]` of
+`ytmp.toml`). In Docker they're in the data volume (`logs/`), and Docker's own console log
+is capped too. What's in them, to find out why a song stopped or buffered: every stream
+lookup (how long, which format, when YouTube's link expires), yt-dlp's steps when a lookup
+fails or is slow, links YouTube refuses (403) and the retry, slow or failed audio through
+the server, and problems listeners' players report (a direct link that failed, long
+buffering).
+

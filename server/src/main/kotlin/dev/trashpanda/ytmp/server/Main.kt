@@ -41,12 +41,14 @@ import java.io.File
 import java.net.InetAddress
 import java.net.URI
 
-private val log = LoggerFactory.getLogger("ytmp")
+// Lazy: logging is set up from the config (see [setUpLogs]), so nothing may log before that.
+private val log by lazy { LoggerFactory.getLogger("ytmp") }
 
 /** Usage: `server [path/to/ytmp.toml]`, or set YTMP_CONFIG. */
 fun main(args: Array<String>) {
     val configFile = (args.firstOrNull() ?: System.getenv("YTMP_CONFIG"))?.let(::File)
     val config = Config.load(configFile)
+    setUpLogs(config.logs)
 
     val http = HttpClient(CIO) {
         install(ContentNegotiation) { json(ProtocolJson) }
@@ -165,3 +167,16 @@ private fun Application.trustServers(auth: TrustedAuthServers, urls: List<String
 }
 
 private fun hostName(): String = runCatching { InetAddress.getLocalHost().hostName }.getOrNull()?.lowercase()?.takeIf { it.isNotBlank() } ?: "ytmp"
+
+/** Hands the [logs] settings to logback.xml, which reads them when the first logger is made. */
+private fun setUpLogs(logs: LogsConfig) {
+    System.setProperty("ytmp.log.level", logs.level.uppercase())
+    System.setProperty("ytmp.log.days", logs.keepDays.coerceAtLeast(1).toString())
+    System.setProperty("ytmp.log.maxMb", logs.maxMb.coerceAtLeast(5).toString())
+    if (logs.dir.isBlank()) {
+        System.setProperty("logback.configurationFile", "logback-console.xml")
+    } else {
+        System.setProperty("ytmp.log.dir", File(logs.dir).absolutePath)
+        log.info("Logs in {} ({} days, at most {} MB)", File(logs.dir).absolutePath, logs.keepDays, logs.maxMb)
+    }
+}

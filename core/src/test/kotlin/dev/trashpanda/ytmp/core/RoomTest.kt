@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -59,6 +60,9 @@ class RoomTest {
             is Event.NowPlayingChanged -> s.copy(nowPlaying = e.item?.let { dev.trashpanda.ytmp.protocol.NowPlaying(it, null) })
             is Event.StreamReady -> s.copy(nowPlaying = s.nowPlaying?.copy(streamUrl = e.streamUrl))
             is Event.PlaybackChanged -> s.copy(playback = e.playback)
+            is Event.ParticipantJoined -> s.copy(participants = s.participants.filter { it.id != e.participant.id } + e.participant)
+            is Event.ParticipantUpdated -> s.copy(participants = s.participants.map { if (it.id == e.participant.id) e.participant else it })
+            is Event.ParticipantLeft -> s.copy(participants = s.participants.filter { it.id != e.participantId })
             else -> s
         }
     }
@@ -75,6 +79,30 @@ class RoomTest {
 
     private suspend fun Room.run(client: FakeClient, command: Command) =
         handle(client.participantId, ClientMessage.CommandMessage("c", command))
+
+    @Test
+    fun `the app's player connection keeps a participant here while its page is frozen`() = runTest {
+        val room = newRoom()
+        val page = room.connect()
+        val other = room.connect("Ben")
+        val me = page.participantId
+        room.handle(me, ClientMessage.CommandMessage("c", Command.SetListening(true)))
+        val token = (page.messages.first() as ServerMessage.Welcome).guestToken
+        val player = FakeClient()
+        room.attach(ClientMessage.Attach(PROTOCOL_VERSION, "ABCD", token), player)
+
+        // The page's connection times out (Android froze it): the player still plays.
+        room.disconnect(me, page)
+        advanceTimeBy(20 * 60_000L)
+        assertFalse(room.cleanup(15 * 60_000L))
+        var anna = other.state.participants.single { it.id == me }
+        assertTrue(anna.online && anna.listening)
+
+        // The player's connection goes too: now really gone.
+        room.disconnect(me, player)
+        anna = other.state.participants.single { it.id == me }
+        assertFalse(anna.online || anna.listening)
+    }
 
     @Test
     fun `adding to an empty room starts playing`() = runTest {

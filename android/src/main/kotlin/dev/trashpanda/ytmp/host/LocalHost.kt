@@ -2,7 +2,7 @@ package dev.trashpanda.ytmp.host
 
 import android.content.Context
 import android.net.ConnectivityManager
-import android.util.Log
+import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.FinishedPlay

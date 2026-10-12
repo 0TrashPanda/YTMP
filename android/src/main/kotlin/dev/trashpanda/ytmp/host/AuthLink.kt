@@ -1,7 +1,7 @@
 package dev.trashpanda.ytmp.host
 
 import android.content.Context
-import android.util.Log
+import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.LinkAuthServerRequest

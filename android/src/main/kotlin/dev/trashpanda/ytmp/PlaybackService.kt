@@ -6,7 +6,6 @@ import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.PowerManager
 import android.os.SystemClock
-import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -77,6 +76,9 @@ class PlaybackService : MediaSessionService() {
 
     /** The room didn't follow a [roomSeekTo] during this song, so don't keep asking. */
     private var roomWontFollow: String? = null
+
+    /** When the player started waiting for data (elapsedRealtime), to log long buffering. */
+    private var bufferingSince: Long? = null
 
     /** The room's last play position and time, to see when someone seeks, pauses or plays. */
     private var lastAnchor: Triple<String?, Long, Long>? = null
@@ -227,6 +229,8 @@ class PlaybackService : MediaSessionService() {
         if (item.itemId != loadedItemId || url != loadedUrl) {
             loadedItemId = item.itemId
             loadedUrl = url
+            Log.i(TAG, "load ${item.songId} \"${item.title}\" ${if (useProxy) "through the host" else "direct"} (${describe(url)})")
+            bufferingSince = null
             exo.setMediaItem(
                 MediaItem.Builder()
                     .setMediaId(item.itemId)
@@ -352,13 +356,22 @@ class PlaybackService : MediaSessionService() {
 
     private val listener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            val target = current ?: return
+            val target = current
+            Log.w(
+                TAG,
+                "player error ${error.errorCodeName} on ${target?.item?.songId} ${if (useProxy) "through the host" else "direct"} " +
+                    "at ${exo.currentPosition / 1000} s (${describe(loadedUrl)}): ${error.message}; cause: ${generateSequence(error.cause) { it.cause }.joinToString(" <- ")}",
+            )
+            target ?: return
             if (!useProxy && target.proxyUrl != null) {
+                Log.i(TAG, "the direct link doesn't work here, playing through the host from now on")
+                report(target, "app: direct link failed for ${target.item?.songId} (${error.errorCodeName}), playing through the host")
                 // The direct URL is probably tied to the host's IP; stream through the host instead.
                 useProxy = true
                 loadedItemId = null
                 apply(target)
             } else {
+                report(target, "app: can't play ${target.item?.songId} through the host either (${error.errorCodeName}: ${error.message})")
                 PlaybackHub.status("error")
             }
         }
@@ -389,7 +402,38 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             PlaybackHub.status(if (playbackState == Player.STATE_BUFFERING) "buffering" else "ready")
+            val now = SystemClock.elapsedRealtime()
+            if (playbackState == Player.STATE_BUFFERING) {
+                if (bufferingSince == null) bufferingSince = now
+                return
+            }
+            val since = bufferingSince ?: return
+            bufferingSince = null
+            val waited = now - since
+            if (playbackState != Player.STATE_READY || waited < LONG_BUFFERING_MS) return
+            val target = current
+            val line = "buffered ${waited / 100 / 10.0} s at ${exo.currentPosition / 1000} s in ${target?.item?.songId} " +
+                "(${if (useProxy) "through the host" else "direct"}, buffered ahead ${exo.totalBufferedDuration / 1000} s)"
+            Log.w(TAG, line)
+            if (target != null) report(target, "app: $line")
         }
+    }
+
+    /** For the log: where a stream URL points, and when YouTube's link expires; never the whole URL. */
+    private fun describe(url: String?): String {
+        val uri = url?.let(Uri::parse) ?: return "no link"
+        val expires = uri.getQueryParameter("expire")?.toLongOrNull()?.let { (it - System.currentTimeMillis() / 1000) / 60 }
+        return uri.host + (expires?.let { ", expires in $it min" } ?: "")
+    }
+
+    /**
+     * Also tells the room's host, so its log shows what listeners hear. Not for rooms on this
+     * phone: those are in this log already.
+     */
+    private fun report(target: PlaybackTarget, message: String) {
+        val room = target.room ?: return
+        if (Uri.parse(room.hostUrl).host in listOf("127.0.0.1", "localhost")) return
+        scope.launch(Dispatchers.IO) { HostReport.send(room.hostUrl, room.code, message) }
     }
 
     /** Stops playing on this device (not in the room). */
@@ -451,6 +495,8 @@ class PlaybackService : MediaSessionService() {
         private const val TAG = "YtmpSync"
         private const val PAUSED_TOLERANCE_MS = 250L
         private const val PAUSE_WAIT_MS = 3000L
+        /** Buffering this long (ms) is logged, and reported to the host. */
+        private const val LONG_BUFFERING_MS = 3000L
 
         /** The room's answer to a seek from here lands about where it was asked to. */
         private const val ROOM_SEEK_MATCH_MS = 1000L
