@@ -1,11 +1,11 @@
 <script lang="ts">
 	// Room settings, laid out like Discord's server settings: a sidebar of sections on the
 	// left, the section on the right, ESC to close.
-	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { DEFAULT_ROLE_COLOR, rank } from '../../permissions';
 	import type { Command, HostInfo, Participant, Permission, Role, RoomOpenMode } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
+	import LeaveRoomDialog from '../LeaveRoomDialog.svelte';
 	import MemberPermissions from './MemberPermissions.svelte';
 	import RoleEditor from './RoleEditor.svelte';
 	import SaveBar from './SaveBar.svelte';
@@ -105,26 +105,7 @@
 		await run({ kind: 'ChangeOwner', participantId: person.id });
 	}
 
-	/** The owner of a party room picks who takes over first; everyone else just leaves. */
 	let leaving = $state(false);
-	const others = $derived(rs.participants.filter((p) => p.id !== me?.id));
-	/** Like the host picks when you don't: the top role, here, the longest (the list is in the order people came). */
-	const suggestedOwner = $derived(others.find((p) => p.online && p.roleId === roles[0]?.id) ?? null);
-	let nextOwner = $state('');
-	function startLeaving() {
-		if (me?.isOwner && rs.room.visibility === 'public' && others.length) {
-			nextOwner = suggestedOwner?.id ?? '';
-			leaving = true;
-		} else {
-			// A solo room, or nobody else here: it stays mine.
-			leave(null, true);
-		}
-	}
-	/** [newOwnerId]: who takes over; null with [stayOwner]: nobody, I can come back as the owner. */
-	async function leave(newOwnerId: string | null, stayOwner = false) {
-		await room.run({ kind: 'LeaveRoom', newOwnerId, stayOwner });
-		goto('/');
-	}
 
 	function onKey(event: KeyboardEvent) {
 		if (event.key === 'Escape' && !permissionsFor) onClose();
@@ -157,7 +138,7 @@
 			<!-- Like Discord's "Leave Server". You can come back with the code, but as someone new. -->
 			<button
 				class="flex items-center justify-between rounded px-2.5 py-1.5 text-left text-base font-medium text-[#f23f43] hover:bg-d-red/10"
-				onclick={startLeaving}
+				onclick={() => (leaving = true)}
 			>
 				Leave Room
 				<svg viewBox="0 0 24 24" class="h-4 w-4"><path fill="currentColor" d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3zm6.6 4.4L15.2 8.8 17.4 11H9v2h8.4l-2.2 2.2 1.4 1.4L21.2 12z" /></svg>
@@ -374,22 +355,7 @@
 </div>
 
 {#if leaving}
-	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" role="presentation" onclick={() => (leaving = false)}>
-		<div class="w-full max-w-md rounded-lg bg-d-bg p-5 text-d-text shadow-xl" role="dialog" aria-label="Leave room" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.key === 'Escape' && (leaving = false)}>
-			<h2 class="mb-2 text-xl font-semibold text-d-head">Leave '{rs.room.name}'</h2>
-			<p class="mb-4 text-sm text-d-muted">You're the owner. Who runs the room after you? They can change the settings, roles and who's in it.</p>
-			<select class={input} bind:value={nextOwner}>
-				{#each others as person (person.id)}
-					<option value={person.id}>{person.name}{person.online ? '' : ' (away)'}{person.roleId === roles[0]?.id ? ` · ${roles[0].name}` : ''}</option>
-				{/each}
-				<option value="">Nobody: I stay the owner and can come back</option>
-			</select>
-			<div class="mt-5 flex justify-end gap-2">
-				<button class="rounded px-4 py-2 text-sm font-medium hover:underline" onclick={() => (leaving = false)}>Cancel</button>
-				<button class="rounded bg-d-red px-4 py-2 text-sm font-medium text-white" onclick={() => leave(nextOwner || null, !nextOwner)}>Leave Room</button>
-			</div>
-		</div>
-	</div>
+	<LeaveRoomDialog {room} onClose={() => (leaving = false)} />
 {/if}
 
 {#if permissionsFor}

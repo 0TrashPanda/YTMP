@@ -60,11 +60,11 @@ Like YTM:
   stay, and **clicking the
   art plays or pauses**, like YTM (a play or pause icon pops up on the art for a moment). The art is always square and never cut off at the top or
   bottom, as big as the space allows.
-- **Image quality** ✅ (profile menu, per device): **High** (default) loads sharp pictures, on
+- **Image quality** ✅ (Settings → Look, per device): **High** (default) loads sharp pictures, on
   big screens bigger than YTM lists them (like YTM, Google's pictures are asked for at the
   size shown, e.g. 1200 px album art in the desktop player); **Low** loads at most 300 px
   pictures, to save data.
-- **Video pictures** ✅ (profile menu, per device): songs from a music video only have a
+- **Video pictures** ✅ (Settings → Look, per device): songs from a music video only have a
   wide picture. **Crop** (default, like YTM) fills the square; **Fit** shows all of it, with
   bars above and below.
 - **The logo** ✅ always goes to Home (closing the full player); on Home already, it loads new
@@ -204,8 +204,17 @@ Open it with the **⋮** button or by **right-clicking** the song.
   Home. On Home it either stops (the app goes to the background, like YTM) or goes on to the
   room list: a setting, separately for solo rooms (default: stop) and party rooms (default:
   room list).
-- The **avatar** (top right; also on the room list in the app) opens YouTube Music sign-in,
-  **Room settings** and the phone's settings. The people icon is hidden in solo rooms.
+- The **avatar** (top right, in rooms and on the room list) opens a short menu, like YTM's:
+  who you are (your YTMP account and YouTube Music), then in a room its actions (**Share
+  room**, **Play on…**, **Clone room**, **Room settings** for those who may change them,
+  **Leave room**), and **Settings**. The people icon is hidden in solo rooms.
+- **Settings** ✅ is one full screen, the same in rooms, on the room list and at your server's
+  `/account`: **Account** (logging in; on your server: listening history, your rooms on other
+  devices, your roles, password, log out; on other hosts: who you're logged in as there),
+  **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
+  bottom), **Playback** (app: headphones, Back button), **Look** (image quality, video
+  pictures), **App** (version, updates, logs) and **Server** (the admin: invites, accounts).
+  Desktop: the sections on the left; phones: the list, then a section.
 - **Pull Home down** to load new suggestions. Rows that scroll sideways have **page dots**.
 - Phones: the mini player's progress line is at its **bottom**, between it and the bottom bar.
 - Actions that need a room permission (for example adding songs) are **disabled** when you

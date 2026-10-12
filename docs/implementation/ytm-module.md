@@ -39,7 +39,7 @@ and yt-dlp stay anonymous. The host serves it through `PersonalCatalog`: `GET /a
 
 **Servers (done):** cookies / request headers, "browser auth" in ytmusicapi. The user
 pastes their YouTube Music browser cookies, request headers or a "Copy as cURL" once (the
-profile menu has a short guide), or hands over the phone app's sign-in. The server keeps
+Settings → YouTube Music has a short guide), or hands over the phone app's sign-in. The server keeps
 them encrypted with the account (`YoutubeLinks.kt`, AES-GCM) and sends them to the module in
 `X-Ytm-Cookie` (see [module API](module-api.md#library-user-scoped-needs-x-ytm-cookie)).
 Works without a Google Cloud project. An expired sign-in shows as signed out. yt-dlp stays

@@ -153,6 +153,6 @@ and `attach` for a participant without an account, get `Rejected(account_require
   page say whose.
 - Server → phone: `GET /api/account/youtube/cookie` returns the stored sign-in for a **login
   session only** (`AccountService.sessionAccount`), never for a host token, so hosts can't get
-  it. The page `/account/youtube-app` (opened from the phone's profile menu or Library) hands it
+  it. The page `/account/youtube-app` (opened from the phone's Settings → YouTube Music or Library) hands it
   to the app with bridge `useYoutubeCookie`, which only accepts it from the linked auth server's
   pages and asks before signing in.

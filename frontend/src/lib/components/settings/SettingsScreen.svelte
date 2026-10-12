@@ -1,0 +1,211 @@
+<script lang="ts" module>
+	export type SettingsSection = 'account' | 'youtube' | 'playback' | 'look' | 'app' | 'server';
+</script>
+
+<script lang="ts">
+	// Settings: one full screen, the same everywhere (in a room, on the room list, and your
+	// server's /account). Sections on the left (phones: a list first), the section on the right.
+	import { onDestroy, onMount } from 'svelte';
+	import { authServer } from '../../account';
+	import { getHost } from '../../api';
+	import { images, setImageQuality, setVideoArt } from '../../images.svelte';
+	import { nativeBridge } from '../../native';
+	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
+	import { saved, type BackLimit, type HeadphonesAction, type ImageQuality, type VideoArt } from '../../storage';
+	import { youtube } from '../../youtube.svelte';
+	import Icon, { type IconName } from '../Icon.svelte';
+	import AccountSection from './AccountSection.svelte';
+	import Choice from './Choice.svelte';
+	import ServerSection from './ServerSection.svelte';
+	import YoutubeSection from './YoutubeSection.svelte';
+
+	let {
+		start = null,
+		invite = null,
+		onClose,
+		onToast
+	}: {
+		/** The section to open; null: the list (desktop: the first section). */
+		start?: SettingsSection | null;
+		/** An invite code for signing up (from /account?invite=…). */
+		invite?: string | null;
+		onClose: () => void;
+		onToast: (text: string) => void;
+	} = $props();
+
+	let host = $state<HostInfo | null>(null);
+	// This server's accounts (only on a server's own pages).
+	let info = $state<AuthServerInfo | null>(null);
+	let account = $state<AccountInfo | null>(null);
+
+	onMount(async () => {
+		try {
+			host = await getHost();
+			if (host.kind === 'server') {
+				info = await authServer.info();
+				account = await authServer.refresh();
+			}
+		} catch {
+			// Offline: what works without the host.
+		}
+		youtube.load();
+	});
+
+	const inApp = !!nativeBridge;
+	const sections = $derived(
+		(
+			[
+				['account', 'Account', 'person', true],
+				['youtube', 'YouTube Music', 'library', true],
+				['playback', 'Playback', 'headphones', inApp],
+				['look', 'Look', 'palette', true],
+				['app', 'App', 'phone', !!nativeBridge?.appVersion],
+				['server', 'Server', 'server', !!account?.isAdmin && !!info]
+			] as [SettingsSection, string, IconName, boolean][]
+		).filter(([, , , shown]) => shown)
+	);
+	// svelte-ignore state_referenced_locally
+	let section = $state<SettingsSection>(start ?? 'account');
+	/** Phones: a section (true) or the list of sections. */
+	// svelte-ignore state_referenced_locally
+	let showingSection = $state(start !== null);
+	const title = $derived(sections.find(([id]) => id === section)?.[1] ?? 'Settings');
+
+	function open(id: SettingsSection) {
+		section = id;
+		showingSection = true;
+	}
+
+	// Playback (the app) and look.
+	let soloBack = $state(saved.backLimit(true));
+	let partyBack = $state(saved.backLimit(false));
+	let headphones = $state(saved.headphonesAction);
+	const qualityOptions: [ImageQuality, string][] = [
+		['high', 'High'],
+		['low', 'Low']
+	];
+	const videoArtOptions: [VideoArt, string][] = [
+		['crop', 'Crop'],
+		['fit', 'Fit']
+	];
+	const backOptions: [BackLimit, string][] = [
+		['home', 'Home page'],
+		['rooms', 'Room list']
+	];
+	const headphoneOptions: [HeadphonesAction, string][] = [
+		['pause', 'Pause'],
+		['stop', 'Stop here'],
+		['keep', 'Keep playing']
+	];
+
+	function onKey(event: KeyboardEvent) {
+		if (event.key === 'Escape') onClose();
+	}
+	onMount(() => window.addEventListener('keydown', onKey));
+	onDestroy(() => window.removeEventListener('keydown', onKey));
+</script>
+
+<div class="fixed inset-0 z-[60] flex bg-bg" role="dialog" aria-modal="true" aria-label="Settings">
+	<!-- The sections -->
+	<nav class="{showingSection ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col gap-1 border-line p-4 md:w-64 md:border-r md:pt-6">
+		<div class="mb-3 flex items-center gap-2">
+			<button class="rounded-full p-1.5 hover:bg-raised" aria-label="Close settings" onclick={onClose}><Icon name="back" /></button>
+			<h1 class="text-xl font-bold">Settings</h1>
+		</div>
+		{#each sections as [id, label, icon] (id)}
+			<button
+				class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left {section === id ? 'md:bg-raised' : ''} hover:bg-raised/60"
+				onclick={() => open(id)}
+			>
+				<Icon name={icon} size={20} class="text-muted" />
+				<span class="flex-1 font-medium">{label}</span>
+				<Icon name="chevron" size={18} class="text-muted md:hidden" />
+			</button>
+		{/each}
+	</nav>
+
+	<!-- The section -->
+	<div class="{showingSection ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col overflow-y-auto">
+		<div class="mx-auto flex w-full max-w-xl flex-col gap-5 p-4 md:p-8">
+			<div class="flex items-center gap-2">
+				<button class="rounded-full p-1.5 hover:bg-raised md:hidden" aria-label="Back to settings" onclick={() => (showingSection = false)}><Icon name="back" /></button>
+				<h2 class="text-xl font-bold">{title}</h2>
+				<button class="ml-auto hidden rounded-full p-1.5 text-muted hover:bg-raised hover:text-white md:block" aria-label="Close settings" onclick={onClose}>
+					<Icon name="close" />
+				</button>
+			</div>
+
+			{#if section === 'account'}
+				<AccountSection {host} {info} {account} {invite} onAccount={(a) => (account = a)} {onToast} />
+			{:else if section === 'youtube'}
+				<YoutubeSection {onToast} />
+			{:else if section === 'playback'}
+				<Choice
+					label="Headphones disconnected"
+					hint="Pause only pauses the room when you're the only one listening; otherwise it stops playing here."
+					options={headphoneOptions}
+					value={headphones}
+					onchange={(v) => {
+						headphones = v;
+						saved.headphonesAction = v;
+						window.dispatchEvent(new Event('ytmp:settings'));
+					}}
+				/>
+				<Choice
+					label="Back button in a solo room"
+					hint="Where the phone's Back button stops once you're on Home."
+					options={backOptions}
+					value={soloBack}
+					onchange={(v) => {
+						soloBack = v;
+						saved.setBackLimit(true, v);
+					}}
+				/>
+				<Choice
+					label="Back button in a party room"
+					hint="Where the phone's Back button stops once you're on Home."
+					options={backOptions}
+					value={partyBack}
+					onchange={(v) => {
+						partyBack = v;
+						saved.setBackLimit(false, v);
+					}}
+				/>
+				<p class="text-xs text-muted">The sync adjustment for Bluetooth is under <em>Play on</em> in a room.</p>
+			{:else if section === 'look'}
+				<Choice
+					label="Image quality"
+					hint="Low loads smaller pictures (album art, artists, playlists): less data, a bit less sharp."
+					options={qualityOptions}
+					value={images.quality}
+					onchange={setImageQuality}
+				/>
+				<Choice
+					label="Video pictures"
+					hint="Songs from a music video only have a wide picture. Crop fills the square (like YouTube Music); Fit shows all of it, with bars."
+					options={videoArtOptions}
+					value={images.videoArt}
+					onchange={setVideoArt}
+				/>
+				<p class="text-xs text-muted">Saved on this {inApp ? 'phone' : 'device'}.</p>
+			{:else if section === 'app' && nativeBridge?.appVersion}
+				<div class="flex items-center gap-3">
+					<div class="flex-1">
+						<p class="text-sm font-medium">Version</p>
+						<p class="text-xs text-muted">YTMP {nativeBridge.appVersion()}</p>
+					</div>
+					<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => nativeBridge?.checkForUpdates?.()}>Check for updates</button>
+				</div>
+				<div class="flex items-center gap-3">
+					<div class="flex-1">
+						<p class="text-sm font-medium">Logs</p>
+						<p class="text-xs text-muted">The last 7 days of what the app did, to send when something goes wrong. Song names and rooms, no passwords.</p>
+					</div>
+					<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => nativeBridge?.shareLogs?.()}>Send logs</button>
+				</div>
+			{:else if section === 'server' && info}
+				<ServerSection {info} {onToast} />
+			{/if}
+		</div>
+	</div>
+</div>

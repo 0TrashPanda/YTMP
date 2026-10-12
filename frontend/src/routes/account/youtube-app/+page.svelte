@@ -54,7 +54,7 @@
 	{#if problem}
 		<p class="text-center text-muted">{problem}</p>
 		{#if problem.includes('no YouTube Music')}
-			<p class="text-center text-sm text-muted">Connect it in the profile menu (your picture) on this server's pages first.</p>
+			<p class="text-center text-sm text-muted">Connect it in Settings → YouTube Music (behind your picture) on this server's pages first.</p>
 		{/if}
 	{:else if info && !loggedIn}
 		<p class="text-center text-muted">Log in to use the YouTube Music sign-in of your account here.</p>

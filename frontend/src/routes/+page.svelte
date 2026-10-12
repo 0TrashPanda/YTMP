@@ -4,7 +4,8 @@
 	import { identity, logInOnce, type Identity } from '../lib/account';
 	import { closeRoom, createRoom, getHost, getRoom, getRoomsElsewhere, linkAuthServer, listRooms, moveRoomHere } from '../lib/api';
 	import Icon from '../lib/components/Icon.svelte';
-	import ProfileSheet from '../lib/components/ProfileSheet.svelte';
+	import AvatarMenu from '../lib/components/AvatarMenu.svelte';
+	import SettingsScreen, { type SettingsSection } from '../lib/components/settings/SettingsScreen.svelte';
 	import { youtube } from '../lib/youtube.svelte';
 	import { nativeBridge, type NearbyRoom } from '../lib/native';
 	import type { HostInfo, RoomInfo, RoomOpenMode, RoomVisibility, SyncedRoom } from '../lib/protocol.gen';
@@ -25,6 +26,7 @@
 	let editingAuth = $state(false);
 	let hideFromHistory = $state(saved.hideFromHistory);
 	let profileOpen = $state(false);
+	let settingsAt = $state<SettingsSection | null | undefined>(undefined);
 	let toastText = $state<string | null>(null);
 	$effect(() => {
 		saved.hideFromHistory = hideFromHistory;
@@ -180,8 +182,8 @@
 	}
 </script>
 
-{#if nativeBridge}
-	<!-- In the app: your YouTube Music sign-in and this phone's settings, like in a room. -->
+{#if host && !(host.accountsOnly && !me)}
+	<!-- Who you are and Settings, like in a room. -->
 	<button class="fixed top-3 right-3 z-10 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (profileOpen = true)}>
 		{#if youtube.account?.photoUrl}
 			<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-8 w-8 rounded-full" />
@@ -191,8 +193,16 @@
 	</button>
 {/if}
 {#if profileOpen}
-	<ProfileSheet
-		onClose={() => (profileOpen = false)}
+	<AvatarMenu {host} onClose={() => (profileOpen = false)} onSettings={(section) => (settingsAt = section ?? null)} />
+{/if}
+{#if settingsAt !== undefined}
+	<SettingsScreen
+		start={settingsAt}
+		onClose={() => {
+			settingsAt = undefined;
+			// Logged in or out meanwhile.
+			if (host) me = identity.get(host.authServers);
+		}}
 		onToast={(text) => {
 			toastText = text;
 			setTimeout(() => toastText === text && (toastText = null), 3000);

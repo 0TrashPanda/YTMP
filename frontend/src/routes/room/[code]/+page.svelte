@@ -8,7 +8,10 @@
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
 	import Sidebar from '../../../lib/components/Sidebar.svelte';
-	import ProfileSheet from '../../../lib/components/ProfileSheet.svelte';
+	import AvatarMenu from '../../../lib/components/AvatarMenu.svelte';
+	import SettingsScreen, { type SettingsSection } from '../../../lib/components/settings/SettingsScreen.svelte';
+	import LeaveRoomDialog from '../../../lib/components/LeaveRoomDialog.svelte';
+	import OutputsSheet from '../../../lib/components/OutputsSheet.svelte';
 	import SaveSheet from '../../../lib/components/SaveSheet.svelte';
 	import { youtube } from '../../../lib/youtube.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
@@ -102,6 +105,10 @@
 	// Home and Library (the bottom bar, in the app with YouTube Music sign-in), under the pages above.
 	let section = $state<'home' | 'library'>('home');
 	let accountOpen = $state(false);
+	/** Settings, at this section (null: the list). */
+	let settingsAt = $state<SettingsSection | null | undefined>(undefined);
+	let leaving = $state(false);
+	let playingOn = $state(false);
 	/** Saving this song to one of your YouTube Music playlists. */
 	let saving = $state<Song | null>(null);
 
@@ -258,12 +265,13 @@
 
 	// The phone's Back button (the app asks the page first, see MainActivity): close what's
 	// open, then go back through the pages you opened, then to Home. On Home it stops, or goes
-	// on to the room list, as set in the profile sheet (separately for solo and party rooms).
+	// on to the room list, as set in Settings → Playback (separately for solo and party rooms).
 	function onBack(): 'handled' | 'exit' | 'default' {
 		if (!room || room.status === 'rejected') return 'default';
-		if (menu || saving || settings || accountOpen || sharing) {
+		if (menu || saving || settings || accountOpen || sharing || cloning || leaving || playingOn || settingsAt !== undefined) {
 			menu = saving = settings = null;
-			accountOpen = sharing = false;
+			accountOpen = sharing = cloning = leaving = playingOn = false;
+			settingsAt = undefined;
 			return 'handled';
 		}
 		// The full player and the phone's search page are history entries.
@@ -662,16 +670,29 @@
 	{/if}
 
 	{#if accountOpen}
-		<ProfileSheet
+		<AvatarMenu
+			{host}
+			{room}
 			onClose={() => (accountOpen = false)}
-			onToast={toast}
-			onRoomSettings={room.can('change_settings') || room.can('edit_roles')
-				? () => {
-						accountOpen = false;
-						settings = 'list';
-					}
-				: undefined}
+			onSettings={(section) => (settingsAt = section ?? null)}
+			onShare={() => (sharing = true)}
+			onPlayOn={player ? () => (playingOn = true) : undefined}
+			onClone={() => (cloning = true)}
+			onRoomSettings={room.can('change_settings') || room.can('edit_roles') || room.can('kick') || room.can('ban') ? () => (settings = 'list') : undefined}
+			onLeave={() => (leaving = true)}
 		/>
+	{/if}
+
+	{#if settingsAt !== undefined}
+		<SettingsScreen start={settingsAt} onClose={() => (settingsAt = undefined)} onToast={toast} />
+	{/if}
+
+	{#if leaving && room.state}
+		<LeaveRoomDialog {room} onClose={() => (leaving = false)} />
+	{/if}
+
+	{#if playingOn && player}
+		<OutputsSheet {room} {player} onClose={() => (playingOn = false)} onToast={toast} />
 	{/if}
 
 	{#if sharing}

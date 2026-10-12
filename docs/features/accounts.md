@@ -69,12 +69,12 @@ phone's owner:
 - Playing songs doesn't use the sign-in (YouTube may flag accounts used for downloading).
 - **YouTube Music history**: songs played on the phone (after 30 s, or to the end) are added
   to your YTM history, like YTM's own player does, so its suggestions learn from them. A
-  setting in the profile menu: **Off**, **Solo rooms** (default), or **All rooms** on this
+  setting in Settings → YouTube Music: **Off**, **Solo rooms** (default), or **All rooms** on this
   phone (also what friends add in a party).
 - **Use your account for search and radio** ✅: your searches, the suggestions while typing
   and *Related* go through your YouTube Music account, and so do the radio and autoplay of
   rooms that are yours (every room on your phone; on a server, rooms your account owns), so
-  they fit your taste like in YTM. **On** by default; a switch in the profile menu. Friends'
+  they fit your taste like in YTM. **On** by default; a switch in Settings → YouTube Music. Friends'
   searches in your rooms never use it. If the sign-in stops working, search and radio carry
   on without it.
 - **Like** ✅ is also in the song menu (right-click or ⋮).
