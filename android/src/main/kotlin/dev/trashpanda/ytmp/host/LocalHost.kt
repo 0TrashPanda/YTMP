@@ -10,6 +10,7 @@ import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.HostKind
+import dev.trashpanda.ytmp.protocol.ShareAddress
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import io.ktor.server.cio.CIO
@@ -119,6 +120,7 @@ class LocalHost(private val context: Context) {
                 options = HostOptions(
                     kind = HostKind.PHONE,
                     shareUrl = ::lanUrl,
+                    shareAddresses = ::lanAddresses,
                     localOnlyRoomManagement = true,
                     supportsPrivateRooms = true,
                     auth = authLink.auth,
@@ -148,6 +150,32 @@ class LocalHost(private val context: Context) {
             ?.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
             ?: return null
         return "http://${address.hostAddress}:$PORT"
+    }
+
+    /**
+     * Every address friends may reach this phone at: its Wi-Fi, its own hotspot, a VPN, … (not
+     * mobile data: nobody reaches a phone there). The one of the active network ([lanUrl]) first.
+     */
+    fun lanAddresses(): List<ShareAddress> {
+        val active = lanUrl()
+        val all = runCatching { java.net.NetworkInterface.getNetworkInterfaces().toList() }.getOrDefault(emptyList())
+            .filter { runCatching { it.isUp && !it.isLoopback }.getOrDefault(false) }
+            .filterNot { name -> MOBILE_DATA.any { name.name.startsWith(it) } }
+            .flatMap { nif ->
+                nif.inetAddresses.toList().filterIsInstance<Inet4Address>().filter { !it.isLoopbackAddress && !it.isLinkLocalAddress }
+                    .map { ShareAddress("http://${it.hostAddress}:$PORT", label(nif.name)) }
+            }
+            .distinctBy { it.url }
+        return all.sortedByDescending { it.url == active }
+    }
+
+    private fun label(interfaceName: String): String = when {
+        HOTSPOT.any { interfaceName.startsWith(it) } -> "Hotspot"
+        interfaceName.startsWith("wlan") -> "Wi-Fi"
+        interfaceName.startsWith("tun") || interfaceName.startsWith("ppp") || interfaceName.startsWith("wg") -> "VPN"
+        interfaceName.startsWith("eth") -> "Cable"
+        interfaceName.startsWith("rndis") || interfaceName.startsWith("usb") -> "USB"
+        else -> interfaceName
     }
 
     /** Copies the bundled web app out of the APK (once per app version), so it can be served as files. */
@@ -184,6 +212,10 @@ class LocalHost(private val context: Context) {
 
     companion object {
         const val PORT = 8765
+        /** Mobile data: friends can't reach the phone there. */
+        private val MOBILE_DATA = listOf("rmnet", "ccmni", "v4-rmnet", "pdp", "seth")
+        /** The phone's own hotspot (differs per maker). */
+        private val HOTSPOT = listOf("swlan", "ap", "softap", "wlan1")
         const val LOCAL_URL = "http://127.0.0.1:$PORT"
         private const val TAG = "YtmpHost"
 

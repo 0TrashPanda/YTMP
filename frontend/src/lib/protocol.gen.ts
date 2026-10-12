@@ -675,6 +675,11 @@ export interface AuthServerRef {
   issuer: string;
 }
 
+export interface ShareAddress {
+  url: string;
+  label: string;
+}
+
 export interface HostInfo {
   kind: HostKind;
   shareUrl: string | null;
@@ -682,6 +687,7 @@ export interface HostInfo {
   supportsPrivateRooms: boolean;
   authServers: AuthServerRef[];
   accountsOnly: boolean;
+  shareAddresses: ShareAddress[];
 }
 
 export interface RoomListResponse {

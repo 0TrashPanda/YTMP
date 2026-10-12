@@ -15,8 +15,34 @@
 	const info = $derived(room.state?.room);
 	const isPrivate = $derived(info?.visibility === 'private');
 	const isOwner = $derived(room.me?.isOwner ?? false);
-	// Friends need an address they can reach: the phone's Wi-Fi address, or this page's own.
-	const link = $derived(info ? `${host?.shareUrl ?? location.origin}/room/${info.code}` : '');
+	// Friends need an address they can reach: the phone's Wi-Fi address (or its hotspot, a VPN,
+	// … when it has several: pick one), or this page's own.
+	const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+	const addresses = $derived.by(() => {
+		const list = [...(host?.shareAddresses ?? [])];
+		const add = (url: string | null | undefined, label: string) => url && !list.some((a) => a.url === url) && list.push({ url, label });
+		add(host?.shareUrl, 'Network');
+		if (!local) add(location.origin, new URL(location.origin).host);
+		return list;
+	});
+	let picked = $state<string | null>(read());
+	function read(): string | null {
+		try {
+			return localStorage.getItem('ytmp.shareAddress');
+		} catch {
+			return null;
+		}
+	}
+	function pick(url: string) {
+		picked = url;
+		try {
+			localStorage.setItem('ytmp.shareAddress', url);
+		} catch {
+			// Picked again next time.
+		}
+	}
+	const base = $derived(addresses.find((a) => a.url === picked)?.url ?? addresses[0]?.url ?? location.origin);
+	const link = $derived(info ? `${base}/room/${info.code}` : '');
 	const qr = $derived(link ? renderSVG(link, { whiteColor: '#ffffff', blackColor: '#000000', border: 2 }) : '');
 
 	async function copy(text: string, what: string) {
@@ -56,6 +82,20 @@
 				</button>
 			{/if}
 		{:else}
+			{#if addresses.length > 1}
+				<div class="flex w-full flex-wrap justify-center gap-2" role="radiogroup" aria-label="Address">
+					{#each addresses as address (address.url)}
+						<button
+							class="rounded-full px-3 py-1 text-sm {address.url === base ? 'bg-white font-medium text-black' : 'bg-raised text-muted hover:bg-line'}"
+							role="radio"
+							aria-checked={address.url === base}
+							title={address.url}
+							onclick={() => pick(address.url)}
+							>{address.label}{addresses.filter((a) => a.label === address.label).length > 1 ? ` ${new URL(address.url).hostname}` : ''}</button
+						>
+					{/each}
+				</div>
+			{/if}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- SVG generated locally from the link -->
 			<div class="w-56 overflow-hidden rounded-xl">{@html qr}</div>
 			<p class="text-center text-sm text-muted">Scan with a phone camera, or open the link in a browser.</p>

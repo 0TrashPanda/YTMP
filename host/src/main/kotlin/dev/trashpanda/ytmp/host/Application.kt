@@ -22,6 +22,7 @@ import dev.trashpanda.ytmp.protocol.SaveSongsRequest
 import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.protocol.RoleTemplate
+import dev.trashpanda.ytmp.protocol.ShareAddress
 import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.protocol.ApiError
@@ -126,6 +127,8 @@ data class HostOptions(
     val kind: HostKind,
     /** Base URL other devices can use to reach this host, or null if the page's own address works. */
     val shareUrl: () -> String? = { null },
+    /** All the addresses other devices may reach this host at, when there are several (see [HostInfo.shareAddresses]). */
+    val shareAddresses: () -> List<ShareAddress> = { emptyList() },
     /**
      * Only the hosting device itself may create, list and close rooms (a phone: friends on
      * the Wi-Fi can join, but not start rooms on someone else's phone).
@@ -289,6 +292,7 @@ fun Application.ytmpModule(
                         supportsPrivateRooms = options.supportsPrivateRooms,
                         authServers = options.auth.servers(),
                         accountsOnly = options.accountsOnly,
+                        shareAddresses = options.shareAddresses(),
                     ),
                 )
             }

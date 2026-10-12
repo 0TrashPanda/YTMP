@@ -61,7 +61,17 @@ data class HostInfo(
     val authServers: List<AuthServerRef> = emptyList(),
     /** Only for people logged in with an account: no guests ([authServers] says where to log in). */
     val accountsOnly: Boolean = false,
+    /**
+     * Every address other devices may reach this host at (a phone on Wi-Fi and its own hotspot,
+     * a VPN, …), to pick one when sharing a room. [shareUrl] is the usual one.
+     */
+    val shareAddresses: List<ShareAddress> = emptyList(),
 )
+
+/** An address of this host for links, with what it is ("Wi-Fi", "Hotspot", "VPN", …). */
+@Serializable
+@SerialName("ShareAddress")
+data class ShareAddress(val url: String, val label: String)
 
 /** `GET /api/rooms`: the rooms on this host (only for the hosting device). */
 @Serializable
