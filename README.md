@@ -118,6 +118,9 @@ devices on the server's network (like speakers at home) may do that. See the gui
 | Android app | `android/` | `./gradlew :android:installDebug`, then for the emulator: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080` |
 
 - Tests: `./gradlew test` and `cd ytm-module && .venv/bin/pytest`.
+- Smoke test of a running phone or server (search, pages, radio, streaming; read-only):
+  `python3 tools/smoke-test.py URL`. For the app on a phone: `adb forward tcp:8765 tcp:8765`,
+  keep the app open, and use `http://127.0.0.1:8765`.
 - After changing anything in `protocol/`, run `./gradlew :protocol:generateTs` to update the
   web app's types (`frontend/src/lib/protocol.gen.ts`).
 - Releases: push a tag like `v0.2.0` and GitHub Actions builds the signed APK and publishes
