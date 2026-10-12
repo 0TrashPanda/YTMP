@@ -104,3 +104,9 @@ into YTMP:
 - Speakers and devices run a **Snapcast client** (snapclient), and Snapcast keeps them in sync
   to within about a millisecond, including each device's own output delay.
 - YTMP keeps doing what it's good at (the shared queue); Snapcast does the precise playback.
+
+## Settings look
+
+The settings were reorganised (a quick menu behind the avatar, one Settings screen, see
+[UI](ui.md)), but they still need a visual update: how the Settings screen and the room
+settings look, and making them feel like one app (the room settings still look like Discord's).
