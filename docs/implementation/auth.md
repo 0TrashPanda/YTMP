@@ -1,8 +1,9 @@
 # Authentication
 
-> Status: **first slice implemented** (accounts, login, signed host tokens, trusted
-> servers, phone hosts linked to a server). Not yet: guest bans by account, "accounts only"
-> rooms, role templates and the other account data.
+> Status: **implemented**: accounts, login, signed host tokens, trusted servers, phone hosts
+> linked to a server, role templates, listening history, log in once, accounts only, and the
+> YouTube Music sign-in. Not yet: YTMP playlists, linked media servers, and room transfer
+> data on the account.
 
 Feature description: [features/accounts.md](../features/accounts.md#auth-servers).
 

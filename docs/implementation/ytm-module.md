@@ -8,8 +8,10 @@ Feature description: [features/sources.md](../features/sources.md#youtube-music-
 - Uses **[ytmusicapi](https://github.com/sigma67/ytmusicapi)** for search and metadata.
 - Uses **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** to resolve the audio stream URL.
 - The stream URL is fetched **on demand**, when the song is about to be played.
-- Optional **local cache** of audio for frequently played songs, for faster start and
-  fewer requests to YouTube.
+- Stream links are cached until shortly before they expire (`YtmCore._streams`); a link
+  YouTube refuses is dropped (`forget_stream`).
+- Planned: an optional **local cache** of audio for frequently played songs, for faster
+  start and fewer requests to YouTube.
 
 ## Logging
 
@@ -35,25 +37,26 @@ and yt-dlp stay anonymous. The host serves it through `PersonalCatalog`: `GET /a
 `GET /api/me/playlists/{id}`, all only for loopback requests. An expired sign-in
 (`NotSignedIn`) is forgotten; being offline isn't.
 
-**Servers (planned):**
+**Servers (done):** cookies / request headers, "browser auth" in ytmusicapi. The user
+pastes their YouTube Music browser cookies, request headers or a "Copy as cURL" once (the
+profile menu has a short guide), or hands over the phone app's sign-in. The server keeps
+them encrypted with the account (`YoutubeLinks.kt`, AES-GCM) and sends them to the module in
+`X-Ytm-Cookie` (see [module API](module-api.md#library-user-scoped-needs-x-ytm-cookie)).
+Works without a Google Cloud project. An expired sign-in shows as signed out. yt-dlp stays
+anonymous (it doesn't use the cookies).
 
-**Decision: cookies / request headers.** The user pastes their YouTube Music browser
-cookies or request headers once ("browser auth" in ytmusicapi). yt-dlp can use the same
-cookies. They are stored encrypted with the user's account on the auth server.
+## Android on-device variant ✅ (Chaquopy)
 
-- Works without a Google Cloud project.
-- Cookies expire now and then. YTMP shows a clear "relink your YouTube account" message
-  when that happens.
-- The UI needs a short guide on how to copy the headers or cookies from the browser.
-
-## Android on-device variant (proposal)
+Built: the app embeds the module with Chaquopy, see [android-app](android-app.md). Not built:
+updating yt-dlp at runtime (below); yt-dlp is only updated with app releases, and using the
+server's YTM service from the phone.
 
 ### Constraint
 YouTube changes often, and **yt-dlp releases fixes very frequently**. If extraction
 only gets updated through app updates (Play Store review, users who don't update),
 the on-device module will regularly be broken.
 
-### Recommendation: embed Python with Chaquopy, and update yt-dlp at runtime
+### Plan: embed Python with Chaquopy, and update yt-dlp at runtime
 
 - Embed a Python runtime in the app with **[Chaquopy](https://chaquo.com/chaquopy/)**.
 - Run the **same Python module code** as the server service, so there is one

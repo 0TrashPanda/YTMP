@@ -1,7 +1,8 @@
 # Protocol Messages
 
-> Status: **partly implemented.** Everything marked ✅ exists in milestone 1 (see
-> `protocol/src/main/kotlin`, which is the source of truth). The rest is still a draft.
+> Status: **partly implemented.** Everything marked ✅ exists (see
+> `protocol/src/main/kotlin/.../Messages.kt`, which is the source of truth). The rest is still
+> a plan for features that aren't built yet.
 
 The design is in [protocol.md](protocol.md): commands from clients, events from the host,
 and a snapshot on connect. Types are Kotlin `@Serializable` classes, and TypeScript types are
@@ -37,13 +38,13 @@ generated from them.
 | → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`, `accountToken` ✅ (a host token, see [auth](auth.md)), `hideFromHistory` ✅ (keep me out of others' listening history) |
 | → | `attach` ✅ | Instead of `hello`: `protocolVersion`, `roomCode`, `guestToken`. A **second connection for a participant who is already in the room**: it gets the same `welcome` and events and may send `command`s and `ping`s as them, but doesn't replace their connection or change whether they're online. Kicks, bans and cleanup end it (`rejected`: `kicked`/`banned`); an unknown token gets `kicked`. Used by the Android app's player, see [android-app](android-app.md) |
 | ← | `welcome` ✅ | `participantId`, `guestToken`, `seq`, `state` (the snapshot), `accountId` ✅ (null when joined as a guest, also when the token wasn't accepted) |
-| ← | `rejected` ✅ | `reason`: `room_not_found`, `version_mismatch`, `invalid_name`, `replaced` ✅. Later: `banned`, `accounts_only`, `untrusted_auth_server` |
+| ← | `rejected` ✅ | `reason`: `room_not_found`, `version_mismatch`, `invalid_name`, `replaced` (the same guest connected again elsewhere), `room_moved` (the room moved to another of the owner's hosts, see [room sync](room-sync.md)), `private_room` (a solo room, only for the hosting device), `kicked`, `banned`, `account_required` (the host only lets in accounts). Later maybe: `untrusted_auth_server` |
 | ⇄ | `ping` / `pong` ✅ | `clientTime` / `clientTime, hostTime`, for clock sync |
 
 ## Snapshot (`RoomState`)
 
-Milestone 1 has `room`, `participants`, `queue`, `history`, `nowPlaying` (`{ item, streamUrl }`)
-and `playback`. The other fields come with permissions, roles, outputs and vote to skip.
+The real `RoomState` is in `Messages.kt`; the sketch below also has fields for features that
+aren't built yet (repeat, vote to skip).
 
 ```jsonc
 {
@@ -79,9 +80,12 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `RemoveQueueItem` ✅ | `itemId` (queue, history or autoplay) | Remove own / others' songs |
 | `MoveQueueItem` ✅ | `itemId`, `toIndex` | Reorder |
 | `MoveItem` ✅ | `itemId`, `list: "history" \| "queue" \| "autoplay"`, `toIndex` | Reorder (autoplay → queue next/last: Add songs) |
+| `ClearQueue` ✅ | – | Remove own / others' songs |
+| `ClearAutoplay` ✅ | – | Autoplay from here |
 | `ShuffleQueue` | – | Reorder |
 | `StartRadio` ✅ (song only so far) | `song`; later `seedId` (song, artist, album or playlist) | Start radio |
 | `AutoplayFromHere` ✅ (song only so far) | `song`; later `seedId` (song, artist, album or playlist) | Autoplay from here |
+| `AutoplaySongs` ✅ | `songs` (a playlist's "Add to autoplay": they replace the autoplay queue, radio continues after them) | Autoplay from here |
 | `LoadHistory` | `beforeItemId`, `limit` | – |
 
 ### Playback
@@ -120,7 +124,9 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `UpdateSettings` ✅ (name, default roles) | partial `settings` (name, visibility, ordering, access, limits, vote to skip, always on, …) | Change settings |
+| `UpdateSettings` ✅ (name, default roles, autoplay) | partial `settings` (later also ordering, access, limits, vote to skip, always on, …) | Change settings |
+| `SetVisibility` ✅ | `visibility: "public" \| "solo"` | Owner only |
+| `SetOpenElsewhere` ✅ | `mode` (ask / move / move if away) or null for the account's setting, see [room sync](room-sync.md) | Owner only |
 | `ChangeOwner` | `participantId` | Owner only |
 | `CloneRoom` | `visibility: "public" \| "solo"` | Clone room. The result has the new room's code. |
 | `SendMigration` | `targetRoom`, `mode: "invite" \| "forced"` | Send migration message |
@@ -149,7 +155,8 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 | `RepeatChanged` | `mode` | everyone |
 | `SkipVotesChanged` | `votes`, `needed` | everyone |
 | `OutputsChanged` ✅ | `outputs` (id, name, kind, active, volume) | everyone |
-| `SettingsChanged` ✅ | `settings` (default roles so far) | everyone |
+| `SettingsChanged` ✅ | `settings` | everyone |
+| `RoomUpdated` ✅ | `room` (name, visibility, owner, …) | everyone |
 | `RolesChanged` ✅ | `roles` (all, ranked) | everyone |
 | `BansChanged` ✅ | `bans` | everyone |
 | `OwnerChanged` | `participantId` | everyone |

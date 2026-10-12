@@ -17,6 +17,9 @@ admin installed them.
 
 ## Where sources are added
 
+> Planned. Today every host has one source, YouTube Music, set up with the host (server
+> config, or built into the app).
+
 | Level | Added by | Examples | Available to |
 |-------|----------|----------|--------------|
 | **Host** | Server admin (server config) or the hosting phone's owner | YouTube Music, YouTube, the server's music folders, the music on the hosting phone | Everyone in rooms on that host (server music folders can be limited to account holders in the server config) |
@@ -63,7 +66,7 @@ phone**, if the room allows it (permission: *Send songs from own device*).
 
 | Source | Status |
 |--------|--------|
-| YouTube Music | First / core |
+| YouTube Music | ✅ Built (server service and on the phone) |
 | YouTube | Planned |
 | Local files | Planned. Includes songs downloaded through YTMP. |
 | Media servers (Plex, Jellyfin, Subsonic/Navidrome, file servers, …) | Planned, linked to an account |
@@ -93,10 +96,10 @@ focus** (see [future ideas](future-ideas.md)).
 
 - Search and fetch metadata for songs, albums, artists and playlists.
 - Play without YouTube Premium.
-- Optional **local cache** so frequently played songs start faster.
+- Optional **local cache** so frequently played songs start faster (planned).
 - Available both **as a server-side service** and **on-device on Android**, so a
   phone can host without a server.
-- With a [linked YouTube account](accounts.md#linked-youtube-account): access
+- With a [linked YouTube account](accounts.md#linked-youtube-account) ✅: access
   to the user's playlists and likes.
 
 Implementation details: [implementation/ytm-module.md](../implementation/ytm-module.md).

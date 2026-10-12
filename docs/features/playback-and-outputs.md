@@ -29,9 +29,9 @@ The host can also send audio to **output modules**. Outputs are **modular**.
 
 | Output | Description |
 |--------|-------------|
-| Local device | The host's own speakers (mainly relevant for a phone or home server host) |
+| Local device | The host's own speakers. On a phone host the phone plays as a client (*this device*); a server's own speakers: planned |
 | Sonos ✅ | Streams to Sonos speakers over HTTP (see [implementation](../implementation/sonos.md)) |
-| Chromecast | Casts to Chromecast / Google Cast devices: TVs, Nest speakers, speaker groups |
+| Chromecast ✅ | Casts to Chromecast / Google Cast devices: TVs, Nest speakers, speaker groups (see [implementation](../implementation/chromecast.md)) |
 | Snapcast | Future idea: precise multi-room sync through a Snapcast server (see [future ideas](future-ideas.md#snapcast-output)) |
 | Discord bot | Future idea: plays into a Discord voice channel (see [future ideas](future-ideas.md#discord-bot-output)) |
 | … | Future output modules |
@@ -45,6 +45,9 @@ Implementation: [implementation/playback-sync.md](../implementation/playback-syn
 
 ## Audio
 
+> Planned. Built: songs follow each other without waiting for the next one to load (the
+> host looks up the next song's stream ahead of time).
+
 - **Loudness normalisation**: songs from different sources (YTM, local files, media
   servers) can differ a lot in volume. YTMP evens out the loudness so the volume does
   not jump between songs. Can be turned off.
@@ -52,6 +55,8 @@ Implementation: [implementation/playback-sync.md](../implementation/playback-syn
 - **Crossfade**: optional fade between songs, with a configurable length. Off by default.
 
 ## Sleep timer
+
+> Planned.
 
 Stops the music automatically, for example when falling asleep.
 

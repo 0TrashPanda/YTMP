@@ -2,6 +2,10 @@
 
 The host keeps **one queue per room**: the list of songs that will be played.
 
+> Status: built are the queue actions, the autoplay queue, radio, queue history and
+> playlists into autoplay. Not built yet: fair ordering, shuffle, repeat, vote to skip and
+> queue limits.
+
 ## Actions
 
 | Action | Who |

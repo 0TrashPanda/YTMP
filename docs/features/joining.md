@@ -28,11 +28,14 @@ A code is never reused while its room exists.
 
 There are three ways to find a phone host, with automatic discovery as the main one:
 
-1. **Automatic discovery (main)**: the app lists YTMP hosts on the same network. Tap one
-   to join, with no code or IP needed.
-2. **QR code**: the host shows a QR code containing its address. Scanning it with the
-   app, or with any phone camera to open it in a browser, joins the room.
-3. **Manual IP**: type the host's IP address (and port).
+1. **Automatic discovery (main)** ✅: the app lists public rooms on the same network
+   (*Nearby rooms*). Tap one to join, with no code or IP needed. (Not tested between two
+   real phones yet.)
+2. **QR code** ✅: the room's share sheet shows a QR code with its link. Scanning it with any
+   phone camera opens it in a browser and joins the room. Planned: the app opening these
+   links itself.
+3. **Manual IP**: type the link (`http://<phone's IP>:8765/room/CODE`) in a browser. Planned:
+   a field for it in the app.
 
 > Browsers cannot discover devices on the network by themselves, so browser clients
 > use the **QR code** or **manual IP**. The phone host also serves the web UI, so

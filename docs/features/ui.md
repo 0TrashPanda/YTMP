@@ -18,6 +18,10 @@ The most common use of YTMP:
 Besides songs, **artists, albums and playlists** can also be the start of a radio: their
 pages have **Start radio**, **Autoplay from here** and **Find similar**.
 
+Built so far: artist pages have **Radio** (from their top songs) and *Add top songs*; album
+pages have *Play*, *Play next*, *Add to queue*; playlist pages have *Play*, *Play next* and
+*Add to autoplay*. Radio from an album or playlist itself is planned.
+
 ## Home & Explore
 
 Like YTM:
@@ -25,9 +29,10 @@ Like YTM:
 - **Home** ✅: the room opens on it. Rows of suggestions from the sources: quick picks
   (songs in a grid of four rows that scrolls sideways; tap = play next), new releases,
   mixes and playlists (cards that scroll sideways and open their page). Without a linked
-  YouTube account these are YTM's general suggestions for the host's country; later
-  personalised with a linked account.
-- **Explore**: new releases, charts, moods & genres.
+  YouTube account these are YTM's general suggestions for the host's country; with one,
+  your own (see [accounts](accounts.md#linked-youtube-account)).
+- **Library** ✅ (with a linked YouTube Music account): your playlists and podcasts.
+- **Explore** (planned): new releases, charts, moods & genres.
 
 ## Player
 
@@ -82,13 +87,10 @@ typing only suggests: **Enter** or a suggestion searches and shows the results. 
 suggestion, Esc closes them. With an empty box it shows your **recent searches** (kept in
 the browser, ✕ removes one). On **phones** the header has a search button that opens a
 full-screen search page (back arrow, the box, suggestions as rows with ↖ to put one in the
-box and keep typing); the phone's back button closes it. It also accepts **links**:
+box and keep typing); the phone's back button closes it.
 
-- **YTMP** links
-- **YouTube Music** links
-- **YouTube** links
-
-Pasting a link shows that song (or playlist/album/artist) directly.
+Planned: it also accepts **links** (YTMP, YouTube Music and YouTube links); pasting one
+shows that song (or playlist/album/artist) directly.
 
 Like YouTube Music, **chips** above the results pick what to search for ✅: **All**,
 **Songs**, **Videos**, **Albums**, **Artists**, **Community playlists** and **Featured
@@ -120,9 +122,10 @@ YTMP plays YouTube Music's podcasts like YTM does:
 
 ## Search history & recently played
 
-- **Search history**: recent searches are shown when you open the search bar, and can
-  be cleared.
-- **Recently played**: a list of songs, albums, playlists and rooms you played recently.
+- **Search history** ✅: recent searches are shown when you open the search bar, and can
+  be removed one by one.
+- **Recently played** (planned): a list of songs, albums, playlists and rooms you played
+  recently.
 
 ## Gestures
 
@@ -145,9 +148,11 @@ have the *Reorder* permission.
 Open it with the **⋮** button or by **right-clicking** the song.
 
 > Implemented so far: Play next, Add to queue, Play now (for the current song: play from
-> the start), Start radio, Autoplay from here, Find similar, Go to artist / album (their
-> pages; a search when the source gives no ID), Open in YouTube Music, and Remove (from the
-> queue, the history or the autoplay queue). The current song has the menu too: right-click
+> the start), Start radio, Autoplay from here, Find similar, Go to artist / album / podcast
+> (their pages; a search when the source gives no ID), Like and Save to playlist (with a
+> linked YouTube Music account), Open in YouTube Music, and Remove (from the queue, the
+> history or the autoplay queue). Planned: YTMP playlists, Download, Share, and a
+> customisable menu. The current song has the menu too: right-click
 > the album art in the full player or the player bar, or its ⋮.
 >
 > **Artist pages** show the artist's top songs, albums and singles, with *Radio* and
@@ -163,13 +168,13 @@ Open it with the **⋮** button or by **right-clicking** the song.
 | Start radio | Replace the queue with a [radio](history-and-recommendations.md#radio--mix) from this song |
 | Autoplay from here | Replace the [autoplay queue](queue.md#autoplay-queue) with a radio from this song, without touching the queue |
 | Find similar | Open [find similar](history-and-recommendations.md#find-similar) from this song |
-| Like | Only if a YouTube account is linked |
-| Add to playlist | YTMP playlist, saved to your account |
-| Add to YTM playlist | Only if a YouTube account is linked |
+| Like ✅ | Only if a YouTube account is linked |
+| Add to playlist | YTMP playlist, saved to your account (planned) |
+| Save to playlist ✅ | YouTube Music playlist; only if a YouTube account is linked |
 | Go to artist | |
 | Go to album | |
-| Download | Save the song as a plain file on the device. YTMP can play it as a local file. |
-| Share | A YTM link or a YTMP link (you choose) |
+| Download (planned) | Save the song as a plain file on the device. YTMP can play it as a local file. |
+| Share (planned) | A YTM link or a YTMP link (you choose) |
 | Open in YouTube Music | For YTM songs |
 
 - In *Up next*, **hold** a song (or right-click it) for its menu; with a mouse a ⋮ also shows
@@ -201,11 +206,13 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - Phones: the mini player's progress line is at its **bottom**, between it and the bottom bar.
 - Actions that need a room permission (for example adding songs) are **disabled** when you
   don't have that permission.
-- The menu is **customisable**: you can change the **order** of the actions and
+- Planned: the menu is **customisable**: you can change the **order** of the actions and
   **show or hide** each one. Your layout is saved to your **account**, and can be
   overridden **per device**.
 
 ### Share links
+
+> Planned. Built now: sharing a **room** (link and QR code in the room's share sheet).
 
 - **YTM link**: opens the song on YouTube Music.
 - **YTMP link**: points to a **page on a YTMP server** for the song. When you are in a
@@ -223,16 +230,18 @@ Open it with the **⋮** button or by **right-clicking** the song.
 
 ## YTMP-specific additions on top of a YTM-like UI
 
-- **Room bar**: room name, room code, participants, your role, sharing (QR code)
-- **Queue** showing who added each song
-- **Room management** screens for admins (permissions, roles, kicking, settings)
-- **Room switcher** for multiple solo rooms (like YTM tabs)
-- **Output picker** (host outputs) and a "play on this device" toggle
-- **Recap** pages from your listening history
-- **Song menu** settings (order, show/hide)
-- **Party screen** for a TV or laptop
+- **Room bar** ✅: room name, room code, participants, sharing (QR code)
+- **Queue** ✅ showing who added each song
+- **Room management** screens ✅ for admins (permissions, roles, kicking, settings)
+- **Room switcher** for multiple solo rooms ✅ (the room list)
+- **Output picker** ✅ (host outputs) and a "play on this device" toggle
+- **Recap** pages from your listening history (planned)
+- **Song menu** settings (order, show/hide) (planned)
+- **Party screen** for a TV or laptop (planned)
 
 ## Lyrics
+
+> Planned.
 
 - Lyrics for the current song, **synced** (the current line is highlighted and scrolls
   along) when available, otherwise plain text.
@@ -243,6 +252,8 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - Optionally shown on the party screen.
 
 ## Party screen
+
+> Planned.
 
 A full-screen view for a **TV, laptop or tablet** during a party:
 
@@ -255,11 +266,16 @@ Any participant can open it, for example in a browser on a TV.
 
 ## Album art colours
 
+> Partly built: the full player shows the album art blurred behind it. Planned: a colour
+> taken from the art.
+
 Like YTM, the background around the now-playing album art takes its **colour from the
 album art** and changes with every song. This is used in the now-playing view and
 especially on the **party screen**.
 
 ## Themes
+
+> Planned. The UI is dark only for now.
 
 - **Light** and **dark** theme
 - Several **built-in themes**
@@ -268,6 +284,8 @@ especially on the **party screen**.
   song menu)
 
 ## Notifications
+
+> Planned.
 
 - **"Your song is next"**: a notification when a song you added is about to play.
   **Off by default.**

@@ -25,13 +25,14 @@ When YTMP runs on a server, it serves a website. A visitor picks one of these op
 1. **Join a room**
    - Enter a **room code**.
    - Joining as a guest requires a **temporary display name**.
-   - A guest who reconnects (within the grace period) is recognised by a **cookie** and
-     gets back their name, role and songs.
+   - A guest who reconnects (within 15 minutes) is recognised by a token the browser keeps,
+     and gets back their name, role and songs.
    - The visitor is now a client in that room.
 2. **Host a room**
    - The visitor creates a new room and becomes its **admin**.
-   - Who may create rooms is set in the **server config** (for example anyone, account
-     holders only, or specific accounts).
+   - Anyone who can use the server may create rooms. A server can be set to **accounts
+     only** (`accounts.guests = false`): then nothing works without an account. Planned:
+     finer rules (specific accounts only).
    - They manage the queue and set permissions for everyone who joins.
 3. **Solo room** ✅
    - A private room on the server that only its owner can join, the same as solo
@@ -40,11 +41,10 @@ When YTMP runs on a server, it serves a website. A visitor picks one of these op
      are listed on the start page. Without one, only the browser that made it (it keeps the
      owner token); such a room is deleted after **30 days** unused. Everyone else, also
      people who know the code, can't see or join it.
-   - A browser can keep **multiple solo rooms** and switch between them.
-   - Go straight to your solo rooms with the **`/solo`** URL (for example
-     `https://ytmp.example.com/solo`).
-   - The browser **remembers** your solo rooms with a **cookie**, so you get them back
-     without an account. With an account they are synced to the account instead.
+   - A browser can keep **multiple solo rooms**; the start page lists them.
+   - The browser **remembers** your solo rooms (local storage), so you get them back
+     without an account. With an account they belong to the account instead.
+   - Planned: a **`/solo`** URL that goes straight to your solo rooms.
 
 ### Via the Android app
 

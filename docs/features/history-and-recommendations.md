@@ -10,7 +10,8 @@ account's **auth server**.
 > Implemented: tracking on/off (pause), "keep me out of others' history" (account setting,
 > or a checkbox for guests), recording every song heard with the fields below, and a
 > history page with search, delete (one entry, a range of days, everything) and export
-> (JSON). Recap, the song graph and radio are next.
+> (JSON). Radio is built with YouTube Music's radio (see below). Recap and the song graph
+> are not built yet.
 
 When tracking is on, YTMP keeps a **full history of every song played** for the account,
 **in order**.
@@ -56,6 +57,8 @@ The user can:
 
 ## Recap
 
+> Not built yet.
+
 A personal overview built from the history, in the style of Spotify Wrapped:
 
 - top songs, artists and albums
@@ -66,6 +69,8 @@ A personal overview built from the history, in the style of Spotify Wrapped:
   and the songs you played most with someone
 
 ## Song graph
+
+> Not built yet. Storage plan: [storage](../implementation/storage.md#song-graph-planned-not-built-yet).
 
 Because the history keeps the **order** in which songs were played, YTMP can build a
 **graph of songs**:
@@ -121,6 +126,9 @@ artist or the current queue: it walks the graph to find songs that often go toge
 - For YTM songs, YTM's own radio can be used directly or mixed with the song graph.
 
 ## Find similar
+
+> Built with YouTube Music's radio: *Find similar* in the song menu, and the *Related* tab of
+> the full player. The song graph will be mixed in later.
 
 Like a radio, but **it does not touch the queue**. Starting from a song, an artist or an
 album, YTMP shows a **list of similar songs** that you can browse, and you pick the ones

@@ -1,6 +1,7 @@
 # Module HTTP API
 
-> Status: **draft for review**.
+> Status: **implemented in part.** Endpoints marked ✅ exist in the YTM module
+> (`ytm-module/ytmp_ytm/http.py`); the rest is the plan for later.
 
 ## What is this?
 
@@ -53,7 +54,7 @@ That way this logic is written once, and works the same for every source.
 The contract is generic. A few parts only make sense for YTM/YT, and other modules
 leave them out:
 
-- `X-YTMP-Credentials` (the linked YouTube account), and the `/me/...` library endpoints
+- `X-Ytm-Cookie` (the linked YouTube account), and the `/me/...` library endpoints
 - `/admin/update` (updating yt-dlp)
 - `loudnessDb` from YouTube, used for loudness normalisation
 
@@ -78,15 +79,15 @@ So the operations below are the contract for both. HTTP is only the transport on
 - IDs are **namespaced**: `ytm:dQw4w9WgXcQ`, `yt:…`. The prefix is the module ID.
 - Lists are **paginated** with an opaque `cursor`: the response has `next` (or `null`).
 - **User-scoped** calls (a linked YouTube account) get the user's credentials per request
-  in the `X-YTMP-Credentials` header. The module stores no user data.
+  in the `X-Ytm-Cookie` header (see Library below). The module stores no user data.
 - Errors:
 
   ```json
   { "error": { "code": "unavailable", "message": "Video unavailable in this country" } }
   ```
 
-  Codes: `not_found`, `unavailable`, `auth_required`, `auth_expired`, `rate_limited`,
-  `upstream_error`, `unsupported`.
+  Codes used now: `unauthorized` (wrong module key), `not_found`, `unavailable`,
+  `not_signed_in`, `invalid`, `upstream_error`. Planned: `rate_limited`, `unsupported`.
 
 ## Data types
 
@@ -129,12 +130,13 @@ mostly lack song durations, and a song without a duration can't end on its own i
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/info` | `{ id, name, version, apiVersion, capabilities: [...] }` |
-| GET | `/health` | Liveness check |
+| GET | `/info` ✅ | `{ id, name, version, apiVersion, capabilities: [...] }` |
+| GET | `/health` ✅ | Liveness check |
 
-`capabilities` tells the host which of the optional endpoints below are supported:
-`search`, `suggestions`, `browse`, `home`, `explore`, `resolve_url`, `stream`, `audio`,
-`radio`, `related`, `lyrics`, `library`, `isrc_lookup`.
+`capabilities` tells the host which of the optional endpoints below are supported. The YTM
+module now answers `search`, `suggestions`, `stream`, `audio`, `radio`, `artist`, `album`,
+`playlist`, `podcast`, `home`, `personal`. Planned: `explore`, `resolve_url`, `related`,
+`lyrics`, `isrc_lookup`.
 
 ### Search & browse
 
@@ -144,8 +146,8 @@ mostly lack song durations, and a song without a duration can't end on its own i
 | GET | `/search/suggestions?q=` ✅ | Suggestions while typing: `{ items: ["daft punk", …] }` (the host: `GET /api/search/suggestions?q=`, empty without a source) |
 | GET | `/search?isrc=` | Find a song by ISRC (optional `isrc_lookup` capability, helps [matching](storage.md#song-matching)) |
 | GET | `/songs/{id}` | Song details |
-| GET | `/albums/{id}` | Album with songs |
-| GET | `/artists/{id}` | Artist: top songs, albums, singles |
+| GET | `/albums/{id}` ✅ | Album with songs (see Recommendations below) |
+| GET | `/artists/{id}` ✅ | Artist: top songs, albums, singles |
 | GET | `/podcasts/{id}` ✅ | A podcast: `PodcastPage` (`id, title, author, description, thumbnails, episodes: [{ song, date, description }]`). Episodes are `Song`s with `podcast: { id, name }` |
 | GET | `/playlists/{id}?cursor=` | Public playlist with songs ✅ (`PlaylistPage`: `id, title, author, description, thumbnails, songs`; the first 200 songs, no paging yet) |
 | GET | `/resolve?url=` | Turn a YTM/YT URL into `{ type, item }` (for links pasted in search) |
@@ -157,8 +159,8 @@ mostly lack song durations, and a song without a duration can't end on its own i
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/songs/{id}/stream` | Resolve a **direct stream URL** on demand: `{ url, expiresAt, mimeType, bitrate, loudnessDb, durationMs }`. `durationMs` ✅ is the exact length (listings round podcast lengths); the host gives the current song that length |
-| GET | `/songs/{id}/audio?format=` | The **audio bytes** themselves, with HTTP `Range` support. Used for proxying, the cache, and [downloads](downloads.md). `format` is a preference (for example `m4a`). |
+| GET | `/songs/{id}/stream` ✅ | Resolve a **direct stream URL** on demand: `{ url, expiresAt, mimeType, bitrate, loudnessDb, durationMs }`. `durationMs` ✅ is the exact length (listings round podcast lengths); the host gives the current song that length. `loudnessDb` is always null for now |
+| GET | `/songs/{id}/audio?format=` ✅ | The **audio bytes** themselves, with HTTP `Range` support. Used for proxying (✅), and later the cache and [downloads](downloads.md). `format` is a preference (for example `m4a`; not read yet). |
 
 - `/stream` is for the direct path of the [hybrid approach](playback-sync.md). `/audio` is
   for the proxied path and the cache.
@@ -168,13 +170,13 @@ mostly lack song durations, and a song without a duration can't end on its own i
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/radio?seed=&cursor=` | YTM radio from a song, artist, album or playlist ID (`seed`): an endless list via `cursor`. ✅ Songs only, `limit` (default 25) instead of `cursor`; the host keeps it endless by asking again from the last song |
+| GET | `/radio?seed=&cursor=` ✅ | YTM radio from a song, artist, album or playlist ID (`seed`): an endless list via `cursor`. ✅ Songs only, `limit` (default 25) instead of `cursor`; the host keeps it endless by asking again from the last song |
 | GET | `/songs/{id}/related` | Related songs |
 | GET | `/artists/{id}` | ✅ Artist page: name, art, description, top songs, albums, singles |
 | GET | `/albums/{id}` | ✅ Album page: title, kind, year, artists, art, songs |
 
 The host stores every radio/related result as **YTM edges** in the song graph (see
-[storage](storage.md#song-graph)).
+[storage](storage.md#song-graph-planned-not-built-yet)).
 
 ### Lyrics
 
@@ -208,7 +210,7 @@ signed in give `401 not_signed_in`.
 
 Not yet: removing songs, unliking from a list, liked songs paging.
 
-### Admin
+### Admin (planned)
 
 | Method | Path | Description |
 |--------|------|-------------|

@@ -33,7 +33,9 @@ A native desktop app for Linux, next to the browser and Android app.
 ## Phone → server migration
 
 Move a phone-hosted room to an online server so it survives the phone leaving
-(see [room lifecycle](room-lifecycle.md)).
+(see [room lifecycle](room-lifecycle.md)). For your **own** rooms this is built as
+[room sync](room-sync.md) (with an account); still open: doing it for a room you don't own,
+or without an account.
 
 ## Upvotes in the queue (maybe)
 
@@ -63,7 +65,7 @@ The UI is English only for now. Translations (for example Dutch) could be added 
 Store the [song graph](history-and-recommendations.md#song-graph) in a real graph
 database (for example Neo4j or Memgraph) instead of normal tables, for bigger graphs or
 more advanced recommendations. Not needed at the current scale (see
-[storage](../implementation/storage.md#song-graph)).
+[storage](../implementation/storage.md#song-graph-planned-not-built-yet)).
 
 ## Spotify module
 

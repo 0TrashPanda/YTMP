@@ -28,15 +28,18 @@ path = "/var/lib/ytmp/ytmp.db"     # sqlite
 | `sessions` | Logins on the server's own pages: SHA-256 of the token, account, created / last used |
 | `invites` | SHA-256 of the invite code, who made it, expiry, who used it |
 | `settings` | Server values: the token signing key, the issuer name |
-| `account_data` | Per account, as JSON: role template, settings (tracking, hide from others) |
+| `account_data` | Per account, as JSON: role template, settings (tracking, hide from others, opening rooms elsewhere), the linked YouTube Music sign-in (encrypted, see `YoutubeLinks.kt`) |
 | `plays` | Listening history: one row per song heard (song as JSON plus title/artists for search, when, heard ms, skipped, room, added by me, listened with as JSON, shared), indexed by account + time |
+| `room_copies` | Copies of accounts' rooms that live on another host (a phone): sync ID, account, where the room lives now (`home`), epoch, room JSON, last seen. See [room sync](room-sync.md) |
 
-On **Android**, the app has its own local **SQLite** database for its rooms (solo rooms
-survive restarts), the local copy of joined rooms (for cloning), downloads and settings.
-Things that belong to an account are synced to the account's server.
+On **Android**, the app has its own local **SQLite** database (`PhoneRoomStore`) with one
+table, `rooms`, so its rooms survive restarts; other settings are in SharedPreferences.
+Planned there: the local copy of joined rooms (for cloning) and downloads. Rooms that
+belong to an account are synced to the account's server (see [room sync](room-sync.md)).
 
-Stored on the server: accounts, role templates, room defaults, playlists, rooms (for
-server-hosted and synced solo rooms), listening history, and the song graph.
+Stored on the server now: accounts, role templates, rooms (server-hosted, plus copies of
+accounts' phone rooms), listening history and linked YouTube Music sign-ins. Planned: room
+defaults, YTMP playlists and the song graph.
 
 ## Rooms (implemented)
 
@@ -61,7 +64,7 @@ rooms
   with `ON CONFLICT`). Phone:
   `PhoneRoomStore` (Android SQLite).
 
-## Song graph
+## Song graph (planned, not built yet)
 
 ### Why not a graph database?
 

@@ -23,8 +23,9 @@ Music, without Premium, and not tied to a single music service.
   browse similar songs.
 - **Permissions & roles.** Decide who can add, skip, remove or manage, per person or per
   role.
-- **Optional accounts.** Listening history now; later moving a room between your
-  devices, playlists and recaps ("you listened 12 hours with Sam").
+- **Optional accounts.** Listening history, your YouTube Music sign-in on your server, and
+  your rooms on all your devices; later playlists and recaps ("you listened 12 hours with
+  Sam").
 
 ## What works today
 
@@ -58,25 +59,37 @@ Music, without Premium, and not tied to a single music service.
   is linked to that server.
 - Listening history (off by default), with search, delete and export.
 - **Sign in to YouTube Music on your phone:** your own Home, a Library with your playlists,
-  liked songs and podcasts, liking and saving to playlists. The sign-in stays on the phone,
-  and guests in a room on your phone never see it.
+  liked songs and podcasts, liking and saving to playlists, and search and radio that fit
+  your taste. The sign-in stays on the phone, and guests in a room on your phone never see it.
+- The same on a **server account**, in every browser you log in with; the phone and the
+  server can share one sign-in.
+- **Your rooms on all your devices:** rooms on your phone show up on your server and the
+  other way round; open one there or move it (with an account).
+- Log in once: the server's pages and the app's own pages share the login.
+
+**The app**
+- Checks for new versions when it starts and installs them; *Check for updates* and *Send
+  logs* in the settings.
+- Server and app keep logs that clean up after themselves (what happened when a song
+  stopped or buffered).
 
 ## What's next
 
-- Using your YouTube Music sign-in in rooms on someone else's phone or a server
+- Handing a room to someone else, cloning a room, moving people to a new room
+- Dealing with YouTube's "confirm you're not a bot" block
+- Using your YouTube Music sign-in in rooms on someone else's phone or server
 - New podcast episodes on Home, playback speed, played marks
-- Fair queue (round-robin, so nobody takes over the queue)
+- Fair queue (round-robin), shuffle, repeat, vote to skip
 - More sources: YouTube, local files, Plex / Jellyfin
 - Learning which songs go together (song graph) for better radio, and recaps
-- Moving a room between your devices, YTMP playlists
-- Lyrics, explore page, party screen for a TV
+- YTMP playlists, lyrics, explore page, party screen for a TV, sleep timer
 
 ## Platforms
 
 | Platform | Status |
 |----------|--------|
-| Linux server (Docker) | ✅ Hosts rooms, serves the web app, accounts and listening history |
-| Android 11+ | ✅ Join rooms with native playback and lock screen controls; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music |
+| Linux server (Docker) | ✅ Hosts rooms, serves the web app, accounts, listening history and YouTube Music sign-ins |
+| Android 11+ | ✅ Join rooms with native playback and lock screen controls; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music; updates itself |
 | Web browser | ✅ Join rooms, or host through a server |
 | iOS | Not supported (the web app may work, but background playback won't) |
 
@@ -84,7 +97,8 @@ Music, without Premium, and not tied to a single music service.
 
 **Android:** get the APK from the [latest release](https://github.com/0TrashPanda/YTMP/releases)
 and open it on your phone (allow installing apps from your browser or file manager when
-asked). New releases install over the old one and keep your rooms and sign-ins.
+asked). After that the app finds new releases itself and offers to install them; they keep
+your rooms and sign-ins.
 
 ## Running a server
 
@@ -97,7 +111,8 @@ echo "YTMP_MODULE_KEY=$(openssl rand -hex 32)" > .env
 docker compose up -d --build
 ```
 
-Open `http://<server>:8080`. For HTTPS, put a reverse proxy such as Caddy in front of it
+Open `http://<server>:8080`. To update, see [the guide](deploy/proxmox.md#updating) (a new
+yt-dlp needs the module rebuilt without Docker's cache). For HTTPS, put a reverse proxy such as Caddy in front of it
 (`deploy/docker-compose.caddy.yml` does that for you), or use your own nginx.
 
 **Step-by-step guide:** [running YTMP on Proxmox](deploy/proxmox.md) (LXC container with

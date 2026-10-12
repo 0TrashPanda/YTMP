@@ -3,6 +3,10 @@
 A room does not live forever on one device. This page covers what happens when people
 leave, and how a room (or its queue) can move to another place.
 
+> Status: built are restarts (rooms come back paused), timeouts, and moving your own rooms
+> between your phone and server ([room sync](room-sync.md)). Not built yet: changing the
+> owner, the no-admin prompt, "always on", cloning and migration.
+
 ## Changing the owner
 
 Before leaving, the **owner** can **hand the room over to another participant**. That

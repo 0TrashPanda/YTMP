@@ -4,21 +4,22 @@ Feature description: [features/joining.md](../features/joining.md).
 
 ## LAN discovery
 
-- The phone host advertises itself with **mDNS / DNS-SD** as service type `_ytmp._tcp`.
-  The TXT record contains the room name, host name, whether the room is public, and the
-  protocol version.
-- Android: `NsdManager` for both advertising and discovery.
-- Solo/private rooms are **not advertised**.
+- The phone host advertises each **public** room with **mDNS / DNS-SD** as service type
+  `_ytmp._tcp` (`android/.../host/Nearby.kt`). The TXT record has `code`, `name` and `v` (the
+  protocol version).
+- Android: `NsdManager` for both advertising and discovery; the app's room list shows
+  *Nearby rooms*.
+- Solo rooms are **not advertised**.
+- Not verified yet between two real phones (the dev PC's firewall blocks mDNS).
 
 ## QR code
 
-The QR code encodes a URL such as `http://192.168.1.23:8080/join?room=KQFM`.
+The share sheet's QR code (and link) is the room's URL: `http://192.168.1.23:8765/room/KQFM`
+for a phone host, `https://ytmp.example.com/room/KQFM` on a server (`ShareSheet.svelte`).
+Scanned with a camera app, the browser opens the web UI served by the host.
 
-- Scanned with the YTMP app → the app opens the room directly.
-- Scanned with a camera app → the browser opens the web UI served by the phone host.
-
-Ideally the app registers as the handler for these URLs, so a camera scan on a phone
-with YTMP installed opens the app instead of the browser.
+Not built yet: the app registering as the handler for these URLs, so a scan on a phone with
+YTMP installed opens the app instead of the browser.
 
 ## Room code generation
 
@@ -30,9 +31,9 @@ with YTMP installed opens the app instead of the browser.
 - Server config:
 
   ```toml
-  [room_code]
-  style  = "letters"   # letters | digits | alnum
-  length = 4
+  [rooms]
+  code_style  = "letters"   # letters | digits | alnum
+  code_length = 4
   ```
 
 ## Transport security on the LAN
@@ -51,19 +52,29 @@ Options:
 
 **Decision:**
 
-- LAN: **plain `ws://` / `http://` by default**.
+- LAN: **plain `ws://` / `http://` by default** (built).
 - LAN: optional **secure mode** with a **self-signed certificate**. Users accept the
-  browser warning once. The app can pin the certificate fingerprint from the QR code.
-- Servers: `wss://` with a real certificate.
+  browser warning once. The app can pin the certificate fingerprint from the QR code. (Not
+  built yet.)
+- Servers: `wss://` with a real certificate (Caddy or your own reverse proxy, see
+  `deploy/`).
 
 ## Default timeouts
+
+Built (`RoomTimeouts` in `core/.../RoomManager.kt`):
+
+| Setting | Default |
+|---------|---------|
+| Public room with nobody connected → deleted | **1 hour** |
+| Solo room on a phone, or owned by an account | Never deleted automatically, only when closed |
+| Solo room of a guest on a server, nobody connected → deleted | **30 days** |
+| Client disconnects → their guest identity (name, role, songs) is kept for | **15 minutes** (recognised by their guest token) |
+
+Planned:
 
 | Setting | Default |
 |---------|---------|
 | No admin connected → prompt participants to clone the room | **5 minutes** |
-| No admin **and** nobody connected → delete the room | **1 hour** |
-| Solo room | Never deleted automatically, only when closed |
 | "Always on" room | Never deleted |
-| Client disconnects → their guest identity (name, role, songs) is kept for | **15 minutes** (recognised by cookie) |
 
-All are configurable per server.
+Not configurable in `ytmp.toml` yet.

@@ -236,6 +236,14 @@ cd deploy && docker compose up -d --build    # add the two -f files with Caddy
 docker image prune -f
 ```
 
+**A new yt-dlp** (when YouTube breaks something and songs stop playing): Docker reuses the
+installed packages as long as the module's code didn't change, so build the module again
+from scratch:
+
+```sh
+cd /opt/ytmp/deploy && docker compose build --no-cache --pull ytm && docker compose up -d
+```
+
 Rooms, accounts and history are kept in Docker volumes. Back up the whole container with
 Proxmox (**Backup** → **Backup now**, or a scheduled backup job).
 

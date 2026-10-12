@@ -3,6 +3,12 @@
 YTMP accounts are **optional**. Everything basic (hosting, joining as a guest)
 works without logging in.
 
+> Status: built are accounts and logging in, custom roles, listening history, the linked
+> YouTube Music account, moving your rooms between devices ([room sync](room-sync.md)) and
+> accounts-only servers. Not built yet: YTMP playlists, linked media servers, saved
+> preferences (song menu layout, theme, room defaults beyond roles) and per-room access
+> control.
+
 ## What an account is for
 
 ### Room transfer

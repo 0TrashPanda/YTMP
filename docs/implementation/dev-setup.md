@@ -33,23 +33,24 @@ runs lint, so none slips through. What differs on 11 and 12:
 ## Repository layout (monorepo)
 
 ```
-protocol/       Kotlin: shared message types (+ generated protocol.d.ts)
+protocol/       Kotlin: shared message types (+ generator for frontend/src/lib/protocol.gen.ts)
 core/           Kotlin: host core (rooms, queue, permissions, sync), used by server and Android
 host/           Kotlin (Ktor): HTTP API, room WebSocket and web app hosting, shared by server and Android
 cast/           Kotlin: Google Cast client (Cast v2 protocol), shared by server and Android
 server/         Kotlin (Ktor): Linux server, web UI hosting, auth server, admin page
 android/        Kotlin: Android app (WebView, Media3, Chaquopy, Ktor host)
 frontend/       Svelte 5 + SvelteKit (static) + Tailwind + TypeScript
-ytm-module/     Python: ytmp_ytm package (core.py + http.py)
-modules/        Kotlin: built-in modules (local-files, plex, sonos, chromecast, …)
+ytm-module/     Python: ytmp_ytm package (core.py + http.py + jsc.py)
 docs/           these docs
-deploy/         docker-compose.yml, example ytmp.toml, Caddyfile
+deploy/         docker-compose.yml, example ytmp.toml, Caddyfile, Proxmox guide
+tools/          smoke-test.py (checks a running phone or server)
 ```
 
 ### Where modules live
 
-- **Built-in modules** (shipped inside the app and server) live **in this repo**: YTM/YT,
-  local files, media servers, Sonos, Chromecast. They change together with the host and
+- **Built-in modules** (shipped inside the app and server) live **in this repo**: YTM/YT
+  (`ytm-module/`), Chromecast (`cast/` + `host/.../CastOutputs.kt`), Sonos (`host/`), and later
+  local files and media servers. They change together with the host and
   the [module API](module-api.md), in the same commit.
 - **External modules** (separate programs that only talk to YTMP over the module API,
   for example a future Discord bot, or modules written by others) get **their own repo**.
@@ -62,11 +63,11 @@ deploy/         docker-compose.yml, example ytmp.toml, Caddyfile
 | Topic | Decision |
 |-------|----------|
 | Kotlin / JVM | Latest Kotlin, Java 21, Gradle with Kotlin DSL |
-| Python | Python 3.12+, managed with `uv` |
+| Python | Python 3.12+, a plain venv + pip (`ytm-module/.venv`) |
 | Frontend | Svelte 5 + SvelteKit (static adapter), Tailwind, Vite |
 | Server install | **Docker Compose**: YTMP server + YTM module, optional **Caddy** for HTTPS |
 | Config | One `ytmp.toml` |
-| CI / releases | GitHub Actions build the APK and Docker images on every release |
+| CI / releases | GitHub Actions build the signed APK on every release tag. Docker images are built on the server from the repo (`deploy/docker-compose.yml`) |
 
 ## Conventions
 
@@ -75,12 +76,12 @@ deploy/         docker-compose.yml, example ytmp.toml, Caddyfile
 | APK signing | One fixed release key (self-update only works if every version is signed with the same key). Keep a backup of it. |
 | Versions | App and server come from the same release. Mismatched protocol versions get a clear "please update" message. |
 | Accounts | Username + password, no email. A forgotten password is reset by the server admin. |
-| Passwords | Hashed with Argon2 |
+| Passwords | PBKDF2-HMAC-SHA256, 600 000 iterations (JDK only, no extra library) |
 | YouTube cookies | Encrypted with a secret key from the server config |
 | YTM region | Server settings `language` and `location`. Default: **English**, **Belgium** (`language = "en"`, `location = "BE"`). |
-| Audio cache | Default 5 GB, configurable |
+| Audio cache | Planned: default 5 GB, configurable (not built yet) |
 | Phone hosting | A foreground service with a "YTMP is hosting" notification, so Android doesn't kill the host |
-| Logging | Plain logs, no external crash reporting |
+| Logging | Plain log files with limits (server: 14 days / 100 MB, app: 7 days / 20 MB), no external crash reporting. See [server admin](../features/server-admin.md#logs-) and [Android app](android-app.md#logs-) |
 
 ## Releases
 
@@ -89,7 +90,9 @@ The Android app is released through GitHub Actions (`.github/workflows/release.y
 - **Push a tag** `vX.Y.Z` (e.g. `git tag v0.2.0 && git push origin v0.2.0`). The workflow
   builds the web app and the release APK, version `X.Y.Z` (version code `X*10000+Y*100+Z`,
   so it must go up every release), and publishes a GitHub release with `ytmp-X.Y.Z.apk`
-  and notes generated from the commits. `0.x` versions are marked as pre-releases.
+  and notes generated from the commits (replace them by hand with notes for people; the
+  app's update dialog shows them, without the *Install* section). `0.x` versions are marked
+  as pre-releases; the app's update check still finds them.
 - **Run it by hand** (Actions → Release → Run workflow) for a test APK, kept as an artifact
   of the run, without a release.
 - **Signing:** every release is signed with the same release key, or phones can't update.

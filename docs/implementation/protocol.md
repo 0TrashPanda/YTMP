@@ -9,19 +9,15 @@ Svelte/TS frontend, and the types on both sides must never drift apart.
 
 Message list: [protocol-messages.md](protocol-messages.md).
 
-## Generating the TypeScript types
+## Generating the TypeScript types ✅
 
-Proposal (to verify in a prototype):
-
-1. Try **[kxs-ts-gen](https://github.com/adamko-dev/kotlinx-serialization-typescript-generator)**,
-   an existing generator that reads kotlinx.serialization classes. It is a small,
-   fairly experimental project.
-2. Fallback: a **small custom Gradle task** that walks the kotlinx.serialization
-   `SerialDescriptor`s of the message classes and writes a `.d.ts` file. Probably a few
-   hundred lines, and it can't break because of someone else's project.
-
-Either way, the generated `protocol.d.ts` is created during the build and checked by the
-frontend's TypeScript compiler, so a mismatch is a build error.
+A **small custom generator** (`protocol/src/main/kotlin/.../tsgen`) walks the
+kotlinx.serialization `SerialDescriptor`s of the protocol classes and writes
+`frontend/src/lib/protocol.gen.ts` (types, plus constants like `PROTOCOL_VERSION`). Run
+`./gradlew :protocol:generateTs` after changing `protocol/`; the file is checked in, and the
+frontend's TypeScript compiler (`pnpm check`) turns a mismatch into an error.
+[kxs-ts-gen](https://github.com/adamko-dev/kotlinx-serialization-typescript-generator) was the
+other option; the own generator can't break because of someone else's project.
 
 ## Question 1: where do the message types come from?
 

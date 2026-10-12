@@ -20,6 +20,11 @@ by hand:
 
 ## Updates
 
+> Not built yet. Now the server is updated by hand: `git pull` and rebuilding the Docker
+> images; a new yt-dlp needs the module rebuilt without Docker's cache (see the
+> [Proxmox guide](../../deploy/proxmox.md#updating)). The YouTube Music module logs its yt-dlp
+> version when it starts (`docker compose logs ytm`).
+
 - **yt-dlp** is updated **automatically** on the server, because YouTube changes often and
   an outdated yt-dlp breaks playback. The admin page shows the current version and
   allows a manual update.

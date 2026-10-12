@@ -1,5 +1,7 @@
 # Downloads
 
+> Status: **planned, not built yet.**
+
 Feature: *Download* in the [song menu](../features/ui.md#song-menu).
 
 ## Who does what

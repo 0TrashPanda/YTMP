@@ -90,7 +90,7 @@
 - The WebView talks to the native side through a **JS bridge**.
 - When hosting, the app also runs the **HTTP/WebSocket server** (Ktor) that serves the web UI
   and the room to other devices on the network.
-- Local data (rooms, downloads, settings) is stored in a local SQLite database (see
+- Rooms are kept in a local SQLite database, settings in SharedPreferences (see
   [storage](storage.md)).
 
 ## Audio playback: native
@@ -104,8 +104,8 @@ inside the WebView.
   - background playback with the screen off
   - lock screen and notification controls
   - headphone / Bluetooth / car buttons
-- ExoPlayer handles **gapless** playback, **crossfade** (two players) and loudness
-  normalisation.
+- ExoPlayer can do **gapless** playback, **crossfade** (two players) and loudness
+  normalisation. Not built yet: crossfade and loudness normalisation.
 - The **sync logic** (clock offset, drift correction, see
   [playback-sync](playback-sync.md)) is implemented twice: in TypeScript for browsers, and in
   Kotlin for the native player.

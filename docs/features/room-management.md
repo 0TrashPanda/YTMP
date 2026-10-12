@@ -9,7 +9,8 @@ and what each participant can do. The owner can be changed
 An admin chooses who can join the room:
 
 - **Everyone**: guests (with a temporary name) and account holders
-- **Accounts only**: guests cannot join, a YTMP account is required
+- **Accounts only**: guests cannot join, a YTMP account is required (built for a whole
+  server, `accounts.guests = false`; per room: planned)
 - Private / solo: nobody else (see [rooms](rooms-and-roles.md#room-visibility))
 
 A phone host can use a YTMP server for account authentication. If it does not, only
@@ -91,17 +92,21 @@ Roles exist on **two levels**:
 ## Room defaults
 
 - The **default role for new joiners** is a room setting (it can differ for guests and
-  account holders).
-- Account holders can save their **preferred room defaults** (default roles, role
-  templates, ordering mode, access control, …) to their account. These are applied to
-  every room they create.
+  account holders). ✅
+- Account holders can save their **preferred room defaults** to their account, applied to
+  every room they create. Built: role templates with default roles and the autoplay
+  setting. Planned: ordering mode, access control, …
 
 ## Room settings
+
+Built: name, visibility (owner), default roles, autoplay, and where the room opens from
+your other devices (owner, see [room sync](room-sync.md)). The rest is planned.
 
 - **Room name**: shown in the room bar and in LAN discovery. The default is the
   creator's name + "'s room" (for example `Jonah's room`), and it can be edited.
 - Visibility: public or private (see [rooms](rooms-and-roles.md#room-visibility))
 - Default role for new joiners (guests / account holders)
+- Autoplay (on by default, see [queue](queue.md#autoplay-queue))
 - Queue ordering mode, for example **fair / round-robin**
   (see [queue](queue.md#ordering-modes))
 - Access control (see above)
