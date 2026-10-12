@@ -17,6 +17,8 @@ dependencies {
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.server.call.logging)
     implementation(libs.ktor.server.status.pages)
+    // Your YouTube Music on your server, from rooms on other hosts (HostOptions.crossOriginPersonal).
+    implementation(libs.ktor.server.cors)
     implementation(libs.ktor.serialization.kotlinx.json)
 
     testImplementation(kotlin("test"))

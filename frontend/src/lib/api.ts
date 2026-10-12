@@ -47,9 +47,12 @@ export class ApiRequestError extends Error {}
  */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	const headers = new Headers(init?.headers);
-	const token = identity.token;
+	// Your YouTube Music from your own server, in a room on another host (see useYoutubeFrom).
+	const remote = path.startsWith('/api/me/') ? youtubeFrom : null;
+	const token = remote ? remote.token : identity.token;
 	if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
-	const response = await fetch(path, { ...init, headers });
+	if (remote && init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+	const response = await fetch(remote ? remote.server + path : path, { ...init, headers });
 	if (!response.ok) {
 		const body = (await response.json().catch(() => null)) as ApiError | null;
 		throw new ApiRequestError(body?.error.message ?? `Request failed (${response.status})`);
@@ -190,12 +193,25 @@ export function getPodcast(id: string): Promise<PodcastPage> {
 	return cached(`podcast:${id}`, () => request(`/api/podcasts/${encodeURIComponent(id)}`));
 }
 
-/** Suggestions for the home page: quick picks, new releases, mixes. */
+/** Suggestions for the home page: quick picks, new releases, mixes (yours, with your YouTube Music). */
 export function getHome(): Promise<HomePage> {
-	return cached('home', () => request<HomePage>(`/api/home${refreshHome ? '?fresh=1' : ''}`).finally(() => (refreshHome = false)));
+	const path = youtubeFrom ? '/api/me/home' : `/api/home${refreshHome ? '?fresh=1' : ''}`;
+	return cached('home', () => request<HomePage>(path).finally(() => (refreshHome = false)));
 }
 
-/** Your YouTube Music sign-in on this host (the phone app only). */
+/**
+ * Your YouTube Music comes from your own server ([server], with a [token] just for that), not
+ * from this host: a room on someone else's phone or server. Null: from this host, as usual.
+ */
+let youtubeFrom: { server: string; token: string } | null = null;
+export function useYoutubeFrom(remote: { server: string; token: string } | null): void {
+	if (remote?.server === youtubeFrom?.server && remote?.token === youtubeFrom?.token) return;
+	youtubeFrom = remote;
+	forgetPersonal();
+	cache.delete('home');
+}
+
+/** Your YouTube Music sign-in on this host (or, after [useYoutubeFrom], on your server). */
 export function getYoutubeAccount(): Promise<YoutubeAccountStatus> {
 	return request('/api/me/youtube');
 }

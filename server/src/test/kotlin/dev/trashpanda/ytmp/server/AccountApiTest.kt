@@ -50,6 +50,7 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -120,6 +121,31 @@ class AccountApiTest {
         assertEquals("SID=1; __Secure-3PAPISID=x", cookieWith(anna.sessionToken).body<YoutubeSignInRequest>().cookie)
         assertEquals(HttpStatusCode.Unauthorized, cookieWith(hostToken).status)
         assertEquals(HttpStatusCode.Unauthorized, cookieWith(null).status)
+    }
+
+    @Test
+    fun `a YouTube Music token is only for your YouTube Music on your server`() = testApplication {
+        val service = setup(SignupMode.OPEN)
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>()
+        val token = client.post("/api/account/youtube-token") { bearerAuth(anna.sessionToken) }.body<HostTokenResponse>().token
+
+        // What it may do.
+        assertEquals("anna@test.example", service.verifyYoutubeToken(token, HttpMethod.Get, "/api/me/library"))
+        assertEquals("anna@test.example", service.verifyYoutubeToken(token, HttpMethod.Put, "/api/me/likes/ytm:abc"))
+        assertEquals("anna@test.example", service.verifyYoutubeToken(token, HttpMethod.Post, "/api/me/playlists/PLx/songs"))
+        // Not destroying or changing things, and it's not a login.
+        assertNull(service.verifyYoutubeToken(token, HttpMethod.Delete, "/api/me/playlists/PLx"))
+        assertNull(service.verifyYoutubeToken(token, HttpMethod.Post, "/api/me/playlists/PLx/remove"))
+        assertNull(service.verifyYoutubeToken(token, HttpMethod.Put, "/api/me/youtube/history"))
+        assertNull(service.verifyYoutubeToken(token, HttpMethod.Get, "/api/rooms"))
+        assertNull(service.verifyOwnToken(token))
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/auth/role-template") { bearerAuth(token) }.status)
+        // A normal host token isn't a YouTube Music token either.
+        val hostToken = client.postJson("/api/account/host-token", HostTokenRequest(origin), session = anna.sessionToken).body<HostTokenResponse>().token
+        assertNull(service.verifyYoutubeToken(hostToken, HttpMethod.Get, "/api/me/library"))
+        // Only with your login session.
+        assertEquals(HttpStatusCode.Unauthorized, client.post("/api/account/youtube-token") { bearerAuth(hostToken) }.status)
     }
 
     @Test

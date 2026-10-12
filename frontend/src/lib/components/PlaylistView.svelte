@@ -3,6 +3,7 @@
 	import { thumbUrl } from '../images.svelte';
 	import { deletePlaylist, getPlaylist, movePlaylistItem, renamePlaylist } from '../api';
 	import Icon from './Icon.svelte';
+	import { youtube } from '../youtube.svelte';
 	import { formatTime } from '../format';
 	import type { PlaylistPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -53,7 +54,8 @@
 
 	// Your own playlists: move songs, rename, delete. Liked music: remove (unlike).
 	const likedMusic = $derived(personal && id === 'LM');
-	const editable = $derived(!!playlist?.owned);
+	// From your server in a room on another host, playlists can't be changed (only there).
+	const editable = $derived(!!playlist?.owned && !youtube.from);
 	let menuOpen = $state(false);
 	let renaming = $state<string | null>(null);
 

@@ -2,7 +2,7 @@
 // happens in the app (android/.../YoutubeLoginActivity.kt), and the cookies stay there. On a
 // server it belongs to your YTMP account there: you sign in through the app, or paste the
 // cookies from a browser, and the server keeps them (server/.../YoutubeLinks.kt).
-import { forgetPersonal, getHost, getYoutubeAccount, setYoutubeHistory, setYoutubePersonalize, signInToYoutube, signOutOfYoutube } from './api';
+import { forgetPersonal, getHost, getYoutubeAccount, setYoutubeHistory, setYoutubePersonalize, signInToYoutube, signOutOfYoutube, useYoutubeFrom } from './api';
 import { identity } from './account';
 import { nativeBridge } from './native';
 import type { YoutubeAccount, YoutubeHistory } from './protocol.gen';
@@ -19,6 +19,11 @@ class YoutubeSignIn {
 	personalize = $state(true);
 	/** On the phone: your linked YTMP server, if you're logged in there (its YouTube Music sign-in can be used here too). */
 	linkedServer = $state<string | null>(null);
+	/**
+	 * Your YouTube Music here comes from your own server (a room on another host): its address.
+	 * Then it can be used, but not changed here (sign-in, settings, deleting playlists).
+	 */
+	from = $state<string | null>(null);
 	/** Changes with every sign-in or sign-out, to reload what depends on it. */
 	version = $state(0);
 	busy = $state(false);
@@ -46,12 +51,29 @@ class YoutubeSignIn {
 
 	async load(): Promise<void> {
 		try {
-			const [status, host] = await Promise.all([getYoutubeAccount(), getHost()]);
+			useYoutubeFrom(null);
+			let [status, host] = await Promise.all([getYoutubeAccount(), getHost()]);
+			// Not signed in here, but you said this host may use your YouTube Music on your server.
+			const remote = !status.account ? identity.youtube : null;
+			const before = this.from;
+			this.from = null;
+			if (remote) {
+				useYoutubeFrom(remote);
+				const there = await getYoutubeAccount().catch(() => null);
+				if (there?.account) {
+					status = there;
+					this.from = new URL(remote.server).host;
+				} else {
+					useYoutubeFrom(null);
+				}
+			}
+			// Home and Library come from somewhere else now: load them again.
+			if (this.from !== before) this.version++;
 			this.onServer = host.kind === 'server';
 			const server = host.authServers.find((s) => s.url)?.url ?? null;
 			this.linkedServer = !this.onServer && identity.get(host.authServers) ? server : null;
 			// On a phone: in its app, or as its owner on another device (logged in), when the phone is signed in.
-			this.available = status.available && (this.onServer || !!nativeBridge?.youtubeSignIn || !!status.account);
+			this.available = status.available && (this.onServer || !!nativeBridge?.youtubeSignIn || !!status.account || !!this.from);
 			this.account = status.account;
 			this.history = status.history;
 			this.personalize = status.personalize;

@@ -136,6 +136,21 @@ the hash as `roomPassword`, and new rooms of that account start with it.
   or `declined`.
 - The join form and the solo-room refusal have **Log in** buttons (the normal `/connect`).
 
+### Your YouTube Music on other hosts
+
+`POST /api/account/youtube-token` (login session) makes a token like a host token, with
+`scope: "youtube"` (and no audience). `/connect` gets one when *Also use my YouTube Music
+there* is ticked and returns it with the host token (`youtube: { server, token, expiresAt }`
+in the fragment); the page keeps it as `ytmp.youtubeFrom`. When the host itself has no YouTube
+Music for you, `youtube.load()` switches every `/api/me/...` request (and Home, as
+`/api/me/home`) to your server with that token (`useYoutubeFrom` in `api.ts`).
+
+- Your server answers those from other origins: `HostOptions.crossOriginPersonal` installs
+  CORS on `/api/me`, and accounts-only lets preflights and such tokens through there.
+- `AccountService.verifyYoutubeToken` only accepts them for: `GET /api/me/...`,
+  `PUT /api/me/likes/...`, `POST /api/me/playlists` and `.../songs`. Everywhere else (host
+  logins, `/api/auth/*`, room sync) tokens with a scope are refused.
+
 ### The phone's owner
 
 The account the phone's own page proves (a bearer token on a loopback request: `/api/host`,

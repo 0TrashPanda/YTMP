@@ -26,24 +26,30 @@
 	let busy = $state(false);
 	let loaded = $state(false);
 
-	// Hosts you said yes to before, per account, in this browser: they don't ask again.
+	// Hosts you said yes to before, per account, in this browser: they don't ask again. And
+	// the ones that also get your YouTube Music from here.
 	const APPROVED = 'ytmp.approvedHosts';
-	function approved(): Record<string, string[]> {
+	const WITH_YOUTUBE = 'ytmp.youtubeHosts';
+	function approved(key = APPROVED): Record<string, string[]> {
 		try {
-			return JSON.parse(localStorage.getItem(APPROVED) ?? '{}');
+			return JSON.parse(localStorage.getItem(key) ?? '{}');
 		} catch {
 			return {};
 		}
 	}
-	function remember(accountId: string, origin: string) {
-		const all = approved();
-		all[accountId] = [...new Set([...(all[accountId] ?? []), origin])];
+	function remember(accountId: string, origin: string, key = APPROVED, yes = true) {
+		const all = approved(key);
+		const others = (all[accountId] ?? []).filter((o) => o !== origin);
+		all[accountId] = yes ? [...others, origin] : others;
 		try {
-			localStorage.setItem(APPROVED, JSON.stringify(all));
+			localStorage.setItem(key, JSON.stringify(all));
 		} catch {
 			// Asks again next time.
 		}
 	}
+
+	/** Also your YouTube Music there (it comes from this server; that host never gets your sign-in). */
+	let withYoutube = $state(true);
 
 	/** Back to the host's page without a login: [answer] `none` (not logged in), or `declined`. */
 	function goBack(answer: 'none' | 'declined') {
@@ -62,6 +68,7 @@
 		}
 		loaded = true;
 		// Our own pages, and hosts you said yes to, don't need to ask.
+		if (account && target && target.origin !== location.origin) withYoutube = approved(WITH_YOUTUBE)[account.id]?.includes(target.origin) ?? true;
 		if (account && target && (target.origin === location.origin || approved()[account.id]?.includes(target.origin))) await allow();
 		// Not logged in here (or the server didn't answer): the host's page asks your name as before.
 		else if (quiet && !account) goBack('none');
@@ -74,7 +81,10 @@
 		try {
 			const token = await authServer.hostToken(target.origin);
 			remember(token.account.id, target.origin);
-			returnWithIdentity(target.toString(), token);
+			const otherHost = target.origin !== location.origin;
+			if (otherHost) remember(token.account.id, target.origin, WITH_YOUTUBE, withYoutube);
+			const youtube = otherHost && withYoutube ? await authServer.youtubeToken().catch(() => undefined) : undefined;
+			returnWithIdentity(target.toString(), token, youtube);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Something went wrong';
 			busy = false;
@@ -106,6 +116,15 @@
 				<span class="text-muted">({account.id})</span>?
 			</p>
 			<p class="text-sm text-muted">That host will see your name and account ID. It never sees your password.</p>
+			<label class="flex items-start gap-2 text-sm">
+				<input type="checkbox" class="mt-0.5 accent-accent" bind:checked={withYoutube} />
+				<span>
+					Also use my YouTube Music there
+					<span class="block text-xs text-muted">
+						Your Home, Library and likes in rooms there come from this server; the host never gets your sign-in. Deleting or changing playlists stays here.
+					</span>
+				</span>
+			</label>
 			<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy} onclick={allow}>Continue</button>
 			<div class="flex justify-between text-sm text-muted">
 				<button class="underline" onclick={switchAccount}>Use another account</button>

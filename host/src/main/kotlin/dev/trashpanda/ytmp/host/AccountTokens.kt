@@ -35,6 +35,11 @@ object AccountTokens {
         val exp: Long,
         /** The account doesn't want to be named in other people's listening history. */
         val hide: Boolean = false,
+        /**
+         * Limits what the token is for. `youtube`: only the account's YouTube Music on its own
+         * server (from rooms on other hosts); it isn't a login anywhere. Null: a normal host token.
+         */
+        val scope: String? = null,
     ) {
         val accountId get() = "$sub@$iss"
     }

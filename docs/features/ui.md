@@ -171,6 +171,8 @@ Open it with the **⋮** button or by **right-clicking** the song.
 | Autoplay from here | Replace the [autoplay queue](queue.md#autoplay-queue) with a radio from this song, without touching the queue |
 | Find similar | Open [find similar](history-and-recommendations.md#find-similar) from this song |
 | Like ✅ | Only if a YouTube account is linked |
+| Dislike ✅ | Thumbs down; the playing song is skipped (if you may) |
+| Remove from this playlist ✅ | On your own playlist's page (Liked music: *Remove from Liked music*) |
 | Add to playlist | YTMP playlist, saved to your account (planned) |
 | Save to playlist ✅ | YouTube Music playlist; only if a YouTube account is linked |
 | Go to artist | |

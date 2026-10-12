@@ -17,6 +17,8 @@ import dev.trashpanda.ytmp.host.localOrigins
 import dev.trashpanda.ytmp.host.normalizeOrigin
 import dev.trashpanda.ytmp.host.AccountTokens
 import dev.trashpanda.ytmp.protocol.AuthServerRef
+import io.ktor.server.request.httpMethod
+import io.ktor.server.request.path
 import io.ktor.server.application.Application
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -133,6 +135,7 @@ fun main(args: Array<String>) {
                 isLocal = { false },
                 mayProxyAudio = audioProxy::allows,
                 accountsOnly = !config.accounts.guests,
+                crossOriginPersonal = true,
             ),
             extraApi = {
                 service.routes(this)
@@ -143,7 +146,12 @@ fun main(args: Array<String>) {
             catalog = cached,
             suggestions = cached,
             // Your account's YouTube Music, when you're logged in with an account of this server.
-            personalFor = { call -> call.bearerToken()?.let(auth::verify)?.id?.let(::localAccount)?.let(youtube::of) },
+            // Also from the pages of rooms on other hosts, with a token just for that (see AccountApi.youtubeToken).
+            personalFor = { call ->
+                val token = call.bearerToken()
+                val id = token?.let(auth::verify)?.id ?: token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
+                id?.let(::localAccount)?.let(youtube::of)
+            },
         )
     }.start(wait = true)
 }

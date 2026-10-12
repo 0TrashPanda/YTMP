@@ -65,6 +65,9 @@ Music, without Premium, and not tied to a single music service.
   your taste. The sign-in stays on the phone, and guests in a room on your phone never see it.
 - The same on a **server account**, in every browser you log in with; the phone and the
   server can share one sign-in.
+- Thumbs up and down, and editing your own playlists (remove, move, rename, delete).
+- Your YouTube Music in rooms on someone else's phone or server too, straight from your
+  server (the host never gets your sign-in).
 - **Your rooms on all your devices:** rooms on your phone show up on your server and the
   other way round; open one there or move it (with an account).
 - Log in once: the server's pages and the app's own pages share the login.
@@ -78,7 +81,6 @@ Music, without Premium, and not tied to a single music service.
 ## What's next
 
 - Dealing with YouTube's "confirm you're not a bot" block
-- Using your YouTube Music sign-in in rooms on someone else's phone or server
 - New podcast episodes on Home, playback speed, played marks
 - Fair queue (round-robin), shuffle, repeat, vote to skip
 - More sources: YouTube, local files, Plex / Jellyfin

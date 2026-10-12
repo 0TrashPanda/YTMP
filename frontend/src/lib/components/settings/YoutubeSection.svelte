@@ -54,6 +54,12 @@
 			{#if account.handle}<p class="truncate text-sm text-muted">{account.handle}</p>{/if}
 		</div>
 	</div>
+	{#if youtube.from}
+		<p class="text-sm text-muted">
+			Your YouTube Music comes from your account on {youtube.from}: Home, Library and likes work here, and this host never gets your sign-in. Change these
+			settings, or sign out, there.
+		</p>
+	{:else}
 	<p class="text-sm text-muted">Your Home and Library come from this YouTube Music account. Only you see them, also when friends are in your rooms.</p>
 	<Choice
 		label="Add to your YouTube Music history"
@@ -75,6 +81,7 @@
 	<div class="mt-4 border-t border-line pt-4">
 		<button class="text-sm text-muted underline hover:text-white" onclick={signOut}>Sign out of YouTube Music</button>
 	</div>
+	{/if}
 {:else if youtube.available && youtube.onServer}
 	<p class="text-sm text-muted">
 		Connect YouTube Music to your YTMP account on this server: your playlists, liked songs and podcasts, and your own suggestions on Home, in every browser. The

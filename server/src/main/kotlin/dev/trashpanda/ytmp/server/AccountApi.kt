@@ -18,6 +18,7 @@ import dev.trashpanda.ytmp.protocol.SessionResponse
 import dev.trashpanda.ytmp.protocol.SetPasswordRequest
 import dev.trashpanda.ytmp.protocol.SignupMode
 import dev.trashpanda.ytmp.protocol.SignupRequest
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
@@ -237,6 +238,11 @@ class AccountService(
             call.respond(SessionResponse(io { accounts.newSession(account.id) }, toInfo(account)))
         }
 
+        // Your YouTube Music here, for the pages of rooms on other hosts (they call this server).
+        post("/account/youtube-token") {
+            call.respond(youtubeToken(call.account()))
+        }
+
         post("/account/host-token") {
             val account = call.account()
             val origin = normalizeOrigin(call.receive<HostTokenRequest>().origin)
@@ -287,7 +293,32 @@ class AccountService(
 
     /** A host token of one of this server's accounts, for any host (they act for the account here). */
     fun verifyOwnToken(token: String): AccountTokens.Claims? =
-        AccountTokens.verify(token, { iss -> if (iss == issuer) key.public else null }, clock() / 1000)
+        AccountTokens.verify(token, { iss -> if (iss == issuer) key.public else null }, clock() / 1000)?.takeIf { it.scope == null }
+
+    /**
+     * A token for one of this server's accounts' YouTube Music only (see [youtubeToken]), and
+     * only for what such a token may do: read, like and dislike, save songs to playlists. Not
+     * removing, moving, renaming or deleting, changing settings or signing out.
+     */
+    fun verifyYoutubeToken(token: String, method: HttpMethod, path: String): String? {
+        val claims = AccountTokens.verify(token, { iss -> if (iss == issuer) key.public else null }, clock() / 1000) ?: return null
+        if (claims.scope != YOUTUBE_SCOPE) return null
+        val allowed = when (method) {
+            HttpMethod.Get -> path.startsWith("/api/me/")
+            HttpMethod.Put -> path.startsWith("/api/me/likes/")
+            HttpMethod.Post -> path == "/api/me/playlists" || (path.startsWith("/api/me/playlists/") && path.endsWith("/songs"))
+            else -> false
+        }
+        return claims.accountId.takeIf { allowed }
+    }
+
+    /** A token for [account]'s YouTube Music on this server, for pages of other hosts (30 days). */
+    fun youtubeToken(account: Accounts.Account): HostTokenResponse {
+        val now = clock() / 1000
+        val exp = now + HOST_TOKEN_LIFETIME.inWholeSeconds
+        val claims = AccountTokens.Claims(issuer, account.username, account.displayName, "", now, exp, scope = YOUTUBE_SCOPE)
+        return HostTokenResponse(AccountTokens.sign(claims, key.private), exp * 1000, toInfo(account))
+    }
 
     /** The account's setting for opening its rooms on another host. */
     fun openElsewhere(username: String): RoomOpenMode = accounts.find(username)?.let(::settings)?.openElsewhere ?: RoomOpenMode.ASK
@@ -336,3 +367,6 @@ class LoginThrottle(private val clock: () -> Long) {
         val WINDOW = 15.minutes
     }
 }
+
+/** [AccountTokens.Claims.scope] of tokens that are only for an account's YouTube Music on its server. */
+const val YOUTUBE_SCOPE = "youtube"

@@ -100,8 +100,25 @@ every browser where you're logged in. Only you see them.
   account has (one confirm). The server only gives the sign-in to you, logged in on its own
   pages; room hosts never get it.
 
-Later: removing songs from your playlists, dislike; using your sign-in in rooms on someone
-else's phone or server without giving that host your sign-in.
+### Your playlists and thumbs ✅
+
+- **Dislike** (thumbs down, next to thumbs up in the full player and the player bar, and in
+  the song menu): like YouTube Music, it suggests fewer songs like it, and a song that's
+  playing is skipped (if you may skip).
+- **Your own playlists** (opened from your Library): remove songs (song menu → *Remove from
+  this playlist*), drag them to another place, **rename** and **delete** the playlist (the ⋮
+  next to its name). In Liked music, *Remove from Liked music* takes the like away.
+
+### Your YouTube Music in rooms on other hosts ✅
+
+When you log in to a room on someone else's phone or server with your account, your server
+asks *"Also use my YouTube Music there"* (on by default, remembered per host). Then your Home,
+Library, likes and saving to playlists in that room come **straight from your server**; the
+host never gets your sign-in. The page there only gets a pass that's good for your YouTube
+Music on your server: not a login, and it can't delete or change playlists, change settings
+or sign out (do that on your own server). Your YouTube Music must be connected to your
+account on your server for this. Not yet: search and radio with your account there, and
+plays there going into your YouTube Music history.
 
 ## Log in once ✅
 

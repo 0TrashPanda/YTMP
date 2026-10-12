@@ -65,6 +65,8 @@ class TrustedAuthServers(
 
     override fun verify(token: String): AccountIdentity? {
         val claims = AccountTokens.verify(token, { trusted[it]?.key }, clock() / 1000) ?: return null
+        // A token for something narrower (your YouTube Music) isn't a login.
+        if (claims.scope != null) return null
         if (!isOwnOrigin(normalizeOrigin(claims.aud) ?: return null)) return null
         return AccountIdentity(claims.accountId, claims.name, hideFromHistory = claims.hide)
     }

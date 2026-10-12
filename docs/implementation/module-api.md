@@ -204,11 +204,15 @@ signed in give `401 not_signed_in`.
 | POST | `/me/playlists` | Create a private playlist: `{ title, songIds }` → `{ id }` |
 | GET | `/me/playlists/{id}` | A playlist, also private ones (`LM` = Liked music) |
 | POST | `/me/playlists/{id}/songs` | Add songs: `{ songIds: [...] }` |
-| GET / PUT | `/me/likes/{songId}` | `{ liked }` |
+| GET / PUT | `/me/likes/{songId}` | `{ liked, disliked }` (thumbs up or down, never both) |
+| POST | `/me/playlists/{id}/remove` | `{ items: [{ songId, itemId }] }`: remove songs (`itemId`: their place, from `PlaylistPage.itemIds`) |
+| POST | `/me/playlists/{id}/move` | `{ itemId, beforeItemId }`: move one song (null: to the end) |
+| PUT / DELETE | `/me/playlists/{id}` | Rename (`{ title }`) / delete one of your playlists |
 | POST | `/me/history/{songId}` | Add a play to the account's YouTube Music history |
 | GET | `/me/search`, `/me/search/suggestions`, `/me/radio` | Like `/search`, `/search/suggestions` and `/radio`, as the account |
 
-Not yet: removing songs, unliking from a list, liked songs paging.
+`GET /me/playlists/{id}` says whether it's one of yours (`owned`) and each song's place in it
+(`itemIds`). Not yet: liked songs paging.
 
 ### Admin (planned)
 

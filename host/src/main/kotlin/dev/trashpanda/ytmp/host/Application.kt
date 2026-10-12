@@ -53,6 +53,8 @@ import io.ktor.server.http.content.staticFiles
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.origin
+import io.ktor.http.HttpMethod
+import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.header
 import io.ktor.server.request.httpMethod
@@ -150,6 +152,11 @@ data class HostOptions(
      * of [auth]. A server setting (`accounts.guests = false`).
      */
     val accountsOnly: Boolean = false,
+    /**
+     * `/api/me/…` (your YouTube Music) may be used by pages of other hosts (CORS): the pages of
+     * rooms on someone else's phone or server use your account's YouTube Music here. A server.
+     */
+    val crossOriginPersonal: Boolean = false,
 )
 
 /** What works without an account on an accounts-only host: what's needed to log in, and audio (speakers can't log in). */
@@ -259,7 +266,10 @@ fun Application.ytmpModule(
     val accountsOnly = createRouteScopedPlugin("AccountsOnly") {
         onCall { call ->
             val path = call.request.path()
-            if (OPEN_WITHOUT_ACCOUNT.none { path == it || path.startsWith(it) } && call.account() == null) {
+            // Your YouTube Music from another host's page: a browser asks first (OPTIONS), then
+            // comes with a token just for that (personalFor).
+            val personalCall = path.startsWith("/api/me/") && (call.request.httpMethod == HttpMethod.Options || personalFor?.invoke(call) != null)
+            if (OPEN_WITHOUT_ACCOUNT.none { path == it || path.startsWith(it) } && !personalCall && call.account() == null) {
                 throw ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Log in to use this server")
             }
         }
@@ -367,8 +377,19 @@ fun Application.ytmpModule(
                 call.respond(if (fresh) source.freshHome() else source.home())
             }
             route("/me") {
+                if (options.crossOriginPersonal) {
+                    install(CORS) {
+                        anyHost()
+                        allowHeader(HttpHeaders.Authorization)
+                        allowHeader(HttpHeaders.ContentType)
+                        allowMethod(HttpMethod.Put)
+                        allowMethod(HttpMethod.Delete)
+                    }
+                }
                 fun ApplicationCall.owner(): PersonalCatalog =
                     personal() ?: throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Log in to use your YouTube Music here")
+                // Your Home, for pages of other hosts (theirs is /api/home).
+                get("/home") { call.respond(call.owner().home()) }
                 get("/youtube") {
                     val mine = call.personal()
                     call.respond(
