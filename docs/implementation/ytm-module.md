@@ -66,9 +66,10 @@ the on-device module will regularly be broken.
 Costs and risks:
 
 - Larger APK (Python runtime), and slower cold start of the Python part.
-- **JavaScript runtime:** recent yt-dlp versions need an external JS runtime (Deno,
-  Node, Bun or QuickJS) for full YouTube support. On Android this most likely means
-  bundling **QuickJS** as a native library. *This must be verified with a prototype.*
+- **JavaScript runtime:** recent yt-dlp versions need a JS runtime (Deno, Node, Bun or
+  QuickJS) for full YouTube support. The server's image has Deno. On Android the app gives
+  yt-dlp the WebView's JavaScript engine instead, through `ytmp_ytm/jsc.py` (see
+  [Android app](android-app.md)).
 - Loading downloaded code at runtime would conflict with Play Store policy. This is not an
   issue, because YTMP is distributed through **GitHub Releases**.
 

@@ -96,6 +96,8 @@ chaquopy {
         pip {
             install("ytmusicapi")
             install("yt-dlp")
+            // The scripts yt-dlp runs in the JavaScript engine (JsEngine).
+            install("yt-dlp-ejs")
         }
     }
     sourceSets {
@@ -120,6 +122,8 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
     implementation(libs.androidx.webkit)
+    // yt-dlp's JavaScript (JsEngine).
+    implementation(libs.androidx.javascriptengine)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity)
     implementation(libs.kotlinx.serialization.json)

@@ -47,7 +47,17 @@
   app's WebView opens it at `http://127.0.0.1:8765/`, which is the app's home screen.
 - **YouTube Music on the phone** (`OnDeviceYtm`): the Python code from `ytm-module/` run with
   **Chaquopy** (Python 3.14, ytmusicapi + yt-dlp). Measured on a Pixel 7: Python starts in
-  0.4 s, a search takes ~1.5 s, resolving a stream ~1.5 s. No JavaScript runtime was needed.
+  0.4 s, a search takes ~1.5 s, resolving a stream ~1.5 s.
+- **yt-dlp's JavaScript** (`JsEngine`): yt-dlp has to run YouTube's player script to solve its
+  challenges; without a JavaScript runtime it only gets a reduced set of formats (and warns).
+  The phone can't start Deno as a program, so the app hands yt-dlp the **WebView's own
+  JavaScript engine** (`androidx.javascriptengine`, V8 in a sandboxed process):
+  `ytm-module/ytmp_ytm/jsc.py` is a yt-dlp challenge provider that runs the same scripts as
+  for Deno (the `yt-dlp-ejs` package) in it. A fresh isolate per run; when the sandbox's
+  process dies it starts a new one. On a WebView without the sandbox, or one that can't take
+  big scripts (the player is ~3 MB), yt-dlp works as before, without JavaScript. Set up on the
+  first stream lookup (connecting waits for the main thread). Takes ~1.3 s, only for lookups
+  that need it.
   Chaquopy 17 supports AGP up to 9.2, so the project uses AGP 9.2.1.
 - **Who can do what:** only the phone itself (loopback) can create, list and close rooms, and
   join **solo** (private) rooms. Friends on the same Wi-Fi can join **public** rooms at

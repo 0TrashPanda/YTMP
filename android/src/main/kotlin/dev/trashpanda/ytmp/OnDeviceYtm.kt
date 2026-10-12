@@ -56,6 +56,14 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
     private val core: PyObject by lazy { python.getModule("ytmp_ytm.core").callAttr("YtmCore", language, location, null) }
     private val json: PyObject
 
+    /**
+     * yt-dlp's JavaScript engine, set up on the first stream lookup: starting it waits for the
+     * main thread, so not in here (see [JsEngine]).
+     */
+    private val jsEngine by lazy {
+        JsEngine.create(context)?.also { python.getModule("ytmp_ytm.jsc").callAttr("use_engine", it) }
+    }
+
     init {
         if (!Python.isStarted()) Python.start(AndroidPlatform(context.applicationContext))
         python = Python.getInstance()
@@ -159,6 +167,7 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
     override suspend fun resolve(songId: String): ResolvedStream = stream(songId).let { ResolvedStream(it.url, it.durationMs) }
 
     suspend fun stream(songId: String, fresh: Boolean = false): Stream = python {
+        jsEngine
         val info = core.callAttr("stream", songId, fresh)
         val headers = info["http_headers"]!!.asMap().entries.associate { (k, v) -> k.toString() to v.toString() }
         // Python's None arrives as null.
