@@ -35,11 +35,11 @@ generated from them.
 
 | Direction | Message | Content |
 |-----------|---------|---------|
-| → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`, `accountToken` ✅ (a host token, see [auth](auth.md)), `hideFromHistory` ✅ (keep me out of others' listening history), `migrationKey` ✅ (moved here from another room: see *Clones* below) |
+| → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`, `accountToken` ✅ (a host token, see [auth](auth.md)), `hideFromHistory` ✅ (keep me out of others' listening history), `migrationKey` ✅ (moved here from another room: see *Clones* below), `password` ✅ (the room's password, when `room.hasPassword`) |
 | → | `attach` ✅ | Instead of `hello`: `protocolVersion`, `roomCode`, `guestToken`. A **second connection for a participant who is already in the room**: it gets the same `welcome` and events and may send `command`s and `ping`s as them, but doesn't replace their connection or change whether they're online. Kicks, bans and cleanup end it (`rejected`: `kicked`/`banned`); an unknown token gets `kicked`. Used by the Android app's player, see [android-app](android-app.md) |
 | ← | `welcome` ✅ | `participantId`, `guestToken`, `seq`, `state` (the snapshot), `accountId` ✅ (null when joined as a guest, also when the token wasn't accepted), `migrationKey` ✅ (only yours) |
 | ← | `owner_token` ✅ | `ownerToken`: you're the owner now (keep it, like the one from creating the room) |
-| ← | `rejected` ✅ | `reason`: `room_not_found`, `version_mismatch`, `invalid_name`, `replaced` (the same guest connected again elsewhere), `room_moved` (the room moved to another of the owner's hosts, see [room sync](room-sync.md)), `private_room` (a solo room, only for the hosting device), `kicked`, `banned`, `account_required` (the host only lets in accounts), `left` (you left, from another connection), `migrated` (everyone was moved; `movedTo` is the new room). Later maybe: `untrusted_auth_server` |
+| ← | `rejected` ✅ | `reason`: `room_not_found`, `version_mismatch`, `invalid_name`, `replaced` (the same guest connected again elsewhere), `room_moved` (the room moved to another of the owner's hosts, see [room sync](room-sync.md)), `private_room` (a solo room, only for the hosting device), `kicked`, `banned`, `account_required` (the host only lets in accounts), `left` (you left, from another connection), `migrated` (everyone was moved; `movedTo` is the new room), `password_required`, `wrong_password`. Later maybe: `untrusted_auth_server` |
 | ⇄ | `ping` / `pong` ✅ | `clientTime` / `clientTime, hostTime`, for clock sync |
 
 ## Snapshot (`RoomState`)
@@ -130,6 +130,7 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 | `SetOpenElsewhere` ✅ | `mode` (ask / move / move if away) or null for the account's setting, see [room sync](room-sync.md) | Owner only |
 | `ChangeOwner` ✅ | `participantId` | Owner only |
 | `LeaveRoom` ✅ | `newOwnerId?`, `stayOwner` (the owner of a party room: who takes over; null = the longest-present person with the top role) | – |
+| `SetPassword` ✅ | `password` (null: none; stored hashed, PBKDF2) | Manage room |
 | `SendMigration` ✅ | `target: { url, code, name }`, `mode: "invite" \| "forced"` | Move everyone |
 | `CancelMigration` ✅ | – | Move everyone |
 | `CloseRoom` | – | Owner only (now `DELETE /api/rooms/{code}`) |

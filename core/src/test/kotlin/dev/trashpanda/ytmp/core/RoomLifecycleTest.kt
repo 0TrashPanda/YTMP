@@ -352,6 +352,68 @@ class RoomLifecycleTest {
         assertTrue(room.save().playing)
     }
 
+    private suspend fun Room.joinWith(name: String, password: String?, local: Boolean = false, guestToken: String? = null): Client {
+        val client = Client()
+        join(ClientMessage.Hello(PROTOCOL_VERSION, code, name, guestToken, null, password = password), client, local = local)
+        return client
+    }
+
+    private fun Client.rejection() = messages.filterIsInstance<ServerMessage.Rejected>().singleOrNull()?.reason
+
+    @Test
+    fun `a room with a password lets in who knows it`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.SetPassword("party time"))
+        assertTrue(room.info.hasPassword)
+
+        assertEquals(RejectReason.PASSWORD_REQUIRED, room.joinWith("Ben", null).rejection())
+        assertEquals(RejectReason.WRONG_PASSWORD, room.joinWith("Ben", "party").rejection())
+        val ben = room.joinWith("Ben", "party time")
+        assertNull(ben.rejection())
+        // Back later as himself: no password needed again.
+        assertNull(room.joinWith("Ben", null, guestToken = ben.welcome.guestToken).rejection())
+        // The owner and the hosting device never need it.
+        assertNull(room.join("Anna", owner = true).rejection())
+        assertNull(room.joinWith("Phone", null, local = true).rejection())
+    }
+
+    @Test
+    fun `only people who manage the room set its password`() = runTest {
+        val room = newRoom()
+        room.join("Anna", owner = true)
+        val ben = room.join("Ben")
+
+        room.run(ben, Command.SetPassword("mine now"))
+
+        assertEquals(ErrorCode.PERMISSION_DENIED, ben.results.last().error?.code)
+        assertFalse(room.info.hasPassword)
+    }
+
+    @Test
+    fun `a password is kept hashed, survives a restart and can be removed`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.SetPassword("party time"))
+        val saved = room.save()
+        assertFalse(saved.passwordHash!!.contains("party time"))
+
+        val back = Room.restore(saved, { "" }, backgroundScope) { testScheduler.currentTime }
+        assertEquals(RejectReason.WRONG_PASSWORD, back.joinWith("Ben", "nope").rejection())
+        val owner = Client().also { back.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Anna", null, "owner-token"), it) }
+        back.handle(owner.id, ClientMessage.CommandMessage("c", Command.SetPassword(null)))
+        assertNull(back.joinWith("Ben", null).rejection())
+    }
+
+    @Test
+    fun `a room can start with its owner's default password`() = runTest {
+        val manager = RoomManager({ id -> "https://stream/$id" }, backgroundScope, clock = { testScheduler.currentTime })
+        val room = manager.create("Party", passwordHash = RoomPasswords.hash("default"))
+
+        assertTrue(room.info.hasPassword)
+        assertNull(room.joinWith("Ben", "default").rejection())
+    }
+
     @Test
     fun `an always-on room isn't deleted for being empty`() = runTest {
         val manager = RoomManager(

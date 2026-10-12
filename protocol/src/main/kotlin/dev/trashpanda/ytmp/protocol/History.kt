@@ -61,4 +61,11 @@ data class AccountSettings(
     val hideFromOthers: Boolean,
     /** Opening one of your rooms on a host where it doesn't live (each room can override it). */
     val openElsewhere: RoomOpenMode = RoomOpenMode.ASK,
+    /** Rooms you create start with your default password (set with `PUT /api/account/room-password`). */
+    val hasRoomPassword: Boolean = false,
 )
+
+/** `PUT /api/account/room-password`: your default room password, or none (null). */
+@Serializable
+@SerialName("RoomPasswordRequest")
+data class RoomPasswordRequest(val password: String?)

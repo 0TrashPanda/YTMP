@@ -31,10 +31,12 @@ import io.ktor.server.response.header
 import io.ktor.http.HttpHeaders
 import dev.trashpanda.ytmp.protocol.AccountSettings
 import dev.trashpanda.ytmp.protocol.RoomOpenMode
+import dev.trashpanda.ytmp.protocol.RoomPasswordRequest
 import dev.trashpanda.ytmp.protocol.HistoryPage
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.core.DefaultRoles
 import dev.trashpanda.ytmp.core.Permissions
+import dev.trashpanda.ytmp.core.RoomPasswords
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.Permission
@@ -74,17 +76,25 @@ class AccountService(
         return HostTokenResponse(AccountTokens.sign(claims, key.private), exp * 1000, toInfo(account))
     }
 
-    /** The account's role template, or the default roles. */
+    /** The account's role template (or the default roles), with its default room password (hashed). */
     fun roleTemplate(account: Accounts.Account): RoleTemplate =
-        accounts.data(account.id, "role_template")
-            ?.let { runCatching { ProtocolJson.decodeFromString(RoleTemplate.serializer(), it) }.getOrNull() }
-            ?.let { Permissions.sanitize(Permissions.upgrade(it)) }
-            ?: DefaultRoles.template
+        (
+            accounts.data(account.id, "role_template")
+                ?.let { runCatching { ProtocolJson.decodeFromString(RoleTemplate.serializer(), it) }.getOrNull() }
+                ?.let { Permissions.sanitize(Permissions.upgrade(it)) }
+                ?: DefaultRoles.template
+            ).copy(roomPassword = roomPassword(account))
+
+    /** The account's default room password, hashed ([RoomPasswords]), or null. */
+    fun roomPassword(account: Accounts.Account): String? = accounts.data(account.id, "room_password")
+
+    fun roomPassword(username: String): String? = accounts.find(username)?.let(::roomPassword)
 
     fun settings(account: Accounts.Account): AccountSettings =
         accounts.data(account.id, "settings")
             ?.let { runCatching { ProtocolJson.decodeFromString(AccountSettings.serializer(), it) }.getOrNull() }
-            ?: AccountSettings(tracking = trackingDefault, hideFromOthers = false)
+            ?.copy(hasRoomPassword = roomPassword(account) != null)
+            ?: AccountSettings(tracking = trackingDefault, hideFromOthers = false, hasRoomPassword = roomPassword(account) != null)
 
     /** A host reports a song [username] heard; kept only if they track their history. */
     fun recordPlay(username: String, report: PlayReport) {
@@ -120,9 +130,23 @@ class AccountService(
 
         put("/account/settings") {
             val account = call.account()
-            val settings = call.receive<AccountSettings>()
+            val settings = call.receive<AccountSettings>().copy(hasRoomPassword = false)
             io { accounts.setData(account.id, "settings", ProtocolJson.encodeToString(AccountSettings.serializer(), settings)) }
-            call.respond(settings)
+            call.respond(io { settings(account) })
+        }
+
+        // Your default room password: rooms you create start with it (kept hashed).
+        put("/account/room-password") {
+            val account = call.account()
+            val password = call.receive<RoomPasswordRequest>().password
+            if (password != null && !RoomPasswords.valid(password)) {
+                throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "A password is 1–${RoomPasswords.MAX_LENGTH} characters")
+            }
+            io {
+                if (password == null) accounts.deleteData(account.id, "room_password")
+                else accounts.setData(account.id, "room_password", RoomPasswords.hash(password))
+            }
+            call.respond(io { settings(account) })
         }
 
         get("/account/history") {

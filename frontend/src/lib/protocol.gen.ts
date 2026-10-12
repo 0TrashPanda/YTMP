@@ -211,6 +211,11 @@ export interface CommandSetParticipantPermissions {
   deny: Permission[];
 }
 
+export interface CommandSetPassword {
+  kind: "SetPassword";
+  password: string | null;
+}
+
 export type RoomVisibility = "public" | "private";
 
 export interface CommandSetVisibility {
@@ -283,6 +288,7 @@ export type Command =
   | CommandSetOutput
   | CommandSetOutputVolume
   | CommandSetParticipantPermissions
+  | CommandSetPassword
   | CommandSetVisibility
   | CommandSkip
   | CommandStartRadio
@@ -306,6 +312,7 @@ export interface ClientMessageHello {
   accountToken: string | null;
   hideFromHistory: boolean;
   migrationKey: string | null;
+  password: string | null;
 }
 
 export interface ClientMessagePing {
@@ -481,6 +488,7 @@ export interface RoomInfo {
   code: string;
   name: string;
   visibility: RoomVisibility;
+  hasPassword: boolean;
 }
 
 export interface EventRoomUpdated {
@@ -548,7 +556,7 @@ export interface ServerMessagePong {
   hostTime: number;
 }
 
-export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "room_moved" | "private_room" | "kicked" | "banned" | "account_required" | "left" | "migrated";
+export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "room_moved" | "private_room" | "kicked" | "banned" | "account_required" | "left" | "migrated" | "password_required" | "wrong_password";
 
 export interface ServerMessageRejected {
   type: "rejected";
@@ -753,6 +761,7 @@ export interface RoleTemplate {
   roles: Role[];
   settings: RoomSettings;
   knownPermissions: Permission[] | null;
+  roomPassword: string | null;
 }
 
 export interface ListenedWith {
@@ -782,6 +791,7 @@ export interface AccountSettings {
   tracking: boolean;
   hideFromOthers: boolean;
   openElsewhere: RoomOpenMode;
+  hasRoomPassword: boolean;
 }
 
 export interface PlayReport {

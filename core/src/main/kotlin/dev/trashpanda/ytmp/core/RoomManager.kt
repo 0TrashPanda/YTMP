@@ -129,6 +129,8 @@ class RoomManager(
         template: RoleTemplate? = null,
         /** Start as a copy of another room. */
         clone: RoomClone? = null,
+        /** Joining needs this password (hashed: [RoomPasswords.hash]). */
+        passwordHash: String? = null,
     ): Room {
         while (true) {
             val code = newCode()
@@ -138,6 +140,7 @@ class RoomManager(
                 onInfoChanged = { roomChanged(code) }, onOwnerChanged = ::disowned, clock = clock,
             )
             if (clone != null) room.startFrom(clone)
+            if (passwordHash != null) room.startWithPassword(passwordHash)
             if (add(room)) {
                 roomChanged(code)
                 return room

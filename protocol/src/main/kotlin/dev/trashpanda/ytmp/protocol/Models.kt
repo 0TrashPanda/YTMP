@@ -137,6 +137,8 @@ data class RoomInfo(
     val code: String,
     val name: String,
     val visibility: RoomVisibility,
+    /** Joining needs a password ([ClientMessage.Hello.password]). */
+    val hasPassword: Boolean = false,
 )
 
 @Serializable

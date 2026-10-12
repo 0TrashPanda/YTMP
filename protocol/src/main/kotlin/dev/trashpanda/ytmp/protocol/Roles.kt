@@ -78,6 +78,11 @@ data class RoleTemplate(
     val settings: RoomSettings,
     /** The permissions that existed when it was saved, so newer ones can be added to it (set by the server). */
     val knownPermissions: List<Permission>? = null,
+    /**
+     * The account's default room password, hashed (see core's RoomPasswords): rooms it creates
+     * start with it. Only set by the auth server when it hands the template to a host.
+     */
+    val roomPassword: String? = null,
 )
 
 /** Someone who can't join the room again. */

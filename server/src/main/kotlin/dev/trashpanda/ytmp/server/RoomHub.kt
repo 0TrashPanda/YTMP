@@ -58,6 +58,8 @@ class RoomHub(
     private val verify: (String) -> AccountTokens.Claims?,
     /** The account's setting for opening rooms elsewhere. */
     private val openSetting: (username: String) -> RoomOpenMode,
+    /** The account's default room password (hashed), for rooms cloned onto this server. */
+    private val defaultPassword: (username: String) -> String? = { null },
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val mutex = Mutex()
@@ -186,7 +188,10 @@ class RoomHub(
         // A phone clones a room onto this server, for its owner here (docs/features/room-lifecycle.md#cloning-a-room).
         post("/auth/rooms/clone") {
             val me = call.owner()
-            val room = rooms.createFor(call.receive<CreateRoomRequest>(), me.account(), template = null, supportsPrivateRooms = true)
+            val room = rooms.createFor(
+                call.receive<CreateRoomRequest>(), me.account(), template = null, supportsPrivateRooms = true,
+                passwordHash = io { defaultPassword(me.sub) },
+            )
             call.respond(CreateRoomResponse(room.code, room.ownerToken, url = roomUrl(serverHome, room.code)))
         }
         post("/auth/rooms/{syncId}/take") {

@@ -116,6 +116,13 @@ auth server can't be reached when a song ends (a phone without internet), that p
   the phone's page goes through the server's `/connect` in the same WebView, which keeps the
   session there.
 
+### Default room password
+
+`PUT /api/account/room-password` keeps the account's default room password, hashed
+(`account_data` `room_password`, `RoomPasswords` in core); `AccountSettings.hasRoomPassword`
+says whether there is one. The role template a host gets (`/api/auth/role-template`) carries
+the hash as `roomPassword`, and new rooms of that account start with it.
+
 ### Logging in on another host's pages
 
 - `connectQuietly` (`frontend/src/lib/account.ts`, run by the layout before the page shows): on

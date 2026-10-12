@@ -103,6 +103,8 @@ export const authServer = {
 
 	settings: () => call<AccountSettings>('/api/account/settings'),
 	saveSettings: (settings: AccountSettings) => call<AccountSettings>('/api/account/settings', settings, 'PUT'),
+	/** Your default room password (null: none). Answers your settings. */
+	setRoomPassword: (password: string | null) => call<AccountSettings>('/api/account/room-password', { password }, 'PUT'),
 	history: (before: number | null, query: string) => {
 		const params = new URLSearchParams({ limit: '50' });
 		if (before !== null) params.set('before', String(before));

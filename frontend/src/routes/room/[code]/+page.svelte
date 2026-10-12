@@ -25,7 +25,7 @@
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import CloneSheet from '../../../lib/components/CloneSheet.svelte';
 	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
-	import { forgetHome, getHost } from '../../../lib/api';
+	import { forgetHome, getHost, getRoom } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
 	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
@@ -165,9 +165,17 @@
 	let now = $state(Date.now());
 	let toastId = 0;
 
+	// The room's password, when it has one (the join form asks; not needed by its owner).
+	let password = $state('');
+	let needsPassword = $state(false);
+	getRoom(code)
+		.then((info) => (needsPassword = info.hasPassword && !saved.ownerToken(code)))
+		.catch(() => {});
+	let retryPassword = $state('');
+
 	function start() {
 		if (!identity.stored) saved.displayName = name.trim();
-		room = new RoomConnection(code, name.trim(), arrivingWithKey);
+		room = new RoomConnection(code, name.trim(), arrivingWithKey, password || null);
 		player = createPlayer(room);
 		room.connect();
 		youtube.load();
@@ -379,13 +387,23 @@
 				placeholder="Your name"
 				autocomplete="nickname"
 			/>
+			{#if needsPassword}
+				<input
+					class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
+					type="password"
+					bind:value={password}
+					maxlength="64"
+					placeholder="The room's password"
+					autocomplete="off"
+				/>
+			{/if}
 			{#if host?.authServers.length}
 				<label class="flex items-center gap-2 text-sm text-muted">
 					<input type="checkbox" class="accent-accent" checked={saved.hideFromHistory} onchange={(e) => (saved.hideFromHistory = e.currentTarget.checked)} />
 					Keep me out of others' listening history
 				</label>
 			{/if}
-			<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={!name.trim()}>
+			<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={!name.trim() || (needsPassword && !password)}>
 				Join
 			</button>
 		</form>
@@ -401,6 +419,27 @@
 {:else if room.status === 'rejected'}
 	<main class="mx-auto flex min-h-full max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
 		<p class="text-lg">{room.rejectMessage}</p>
+		{#if room.rejectReason === 'password_required' || room.rejectReason === 'wrong_password'}
+			<form
+				class="flex w-full flex-col gap-3"
+				onsubmit={(e) => {
+					e.preventDefault();
+					if (retryPassword) room?.retryWithPassword(retryPassword);
+				}}
+			>
+				<!-- svelte-ignore a11y_autofocus -->
+				<input
+					class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
+					type="password"
+					bind:value={retryPassword}
+					maxlength="64"
+					placeholder="The room's password"
+					autocomplete="off"
+					autofocus
+				/>
+				<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={!retryPassword}>Join</button>
+			</form>
+		{/if}
 		{#if (host?.accountsOnly || room.rejectReason === 'private_room') && host && !identity.get(host.authServers)}
 			{#if room.rejectReason === 'private_room'}
 				<p class="text-sm text-muted">Is it yours? Log in with your account to open it.</p>

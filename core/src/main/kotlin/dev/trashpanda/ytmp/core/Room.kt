@@ -102,7 +102,11 @@ class Room(
     var name: String = name
         private set
 
-    val info: RoomInfo get() = RoomInfo(code, name, visibility)
+    val info: RoomInfo get() = RoomInfo(code, name, visibility, hasPassword = passwordHash != null)
+
+    /** Joining needs this password (hashed, see [RoomPasswords]); null: none. */
+    @Volatile
+    private var passwordHash: String? = null
 
     private class Member(
         val id: String,
@@ -271,6 +275,15 @@ class Room(
         val returning = members.values.firstOrNull { it.token == hello.guestToken }
         // Moved here from the room this is a clone of: their role (and id, so their songs are theirs) comes along.
         val migrant = if (returning == null) hello.migrationKey?.let { key -> Ids.sha256(key).let { tag -> migrants.firstOrNull { it.tag == tag } } } else null
+        // The password: not for the owner, people already here, the hosting device, or people moved here.
+        val hash = passwordHash
+        if (hash != null && returning == null && migrant == null && !isOwner && !local) {
+            val password = hello.password
+            if (password == null || !RoomPasswords.verify(password, hash)) {
+                outbox.send(ServerMessage.Rejected(if (password == null) RejectReason.PASSWORD_REQUIRED else RejectReason.WRONG_PASSWORD))
+                return null
+            }
+        }
         if (migrant != null) migrants.remove(migrant)
         val member = returning ?: Member(
             id = migrant?.id?.takeIf { it.isNotBlank() && it !in members } ?: Ids.short(),
@@ -439,6 +452,7 @@ class Room(
             playing = wantPlaying && current != null,
             migrants = migrants.toList(),
             migration = migration,
+            passwordHash = passwordHash,
         )
     }
 
@@ -468,6 +482,7 @@ class Room(
         }
         migrants += saved.migrants
         migration = saved.migration
+        passwordHash = saved.passwordHash
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay += saved.autoplay
         autoplaySeed = saved.autoplaySeed
@@ -725,6 +740,15 @@ class Room(
                 changeOwner(target)
             }
             is Command.LeaveRoom -> return leave(member, command.newOwnerId, command.stayOwner)
+            is Command.SetPassword -> {
+                need(member, Permission.CHANGE_SETTINGS)?.let { return it }
+                val password = command.password
+                if (password != null && !RoomPasswords.valid(password)) return invalid("A password is 1–${RoomPasswords.MAX_LENGTH} characters")
+                passwordHash = password?.let(RoomPasswords::hash)
+                emit(Event.RoomUpdated(info))
+                emit(Event.Notice(if (password == null) "${member.name} removed the room's password" else "${member.name} set a password for the room"))
+                onInfoChanged()
+            }
             is Command.SendMigration -> {
                 need(member, Permission.SEND_MIGRATION)?.let { return it }
                 val target = command.target
@@ -951,6 +975,11 @@ class Room(
             adminless = value
             emit(Event.AdminlessChanged(value))
         }
+    }
+
+    /** A new room starts with this password ([RoomPasswords.hash]). Only before anyone can join. */
+    internal fun startWithPassword(hash: String) {
+        passwordHash = hash
     }
 
     /** A new room starts as a copy of another one ([clone]). Only before anyone can join. */

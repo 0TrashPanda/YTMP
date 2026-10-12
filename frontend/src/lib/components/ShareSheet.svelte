@@ -67,6 +67,9 @@
 			{#if host?.kind === 'phone'}
 				<p class="text-center text-xs text-muted">Friends must be on the same Wi-Fi as this phone.</p>
 			{/if}
+			{#if info?.hasPassword}
+				<p class="text-center text-xs text-muted">🔒 Joining needs the room's password (Room settings → Overview).</p>
+			{/if}
 		{/if}
 		{#if onClone}
 			<button class="text-sm text-muted underline hover:text-white" onclick={onClone}>Clone this room somewhere else</button>

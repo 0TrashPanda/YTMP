@@ -114,7 +114,7 @@ fun main(args: Array<String>) {
             ownerRadio = { owner, seed -> owner?.let(::localAccount)?.let(youtube::of)?.personalized()?.radio(seed) },
         )
         rooms.startCleanup()
-        val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere)
+        val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, defaultPassword = service::roomPassword)
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
         casts.attach(rooms)
         sonos.attach(rooms)

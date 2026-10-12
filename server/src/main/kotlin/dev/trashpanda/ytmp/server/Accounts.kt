@@ -159,6 +159,15 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
         Unit
     }
 
+    fun deleteData(accountId: String, name: String) = db.use { c ->
+        c.prepareStatement("DELETE FROM account_data WHERE account_id = ? AND name = ?").use {
+            it.setString(1, accountId)
+            it.setString(2, name)
+            it.executeUpdate()
+        }
+        Unit
+    }
+
     // --- settings ---------------------------------------------------------------------
 
     /** The key account tokens are signed with; made on first start. */

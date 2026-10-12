@@ -58,6 +58,8 @@ data class SavedRoom(
     /** People from the room this is a clone of who haven't come yet. */
     val migrants: List<Migrant> = emptyList(),
     val migration: MigrationOffer? = null,
+    /** Joining needs this password ([RoomPasswords]). */
+    val passwordHash: String? = null,
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 

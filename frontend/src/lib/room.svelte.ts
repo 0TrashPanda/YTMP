@@ -29,7 +29,9 @@ const REJECT_MESSAGES: Record<RejectReason, string> = {
 	banned: "You're banned from this room.",
 	account_required: 'This server is for accounts only. Log in to join.',
 	left: 'You left this room.',
-	migrated: 'Everyone moved to another room.'
+	migrated: 'Everyone moved to another room.',
+	password_required: 'This room has a password.',
+	wrong_password: "That's not the room's password."
 };
 
 /**
@@ -67,8 +69,19 @@ export class RoomConnection {
 		readonly roomCode: string,
 		private readonly name: string,
 		/** Moved here from another room: the key from there, to get my role back (sent until I'm in). */
-		private arrivingWithKey: string | null = null
+		private arrivingWithKey: string | null = null,
+		/** The room's password, if it has one. */
+		private password: string | null = null
 	) {}
+
+	/** Tries again with the room's password (after `password_required` or `wrong_password`). */
+	retryWithPassword(password: string): void {
+		this.password = password;
+		this.status = 'connecting';
+		this.rejectReason = null;
+		this.rejectMessage = null;
+		this.connect();
+	}
 
 	/** A link to [url] (a clone of this room) that takes my role along. */
 	migrationLink(url: string): string {
@@ -122,7 +135,8 @@ export class RoomConnection {
 				ownerToken: saved.ownerToken(this.roomCode),
 				accountToken,
 				hideFromHistory: saved.hideFromHistory,
-				migrationKey: this.arrivingWithKey
+				migrationKey: this.arrivingWithKey,
+				password: this.password
 			});
 		};
 		socket.onmessage = (event) => this.receive(JSON.parse(event.data) as ServerMessage);

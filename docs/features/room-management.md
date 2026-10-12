@@ -12,6 +12,12 @@ An admin chooses who can join the room:
 - **Accounts only**: guests cannot join, a YTMP account is required (built for a whole
   server, `accounts.guests = false`; per room: planned)
 - Private / solo: nobody else (see [rooms](rooms-and-roles.md#room-visibility))
+- **Password** ✅: people need the room's password to join (the join form asks). Not needed by
+  the owner, people already in the room, the hosting phone itself, or people moved over from a
+  clone. Set, changed or removed in Room settings → Overview (*Manage room*); the share sheet
+  says a room has one. Kept hashed, so nobody can read it back. **Default password** on your
+  account (Settings → Account → *Room password*): every room you make starts with it, also
+  rooms on your phone (with your account) and rooms cloned onto your server.
 
 A phone host can use a YTMP server for account authentication. If it does not, only
 guests can join (see [accounts](accounts.md#authentication-on-phone-hosts)).

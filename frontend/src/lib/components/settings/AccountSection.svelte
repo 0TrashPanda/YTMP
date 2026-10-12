@@ -52,6 +52,18 @@
 
 	const saveSettings = (next: AccountSettings) => attempt(async () => void (settings = await authServer.saveSettings(next)));
 
+	let roomPassword = $state('');
+	let changingRoomPassword = $state(false);
+	const setRoomPassword = (password: string | null) =>
+		attempt(
+			async () => {
+				settings = await authServer.setRoomPassword(password);
+				roomPassword = '';
+				changingRoomPassword = false;
+			},
+			password ? 'New rooms start with this password.' : 'New rooms start without a password.'
+		);
+
 	function changePassword(event: SubmitEvent) {
 		event.preventDefault();
 		attempt(async () => {
@@ -125,6 +137,34 @@
 				<option value="move">Always move it to where I open it</option>
 				<option value="move_if_away">Move it only if its device is away</option>
 			</select>
+		</section>
+	{/if}
+
+	{#if settings}
+		<section class={card}>
+			<h3 class="font-bold">Room password</h3>
+			<p class="text-xs text-muted">
+				{settings.hasRoomPassword
+					? 'Rooms you make start with your password: people need it to join (each room can change or remove it).'
+					: 'Rooms you make can start with a password people need to join. Each room can change or remove it.'}
+			</p>
+			{#if changingRoomPassword || !settings.hasRoomPassword}
+				<form
+					class="flex gap-2"
+					onsubmit={(e) => {
+						e.preventDefault();
+						if (roomPassword) setRoomPassword(roomPassword);
+					}}
+				>
+					<input class="{input} min-w-0 flex-1 py-2" type="text" bind:value={roomPassword} maxlength="64" placeholder="Default room password" autocomplete="off" />
+					<button class="rounded-full bg-raised px-4 text-sm font-medium hover:bg-line disabled:opacity-40" disabled={busy || !roomPassword}>Set</button>
+				</form>
+			{:else}
+				<div class="flex gap-3 text-sm">
+					<button class="rounded-full bg-raised px-4 py-2 font-medium hover:bg-line" onclick={() => (changingRoomPassword = true)}>Change</button>
+					<button class="text-muted underline" disabled={busy} onclick={() => setRoomPassword(null)}>No default password</button>
+				</div>
+			{/if}
 		</section>
 	{/if}
 

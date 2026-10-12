@@ -98,6 +98,16 @@
 		overviewBusy = false;
 	}
 
+	// --- password ---
+	let newPassword = $state('');
+	let changingPassword = $state(false);
+	async function setPassword(password: string | null) {
+		if (await run({ kind: 'SetPassword', password })) {
+			newPassword = '';
+			changingPassword = false;
+		}
+	}
+
 	// --- owner and leaving ---
 	async function makeOwner(person: Participant) {
 		menuFor = null;
@@ -185,6 +195,30 @@
 						</div>
 						<Switch checked={autoplay} label="Autoplay" onchange={(on) => (autoplay = on)} />
 					</div>
+					<div class="my-6 h-px bg-d-line"></div>
+					<h3 class="mb-1 text-base font-semibold text-d-head">Password</h3>
+					<p class="mb-3 text-sm text-d-muted">
+						{rs.room.hasPassword
+							? "People need the password to join. Who's already in, the owner and the hosting phone don't."
+							: 'Anyone with the code (or the link) can join. Set a password to ask for it first.'}
+					</p>
+					{#if changingPassword || !rs.room.hasPassword}
+						<form
+							class="flex gap-2"
+							onsubmit={(e) => {
+								e.preventDefault();
+								if (newPassword) setPassword(newPassword);
+							}}
+						>
+							<input class="{input} flex-1" type="text" bind:value={newPassword} maxlength="64" placeholder="New password" autocomplete="off" />
+							<button class="rounded bg-d-blurple px-4 text-sm font-medium text-white disabled:opacity-50" disabled={!newPassword}>Set</button>
+						</form>
+					{:else}
+						<div class="flex gap-2">
+							<button class="rounded bg-d-active px-4 py-2 text-sm font-medium text-d-head hover:bg-d-hover" onclick={() => (changingPassword = true)}>Change</button>
+							<button class="rounded px-4 py-2 text-sm font-medium text-[#f23f43] hover:bg-d-red/10" onclick={() => setPassword(null)}>Remove password</button>
+						</div>
+					{/if}
 					{#if host?.kind === 'server' && rs.room.visibility === 'public'}
 						<div class="my-6 h-px bg-d-line"></div>
 						<div class="flex items-center gap-4">

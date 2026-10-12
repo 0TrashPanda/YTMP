@@ -27,6 +27,8 @@ sealed interface ClientMessage {
         val hideFromHistory: Boolean = false,
         /** Moved here from another room: the key from there, to get your role back ([Migrant]). */
         val migrationKey: String? = null,
+        /** The room's password, when it has one ([RoomInfo.hasPassword]). */
+        val password: String? = null,
     ) : ClientMessage
 
     /**
@@ -199,6 +201,11 @@ sealed interface Command {
     @SerialName("SendMigration")
     data class SendMigration(val target: MigrationTarget, val mode: MigrationMode) : Command
 
+    /** Sets the room's password (needed to join), or removes it (null). Manage room. */
+    @Serializable
+    @SerialName("SetPassword")
+    data class SetPassword(val password: String?) : Command
+
     /** Takes back an invite from [SendMigration]. */
     @Serializable
     @SerialName("CancelMigration")
@@ -345,6 +352,11 @@ enum class RejectReason {
 
     /** Everyone was moved to another room ([ServerMessage.Rejected.movedTo]). */
     @SerialName("migrated") MIGRATED,
+
+    /** The room has a password: join again with it. */
+    @SerialName("password_required") PASSWORD_REQUIRED,
+
+    @SerialName("wrong_password") WRONG_PASSWORD,
 }
 
 @Serializable
