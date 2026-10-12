@@ -109,7 +109,11 @@ sealed interface Command {
     /** Clears the queue, and plays [song] and then its radio (the autoplay queue becomes the radio). */
     @Serializable
     @SerialName("StartRadio")
-    data class StartRadio(val song: Song) : Command
+    data class StartRadio(
+        val song: Song,
+        /** The radio, when the one who starts it brings their own (their YouTube Music account); null: the room's. */
+        val songs: List<Song>? = null,
+    ) : Command
 
     /** Empties the upcoming queue. */
     @Serializable
@@ -124,7 +128,11 @@ sealed interface Command {
     /** "Autoplay this": replaces the autoplay queue with a radio from [song], without touching the queue. */
     @Serializable
     @SerialName("AutoplayFromHere")
-    data class AutoplayFromHere(val song: Song) : Command
+    data class AutoplayFromHere(
+        val song: Song,
+        /** The radio, when the one who starts it brings their own (their YouTube Music account); null: the room's. */
+        val songs: List<Song>? = null,
+    ) : Command
 
     /**
      * "Add to autoplay" for a playlist: [songs] become the autoplay queue (they play when the

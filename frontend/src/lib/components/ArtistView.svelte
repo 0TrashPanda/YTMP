@@ -1,7 +1,7 @@
 <script lang="ts">
 	// An artist page: top songs, albums and singles.
 	import { thumbUrl } from '../images.svelte';
-	import { getArtist } from '../api';
+	import { getArtist, yourRadio } from '../api';
 	import type { AlbumSummary, ArtistPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import AlbumGrid from './AlbumGrid.svelte';
@@ -46,7 +46,7 @@
 	async function radio() {
 		const first = artist?.songs[0];
 		if (!first) return;
-		const e = await room.run({ kind: 'StartRadio', song: first });
+		const e = await room.run({ kind: 'StartRadio', song: first, songs: await yourRadio(first.id) });
 		onToast(e ? e.message : `Starting a radio from ${artist!.name}`);
 	}
 

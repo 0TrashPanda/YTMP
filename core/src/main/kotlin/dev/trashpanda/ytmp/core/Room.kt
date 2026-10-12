@@ -656,11 +656,11 @@ class Room(
             }
             is Command.StartRadio -> {
                 need(member, Permission.START_RADIO)?.let { return it }
-                startRadio(command.song, member.id, member.name)
+                startRadio(command.song, member.id, member.name, command.songs?.take(MAX_BROUGHT_RADIO))
             }
             is Command.AutoplayFromHere -> {
                 need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
-                autoplayFromHere(command.song, member.id, member.name)
+                autoplayFromHere(command.song, member.id, member.name, command.songs?.take(MAX_BROUGHT_RADIO))
             }
             is Command.AutoplaySongs -> {
                 need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
@@ -1238,10 +1238,12 @@ class Room(
      * Start radio: plays [song] now, and the queue becomes a radio from it. On the song that's
      * playing, it keeps playing (like YTM) and only the queue changes.
      */
-    private fun startRadio(song: Song, byId: String, byName: String) {
-        val source = radio ?: return
+    /** [brought]: the radio the one who starts it brought (their own account's); null: the room's. */
+    private fun startRadio(song: Song, byId: String, byName: String, brought: List<Song>? = null) {
+        val source = radio
+        if (source == null && brought == null) return
         scope.launch {
-            val songs = runCatching { source.radio(song.id) }
+            val songs = runCatching { brought ?: source!!.radio(song.id) }
             mutex.withLock {
                 songs.onFailure { e ->
                     if (e is CancellationException) throw e
@@ -1272,11 +1274,12 @@ class Room(
     }
 
     /** Autoplay from here: the autoplay queue becomes a radio from [song]; the queue stays. */
-    private fun autoplayFromHere(song: Song, byId: String, byName: String) {
-        val source = radio ?: return
+    private fun autoplayFromHere(song: Song, byId: String, byName: String, brought: List<Song>? = null) {
+        val source = radio
+        if (source == null && brought == null) return
         autoplayJob?.cancel()
         autoplayJob = scope.launch {
-            val songs = runCatching { source.radio(song.id) }
+            val songs = runCatching { brought ?: source!!.radio(song.id) }
             mutex.withLock {
                 songs.onFailure { e ->
                     if (e is CancellationException) throw e
@@ -1494,6 +1497,8 @@ class Room(
         /** A clone's queue (and autoplay queue) keeps at most this many songs. */
         const val MAX_CLONE_QUEUE = 1000
         const val MAX_MIGRANTS = 200
+        /** A radio someone brings ([Command.StartRadio.songs]) keeps at most this many songs. */
+        const val MAX_BROUGHT_RADIO = 100
         /** Everyone gone this long: the music pauses. */
         const val EVERYONE_GONE_PAUSE_MS = 60_000L
         const val PREVIOUS_RESTART_MS = 3_000L

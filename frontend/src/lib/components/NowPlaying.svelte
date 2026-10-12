@@ -72,12 +72,13 @@
 		if (song && liked !== null) likes.set(song.id, !liked, onToast);
 	}
 
-	// Thumbs down: like YouTube Music, the song is skipped too (if you may skip).
+	// Thumbs down: in a solo room the song is skipped too, like YouTube Music (not in a party: it's everyone's music).
 	const rating = $derived(likes.rating(song?.id));
 	async function toggleDislike() {
 		if (!song || rating === null) return;
 		const disliking = rating !== 'dislike';
-		if ((await likes.rate(song.id, disliking ? 'dislike' : 'none', onToast)) && disliking && room.can('skip')) await room.run({ kind: 'Skip' });
+		const solo = room.state?.room.visibility === 'private';
+		if ((await likes.rate(song.id, disliking ? 'dislike' : 'none', onToast)) && disliking && solo && room.can('skip')) await room.run({ kind: 'Skip' });
 	}
 	/** Phones: Up next / Related slid up over the player. */
 	let sheet = $state(false);

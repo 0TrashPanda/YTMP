@@ -2,9 +2,15 @@
 // picture settings: "Image quality" (High looks sharp on big screens, Low saves data and
 // battery) and "Video pictures" (wide pictures cropped to the square, or whole; see Art.svelte).
 import type { Thumbnail } from './protocol.gen';
-import { saved, type ImageQuality, type VideoArt } from './storage';
+import { saved, type DislikeButton, type ImageQuality, type VideoArt } from './storage';
 
-export const images = $state({ quality: saved.imageQuality, videoArt: saved.videoArt });
+export const images = $state({ quality: saved.imageQuality, videoArt: saved.videoArt, dislikeButton: saved.dislikeButton });
+
+/** The dislike button in the player bar: as bright as the others, dimmed, or not there. */
+export function setDislikeButton(look: DislikeButton): void {
+	images.dislikeButton = look;
+	saved.dislikeButton = look;
+}
 
 export function setImageQuality(quality: ImageQuality): void {
 	images.quality = quality;

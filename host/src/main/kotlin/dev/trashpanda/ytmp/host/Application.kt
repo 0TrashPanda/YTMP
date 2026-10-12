@@ -388,8 +388,24 @@ fun Application.ytmpModule(
                 }
                 fun ApplicationCall.owner(): PersonalCatalog =
                     personal() ?: throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Log in to use your YouTube Music here")
-                // Your Home, for pages of other hosts (theirs is /api/home).
+                // Your Home, search and radio, for pages of other hosts (theirs are /api/home, /api/search, …).
                 get("/home") { call.respond(call.owner().home()) }
+                get("/search") {
+                    val query = call.request.queryParameters["q"]?.trim().orEmpty()
+                    if (query.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing q")
+                    val type = call.request.queryParameters["type"]?.let(::searchType) ?: SearchType.ALL
+                    call.respond(call.owner().search(query, type) ?: throw notHere())
+                }
+                get("/search/suggestions") {
+                    val query = call.request.queryParameters["q"].orEmpty()
+                    if (query.isBlank()) return@get call.respond(SuggestionsResponse(emptyList()))
+                    call.respond(SuggestionsResponse(call.owner().suggestions(query) ?: throw notHere()))
+                }
+                get("/similar") {
+                    val songId = call.request.queryParameters["id"]?.trim().orEmpty()
+                    if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
+                    call.respond(SearchResponse((call.owner().radio(songId) ?: throw notHere()).filter { it.id != songId }))
+                }
                 get("/youtube") {
                     val mine = call.personal()
                     call.respond(
@@ -628,3 +644,5 @@ fun RoomManager.createFor(
     )
     return room
 }
+
+private fun notHere() = ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Not with this YouTube Music sign-in")

@@ -20,7 +20,7 @@
 	// The song menu (docs/features/ui.md#song-menu): right-click a song, or its ⋮ button.
 	import { onMount, tick } from 'svelte';
 	import type { Command } from '../protocol.gen';
-	import { removeFromPlaylist } from '../api';
+	import { removeFromPlaylist, yourRadio } from '../api';
 	import { likes } from '../likes.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import { youtube } from '../youtube.svelte';
@@ -98,9 +98,20 @@
 		list.push(null);
 		// Radio and "similar" are about music, not podcast episodes.
 		if (!song.podcast) {
-			if (room.can('start_radio')) list.push({ icon: 'radio', label: 'Start radio', run: () => command({ kind: 'StartRadio', song }, `Starting a radio from "${song.title}"`) });
+			const seed = song;
+			if (room.can('start_radio')) {
+				list.push({
+					icon: 'radio',
+					label: 'Start radio',
+					run: async () => command({ kind: 'StartRadio', song: seed, songs: await yourRadio(seed.id) }, `Starting a radio from "${seed.title}"`)
+				});
+			}
 			if (room.can('autoplay_from_here')) {
-				list.push({ icon: 'autoplay', label: 'Autoplay this', run: () => command({ kind: 'AutoplayFromHere', song }, `Autoplay: songs like "${song.title}"`) });
+				list.push({
+					icon: 'autoplay',
+					label: 'Autoplay this',
+					run: async () => command({ kind: 'AutoplayFromHere', song: seed, songs: await yourRadio(seed.id) }, `Autoplay: songs like "${seed.title}"`)
+				});
 			}
 			// Read everything from the target before closing: closing clears it.
 			const current = song;
@@ -117,8 +128,9 @@
 				run: async () => {
 					onClose();
 					const disliking = rating !== 'dislike';
-					// Like YouTube Music: a disliked song that's playing is skipped (if you may).
-					if ((await likes.rate(current.id, disliking ? 'dislike' : 'none', onToast)) && disliking && wasCurrent && room.can('skip')) {
+					// Like YouTube Music: a disliked song that's playing is skipped, in a solo room (a party's music is everyone's).
+					const solo = room.state?.room.visibility === 'private';
+					if ((await likes.rate(current.id, disliking ? 'dislike' : 'none', onToast)) && disliking && wasCurrent && solo && room.can('skip')) {
 						await room.run({ kind: 'Skip' });
 					}
 				}

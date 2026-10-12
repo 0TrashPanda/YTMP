@@ -8,10 +8,10 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { authServer } from '../../account';
 	import { getHost } from '../../api';
-	import { images, setImageQuality, setVideoArt } from '../../images.svelte';
+	import { images, setDislikeButton, setImageQuality, setVideoArt } from '../../images.svelte';
 	import { nativeBridge } from '../../native';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
-	import { saved, type BackLimit, type HeadphonesAction, type ImageQuality, type VideoArt } from '../../storage';
+	import { saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type VideoArt } from '../../storage';
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
 	import AccountSection from './AccountSection.svelte';
@@ -186,6 +186,17 @@
 					options={videoArtOptions}
 					value={images.videoArt}
 					onchange={setVideoArt}
+				/>
+				<Choice
+					label="Dislike button in the player bar"
+					hint="Thumbs down next to thumbs up at the bottom (computers). Dimmed: still there, but darker, so you don't hit it by accident."
+					options={[
+						['normal', 'Normal'],
+						['dim', 'Dimmed'],
+						['hidden', 'Hidden']
+					] as [DislikeButton, string][]}
+					value={images.dislikeButton}
+					onchange={setDislikeButton}
 				/>
 				<p class="text-xs text-muted">Saved on this {inApp ? 'phone' : 'device'}.</p>
 			{:else if section === 'app' && nativeBridge?.appVersion}

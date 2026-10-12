@@ -24,6 +24,8 @@ export type BackLimit = 'home' | 'rooms';
 
 /** When headphones are unplugged or Bluetooth disconnects (the app). */
 export type HeadphonesAction = 'pause' | 'stop' | 'keep';
+/** How the dislike button in the player bar looks. */
+export type DislikeButton = 'normal' | 'dim' | 'hidden';
 export type ImageQuality = 'high' | 'low';
 export type VideoArt = 'crop' | 'fit';
 
@@ -112,6 +114,12 @@ export const saved = {
 	},
 	set headphonesAction(action: HeadphonesAction) {
 		write('ytmp.headphones', action);
+	},
+	get dislikeButton(): DislikeButton {
+		return pick('ytmp.dislikeButton', ['normal', 'dim', 'hidden'], 'normal');
+	},
+	set dislikeButton(look: DislikeButton) {
+		write('ytmp.dislikeButton', look);
 	},
 	/** Sharp pictures, or small ones to save data (see images.svelte.ts). */
 	get imageQuality(): ImageQuality {

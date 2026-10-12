@@ -63,6 +63,8 @@ class YoutubeSignIn {
 				if (there?.account) {
 					status = there;
 					this.from = new URL(remote.server).host;
+					// Search and radio with your account too, if you want that (a setting on your server).
+					useYoutubeFrom({ ...remote, personalize: there.personalize });
 				} else {
 					useYoutubeFrom(null);
 				}

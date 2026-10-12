@@ -3,6 +3,7 @@
 	import { MediaQuery } from 'svelte/reactivity';
 	import { getAlbum, prefetch } from '../api';
 	import { artistNames, formatTime } from '../format';
+	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef } from '../protocol.gen';
@@ -76,11 +77,12 @@
 	const songId = $derived(current?.item.song.id);
 	const liked = $derived(likes.get(songId));
 	const rating = $derived(likes.rating(songId));
-	/** Thumbs down; like YouTube Music, the song is skipped too (if you may skip). */
+	/** Thumbs down; in a solo room the song is skipped too, like YouTube Music (not in a party: it's everyone's music). */
 	async function toggleDislike(id: string) {
 		if (rating === null) return;
 		const disliking = rating !== 'dislike';
-		if ((await likes.rate(id, disliking ? 'dislike' : 'none', onToast)) && disliking && room.can('skip')) await room.run({ kind: 'Skip' });
+		const solo = room.state?.room.visibility === 'private';
+		if ((await likes.rate(id, disliking ? 'dislike' : 'none', onToast)) && disliking && solo && room.can('skip')) await room.run({ kind: 'Skip' });
 	}
 	$effect(() => {
 		if (songId && wide.current) likes.load(songId);
@@ -193,10 +195,10 @@
 						{/if}
 					</div>
 				</div>
-				{#if current && youtube.account}
+				{#if current && youtube.account && images.dislikeButton !== 'hidden'}
 					{@const id = current.item.song.id}
 					<button
-						class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-40 {rating === 'dislike' ? 'text-white' : ''}"
+						class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-40 {rating === 'dislike' ? 'text-white' : ''} {images.dislikeButton === 'dim' ? 'opacity-35 hover:opacity-100' : ''}"
 						disabled={rating === null}
 						aria-label={rating === 'dislike' ? 'Remove dislike' : 'Dislike'}
 						aria-pressed={rating === 'dislike'}
@@ -204,6 +206,9 @@
 					>
 						<Icon name={rating === 'dislike' ? 'disliked' : 'dislike'} size={20} />
 					</button>
+				{/if}
+				{#if current && youtube.account}
+					{@const id = current.item.song.id}
 					<button
 						class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-40 {liked ? 'text-white' : ''}"
 						disabled={liked === null}

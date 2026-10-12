@@ -59,6 +59,7 @@ export interface CommandAssignRole {
 export interface CommandAutoplayFromHere {
   kind: "AutoplayFromHere";
   song: Song;
+  songs: Song[] | null;
 }
 
 export interface CommandAutoplaySongs {
@@ -230,6 +231,7 @@ export interface CommandSkip {
 export interface CommandStartRadio {
   kind: "StartRadio";
   song: Song;
+  songs: Song[] | null;
 }
 
 export interface CommandUnban {

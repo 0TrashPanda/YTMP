@@ -64,6 +64,8 @@ Like YTM:
   big screens bigger than YTM lists them (like YTM, Google's pictures are asked for at the
   size shown, e.g. 1200 px album art in the desktop player); **Low** loads at most 300 px
   pictures, to save data.
+- **Dislike button in the player bar** ✅ (Settings → Look, per device): Normal, Dimmed
+  (darker until you point at it) or Hidden.
 - **Video pictures** ✅ (Settings → Look, per device): songs from a music video only have a
   wide picture. **Crop** (default, like YTM) fills the square; **Fit** shows all of it, with
   bars above and below.
@@ -171,7 +173,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
 | Autoplay from here | Replace the [autoplay queue](queue.md#autoplay-queue) with a radio from this song, without touching the queue |
 | Find similar | Open [find similar](history-and-recommendations.md#find-similar) from this song |
 | Like ✅ | Only if a YouTube account is linked |
-| Dislike ✅ | Thumbs down; the playing song is skipped (if you may) |
+| Dislike ✅ | Thumbs down; in a solo room the playing song is skipped (if you may) |
 | Remove from this playlist ✅ | On your own playlist's page (Liked music: *Remove from Liked music*) |
 | Add to playlist | YTMP playlist, saved to your account (planned) |
 | Save to playlist ✅ | YouTube Music playlist; only if a YouTube account is linked |

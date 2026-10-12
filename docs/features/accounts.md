@@ -103,8 +103,9 @@ every browser where you're logged in. Only you see them.
 ### Your playlists and thumbs ✅
 
 - **Dislike** (thumbs down, next to thumbs up in the full player and the player bar, and in
-  the song menu): like YouTube Music, it suggests fewer songs like it, and a song that's
-  playing is skipped (if you may skip).
+  the song menu): like YouTube Music, it suggests fewer songs like it. In a **solo** room the
+  playing song is also skipped (if you may skip); in a party it keeps playing, it's everyone's
+  music. Settings → Look can dim or hide the dislike button in the player bar.
 - **Your own playlists** (opened from your Library): remove songs (song menu → *Remove from
   this playlist*), drag them to another place, **rename** and **delete** the playlist (the ⋮
   next to its name). In Liked music, *Remove from Liked music* takes the like away.
@@ -117,8 +118,11 @@ Library, likes and saving to playlists in that room come **straight from your se
 host never gets your sign-in. The page there only gets a pass that's good for your YouTube
 Music on your server: not a login, and it can't delete or change playlists, change settings
 or sign out (do that on your own server). Your YouTube Music must be connected to your
-account on your server for this. Not yet: search and radio with your account there, and
-plays there going into your YouTube Music history.
+account on your server for this. With *Use your account for search and radio* on (your
+server's setting), your searches, suggestions and *Related* there go through your account
+too, and so do radios **you** start there (Start radio, Autoplay this): your page brings the
+songs. When that radio runs low, the room goes on with its own. Not yet: plays there going
+into your YouTube Music history.
 
 ## Log in once ✅
 

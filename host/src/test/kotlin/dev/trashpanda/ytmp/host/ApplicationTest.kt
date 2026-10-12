@@ -444,6 +444,18 @@ class ApplicationTest {
     }
 
     @Test
+    fun `your own search and radio, for pages of other hosts`() = testApplication {
+        val owner = Owner(YoutubeAccount("Jonah", "@jonah", null))
+        setupPhone(generalCatalog, owner)
+        val client = jsonClient()
+
+        assertEquals("Mine", client.get("/api/me/search?q=daft").body<SearchPage>().sections.single().title)
+        assertEquals(listOf("daft (mine)"), client.get("/api/me/search/suggestions?q=daft").body<SuggestionsResponse>().items)
+        // Guests: none of the owner's.
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/me/search?q=daft") { header("X-Remote", "1") }.status)
+    }
+
+    @Test
     fun `the phone's owner, logged in on another device, uses the phone's YouTube Music there too`() = testApplication {
         val youtube = Owner(YoutubeAccount("Jonah", "@jonah", null))
         var owner: String? = null

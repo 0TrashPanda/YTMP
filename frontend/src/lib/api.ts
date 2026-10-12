@@ -149,10 +149,18 @@ function abortable<T>(value: Promise<T>, signal?: AbortSignal): Promise<T> {
 	});
 }
 
+/**
+ * Searches (and suggestions, similar songs) go through your account on your server: in a room
+ * on another host, with your YouTube Music from there and "Use your account for search and
+ * radio" on (see [useYoutubeFrom]). Else through this host, as usual.
+ */
+const viaYourServer = () => !!youtubeFrom?.personalize;
+
 export function search(query: string, type: SearchType, signal?: AbortSignal): Promise<SearchPage> {
 	const q = query.trim().toLowerCase();
+	const base = viaYourServer() ? '/api/me/search' : '/api/search';
 	return abortable(
-		cached(`search:${type}:${q}`, () => request<SearchPage>(`/api/search?q=${encodeURIComponent(q)}&type=${type}`)),
+		cached(`${viaYourServer() ? 'me:' : ''}search:${type}:${q}`, () => request<SearchPage>(`${base}?q=${encodeURIComponent(q)}&type=${type}`)),
 		signal
 	);
 }
@@ -160,18 +168,34 @@ export function search(query: string, type: SearchType, signal?: AbortSignal): P
 /** What to search for, while typing. Empty when the host has no suggestions. */
 export function suggestions(query: string, signal?: AbortSignal): Promise<string[]> {
 	const q = query.toLowerCase();
+	const base = viaYourServer() ? '/api/me/search/suggestions' : '/api/search/suggestions';
 	return abortable(
-		cached(`suggest:${q}`, async () => (await request<SuggestionsResponse>(`/api/search/suggestions?q=${encodeURIComponent(q)}`)).items),
+		cached(`${viaYourServer() ? 'me:' : ''}suggest:${q}`, async () => (await request<SuggestionsResponse>(`${base}?q=${encodeURIComponent(q)}`)).items),
 		signal
 	);
 }
 
 /** Songs similar to a song (YTM's radio), for Find similar. */
 export function similar(songId: string, signal?: AbortSignal): Promise<Song[]> {
+	const base = viaYourServer() ? '/api/me/similar' : '/api/similar';
 	return abortable(
-		cached(`similar:${songId}`, async () => (await request<SearchResponse>(`/api/similar?id=${encodeURIComponent(songId)}`)).items),
+		cached(`${viaYourServer() ? 'me:' : ''}similar:${songId}`, async () => (await request<SearchResponse>(`${base}?id=${encodeURIComponent(songId)}`)).items),
 		signal
 	);
+}
+
+/**
+ * A radio you bring to this room (your own account's, from your server), for Start radio and
+ * Autoplay this; null when the room's own radio is used (it's the room's, or your account is
+ * on this host anyway).
+ */
+export async function yourRadio(songId: string): Promise<Song[] | null> {
+	if (!viaYourServer()) return null;
+	try {
+		return await similar(songId);
+	} catch {
+		return null;
+	}
 }
 
 export function getArtist(id: string): Promise<ArtistPage> {
@@ -203,9 +227,9 @@ export function getHome(): Promise<HomePage> {
  * Your YouTube Music comes from your own server ([server], with a [token] just for that), not
  * from this host: a room on someone else's phone or server. Null: from this host, as usual.
  */
-let youtubeFrom: { server: string; token: string } | null = null;
-export function useYoutubeFrom(remote: { server: string; token: string } | null): void {
-	if (remote?.server === youtubeFrom?.server && remote?.token === youtubeFrom?.token) return;
+let youtubeFrom: { server: string; token: string; personalize?: boolean } | null = null;
+export function useYoutubeFrom(remote: { server: string; token: string; personalize?: boolean } | null): void {
+	if (remote?.server === youtubeFrom?.server && remote?.token === youtubeFrom?.token && remote?.personalize === youtubeFrom?.personalize) return;
 	youtubeFrom = remote;
 	forgetPersonal();
 	cache.delete('home');

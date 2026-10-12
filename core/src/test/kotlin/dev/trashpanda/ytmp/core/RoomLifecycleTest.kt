@@ -415,6 +415,22 @@ class RoomLifecycleTest {
     }
 
     @Test
+    fun `someone can bring their own radio to a room`() = runTest {
+        // A room without a radio of its own: the brought one is used as it is.
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.StartRadio(song(1), songs = listOf(song(2), song(3))))
+        runCurrent()
+        val saved = room.save()
+        assertEquals("ytm:song1", saved.current?.song?.id)
+        assertEquals(listOf("ytm:song2", "ytm:song3"), saved.autoplay.map { it.song.id })
+
+        room.run(anna, Command.AutoplayFromHere(song(4), songs = listOf(song(5))))
+        runCurrent()
+        assertEquals(listOf("ytm:song5"), room.save().autoplay.map { it.song.id })
+    }
+
+    @Test
     fun `an always-on room isn't deleted for being empty`() = runTest {
         val manager = RoomManager(
             { id -> "https://stream/$id" }, backgroundScope, clock = { testScheduler.currentTime },
