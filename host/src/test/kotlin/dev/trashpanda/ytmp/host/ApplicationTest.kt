@@ -300,7 +300,19 @@ class ApplicationTest {
     }
 
     /** Phone mode. Requests with the "X-Remote" header count as coming from another device. */
-    private fun ApplicationTestBuilder.setupPhone(catalog: CatalogSource? = null, personal: PersonalCatalog? = null, suggestions: SearchSuggestions? = null) {
+    /** Tokens are "token-<username>", for accounts of "home". */
+    private val testAuth = object : HostAuth {
+        override fun servers() = listOf(AuthServerRef("https://home.example", "home"))
+        override fun verify(token: String) = token.removePrefix("token-").takeIf { it != token }?.let { AccountIdentity("$it@home", it) }
+    }
+
+    private fun ApplicationTestBuilder.setupPhone(
+        catalog: CatalogSource? = null,
+        personal: PersonalCatalog? = null,
+        suggestions: SearchSuggestions? = null,
+        deviceOwner: () -> String? = { null },
+        onLocalAccount: (AccountIdentity) -> Unit = {},
+    ) {
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
             ytmpModule(
@@ -311,6 +323,9 @@ class ApplicationTest {
                     localOnlyRoomManagement = true,
                     supportsPrivateRooms = true,
                     isLocal = { it.request.headers["X-Remote"] == null },
+                    auth = testAuth,
+                    deviceOwner = deviceOwner,
+                    onLocalAccount = onLocalAccount,
                 ),
                 catalog = catalog,
                 personal = personal,
@@ -387,6 +402,31 @@ class ApplicationTest {
         owner.personalize = true
         owner.account = null
         assertEquals("all", searchTitle())
+    }
+
+    @Test
+    fun `the phone's owner, logged in on another device, uses the phone's YouTube Music there too`() = testApplication {
+        val youtube = Owner(YoutubeAccount("Jonah", "@jonah", null))
+        var owner: String? = null
+        setupPhone(generalCatalog, youtube, deviceOwner = { owner }, onLocalAccount = { owner = it.id })
+        val client = jsonClient()
+        suspend fun library(token: String?) = client.get("/api/me/library") {
+            header("X-Remote", "1")
+            if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
+        }.status
+
+        // The phone's own page, logged in as jonah, makes jonah the phone's owner.
+        client.get("/api/me/youtube") { header(HttpHeaders.Authorization, "Bearer token-jonah") }
+        assertEquals("jonah@home", owner)
+
+        assertEquals(HttpStatusCode.OK, library("token-jonah"))
+        assertEquals("Mine", client.get("/api/home") { header("X-Remote", "1"); header(HttpHeaders.Authorization, "Bearer token-jonah") }.body<HomePage>().sections.single().title)
+        // Another account, or a guest: nothing of the owner's.
+        assertEquals(HttpStatusCode.Forbidden, library("token-sam"))
+        assertEquals(HttpStatusCode.Forbidden, library(null))
+        // A remote device can't make itself the owner.
+        client.get("/api/me/youtube") { header("X-Remote", "1"); header(HttpHeaders.Authorization, "Bearer token-sam") }
+        assertEquals("jonah@home", owner)
     }
 
     @Test

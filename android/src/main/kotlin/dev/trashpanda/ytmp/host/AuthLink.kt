@@ -25,6 +25,23 @@ class AuthLink(context: Context, port: Int) {
     /** The linked server, e.g. `https://ytmp.example.com`, or null. */
     val url: String? get() = auth.servers().firstOrNull()?.url
 
+    /**
+     * The account the phone's own pages are logged in with: the phone's owner. Logged in with
+     * it on another device (a laptop on the Wi-Fi), they're the owner there too: their YouTube
+     * Music sign-in on this phone works for them.
+     */
+    @Volatile
+    var ownerAccount: String? = prefs.getString("owner", null)
+        private set
+
+    /** The phone's own page proved [account]. */
+    fun usedBy(account: String) {
+        if (account == ownerAccount) return
+        ownerAccount = account
+        prefs.edit().putString("owner", account).apply()
+        Log.i(TAG, "This phone's owner: $account")
+    }
+
     init {
         val url = prefs.getString("url", null)
         val issuer = prefs.getString("issuer", null)
@@ -40,6 +57,7 @@ class AuthLink(context: Context, port: Int) {
         if (url == null) {
             auth.clear()
             prefs.edit().clear().apply()
+            ownerAccount = null
             return
         }
         val base = normalizeOrigin(url) ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Enter the server's address, like https://ytmp.example.com")
@@ -51,7 +69,9 @@ class AuthLink(context: Context, port: Int) {
         val key = AccountTokens.decodePublicKey(info.publicKey)
         auth.clear()
         auth.trust(AuthServerRef(base, info.issuer), key)
-        prefs.edit().putString("url", base).putString("issuer", info.issuer).putString("key", info.publicKey).apply()
+        if (info.issuer != prefs.getString("issuer", null)) ownerAccount = null
+        prefs.edit().putString("url", base).putString("issuer", info.issuer).putString("key", info.publicKey)
+            .apply { if (ownerAccount == null) remove("owner") }.apply()
         Log.i(TAG, "Using $base (${info.issuer}) for accounts")
     }
 

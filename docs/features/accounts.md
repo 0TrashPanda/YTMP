@@ -109,7 +109,16 @@ else's phone or server without giving that host your sign-in.
   you in for its rooms (and your name is filled in when you join a room).
 - In the app, logging in on your server's pages also logs in the phone's own pages, and the
   other way round. A browser on another device logs in once itself.
-- Rooms on other people's hosts still ask first ("Join rooms on <host> as <name>?").
+- **Another host's pages** (your phone on the Wi-Fi, in your laptop's browser): when they
+  don't know you yet, they quickly check with your server whether this browser is logged in
+  there. The first time, your server asks *"Join rooms on <host> as <name>?"* (or *Not now,
+  join as a guest*); after a yes, that host logs you in by itself, without asking your name.
+  Not logged in there, or the server can't be reached (no internet): the host asks your name
+  as before, with a **Log in** button. *Not now* isn't asked again for a week.
+- **Your phone's YouTube Music on your other devices**: the account the phone's own pages are
+  logged in with is the phone's **owner**. Logged in with that account on another device (in a
+  room on the phone), you get the phone's YouTube Music too: your Home, Library, likes, and
+  search and radio with your account. Nobody else does.
 
 ## Accounts-only servers ✅
 

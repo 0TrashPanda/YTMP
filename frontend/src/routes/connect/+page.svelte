@@ -9,6 +9,8 @@
 	import type { AccountInfo, AuthServerInfo } from '../../lib/protocol.gen';
 
 	const returnUrl = page.url.searchParams.get('return');
+	/** A host's page checking whether you're logged in here (see connectQuietly): no login form. */
+	const quiet = page.url.searchParams.get('quiet') === '1';
 	const target = (() => {
 		try {
 			const url = new URL(returnUrl ?? '');
@@ -24,6 +26,33 @@
 	let busy = $state(false);
 	let loaded = $state(false);
 
+	// Hosts you said yes to before, per account, in this browser: they don't ask again.
+	const APPROVED = 'ytmp.approvedHosts';
+	function approved(): Record<string, string[]> {
+		try {
+			return JSON.parse(localStorage.getItem(APPROVED) ?? '{}');
+		} catch {
+			return {};
+		}
+	}
+	function remember(accountId: string, origin: string) {
+		const all = approved();
+		all[accountId] = [...new Set([...(all[accountId] ?? []), origin])];
+		try {
+			localStorage.setItem(APPROVED, JSON.stringify(all));
+		} catch {
+			// Asks again next time.
+		}
+	}
+
+	/** Back to the host's page without a login: [answer] `none` (not logged in), or `declined`. */
+	function goBack(answer: 'none' | 'declined') {
+		if (!target) return;
+		const url = new URL(target);
+		url.hash = `ytmp-connect=${answer}`;
+		location.href = url.toString();
+	}
+
 	onMount(async () => {
 		try {
 			info = await authServer.info();
@@ -32,8 +61,10 @@
 			error = e instanceof Error ? e.message : "Can't reach the server";
 		}
 		loaded = true;
-		// Our own pages don't need to ask.
-		if (account && target?.origin === location.origin) await allow();
+		// Our own pages, and hosts you said yes to, don't need to ask.
+		if (account && target && (target.origin === location.origin || approved()[account.id]?.includes(target.origin))) await allow();
+		// Not logged in here (or the server didn't answer): the host's page asks your name as before.
+		else if (quiet && !account) goBack('none');
 	});
 
 	async function allow() {
@@ -41,7 +72,9 @@
 		busy = true;
 		error = null;
 		try {
-			returnWithIdentity(target.toString(), await authServer.hostToken(target.origin));
+			const token = await authServer.hostToken(target.origin);
+			remember(token.account.id, target.origin);
+			returnWithIdentity(target.toString(), token);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Something went wrong';
 			busy = false;
@@ -76,7 +109,11 @@
 			<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy} onclick={allow}>Continue</button>
 			<div class="flex justify-between text-sm text-muted">
 				<button class="underline" onclick={switchAccount}>Use another account</button>
-				<a class="underline" href={target.toString()}>Cancel</a>
+				{#if quiet}
+					<button class="underline" onclick={() => goBack('declined')}>Not now, join as a guest</button>
+				{:else}
+					<a class="underline" href={target.toString()}>Cancel</a>
+				{/if}
 			</div>
 		</section>
 	{/if}

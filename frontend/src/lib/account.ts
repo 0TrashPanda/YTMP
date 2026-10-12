@@ -176,24 +176,69 @@ export const identity = {
 		}
 	},
 
-	/** Takes an identity that /connect put in the URL fragment, and removes it from the URL. */
+	/**
+	 * Takes an identity that /connect put in the URL fragment, and removes it from the URL. A
+	 * quiet check ([connectQuietly]) may also come back with `none` (not logged in there) or
+	 * `declined` ("Not now": don't ask again for a while).
+	 */
 	takeFromUrl(): void {
 		if (!location.hash.startsWith(`#${FRAGMENT}`)) return;
-		try {
-			const value = JSON.parse(decodeURIComponent(location.hash.slice(FRAGMENT.length + 1))) as Identity;
-			if (value.token && value.account) write('ytmp.identity', value);
-		} catch {
-			// Not ours or broken; ignore.
+		const answer = decodeURIComponent(location.hash.slice(FRAGMENT.length + 1));
+		if (answer === 'declined') {
+			write('ytmp.connectDeclined', Date.now());
+		} else if (answer !== 'none') {
+			try {
+				const value = JSON.parse(answer) as Identity;
+				if (value.token && value.account) write('ytmp.identity', value);
+			} catch {
+				// Not ours or broken; ignore.
+			}
 		}
 		history.replaceState(history.state, '', location.pathname + location.search);
 	},
 
-	/** Where to go to log in with [server]; you come back to this page. */
-	loginUrl(server: AuthServerRef): string {
+	/** Where to go to log in with [server]; you come back to this page. [quiet]: see [connectQuietly]. */
+	loginUrl(server: AuthServerRef, quiet = false): string {
 		const base = server.url ?? '';
-		return `${base}/connect?return=${encodeURIComponent(location.href)}`;
+		return `${base}/connect?${quiet ? 'quiet=1&' : ''}return=${encodeURIComponent(location.href)}`;
 	}
 };
+
+/** After "Not now" on a host, it doesn't ask again for this long. */
+const DECLINED_MS = 7 * 24 * 3600_000;
+
+/**
+ * On another host's pages (a phone on the Wi-Fi) that don't know you yet: if this browser is
+ * logged in on your server, you're logged in here too, without typing anything. The page goes
+ * to the server's /connect for a moment; it comes straight back with your login (a host you
+ * said yes to before), asks once ("Join rooms on … as …?"), or comes back without one (not
+ * logged in there). Once per browser session per host, not on the server's own pages or the
+ * app's, and not when the server can't be reached (a phone party without internet).
+ * Returns true when the page is going there.
+ */
+export async function connectQuietly(host: HostInfo): Promise<boolean> {
+	// The app's own pages get your login from the app.
+	if (location.origin === APP_HOME_ORIGIN) return false;
+	if (identity.get(host.authServers)) return false;
+	const server = host.authServers.find((s) => s.url && new URL(s.url).origin !== location.origin);
+	if (!server?.url) return false;
+	const declined = read<number>('ytmp.connectDeclined');
+	if (declined && Date.now() - declined < DECLINED_MS) return false;
+	try {
+		if (sessionStorage.getItem('ytmp.quietConnect')) return false;
+		sessionStorage.setItem('ytmp.quietConnect', '1');
+	} catch {
+		return false;
+	}
+	try {
+		// Only to see that it answers (it doesn't allow reading the answer from here).
+		await fetch(`${server.url}/api/auth/info`, { mode: 'no-cors', signal: AbortSignal.timeout(2500) });
+	} catch {
+		return false;
+	}
+	location.href = identity.loginUrl(server, true);
+	return true;
+}
 
 // --- log in once ---------------------------------------------------------------------------
 

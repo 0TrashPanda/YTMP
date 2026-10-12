@@ -135,6 +135,13 @@ data class HostOptions(
     val mayProxyAudio: (ApplicationCall) -> Boolean = { true },
     /** An account token was accepted (a phone keeps the latest, to sync the account's rooms). */
     val onAccountToken: (token: String, account: AccountIdentity) -> Unit = { _, _ -> },
+    /** The hosting device itself proved [AccountIdentity] (a phone: its owner's account). */
+    val onLocalAccount: (AccountIdentity) -> Unit = {},
+    /**
+     * The account of whoever owns the hosting device (a phone), or null. Logged in with it on
+     * another device, they may use the device's own YouTube Music sign-in ([ytmpModule]'s `personal`).
+     */
+    val deviceOwner: () -> String? = { null },
     /**
      * No guests: the API (but logging in and audio for speakers) and rooms need an account
      * of [auth]. A server setting (`accounts.guests = false`).
@@ -194,8 +201,34 @@ fun Application.ytmpModule(
 
     fun ApplicationCall.mayManageRooms() = !options.localOnlyRoomManagement || options.isLocal(this)
 
-    /** Your YouTube Music: the phone owner's in their own app, or (a server) your account's. */
-    fun ApplicationCall.personal(): PersonalCatalog? = personalFor?.invoke(this) ?: personal?.takeIf { options.isLocal(this) }
+    /** The account this request proves (bearer host token), if any. */
+    fun ApplicationCall.account(): AccountIdentity? {
+        val token = bearerToken() ?: return null
+        return options.auth.verify(token)?.also {
+            options.onAccountToken(token, it)
+            if (options.isLocal(this)) options.onLocalAccount(it)
+        }
+    }
+
+    /** Logged in with the account of whoever owns this device (a phone), on another device. */
+    fun ApplicationCall.isDeviceOwner(): Boolean {
+        val owner = options.deviceOwner() ?: return false
+        return account()?.id == owner
+    }
+
+    /**
+     * Your YouTube Music: on a phone, its owner's, in their own app or logged in with their
+     * account on another device; on a server, your account's.
+     */
+    fun ApplicationCall.personal(): PersonalCatalog? {
+        personalFor?.invoke(this)?.let { return it }
+        if (options.isLocal(this)) {
+            // The device's own page: notes who's logged in there (its owner).
+            account()
+            return personal
+        }
+        return personal?.takeIf { isDeviceOwner() }
+    }
 
     /**
      * Your own searches (and Related) go through your YouTube Music account, when you're signed
@@ -213,12 +246,6 @@ fun Application.ytmpModule(
             }
         }
         return anonymous()
-    }
-
-    /** The account this request proves (bearer host token), if any. */
-    fun ApplicationCall.account(): AccountIdentity? {
-        val token = bearerToken() ?: return null
-        return options.auth.verify(token)?.also { options.onAccountToken(token, it) }
     }
 
     /** The room's owner: its owner token (header), or its owner account. */
@@ -239,6 +266,8 @@ fun Application.ytmpModule(
         route("/api") {
             if (options.accountsOnly) install(accountsOnly)
             get("/host") {
+                // The hosting device's own page, logged in: whose device this is.
+                if (options.isLocal(call)) call.account()
                 call.respond(
                     HostInfo(
                         kind = options.kind,

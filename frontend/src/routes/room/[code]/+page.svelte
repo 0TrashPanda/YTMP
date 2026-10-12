@@ -381,14 +381,26 @@
 				Join
 			</button>
 		</form>
+		{#if host && !identity.get(host.authServers)}
+			{#each host.authServers as server (server.issuer)}
+				<a href={identity.loginUrl(server)} class="rounded-full bg-raised py-3 text-center font-medium hover:bg-line">
+					Log in with {server.url ? new URL(server.url).host : server.issuer}
+				</a>
+			{/each}
+		{/if}
 		{/if}
 	</main>
 {:else if room.status === 'rejected'}
 	<main class="mx-auto flex min-h-full max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
 		<p class="text-lg">{room.rejectMessage}</p>
-		{#if host?.accountsOnly && !identity.stored}
+		{#if (host?.accountsOnly || room.rejectReason === 'private_room') && host && !identity.get(host.authServers)}
+			{#if room.rejectReason === 'private_room'}
+				<p class="text-sm text-muted">Is it yours? Log in with your account to open it.</p>
+			{/if}
 			{#each host.authServers as server (server.issuer)}
-				<a href={identity.loginUrl(server)} class="rounded-full bg-white px-6 py-3 font-medium text-black">Log in</a>
+				<a href={identity.loginUrl(server)} class="rounded-full bg-white px-6 py-3 font-medium text-black">
+					Log in{host.authServers.length > 1 ? ` with ${server.url ? new URL(server.url).host : server.issuer}` : ''}
+				</a>
 			{/each}
 		{/if}
 		{#if room.movedTo}

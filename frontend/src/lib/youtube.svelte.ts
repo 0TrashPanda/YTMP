@@ -50,7 +50,8 @@ class YoutubeSignIn {
 			this.onServer = host.kind === 'server';
 			const server = host.authServers.find((s) => s.url)?.url ?? null;
 			this.linkedServer = !this.onServer && identity.get(host.authServers) ? server : null;
-			this.available = status.available && (this.onServer || !!nativeBridge?.youtubeSignIn);
+			// On a phone: in its app, or as its owner on another device (logged in), when the phone is signed in.
+			this.available = status.available && (this.onServer || !!nativeBridge?.youtubeSignIn || !!status.account);
 			this.account = status.account;
 			this.history = status.history;
 			this.personalize = status.personalize;

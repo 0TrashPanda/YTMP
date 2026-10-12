@@ -123,6 +123,8 @@ class LocalHost(private val context: Context) {
                     supportsPrivateRooms = true,
                     auth = authLink.auth,
                     onAccountToken = sync::remember,
+                    onLocalAccount = { authLink.usedBy(it.id) },
+                    deviceOwner = { authLink.ownerAccount },
                 ),
                 extraApi = {
                     authLink.routes(this)

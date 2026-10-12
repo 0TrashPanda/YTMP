@@ -116,6 +116,27 @@ auth server can't be reached when a song ends (a phone without internet), that p
   the phone's page goes through the server's `/connect` in the same WebView, which keeps the
   session there.
 
+### Logging in on another host's pages
+
+- `connectQuietly` (`frontend/src/lib/account.ts`, run by the layout before the page shows): on
+  a host's page without an identity, whose auth server has a `url` on another origin, once per
+  browser session (and not for a week after *Not now*, and not on the app's own pages), it
+  checks the server answers (`no-cors` fetch, 2.5 s) and goes to `<server>/connect?quiet=1`.
+- `/connect?quiet=1`: logged in there and the host's origin is one you said yes to before
+  (`ytmp.approvedHosts` in that browser, per account) → straight back with a host token.
+  Logged in but not yet approved → the usual question, with *Not now, join as a guest*. Not
+  logged in → back at once. It answers in the fragment: `#ytmp-connect=<token JSON>`, `none`
+  or `declined`.
+- The join form and the solo-room refusal have **Log in** buttons (the normal `/connect`).
+
+### The phone's owner
+
+The account the phone's own page proves (a bearer token on a loopback request: `/api/host`,
+`/api/me/*`) is kept as the phone's owner (`AuthLink.ownerAccount`, `HostOptions.onLocalAccount`
+/ `deviceOwner`). A request from another device with a host token of that account may use
+the phone's YouTube Music sign-in like the phone itself (`personal()` in `Application.kt`).
+Linking another auth server forgets the owner.
+
 ### Accounts only
 
 `accounts.guests = false` (`YTMP_GUESTS`) → `HostOptions.accountsOnly`: a route-scoped plugin
