@@ -56,7 +56,7 @@ Then **Create CT**:
 | Template | The Debian template |
 | Disks | 20 GB |
 | CPU | 2 cores |
-| Memory | 4096 MB, swap 1024 MB (building the images needs it; 2048 MB is enough once it runs) |
+| Memory | 2048 MB, swap 512 MB (the images come ready-made from GitHub; 4096 MB if you build them yourself) |
 | Network | Bridge `vmbr0`, IPv4 DHCP, or a static address |
 
 Before starting it: the container → **Options** → **Features** → tick **nesting** and
@@ -210,12 +210,12 @@ address** (as it does on the Proxmox host or in another container): YTMP only tr
 
 ```sh
 cd /opt/ytmp/deploy
-docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build   # A: Caddy
-docker compose up -d --build                                                     # B: nginx
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d   # A: Caddy
+docker compose up -d                                                     # B: nginx
 ```
 
-The first build takes a few minutes (it compiles the server and the web app). Then check
-(add the two `-f` files with Caddy):
+This downloads the ready-made images from GitHub (the git checkout is only for the setup
+files). Then check (add the two `-f` files with Caddy):
 
 ```sh
 docker compose logs ytmp | grep "Streaming audio"
@@ -230,19 +230,31 @@ Open `https://ytmp.example.com`.
 
 ## Updating
 
+**Nothing to do.** Every release, GitHub builds new images, and the YouTube Music module's
+image again whenever a new yt-dlp is out (that's what fixes playback when YouTube changes
+something). The `watchtower` container checks every night at 4:00, restarts YTMP with newer
+images, and removes the old ones. Rooms, accounts and history stay.
+
+- **Update right away** (a release you want now, or songs stopped playing and a new yt-dlp
+  is out): `cd /opt/ytmp/deploy && docker compose pull && docker compose up -d` (add the two
+  `-f` files with Caddy).
+- **Stay on a version** (or go back to one): put `YTMP_VERSION=0.7.0` in `.env` and run the
+  same command. Remove the line to follow the newest again.
+- **What it did**: `docker compose logs watchtower`.
+- **The setup files themselves** (`docker-compose.yml`, `Caddyfile`, rarely changed):
+  `cd /opt/ytmp && git pull`, then the command above.
+
+### Switching an older install to this
+
+Installs from before v0.7.0 built the images themselves. Once:
+
 ```sh
 cd /opt/ytmp && git pull
-cd deploy && docker compose up -d --build    # add the two -f files with Caddy
+cd deploy && docker compose up -d --remove-orphans    # add the two -f files with Caddy
 docker image prune -f
 ```
 
-**A new yt-dlp** (when YouTube breaks something and songs stop playing): Docker reuses the
-installed packages as long as the module's code didn't change, so build the module again
-from scratch:
-
-```sh
-cd /opt/ytmp/deploy && docker compose build --no-cache --pull ytm && docker compose up -d
-```
+Your data is in the same volume, so nothing is lost.
 
 Rooms, accounts and history are kept in Docker volumes. Back up the whole container with
 Proxmox (**Backup** → **Backup now**, or a scheduled backup job).

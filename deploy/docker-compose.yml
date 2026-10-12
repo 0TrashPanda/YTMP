@@ -1,8 +1,14 @@
 # Run YTMP on a server:
 #   cp ytmp.example.toml ytmp.toml   (optional, every setting has a default)
 #   echo "YTMP_MODULE_KEY=$(openssl rand -hex 32)" > .env
-#   docker compose up -d --build
+#   docker compose up -d
 # Then open http://<server>:8080. Put a reverse proxy (e.g. Caddy) in front for HTTPS.
+#
+# Updates: the images come from GitHub (built for every release; the YouTube Music module
+# also whenever a new yt-dlp is out). Watchtower checks every night at 4:00 and restarts
+# with newer ones. To update right away: docker compose pull && docker compose up -d
+# To stay on a version: YTMP_VERSION=0.7.0 in .env. To build from this checkout instead,
+# add -f docker-compose.build.yml (see there).
 
 # Docker keeps console output forever by default: at most 3 × 10 MB per container here.
 # The server also keeps its own log files in the ytmp-data volume (logs/, see [logs] in ytmp.toml).
@@ -14,9 +20,7 @@ x-logging: &logging
 
 services:
   ytmp:
-    build:
-      context: ..
-      dockerfile: server/Dockerfile
+    image: ghcr.io/0trashpanda/ytmp-server:${YTMP_VERSION:-latest}
     ports:
       - "8080:8080"
     environment:
@@ -29,17 +33,34 @@ services:
       - ytmp-data:/var/lib/ytmp
     depends_on:
       - ytm
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     restart: unless-stopped
     logging: *logging
 
   ytm:
-    build: ../ytm-module
+    image: ghcr.io/0trashpanda/ytmp-ytm:${YTMP_VERSION:-latest}
     environment:
       YTMP_MODULE_KEY: ${YTMP_MODULE_KEY:?set YTMP_MODULE_KEY in .env}
       YTMP_YTM_LANGUAGE: en
       YTMP_YTM_LOCATION: BE
       # debug: also yt-dlp's steps for every song, not only for failed or slow ones.
       YTMP_YTM_LOG_LEVEL: info
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    restart: unless-stopped
+    logging: *logging
+
+  # Updates the two services above (only those) every night, and removes the old images.
+  watchtower:
+    image: nickfedor/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_SCHEDULE: "0 0 4 * * *"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      TZ: ${TZ:-Europe/Brussels}
     restart: unless-stopped
     logging: *logging
 

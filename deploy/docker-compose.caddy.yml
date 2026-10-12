@@ -1,6 +1,6 @@
 # HTTPS with Caddy in front of YTMP (certificates from Let's Encrypt, renewed automatically):
 #   echo "YTMP_DOMAIN=ytmp.example.com" >> .env
-#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
 # Forward TCP ports 80 and 443 on your router to this machine, not 8080.
 # See proxmox.md.
 

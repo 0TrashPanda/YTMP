@@ -1,0 +1,18 @@
+# Build YTMP from this checkout instead of downloading the images (to try changes):
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# Watchtower leaves images built here alone (they aren't on GitHub).
+
+services:
+  ytmp:
+    image: ytmp-server:local
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  ytm:
+    image: ytmp-ytm:local
+    build: ../ytm-module
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"

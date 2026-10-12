@@ -67,7 +67,7 @@ tools/          smoke-test.py (checks a running phone or server)
 | Frontend | Svelte 5 + SvelteKit (static adapter), Tailwind, Vite |
 | Server install | **Docker Compose**: YTMP server + YTM module, optional **Caddy** for HTTPS |
 | Config | One `ytmp.toml` |
-| CI / releases | GitHub Actions build the signed APK on every release tag. Docker images are built on the server from the repo (`deploy/docker-compose.yml`) |
+| CI / releases | GitHub Actions build the signed APK (`release.yml`) and the Docker images (`docker.yml`, on ghcr.io) on every release tag; the YouTube Music module's image also every night when a new yt-dlp or ytmusicapi is out. Servers pull them and Watchtower updates them nightly |
 
 ## Conventions
 
@@ -101,6 +101,12 @@ The Android app is released through GitHub Actions (`.github/workflows/release.y
   `YTMP_KEYSTORE_PASSWORD` (key alias `ytmp`). Locally, `./gradlew :android:assembleRelease`
   signs when `YTMP_KEYSTORE`, `YTMP_KEYSTORE_PASSWORD`, `YTMP_KEY_ALIAS` and
   `YTMP_KEY_PASSWORD` are set; `YTMP_VERSION` sets the version.
+- **Server images** (`.github/workflows/docker.yml`): the same tag builds
+  `ghcr.io/0trashpanda/ytmp-server` and `ytmp-ytm`, tagged with the version and `latest`.
+  Every night at 2:30 UTC it rebuilds `ytmp-ytm` from the latest release with the newest
+  yt-dlp and ytmusicapi, only when one of them is new (it checks for an image tagged
+  `<version>-ytdlp-<v>-ytm-<v>`). It can also be run by hand. The packages must be **public**
+  on GitHub, or servers can't pull them without logging in.
 - Debug builds (`installDebug`) are signed with the local debug key, so a phone with a debug
   build has to uninstall it before installing a release (and the other way round).
 

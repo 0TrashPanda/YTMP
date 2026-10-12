@@ -109,11 +109,13 @@ Needs Docker with Compose.
 cd deploy
 cp ytmp.example.toml ytmp.toml          # optional, every setting has a default
 echo "YTMP_MODULE_KEY=$(openssl rand -hex 32)" > .env
-docker compose up -d --build
+docker compose up -d
 ```
 
-Open `http://<server>:8080`. To update, see [the guide](deploy/proxmox.md#updating) (a new
-yt-dlp needs the module rebuilt without Docker's cache). For HTTPS, put a reverse proxy such as Caddy in front of it
+Open `http://<server>:8080`. The images come from GitHub, and the server **updates itself**
+every night (Watchtower): new releases, and a new yt-dlp whenever YouTube breaks something.
+To update right away: `docker compose pull && docker compose up -d`. See
+[updating](deploy/proxmox.md#updating). For HTTPS, put a reverse proxy such as Caddy in front of it
 (`deploy/docker-compose.caddy.yml` does that for you), or use your own nginx.
 
 **Step-by-step guide:** [running YTMP on Proxmox](deploy/proxmox.md) (LXC container with

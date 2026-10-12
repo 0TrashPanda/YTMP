@@ -1,0 +1,100 @@
+# Builds the server's Docker images and publishes them on GitHub (ghcr.io), so a server only
+# downloads them (deploy/docker-compose.yml, updated by Watchtower every night).
+#
+# - Push a tag like v0.7.0: ytmp-server and ytmp-ytm, tagged 0.7.0 and latest.
+# - Every night: ytmp-ytm again, from the latest release, but only when a new yt-dlp or
+#   ytmusicapi is out (YouTube changes often; a new yt-dlp is the usual fix).
+# - Run it by hand (Actions → Docker → Run workflow): both, from the latest release.
+name: Docker
+
+on:
+  push:
+    tags: ['v*']
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # ghcr.io names are lowercase.
+  REGISTRY: ghcr.io/0trashpanda
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Which release
+        id: release
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+          else
+            tag="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+            git checkout -q "$tag"
+          fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "Building from $tag"
+
+      - name: Newest yt-dlp and ytmusicapi
+        id: deps
+        run: |
+          ytdlp=$(curl -fsS https://pypi.org/pypi/yt-dlp/json | jq -r .info.version)
+          ytm=$(curl -fsS https://pypi.org/pypi/ytmusicapi/json | jq -r .info.version)
+          echo "ytdlp=$ytdlp" >> "$GITHUB_OUTPUT"
+          echo "ytmusicapi=$ytm" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ steps.release.outputs.version }}-ytdlp-$ytdlp-ytm-$ytm" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Is the module image up to date?
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = schedule ] && docker manifest inspect "$REGISTRY/ytmp-ytm:${{ steps.deps.outputs.tag }}" > /dev/null 2>&1; then
+            echo "Nothing new for the module"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Server image
+        if: github.event_name != 'schedule'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/ytmp-server:${{ steps.release.outputs.version }}
+            ${{ env.REGISTRY }}/ytmp-server:latest
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+      - name: Module image
+        if: steps.check.outputs.skip != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ytm-module
+          push: true
+          pull: true
+          no-cache: true
+          build-args: |
+            YT_DLP_VERSION=${{ steps.deps.outputs.ytdlp }}
+            YTMUSICAPI_VERSION=${{ steps.deps.outputs.ytmusicapi }}
+          tags: |
+            ${{ env.REGISTRY }}/ytmp-ytm:${{ steps.release.outputs.version }}
+            ${{ env.REGISTRY }}/ytmp-ytm:${{ steps.deps.outputs.tag }}
+            ${{ env.REGISTRY }}/ytmp-ytm:latest
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
