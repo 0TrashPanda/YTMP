@@ -307,20 +307,62 @@ class RoomLifecycleTest {
     }
 
     @Test
-    fun `the music pauses a minute after everyone went`() = runTest {
+    fun `the music pauses a minute after the last listening device disconnected`() = runTest {
         val room = newRoom()
         val anna = room.join("Anna", owner = true)
         room.run(anna, Command.AddSongs(listOf(longSong()), QueuePosition.END))
+        room.run(anna, Command.SetListening(true))
         runCurrent()
         room.disconnect(anna.id, anna)
 
-        // A reload: back within the minute, still playing.
+        // A reload: back within the minute, playing here again.
         advanceTimeBy(30_000)
-        room.join("Anna", owner = true, guestToken = anna.welcome.guestToken).also { room.disconnect(it.id, it) }
+        val back = room.join("Anna", owner = true, guestToken = anna.welcome.guestToken)
+        room.run(back, Command.SetListening(true))
         advanceTimeBy(50_000)
         assertTrue(room.save().playing)
 
-        advanceTimeBy(20_000)
+        // Gone for good.
+        room.disconnect(back.id, back)
+        advanceTimeBy(59_000)
+        assertTrue(room.save().playing)
+        advanceTimeBy(2_000)
+        assertFalse(room.save().playing)
+    }
+
+    @Test
+    fun `switching off the last device that plays the music pauses it`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        val ben = room.join("Ben")
+        room.run(anna, Command.AddSongs(listOf(longSong()), QueuePosition.END))
+        room.run(anna, Command.SetListening(true))
+        room.run(ben, Command.SetListening(true))
+        runCurrent()
+
+        // Ben still plays it.
+        room.run(anna, Command.SetListening(false))
+        runCurrent()
+        assertTrue(room.save().playing)
+
+        room.run(ben, Command.SetListening(false))
+        runCurrent()
+        assertFalse(room.save().playing)
+        assertTrue(anna.events.any { it is Event.Notice && "paused" in it.message })
+    }
+
+    @Test
+    fun `when another app takes the last speaker, the music pauses`() = runTest {
+        val room = newRoom()
+        room.setAvailableOutputs(listOf(OutputDevice("kitchen", "Kitchen", dev.trashpanda.ytmp.protocol.OutputKind.SONOS)))
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.AddSongs(listOf(longSong()), QueuePosition.END))
+        room.run(anna, Command.SetOutput("kitchen", true))
+        runCurrent()
+
+        room.outputTakenOver("kitchen")
+        runCurrent()
+
         assertFalse(room.save().playing)
     }
 

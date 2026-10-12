@@ -224,7 +224,7 @@ class Room(
 
     private var resolveJob: Job? = null
     private var endJob: Job? = null
-    /** Pauses the music a while after the last person went (see [pauseWhenEveryoneGone]). */
+    /** Pauses the music when nothing plays it any more (see [pauseWhenNobodyHears]). */
     private var emptyJob: Job? = null
 
     /** Songs in a row that couldn't load; after [MAX_FAILED_IN_A_ROW] the room pauses (likely no internet). */
@@ -312,7 +312,6 @@ class Room(
         member.isOwner = member.isOwner || isOwner
         member.offlineSince = null
         lastActive = clock()
-        emptyJob?.cancel()
 
         outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = account?.id, migrationKey = member.migrationKey))
         emit(if (returning == null) Event.ParticipantJoined(member.toParticipant()) else Event.ParticipantUpdated(member.toParticipant()))
@@ -350,7 +349,6 @@ class Room(
             return null
         }
         member.attached += outbox
-        emptyJob?.cancel()
         outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = member.accountId, migrationKey = member.migrationKey))
         member.id
     }
@@ -367,23 +365,27 @@ class Room(
         member.listening = false
         member.offlineSince = clock()
         emit(Event.ParticipantUpdated(member.toParticipant()))
-        pauseWhenEveryoneGone(EVERYONE_GONE_PAUSE_MS)
+        pauseWhenNobodyHears(GONE_PAUSE_MS)
     }
 
+    /** Something plays the room's music: a device with "Play here" on, or a speaker or TV. */
+    private fun heard() = members.values.any { it.online && it.listening } || activeOutputs.isNotEmpty()
+
     /**
-     * Nobody is here any more: the music pauses after [afterMs] (a reload or a short network
-     * drop isn't leaving), unless it plays on speakers or a TV (people may be listening there).
-     * Called with [mutex] held.
+     * The last device or speaker playing the music went: the music pauses after [afterMs] (0
+     * when it was switched off on purpose; a while when a device disconnected, since a reload or
+     * a short network drop isn't leaving). Called with [mutex] held.
      */
-    private fun pauseWhenEveryoneGone(afterMs: Long) {
+    private fun pauseWhenNobodyHears(afterMs: Long) {
         emptyJob?.cancel()
-        if (!wantPlaying || members.values.any { it.online } || activeOutputs.isNotEmpty()) return
+        if (!wantPlaying || heard()) return
         emptyJob = scope.launch {
             delay(afterMs)
             mutex.withLock {
-                if (wantPlaying && members.values.none { it.online } && activeOutputs.isEmpty()) {
-                    log.info("Room {}: everyone left, pausing", code)
+                if (wantPlaying && !heard()) {
+                    log.info("Room {}: nothing plays the music any more, pausing", code)
                     pausePlayback()
+                    emit(Event.Notice("Nothing is playing the music any more, so it paused"))
                 }
             }
         }
@@ -542,6 +544,7 @@ class Room(
         log.info("Room {}: {} plays something else now, letting go of it", code, name)
         emit(Event.OutputsChanged(outputInfos()))
         emit(Event.Notice("$name is playing something else now, so this room stopped playing there"))
+        pauseWhenNobodyHears(0)
     }
 
     /** Tells everyone in the room about a problem, e.g. a speaker that couldn't play a song. */
@@ -718,12 +721,14 @@ class Room(
                 if (command.on) need(member, Permission.LISTEN_LOCALLY)?.let { return it }
                 member.listening = command.on
                 emit(Event.ParticipantUpdated(member.toParticipant()))
+                if (command.on) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
             is Command.SetOutput -> {
                 need(member, Permission.CHANGE_OUTPUTS)?.let { return it }
                 if (availableOutputs.none { it.id == command.outputId }) return ErrorInfo(ErrorCode.NOT_FOUND, "That speaker isn't available")
                 if (command.active) activeOutputs.putIfAbsent(command.outputId, null) else activeOutputs.remove(command.outputId)
                 emit(Event.OutputsChanged(outputInfos()))
+                if (command.active) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
             is Command.SetOutputVolume -> {
                 need(member, Permission.OUTPUT_VOLUME)?.let { return it }
@@ -956,7 +961,7 @@ class Room(
         member.outbox = null
         emit(Event.ParticipantLeft(member.id))
         // The last one out: no need to wait.
-        pauseWhenEveryoneGone(0)
+        pauseWhenNobodyHears(0)
         return null
     }
 
@@ -1512,8 +1517,8 @@ class Room(
         const val MAX_MIGRANTS = 200
         /** A radio someone brings ([Command.StartRadio.songs]) keeps at most this many songs. */
         const val MAX_BROUGHT_RADIO = 100
-        /** Everyone gone this long: the music pauses. */
-        const val EVERYONE_GONE_PAUSE_MS = 60_000L
+        /** The last listening device disconnected this long ago: the music pauses (a reload isn't leaving). */
+        const val GONE_PAUSE_MS = 60_000L
         const val PREVIOUS_RESTART_MS = 3_000L
         const val SNAPSHOT_HISTORY = 200
         const val SAVED_HISTORY = 500

@@ -31,12 +31,19 @@ new owner's. Its radio then uses the new owner's YouTube Music sign-in where the
 On a phone-hosted room, the phone stays the host. If the phone leaves, the room still ends
 (see below).
 
-## When everyone has gone
+## When nothing plays the music any more
 
-When nobody is connected to a room any more, the music **pauses** after a minute (a reload
-or a short network drop isn't leaving); when the last person taps *Leave Room*, right away.
-Not when it plays on speakers or a TV: people may still be listening there. Anyone who comes
-back presses play.
+The music **pauses** when nothing plays it any more: no device with *Play here* on and no
+speaker or TV.
+
+- Right away when that's on purpose: *Play here* switched off on the last device, the last
+  speaker switched off, the last listener taps *Leave Room*, or another app takes the last
+  speaker.
+- After a minute when the last listening device disconnects (a reload or a short network drop
+  isn't leaving).
+
+Everyone in the room sees *"Nothing is playing the music any more, so it paused"*. Press play
+to go on.
 
 ## When the admin leaves
 
