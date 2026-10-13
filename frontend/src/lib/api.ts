@@ -366,7 +366,10 @@ export function prefetch(kind: keyof typeof pages, id: string): void {
  * buffering), for its log. Best effort: never fails.
  */
 export function reportProblem(message: string, room?: string): void {
-	fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, room }), keepalive: true }).catch(() => {});
+	// With your account: accounts-only servers turn away anything without one.
+	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+	if (identity.token) headers['Authorization'] = `Bearer ${identity.token}`;
+	fetch('/api/log', { method: 'POST', headers, body: JSON.stringify({ message, room }), keepalive: true }).catch(() => {});
 }
 
 /** Audio streamed through the host, for when the direct stream URL doesn't work. */

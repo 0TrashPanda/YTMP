@@ -495,7 +495,9 @@ fun Application.ytmpModule(
                 val songId = call.parameters["songId"]!!
                 val range = call.request.header(HttpHeaders.Range)
                 if (!options.mayProxyAudio(call)) {
-                    log.info("audio {}: not streamed to {} (outside the network)", songId, call.request.origin.remoteAddress)
+                    // Behind a reverse proxy the peer is the proxy; the visitor is in X-Forwarded-For.
+                    val forwarded = call.request.headers[HttpHeaders.XForwardedFor]?.let { " (forwarded for $it)" }.orEmpty()
+                    log.info("audio {}: not streamed to {}{} (outside the network)", songId, call.request.origin.remoteAddress, forwarded)
                     throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "This server doesn't stream audio to devices outside its network")
                 }
                 log.debug("audio {}: through the host for {} ({})", songId, call.request.origin.remoteAddress, range ?: "whole file")
