@@ -53,6 +53,9 @@ Music, without Premium, and not tied to a single music service.
 - Play on this device, on Chromecasts (including speakers with Chromecast built in) and on
   Sonos speakers, with their volume.
 - Android: lock screen and notification controls, keeps playing with the screen off.
+- Music comes straight from YouTube, also when you listen to a server elsewhere: the app
+  looks songs up itself, and a browser can use a YouTube Music module on your own computer
+  (*Settings → Playback*), instead of streaming through the server.
 
 **People and accounts**
 - Roles and permissions with a Discord-style editor (one role per person plus per-person
@@ -127,6 +130,9 @@ Docker, your own domain with HTTPS through Caddy or your existing nginx).
 server's own internet connection. Elsewhere they fall back to streaming through the server.
 To keep music off a slow upload, set `[audio] proxy = "lan"` in `ytmp.toml`: then only
 devices on the server's network (like speakers at home) may do that. See the guide.
+The app doesn't need the server for that: it looks songs up itself. In a browser, run the
+YouTube Music module on your own computer and enter it under *Settings → Playback*:
+`docker run -d -p 127.0.0.1:8401:8401 -e YTMP_MODULE_KEY=<a key you choose> ghcr.io/0trashpanda/ytmp-ytm`.
 
 ## Development
 

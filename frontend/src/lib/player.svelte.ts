@@ -1,6 +1,8 @@
 import { proxiedAudioUrl, reportProblem } from './api';
 import { artUrl, artistNames } from './format';
 import { nativeBridge, type NativeBridge } from './native';
+import { forgetOwnStream, isYoutubeSong, ownStreamUrl, prefetchOwnStream } from './ownModule';
+import type { NowPlaying } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 import { saved } from './storage';
 import { correction, targetPosition } from './sync';
@@ -29,6 +31,10 @@ export interface RoomPlayer {
 const LONG_BUFFERING_MS = 3000;
 const MEDIA_ERRORS: Record<number, string> = { 1: 'aborted', 2: 'network error', 3: 'decode error', 4: 'not supported (link refused?)' };
 
+/** Where the audio comes from: the room's link, a link from your own module, or the host streaming it. */
+type Source = 'direct' | 'own' | 'host';
+const SOURCE_NAMES: Record<Source, string> = { direct: 'the direct link', own: 'your own module', host: 'through the host' };
+
 export function createPlayer(room: RoomConnection): RoomPlayer {
 	return nativeBridge ? new NativePlayer(room, nativeBridge) : new WebPlayer(room);
 }
@@ -36,8 +42,10 @@ export function createPlayer(room: RoomConnection): RoomPlayer {
 /**
  * Plays the room's audio in the browser, in sync with the host.
  *
- * Uses the direct stream URL first and switches to the host proxy for the rest of the
- * room when the direct URL doesn't work (see docs/implementation/playback-sync.md).
+ * Uses the direct stream URL first. When that doesn't work here (YouTube's links are tied to
+ * the host's internet connection), it uses links from your own module if you have one set up,
+ * and otherwise streams through the host, for the rest of the room
+ * (see docs/implementation/playback-sync.md).
  */
 class WebPlayer implements RoomPlayer {
 	readonly canStartWithoutGesture = false;
@@ -48,7 +56,14 @@ class WebPlayer implements RoomPlayer {
 	error = $state<string | null>(null);
 
 	private audio = new Audio();
-	private useProxy = false;
+	/** Where songs in this room come from, after what worked so far. */
+	private preferred: Source = 'direct';
+	/** Where the loaded song comes from. */
+	private source: Source = 'direct';
+	/** This item goes through the host: its own link didn't work. */
+	private hostItemId: string | null = null;
+	/** Counts loads, so a lookup that finishes after the song changed is ignored. */
+	private loads = 0;
 	private loadedItemId: string | null = null;
 	private timer: ReturnType<typeof setInterval> | undefined;
 	/** When the current wait for data started (performance.now()), to report long buffering. */
@@ -131,8 +146,7 @@ class WebPlayer implements RoomPlayer {
 			this.loadedItemId = now.item.itemId;
 			this.error = null;
 			this.showMetadata();
-			this.audio.src = this.useProxy ? proxiedAudioUrl(now.item.song.id) : now.streamUrl;
-			this.audio.playbackRate = 1;
+			this.load(now, now.streamUrl);
 			return; // 'canplay' calls sync again.
 		}
 		if (this.audio.readyState < HTMLMediaElement.HAVE_METADATA) return;
@@ -154,6 +168,42 @@ class WebPlayer implements RoomPlayer {
 				this.error = 'Tap "Play here" again to allow audio.';
 			});
 		}
+	}
+
+	private sourceFor(now: NowPlaying): Source {
+		if (this.hostItemId === now.item.itemId) return 'host';
+		if (this.preferred === 'own') return isYoutubeSong(now.item.song.id) ? 'own' : 'direct';
+		return this.preferred;
+	}
+
+	private load(now: NowPlaying, streamUrl: string): void {
+		const load = ++this.loads;
+		const songId = now.item.song.id;
+		this.source = this.sourceFor(now);
+		this.audio.playbackRate = 1;
+		if (this.source !== 'own') {
+			this.audio.src = this.source === 'host' ? proxiedAudioUrl(songId) : streamUrl;
+			return;
+		}
+		// Nothing plays while your module looks the song up, not even the last one.
+		this.audio.removeAttribute('src');
+		this.audio.load();
+		this.buffering = true;
+		ownStreamUrl(songId).then(
+			(url) => {
+				if (load !== this.loads) return;
+				this.audio.src = url;
+				const state = this.room.state;
+				const next = state?.queue[0] ?? state?.autoplay[0];
+				if (next) prefetchOwnStream(next.song.id);
+			},
+			(e: Error) => {
+				if (load !== this.loads) return;
+				reportProblem(`browser: ${e.message} (${songId}), playing it through the host`, this.room.roomCode);
+				this.hostItemId = now.item.itemId;
+				this.load(now, streamUrl);
+			}
+		);
 	}
 
 	/**
@@ -204,7 +254,7 @@ class WebPlayer implements RoomPlayer {
 		const song = this.room.state?.nowPlaying?.item.song;
 		if (ms < LONG_BUFFERING_MS || !song) return;
 		reportProblem(
-			`browser buffered ${(ms / 1000).toFixed(1)} s at ${Math.round(this.audio.currentTime)} s in ${song.id} (${this.useProxy ? 'through the host' : 'direct link'})`,
+			`browser buffered ${(ms / 1000).toFixed(1)} s at ${Math.round(this.audio.currentTime)} s in ${song.id} (${SOURCE_NAMES[this.source]})`,
 			this.room.roomCode
 		);
 	}
@@ -213,28 +263,40 @@ class WebPlayer implements RoomPlayer {
 		const now = this.room.state?.nowPlaying;
 		if (!this.enabled || !now) return;
 		const error = this.audio.error;
+		const songId = now.item.song.id;
+		const from = this.source;
+		let next: Source = 'host';
+		if (from === 'direct' && isYoutubeSong(songId)) {
+			// The direct URL is probably tied to the host's IP: use your own module for the rest of
+			// the room, or stream through the host.
+			next = saved.ownModule ? 'own' : 'host';
+			this.preferred = next;
+		} else if (from !== 'host') {
+			// Your module's link (or a host's file) didn't play: this song through the host.
+			if (from === 'own') forgetOwnStream(songId);
+			this.hostItemId = now.item.itemId;
+		}
 		reportProblem(
-			`browser can't play ${now.item.song.id} ${this.useProxy ? 'through the host' : 'from the direct link'}: ` +
+			`browser can't play ${songId} from ${SOURCE_NAMES[from]}: ` +
 				`${MEDIA_ERRORS[error?.code ?? 0] ?? 'unknown error'}${error?.message ? ` (${error.message})` : ''} at ${Math.round(this.audio.currentTime)} s` +
-				(this.useProxy ? '' : ', switching to the host'),
+				(from === 'host' ? '' : `, switching to ${SOURCE_NAMES[next]}`),
 			this.room.roomCode
 		);
-		if (!this.useProxy) {
-			// The direct URL is probably tied to the host's IP; stream through the host instead.
-			this.useProxy = true;
+		if (from !== 'host') {
 			this.loadedItemId = null;
 			this.sync();
 		} else {
 			this.error = `Can't play "${now.item.song.title}" on this device.`;
 			// The host can't help either (it may not stream to this network): the next song tries
 			// its direct link again, which often works, instead of failing the same way.
-			this.useProxy = false;
+			if (this.preferred === 'host') this.preferred = 'direct';
 		}
 	}
 
 	private unload(): void {
 		if (this.loadedItemId === null) return;
 		this.loadedItemId = null;
+		this.loads++;
 		this.audio.removeAttribute('src');
 		this.audio.load();
 	}

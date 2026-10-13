@@ -16,6 +16,7 @@
 	import Icon, { type IconName } from '../Icon.svelte';
 	import AccountSection from './AccountSection.svelte';
 	import Choice from './Choice.svelte';
+	import OwnModuleSection from './OwnModuleSection.svelte';
 	import ServerSection from './ServerSection.svelte';
 	import YoutubeSection from './YoutubeSection.svelte';
 
@@ -57,7 +58,7 @@
 			[
 				['account', 'Account', 'person', true],
 				['youtube', 'YouTube Music', 'library', true],
-				['playback', 'Playback', 'headphones', inApp],
+				['playback', 'Playback', 'headphones', true],
 				['look', 'Look', 'palette', true],
 				['app', 'App', 'phone', !!nativeBridge?.appVersion],
 				['server', 'Server', 'server', !!account?.isAdmin && !!info]
@@ -151,6 +152,8 @@
 				<AccountSection {host} {info} {account} {invite} onAccount={(a) => (account = a)} {onToast} />
 			{:else if section === 'youtube'}
 				<YoutubeSection {onToast} />
+			{:else if section === 'playback' && !inApp}
+				<OwnModuleSection {onToast} />
 			{:else if section === 'playback'}
 				<Choice
 					label="Headphones disconnected"

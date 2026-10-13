@@ -45,3 +45,31 @@ def test_each_account_gets_its_own_view(monkeypatch):
     assert (anna._user, bob._user, ytm._user) == ("anna", "bob", None)
     # The anonymous side and the stream cache are shared.
     assert anna._ytm is ytm._ytm and anna._streams is ytm._streams
+
+
+def test_a_page_may_ask_with_the_key(monkeypatch):
+    client = TestClient(create_app(core.YtmCore(), key="k"))
+    preflight = client.options(
+        "/info",
+        headers={
+            "Origin": "https://ytmp.example.com",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+            "Access-Control-Request-Private-Network": "true",
+        },
+    )
+    assert preflight.status_code == 204
+    assert preflight.headers["access-control-allow-origin"] == "https://ytmp.example.com"
+    assert preflight.headers["access-control-allow-private-network"] == "true"
+
+    page = {"Origin": "https://ytmp.example.com"}
+    assert client.get("/info", headers=page).status_code == 401
+    answer = client.get("/info", headers=page | {"Authorization": "Bearer k"})
+    assert answer.status_code == 200
+    assert answer.headers["access-control-allow-origin"] == "https://ytmp.example.com"
+
+
+def test_without_a_key_pages_cant_use_it():
+    client = TestClient(create_app(core.YtmCore(), key=None))
+    answer = client.get("/info", headers={"Origin": "https://example.com"})
+    assert "access-control-allow-origin" not in answer.headers

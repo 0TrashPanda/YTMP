@@ -15,7 +15,7 @@ import httpx
 import uvicorn
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from . import core
 
@@ -36,6 +36,28 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         await http.aclose()
 
     app = FastAPI(title="YTMP YTM module", version=VERSION, lifespan=lifespan)
+
+    if key:
+        # A listener's web app may use a module on their own computer, so stream links are
+        # resolved from their own IP address (docs/implementation/playback-sync.md). Any page
+        # may ask, but only with the key, which a page can't get by itself.
+        @app.middleware("http")
+        async def cors(request: Request, call_next):
+            origin = request.headers.get("origin")
+            if request.method == "OPTIONS" and origin and request.headers.get("access-control-request-method"):
+                response = Response(status_code=204)
+                response.headers["Access-Control-Allow-Methods"] = "GET"
+                response.headers["Access-Control-Allow-Headers"] = "Authorization"
+                response.headers["Access-Control-Max-Age"] = "600"
+                # Chrome asks before a page on the internet reaches this computer.
+                if request.headers.get("access-control-request-private-network"):
+                    response.headers["Access-Control-Allow-Private-Network"] = "true"
+            else:
+                response = await call_next(request)
+            if origin:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Vary"] = "Origin"
+            return response
 
     def check_key(authorization: str | None = Header(default=None)) -> None:
         if key and not (authorization and secrets.compare_digest(authorization, f"Bearer {key}")):

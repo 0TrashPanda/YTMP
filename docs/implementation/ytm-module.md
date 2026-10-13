@@ -13,6 +13,12 @@ Feature description: [features/sources.md](../features/sources.md#youtube-music-
 - Planned: an optional **local cache** of audio for frequently played songs, for faster
   start and fewer requests to YouTube.
 
+**On a listener's computer:** the same module can run next to a browser, so the web app
+gets stream links from the listener's own IP address (see
+[playback-sync](playback-sync.md#known-risk-ip-bound-stream-urls)). With a key set, it allows
+requests from any web page (CORS, `Access-Control-Allow-Private-Network`); the key keeps
+other pages out. Without a key it sends no CORS headers.
+
 ## Logging
 
 Python `logging` under `ytmp_ytm` (the HTTP service: console, level `YTMP_YTM_LOG_LEVEL`;

@@ -28,6 +28,8 @@ export type HeadphonesAction = 'pause' | 'stop' | 'keep';
 export type DislikeButton = 'normal' | 'dim' | 'hidden';
 export type ImageQuality = 'high' | 'low';
 export type VideoArt = 'crop' | 'fit';
+/** A YouTube Music module on this computer, to get stream links from your own internet connection. */
+export type OwnModule = { url: string; key: string };
 
 function pick<T extends string>(key: string, options: readonly T[], fallback: T): T {
 	const value = read(key);
@@ -134,5 +136,17 @@ export const saved = {
 	},
 	set videoArt(value: VideoArt) {
 		write('ytmp.videoArt', value);
+	},
+	/** Your own YouTube Music module (see ownModule.ts), or null. */
+	get ownModule(): OwnModule | null {
+		try {
+			const value = JSON.parse(read('ytmp.ownModule') ?? 'null');
+			return typeof value?.url === 'string' && typeof value?.key === 'string' && value.url ? value : null;
+		} catch {
+			return null;
+		}
+	},
+	set ownModule(value: OwnModule | null) {
+		write('ytmp.ownModule', JSON.stringify(value));
 	}
 };

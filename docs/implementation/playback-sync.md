@@ -49,6 +49,22 @@ network (e.g. Caddy) the last `X-Forwarded-For` entry counts, and the header is 
 the request doesn't come from such a proxy. Others get 403 and the player shows it can't
 play the song. Verified: the stream URL carries `ip=<server's public IPv4>` in `sparams`.
 
+**Own lookups** ✅ (between steps 1 and 2): after the direct URL failed, a client that can
+resolve YouTube links itself does so for the rest of the room, and only uses the proxy for a
+song whose own link fails too. Songs that aren't YouTube's (`ytm:` IDs) keep the host's URL.
+
+- **Android app** (`PlaybackService`, `Source`): the phone's own module (`OnDeviceYtm`,
+  `LocalHost.ytm`), not for rooms on the phone itself. Links are kept per song while they
+  have 10 min left; the next song (queue, else autoplay, from `RoomFollower`) is looked up
+  as soon as one starts.
+- **Browser** (`WebPlayer`, `ownModule.ts`): a YTM module the listener runs on their own
+  computer, set in *Settings → Playback* (`saved.ownModule`: address and key, checked with
+  `GET /info`). The player calls `GET /songs/{id}/stream` there and prefetches the next
+  song. The module answers pages from any origin only when it has a key (CORS, including
+  Chrome's private network preflight; see [module API](module-api.md)).
+- A lookup that fails (module unreachable, wrong key, unavailable) is reported to the host
+  log and the song goes through the proxy.
+
 Local files, media server songs and cached songs are always served by the host.
 
 ## Sync accuracy

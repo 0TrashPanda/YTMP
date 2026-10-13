@@ -22,6 +22,13 @@ permissions say otherwise (permission: *Play audio locally*).
 - Listening **alone**, a device that starts a song late (buffering) doesn't jump ahead: the
   room moves to where the device is, so there's no audible skip.
 - Other rooms remember your last choice in the app.
+- **Where the audio comes from** ✅: straight from YouTube when possible. YouTube's links
+  only work on the internet connection of the host that asked for them, so elsewhere:
+  - **the app** looks songs up itself, on the phone, and plays them straight from YouTube;
+  - **a browser** does the same with **your own YouTube Music module** on your computer, if
+    you set one up (*Settings → Playback*: its address and key);
+  - otherwise, or when that fails, the host streams the song to you (if the server allows
+    that on your network, see [server admin](server-admin.md)).
 
 ## Host outputs
 

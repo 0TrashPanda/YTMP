@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /**
@@ -40,6 +41,11 @@ import kotlin.math.abs
  * What should play comes from the page ([PlaybackHub.target]), but while the player's own
  * room connection ([RoomFollower]) is up, the room's song, stream and clock come from that
  * instead: Android freezes the page after a few minutes with the screen off.
+ *
+ * Songs play from the host's direct stream URL. When that doesn't work here (YouTube's links
+ * are tied to the host's internet connection), the phone looks songs up itself with its own
+ * YouTube Music module for the rest of the room, and streams through the host only when that
+ * fails too (see docs/implementation/playback-sync.md).
  */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
@@ -52,7 +58,22 @@ class PlaybackService : MediaSessionService() {
 
     private var loadedItemId: String? = null
     private var loadedUrl: String? = null
-    private var useProxy = false
+
+    /** Where songs in this room come from, after what worked so far. */
+    private var preferred = Source.DIRECT
+
+    /** Where the loaded song comes from. */
+    private var source = Source.DIRECT
+
+    /** This item goes through the host: its own link didn't work. */
+    private var hostItemId: String? = null
+
+    /** The room [preferred] was learned in. */
+    private var sourceRoom: RoomLink? = null
+
+    /** Stream links this phone looked up itself, by song ID. Main thread only. */
+    private val ownLinks = mutableMapOf<String, String>()
+    private val lookingUp = mutableSetOf<String>()
 
     private val follower = RoomFollower()
 
@@ -218,8 +239,14 @@ class PlaybackService : MediaSessionService() {
         measuring.value = target != null && target.enabled && target.playing && target.item != null
         holdLocks(measuring.value)
         setKeepForeground(target != null && target.enabled && target.item != null)
+        if (target?.room != null && target.room.hostUrl != sourceRoom?.hostUrl) {
+            sourceRoom = target.room
+            preferred = Source.DIRECT
+            hostItemId = null
+        }
         val item = target?.item
-        val url = target?.let { if (useProxy) it.proxyUrl else it.streamUrl }
+        val from = if (target != null && item != null) sourceFor(target, item) else Source.DIRECT
+        val url = target?.let { if (item != null) urlFor(it, item, from) else null }
         if (target == null || !target.enabled || item == null || url == null) {
             exo.playWhenReady = false
             if (target == null || !target.enabled || item == null) unload()
@@ -229,7 +256,9 @@ class PlaybackService : MediaSessionService() {
         if (item.itemId != loadedItemId || url != loadedUrl) {
             loadedItemId = item.itemId
             loadedUrl = url
-            Log.i(TAG, "load ${item.songId} \"${item.title}\" ${if (useProxy) "through the host" else "direct"} (${describe(url)})")
+            source = from
+            Log.i(TAG, "load ${item.songId} \"${item.title}\" ${from.label} (${describe(url)})")
+            if (from == Source.OWN) lookUpNext()
             bufferingSince = null
             exo.setMediaItem(
                 MediaItem.Builder()
@@ -255,6 +284,58 @@ class PlaybackService : MediaSessionService() {
         if (!target.playing || !target.alone) pausingRoom = false
         followRoomJump(target)
         correct(target)
+    }
+
+    private fun sourceFor(target: PlaybackTarget, item: TargetItem): Source = when {
+        item.itemId == hostItemId -> Source.HOST
+        preferred == Source.OWN -> if (canLookUp(target, item.songId)) Source.OWN else Source.DIRECT
+        else -> preferred
+    }
+
+    private fun urlFor(target: PlaybackTarget, item: TargetItem, from: Source): String? = when (from) {
+        Source.DIRECT -> target.streamUrl
+        Source.HOST -> target.proxyUrl
+        Source.OWN -> ownLink(item.songId) ?: run { lookUp(item.songId); null }
+    }
+
+    /** A YouTube song in a room on another host: this phone's own links work better there. */
+    private fun canLookUp(target: PlaybackTarget, songId: String) =
+        songId.startsWith("ytm:") && target.room != null && !isOnThisPhone(target.room)
+
+    private fun isOnThisPhone(room: RoomLink) = Uri.parse(room.hostUrl).host in listOf("127.0.0.1", "localhost")
+
+    /** A link looked up earlier, while it has a while left. */
+    private fun ownLink(songId: String): String? {
+        val url = ownLinks[songId] ?: return null
+        val expires = Uri.parse(url).getQueryParameter("expire")?.toLongOrNull() ?: 0
+        if (expires - System.currentTimeMillis() / 1000 > OWN_LINK_MARGIN_S) return url
+        ownLinks.remove(songId)
+        return null
+    }
+
+    /** Looks [songId] up with the phone's own YouTube Music module, then plays it if it's still the song. */
+    private fun lookUp(songId: String) {
+        if (!lookingUp.add(songId)) return
+        scope.launch {
+            // Starting Python takes a moment the first time: not on the main thread.
+            val result = runCatching { withContext(Dispatchers.IO) { (application as YtmpApp).host.ytm }.stream(songId).url }
+            lookingUp.remove(songId)
+            result.onSuccess { ownLinks[songId] = it }.onFailure { e ->
+                val target = current ?: return@onFailure
+                val item = target.item?.takeIf { it.songId == songId } ?: return@onFailure
+                Log.w(TAG, "looking up $songId on this phone failed: ${e.message}")
+                report(target, "app: looking up $songId on the phone failed (${e.message}), playing through the host")
+                hostItemId = item.itemId
+            }
+            current?.let(::apply)
+        }
+    }
+
+    /** Looks the next song up ahead of time, so it starts without waiting. */
+    private fun lookUpNext() {
+        val state = lastFollowed?.state ?: return
+        val next = (state.queue.firstOrNull() ?: state.autoplay.firstOrNull())?.song?.id ?: return
+        if (next.startsWith("ytm:") && ownLink(next) == null) lookUp(next)
     }
 
     /**
@@ -359,15 +440,27 @@ class PlaybackService : MediaSessionService() {
             val target = current
             Log.w(
                 TAG,
-                "player error ${error.errorCodeName} on ${target?.item?.songId} ${if (useProxy) "through the host" else "direct"} " +
+                "player error ${error.errorCodeName} on ${target?.item?.songId} ${source.label} " +
                     "at ${exo.currentPosition / 1000} s (${describe(loadedUrl)}): ${error.message}; cause: ${generateSequence(error.cause) { it.cause }.joinToString(" <- ")}",
             )
             target ?: return
-            if (!useProxy && target.proxyUrl != null) {
-                Log.i(TAG, "the direct link doesn't work here, playing through the host from now on")
-                report(target, "app: direct link failed for ${target.item?.songId} (${error.errorCodeName}), playing through the host")
-                // The direct URL is probably tied to the host's IP; stream through the host instead.
-                useProxy = true
+            val item = target.item
+            val from = source
+            val next = when {
+                item == null || from == Source.HOST -> null
+                // The direct URL is probably tied to the host's IP: look songs up here for the rest
+                // of the room, or stream through the host.
+                from == Source.DIRECT && canLookUp(target, item.songId) -> Source.OWN.also { preferred = it }
+                from == Source.DIRECT && item.songId.startsWith("ytm:") -> Source.HOST.also { preferred = it }
+                // This phone's own link (or a host's file) didn't play: this song through the host.
+                else -> Source.HOST.also {
+                    ownLinks.remove(item.songId)
+                    hostItemId = item.itemId
+                }
+            }
+            if (item != null && next != null && (next != Source.HOST || target.proxyUrl != null)) {
+                Log.i(TAG, "${item.songId} doesn't play ${from.label}, now ${next.label}")
+                report(target, "app: ${from.label} failed for ${item.songId} (${error.errorCodeName}), now ${next.label}")
                 loadedItemId = null
                 apply(target)
             } else {
@@ -413,7 +506,7 @@ class PlaybackService : MediaSessionService() {
             if (playbackState != Player.STATE_READY || waited < LONG_BUFFERING_MS) return
             val target = current
             val line = "buffered ${waited / 100 / 10.0} s at ${exo.currentPosition / 1000} s in ${target?.item?.songId} " +
-                "(${if (useProxy) "through the host" else "direct"}, buffered ahead ${exo.totalBufferedDuration / 1000} s)"
+                "(${source.label}, buffered ahead ${exo.totalBufferedDuration / 1000} s)"
             Log.w(TAG, line)
             if (target != null) report(target, "app: $line")
         }
@@ -447,6 +540,13 @@ class PlaybackService : MediaSessionService() {
         exo.playWhenReady = false
         follower.command("""{"kind":"SetListening","on":false}""")
         PlaybackHub.status("stopped")
+    }
+
+    /** Where the audio comes from: the host's link, a link this phone looked up, or the host streaming it. */
+    private enum class Source(val label: String) {
+        DIRECT("direct"),
+        OWN("looked up on this phone"),
+        HOST("through the host"),
     }
 
     /** Turns media controls (lock screen, notification, headphones) into room commands. */
@@ -500,5 +600,8 @@ class PlaybackService : MediaSessionService() {
 
         /** The room's answer to a seek from here lands about where it was asked to. */
         private const val ROOM_SEEK_MATCH_MS = 1000L
+
+        /** Use a link this phone looked up only while it has at least this long (s) left. */
+        private const val OWN_LINK_MARGIN_S = 600L
     }
 }

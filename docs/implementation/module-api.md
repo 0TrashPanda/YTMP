@@ -76,6 +76,10 @@ So the operations below are the contract for both. HTTP is only the transport on
 
 - JSON over HTTP. The base URL and a **shared key** are set in the host's config.
   Every request sends `Authorization: Bearer <key>`.
+- With a key, the YTM module also answers web pages (CORS: any `Origin`, `GET`, the
+  `Authorization` header, and `Access-Control-Allow-Private-Network` for Chrome), so a
+  listener's browser can use a module on their own computer
+  ([playback-sync](playback-sync.md#known-risk-ip-bound-stream-urls)).
 - IDs are **namespaced**: `ytm:dQw4w9WgXcQ`, `yt:…`. The prefix is the module ID.
 - Lists are **paginated** with an opaque `cursor`: the response has `next` (or `null`).
 - **User-scoped** calls (a linked YouTube account) get the user's credentials per request
