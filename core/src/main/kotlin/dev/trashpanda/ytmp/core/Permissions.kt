@@ -8,8 +8,9 @@ import dev.trashpanda.ytmp.protocol.RoomSettings
 
 /** Roles a room starts with when its creator has no template. See docs/features/room-management.md. */
 object DefaultRoles {
-    private val listener = listOf(ADD_SONGS, REMOVE_OWN, PLAY_PAUSE, SKIP, LISTEN_LOCALLY, CLONE_ROOM)
-    private val dj = listener + listOf(PLAY_NOW, REORDER, REMOVE_OTHERS, SEEK, CHANGE_OUTPUTS, OUTPUT_VOLUME, START_RADIO, AUTOPLAY_FROM_HERE)
+    // Listeners skip by voting when the room votes to skip (and right away when it doesn't); DJs always right away.
+    private val listener = listOf(ADD_SONGS, REMOVE_OWN, PLAY_PAUSE, VOTE_SKIP, LISTEN_LOCALLY, CLONE_ROOM)
+    private val dj = listener - VOTE_SKIP + listOf(SKIP, PLAY_NOW, REORDER, REMOVE_OTHERS, SEEK, REPEAT, CHANGE_OUTPUTS, OUTPUT_VOLUME, START_RADIO, AUTOPLAY_FROM_HERE)
 
     val template = RoleTemplate(
         roles = listOf(
@@ -36,12 +37,19 @@ object Permissions {
         if (roles.isEmpty()) return DefaultRoles.template
         val ids = roles.map { it.id }.toSet()
         val fallback = roles.last().id
+        val s = template.settings
         return RoleTemplate(
             roles,
             RoomSettings(
-                defaultGuestRole = template.settings.defaultGuestRole.takeIf { it in ids } ?: fallback,
-                defaultAccountRole = template.settings.defaultAccountRole.takeIf { it in ids } ?: fallback,
-                autoplay = template.settings.autoplay,
+                defaultGuestRole = s.defaultGuestRole.takeIf { it in ids } ?: fallback,
+                defaultAccountRole = s.defaultAccountRole.takeIf { it in ids } ?: fallback,
+                autoplay = s.autoplay,
+                fairOrder = s.fairOrder,
+                voteSkip = s.voteSkip,
+                voteSkipPercent = s.voteSkipPercent.coerceIn(1, 100),
+                maxSongsPerPerson = s.maxSongsPerPerson.coerceIn(0, MAX_LIMIT),
+                maxSongMinutes = s.maxSongMinutes.coerceIn(0, MAX_LIMIT),
+                noRepeatMinutes = s.noRepeatMinutes.coerceIn(0, MAX_LIMIT),
             ),
         )
     }
@@ -55,7 +63,9 @@ object Permissions {
     /**
      * Gives roles the permissions added since they were saved (when only [known] existed):
      * a role that had every permission (an admin role) gets all new ones, and a default role
-     * nobody changed gets what that default role has now. Other roles stay as they are.
+     * nobody changed gets what that default role has now. Since *Vote to skip* exists, the
+     * default Listener skips by voting instead of right away, and any role that could skip may
+     * vote too. Other roles stay as they are.
      */
     fun upgrade(roles: List<Role>, known: Set<Permission>): List<Role> {
         val added = Permission.entries.toSet() - known
@@ -64,18 +74,27 @@ object Permissions {
         return roles.map { role ->
             val have = role.permissions.toSet()
             val default = defaults[role.id]?.permissions?.toSet()
+            val newVoting = VOTE_SKIP in added
             when {
                 have.containsAll(known) -> role.copy(permissions = role.permissions + added)
                 default != null && have == default intersect known -> role.copy(permissions = role.permissions + (default intersect added))
+                default != null && newVoting && OLD_LISTENER intersect known == have -> role.copy(permissions = default.toList())
+                newVoting && SKIP in have -> role.copy(permissions = role.permissions + VOTE_SKIP)
                 else -> role
             }
         }
     }
 
+    /** The default Listener before *Vote to skip* (it could skip right away). */
+    private val OLD_LISTENER = setOf(ADD_SONGS, REMOVE_OWN, PLAY_PAUSE, SKIP, LISTEN_LOCALLY, CLONE_ROOM)
+
     fun upgrade(template: RoleTemplate): RoleTemplate =
         template.copy(roles = upgrade(template.roles, template.knownPermissions?.toSet() ?: BEFORE_RADIO), knownPermissions = Permission.entries)
 
     fun validColor(color: String): String = color.trim().lowercase().takeIf { COLOR.matches(it) } ?: "#949ba4"
+
+    /** The highest value of a queue limit (songs or minutes). */
+    const val MAX_LIMIT = 1000
 
     const val MAX_ROLES = 25
     const val MAX_ROLE_NAME = 32

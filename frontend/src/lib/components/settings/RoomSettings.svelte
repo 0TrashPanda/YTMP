@@ -11,7 +11,7 @@
 	import SaveBar from './SaveBar.svelte';
 	import Switch from './Switch.svelte';
 
-	type Section = 'overview' | 'roles' | 'members' | 'bans';
+	type Section = 'overview' | 'queue' | 'roles' | 'members' | 'bans';
 	/** [start]: the section to open; 'list' opens the list of sections on phones (desktop shows the first one next to it). */
 	let {
 		room,
@@ -38,6 +38,7 @@
 		(
 			[
 				['overview', 'Overview', room.can('change_settings')],
+				['queue', 'Queue', room.can('change_settings')],
 				['roles', 'Roles', room.can('edit_roles')],
 				['members', 'Members', true],
 				['bans', 'Bans', room.can('ban')]
@@ -110,9 +111,49 @@
 	);
 	async function saveOverview() {
 		overviewBusy = true;
-		await run({ kind: 'UpdateSettings', name: name.trim(), defaultGuestRole: guestRole, defaultAccountRole: accountRole, autoplay, alwaysOn });
+		await run({
+			kind: 'UpdateSettings',
+			name: name.trim(),
+			defaultGuestRole: guestRole,
+			defaultAccountRole: accountRole,
+			autoplay,
+			alwaysOn,
+			...unchangedQueueSettings
+		});
 		overviewBusy = false;
 	}
+
+	/** Null: the host leaves it as it is. */
+	const unchangedQueueSettings = { fairOrder: null, voteSkip: null, voteSkipPercent: null, maxSongsPerPerson: null, maxSongMinutes: null, noRepeatMinutes: null };
+
+	// --- queue: fair order, vote to skip, limits (docs/features/queue.md) ---
+	let fairOrder = $state(false);
+	let voteSkip = $state(false);
+	let voteSkipPercent = $state(50);
+	let maxSongsPerPerson = $state(0);
+	let maxSongMinutes = $state(0);
+	let noRepeatMinutes = $state(0);
+	let queueBusy = $state(false);
+	function resetQueue() {
+		({ fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes } = rs.settings);
+	}
+	resetQueue();
+	const queueDirty = $derived(
+		fairOrder !== rs.settings.fairOrder ||
+			voteSkip !== rs.settings.voteSkip ||
+			voteSkipPercent !== rs.settings.voteSkipPercent ||
+			maxSongsPerPerson !== rs.settings.maxSongsPerPerson ||
+			maxSongMinutes !== rs.settings.maxSongMinutes ||
+			noRepeatMinutes !== rs.settings.noRepeatMinutes
+	);
+	async function saveQueue() {
+		queueBusy = true;
+		await run({ kind: 'UpdateSettings', name: null, defaultGuestRole: null, defaultAccountRole: null, autoplay: null, alwaysOn: null, fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes });
+		queueBusy = false;
+	}
+	/** Choices for a limit, with the current value even when it isn't one of them (set elsewhere). */
+	const choices = (values: number[], current: number) => [...new Set([0, ...values, current])].sort((a, b) => a - b);
+	const minutes = (m: number) => (m % 60 === 0 && m >= 60 ? `${m / 60} hour${m === 60 ? '' : 's'}` : `${m} min`);
 
 	// --- password ---
 	let newPassword = $state('');
@@ -266,6 +307,71 @@
 				</div>
 				{#if overviewDirty}
 					<div class="pb-4"><SaveBar busy={overviewBusy} onReset={resetOverview} onSave={saveOverview} /></div>
+				{/if}
+			{:else if section === 'queue'}
+				<div class="min-h-0 flex-1 overflow-y-auto">
+					<div class="flex items-center gap-4">
+						<div class="min-w-0 flex-1">
+							<h3 class="text-base font-semibold text-d-head">Fair order</h3>
+							<p class="text-sm text-d-muted">
+								The queue goes round by round, one song per person per round, so nobody takes over. Someone with nothing queued gets their song near the top. People
+								who may reorder the queue can still drag songs anywhere.
+							</p>
+						</div>
+						<Switch checked={fairOrder} label="Fair order" onchange={(on) => (fairOrder = on)} />
+					</div>
+					<div class="my-6 h-px bg-d-line"></div>
+					<div class="flex items-center gap-4">
+						<div class="min-w-0 flex-1">
+							<h3 class="text-base font-semibold text-d-head">Vote to skip</h3>
+							<p class="text-sm text-d-muted">
+								People with <em>Vote to Skip</em> (Listeners) vote instead of skipping right away; the song is skipped once enough of the people here voted. People with
+								<em>Skip</em> (DJs, Admins) still skip right away.
+							</p>
+						</div>
+						<Switch checked={voteSkip} label="Vote to skip" onchange={(on) => (voteSkip = on)} />
+					</div>
+					{#if voteSkip}
+						<label class="mt-4 block">
+							<span class={label}>Votes needed</span>
+							<select class={input} bind:value={voteSkipPercent}>
+								{#each choices([25, 33, 50, 66, 75, 100], voteSkipPercent).filter((p) => p > 0) as percent (percent)}
+									<option value={percent}>{percent === 100 ? 'Everyone' : `${percent}% of the people here`}</option>
+								{/each}
+							</select>
+						</label>
+					{/if}
+					<div class="my-6 h-px bg-d-line"></div>
+					<h3 class="mb-1 text-base font-semibold text-d-head">Limits</h3>
+					<p class="mb-4 text-sm text-d-muted">For everyone who can't change the room's settings. Songs over a limit aren't added, and they're told why.</p>
+					<label class="mb-5 block">
+						<span class={label}>Songs per person in the queue</span>
+						<select class={input} bind:value={maxSongsPerPerson}>
+							{#each choices([1, 2, 3, 5, 10, 20], maxSongsPerPerson) as count (count)}
+								<option value={count}>{count === 0 ? 'No limit' : `At most ${count}`}</option>
+							{/each}
+						</select>
+					</label>
+					<label class="mb-5 block">
+						<span class={label}>Song length</span>
+						<select class={input} bind:value={maxSongMinutes}>
+							{#each choices([5, 7, 10, 15, 20, 30, 60], maxSongMinutes) as m (m)}
+								<option value={m}>{m === 0 ? 'No limit' : `At most ${minutes(m)}`}</option>
+							{/each}
+						</select>
+					</label>
+					<label class="mb-5 block">
+						<span class={label}>Played again</span>
+						<select class={input} bind:value={noRepeatMinutes}>
+							{#each choices([30, 60, 120, 240, 480], noRepeatMinutes) as m (m)}
+								<option value={m}>{m === 0 ? 'Any time' : `Not within ${minutes(m)} of the last time`}</option>
+							{/each}
+						</select>
+					</label>
+					<p class="text-sm text-d-muted">Shuffle and repeat are next to the controls in the player.</p>
+				</div>
+				{#if queueDirty}
+					<div class="pb-4"><SaveBar busy={queueBusy} onReset={resetQueue} onSave={saveQueue} /></div>
 				{/if}
 			{:else if section === 'roles'}
 				<p class="-mt-2 mb-5 text-sm text-d-muted">

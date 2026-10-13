@@ -21,6 +21,7 @@ import dev.trashpanda.ytmp.protocol.QueueItemOrigin
 import dev.trashpanda.ytmp.protocol.QueueItemResult
 import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.RejectReason
+import dev.trashpanda.ytmp.protocol.RepeatMode
 import dev.trashpanda.ytmp.protocol.Role
 import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.RoomClone
@@ -29,6 +30,7 @@ import dev.trashpanda.ytmp.protocol.RoomSettings
 import dev.trashpanda.ytmp.protocol.RoomState
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ServerMessage
+import dev.trashpanda.ytmp.protocol.SkipVotes
 import dev.trashpanda.ytmp.protocol.Song
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
@@ -183,6 +185,18 @@ class Room(
     /** Someone cleared the autoplay queue: don't refill it until something new is played or started. */
     private var autoplayDismissed = false
 
+    private var repeat = RepeatMode.OFF
+
+    /** The first song (item id) of the run of queue songs playing now: what repeat queue plays again. */
+    private var runStart: String? = null
+
+    /** Who voted to skip the current song ([RoomSettings.voteSkip]). */
+    private val skipVoters = LinkedHashSet<String>()
+    private var sentSkipVotes: SkipVotes? = null
+
+    /** When songs last started playing (song id -> time), for [RoomSettings.noRepeatMinutes]. Oldest first. */
+    private val playedAt = LinkedHashMap<String, Long>()
+
     /** Ranked, highest first. */
     private val roles = ArrayList<Role>()
     @Volatile
@@ -320,6 +334,7 @@ class Room(
             adminSeenAt = clock()
             emit(Event.AdminlessChanged(false))
         }
+        updateSkipVotes()
         member.id
     }
 
@@ -366,6 +381,7 @@ class Room(
         member.offlineSince = clock()
         emit(Event.ParticipantUpdated(member.toParticipant()))
         pauseWhenNobodyHears(GONE_PAUSE_MS)
+        updateSkipVotes()
     }
 
     /** Something plays the room's music: a device with "Play here" on, or a speaker or TV. */
@@ -404,6 +420,8 @@ class Room(
                 is ClientMessage.CommandMessage -> {
                     val error = runCatching { execute(member, message.command) }
                         .fold({ it }, { e -> if (e is CancellationException) throw e else ErrorInfo(ErrorCode.INVALID, e.message ?: "error") })
+                    // Who's here, their permissions or the settings may have changed what a vote needs.
+                    updateSkipVotes()
                     outbox.send(ServerMessage.Result(message.id, error))
                 }
                 is ClientMessage.Hello, is ClientMessage.Attach -> Unit
@@ -455,6 +473,8 @@ class Room(
             migrants = migrants.toList(),
             migration = migration,
             passwordHash = passwordHash,
+            repeat = repeat,
+            runStart = runStart,
         )
     }
 
@@ -485,6 +505,8 @@ class Room(
         migrants += saved.migrants
         migration = saved.migration
         passwordHash = saved.passwordHash
+        repeat = saved.repeat
+        runStart = saved.runStart
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay += saved.autoplay
         autoplaySeed = saved.autoplaySeed
@@ -564,7 +586,14 @@ class Room(
             hostTimeMs = clock(),
             activeOutputs = LinkedHashMap(activeOutputs),
             previous = history.lastOrNull(),
-            next = queue.firstOrNull() ?: autoplay.firstOrNull(),
+            // Speakers move on to the next song by themselves (and the room follows them). With
+            // repeat one, or repeat queue at the end of the queue, the room decides what comes next.
+            next = when {
+                repeat == RepeatMode.ONE -> null
+                queue.isNotEmpty() -> queue.first()
+                repeat == RepeatMode.QUEUE -> null
+                else -> autoplay.firstOrNull()
+            },
         )
     }
 
@@ -597,22 +626,50 @@ class Room(
             is Command.AddSongs -> {
                 need(member, Permission.ADD_SONGS)?.let { return it }
                 if (command.songs.isEmpty()) return invalid("No songs")
+                val (songs, leftOut) = withinLimits(member, command.songs, countPerPerson = true)
+                if (songs.isEmpty()) return leftOut
                 autoplayDismissed = false
-                val items = command.songs.map { newItem(it, member) }
-                val index = if (command.position == QueuePosition.NEXT) 0 else queue.size
-                queue.addAll(index, items)
-                emit(Event.QueueItemsAdded(items, index))
+                val items = songs.map { newItem(it, member) }
+                // Fair order: each song in the next round where they have none yet ("play next"
+                // too, unless they may reorder the queue anyway).
+                if (settings.fairOrder && (command.position == QueuePosition.END || !can(member, Permission.REORDER))) {
+                    for (item in items) queue.add(fairIndex(member.id), item)
+                    if (items.size == 1) emit(Event.QueueItemsAdded(items, queue.indexOf(items[0]))) else emit(Event.QueueReplaced(queue.toList()))
+                } else {
+                    val index = if (command.position == QueuePosition.NEXT) 0 else queue.size
+                    queue.addAll(index, items)
+                    emit(Event.QueueItemsAdded(items, index))
+                }
                 if (current == null) {
                     wantPlaying = true
                     playNextFromQueue()
                 }
+                return leftOut
             }
             is Command.PlayNow -> {
                 need(member, Permission.PLAY_NOW)?.let { return it }
+                val (songs, leftOut) = withinLimits(member, listOf(command.song), countPerPerson = false)
+                if (songs.isEmpty()) return leftOut
                 autoplayDismissed = false
                 retireCurrent(QueueItemResult.SKIPPED)
                 wantPlaying = true
                 setCurrent(newItem(command.song, member))
+            }
+            Command.ShuffleQueue -> {
+                need(member, Permission.REORDER)?.let { return it }
+                if (queue.size < 2) return null
+                shuffleQueue()
+            }
+            is Command.SetRepeat -> {
+                need(member, Permission.REPEAT)?.let { return it }
+                if (repeat != command.mode) {
+                    repeat = command.mode
+                    emit(Event.RepeatChanged(repeat))
+                }
+            }
+            is Command.VoteSkip -> {
+                need(member, Permission.VOTE_SKIP)?.let { return it }
+                return vote(member, command.on)
             }
             is Command.RemoveQueueItem -> {
                 // The current song: it stops, and doesn't stay in the history.
@@ -702,13 +759,15 @@ class Room(
                 pausePlayback()
             }
             Command.Skip -> {
-                need(member, Permission.SKIP)?.let { return it }
+                if (!mayVoteOrSkip(member)) return need(member, Permission.SKIP)
                 if (current == null) return invalid("Nothing is playing")
+                // Someone who may only vote: their skip is a vote.
+                if (!can(member, Permission.SKIP) && settings.voteSkip) return vote(member, true)
                 retireCurrent(QueueItemResult.SKIPPED)
                 playNextFromQueue()
             }
             Command.Previous -> {
-                need(member, Permission.SKIP)?.let { return it }
+                if (!can(member, Permission.SKIP) && !(can(member, Permission.VOTE_SKIP) && !settings.voteSkip)) return need(member, Permission.SKIP)
                 val last = history.lastOrNull()
                 if (position() > PREVIOUS_RESTART_MS || last == null) seek(0) else return jumpTo(last.itemId)
             }
@@ -886,6 +945,9 @@ class Room(
                 if (newName != null && (newName.isEmpty() || newName.length > 64)) return invalid("Room names are 1–64 characters")
                 val ids = roles.map { it.id }.toSet()
                 if (listOfNotNull(command.defaultGuestRole, command.defaultAccountRole).any { it !in ids }) return notFoundRole()
+                if (command.voteSkipPercent != null && command.voteSkipPercent !in 1..100) return invalid("The share of votes is 1–100%")
+                val limits = listOfNotNull(command.maxSongsPerPerson, command.maxSongMinutes, command.noRepeatMinutes)
+                if (limits.any { it !in 0..Permissions.MAX_LIMIT }) return invalid("Limits are 0 (off) to ${Permissions.MAX_LIMIT}")
                 if (newName != null && newName != name) {
                     name = newName
                     emit(Event.RoomUpdated(info))
@@ -896,15 +958,32 @@ class Room(
                     defaultAccountRole = command.defaultAccountRole ?: settings.defaultAccountRole,
                     autoplay = command.autoplay ?: settings.autoplay,
                     alwaysOn = command.alwaysOn ?: settings.alwaysOn,
+                    fairOrder = command.fairOrder ?: settings.fairOrder,
+                    voteSkip = command.voteSkip ?: settings.voteSkip,
+                    voteSkipPercent = command.voteSkipPercent ?: settings.voteSkipPercent,
+                    maxSongsPerPerson = command.maxSongsPerPerson ?: settings.maxSongsPerPerson,
+                    maxSongMinutes = command.maxSongMinutes ?: settings.maxSongMinutes,
+                    noRepeatMinutes = command.noRepeatMinutes ?: settings.noRepeatMinutes,
                 )
                 if (updated != settings) {
                     val autoplayChanged = updated.autoplay != settings.autoplay
+                    val fairNow = updated.fairOrder && !settings.fairOrder
                     settings = updated
                     emit(Event.SettingsChanged(settings))
                     if (autoplayChanged) {
                         autoplayDismissed = false
                         if (!settings.autoplay) clearAutoplay() else refillAutoplay()
                     }
+                    // Fair order from now on: the queue is put in rounds right away.
+                    if (fairNow && queue.size > 1) {
+                        val fair = inRounds(queue)
+                        if (fair != queue) {
+                            queue.clear()
+                            queue += fair
+                            emit(Event.QueueReplaced(queue.toList()))
+                        }
+                    }
+                    if (!settings.voteSkip) skipVoters.clear()
                 }
             }
             else -> Unit
@@ -1082,7 +1161,8 @@ class Room(
         }
         val target = listOf(command.list)
         // The client saw history from historyOffset on, without the moved item: count from there.
-        val to = (command.toIndex + if (command.list == ItemList.HISTORY) historyOffset else 0).coerceIn(0, target.size)
+        val to = if (adding && settings.fairOrder && !can(member, Permission.REORDER)) fairIndex(member.id)
+        else (command.toIndex + if (command.list == ItemList.HISTORY) historyOffset else 0).coerceIn(0, target.size)
         target.add(to, item)
 
         if (from == ItemList.QUEUE && command.list == ItemList.QUEUE) {
@@ -1169,6 +1249,146 @@ class Room(
         return null
     }
 
+    // --- fair order, shuffle, repeat, votes, limits ------------------------------------
+
+    /**
+     * Each queued song's round in fair order: the how-manieth song of the person who added it.
+     * The person whose song plays now has had their turn: their first queued song is round 1.
+     */
+    private fun rounds(items: List<QueueItem>): List<Int> {
+        val count = HashMap<String, Int>()
+        current?.takeIf { it.origin != QueueItemOrigin.AUTOPLAY }?.let { count[it.addedBy] = 1 }
+        return items.map { item -> (count.merge(item.addedBy, 1, Int::plus) ?: 1) - 1 }
+    }
+
+    /**
+     * Where a new song by [personId] goes in fair order: in the next round where they have no
+     * song yet, after everyone else's song in that round. Someone with nothing queued lands
+     * near the top, however long the queue is.
+     */
+    private fun fairIndex(personId: String): Int {
+        val rounds = rounds(queue)
+        val theirs = queue.count { it.addedBy == personId } +
+            if (current?.let { it.addedBy == personId && it.origin != QueueItemOrigin.AUTOPLAY } == true) 1 else 0
+        return rounds.indexOfLast { it <= theirs } + 1
+    }
+
+    /** [items] in fair order: round by round, each person's songs in their order. */
+    private fun inRounds(items: List<QueueItem>): List<QueueItem> {
+        val rounds = rounds(items)
+        return items.indices.sortedWith(compareBy({ rounds[it] }, { it })).map { items[it] }
+    }
+
+    /**
+     * Shuffle: the upcoming songs in a random order. With fair order it keeps the rounds:
+     * each person's songs are shuffled, and so is the order within each round.
+     */
+    private fun shuffleQueue() {
+        val shuffled = if (settings.fairOrder) {
+            val mixed = queue.groupBy { it.addedBy }.values.flatMap { it.shuffled() }
+            val rounds = rounds(mixed)
+            val luck = mixed.map { Math.random() }
+            mixed.indices.sortedWith(compareBy({ rounds[it] }, { luck[it] })).map { mixed[it] }
+        } else {
+            queue.shuffled()
+        }
+        queue.clear()
+        queue += shuffled
+        emit(Event.QueueReplaced(queue.toList()))
+    }
+
+    /**
+     * Repeat queue, and the queue ran out: the songs of this run (since the queue last started
+     * playing, autoplay songs left out) are queued again.
+     */
+    private fun requeueRun() {
+        val start = runStart?.let { id -> history.indexOfLast { it.itemId == id } } ?: -1
+        val run = if (start >= 0) history.subList(start, history.size).toList() else history.takeLastWhile { it.origin != QueueItemOrigin.AUTOPLAY }
+        val items = run.filter { it.origin != QueueItemOrigin.AUTOPLAY }.takeLast(MAX_REPEAT_RUN)
+            .map { it.copy(itemId = Ids.short(), result = null) }
+        if (items.isEmpty()) return
+        queue += items
+        emit(Event.QueueItemsAdded(items, 0))
+        // The first of them starts the next run.
+        runStart = null
+    }
+
+    /** May skip right away, or vote to (also right away when the room doesn't vote). */
+    private fun mayVoteOrSkip(member: Member) = can(member, Permission.SKIP) || can(member, Permission.VOTE_SKIP)
+
+    private fun vote(member: Member, on: Boolean): ErrorInfo? {
+        if (!settings.voteSkip) return invalid("This room doesn't vote to skip")
+        if (current == null) return invalid("Nothing is playing")
+        if (on) skipVoters += member.id else skipVoters -= member.id
+        return null
+    }
+
+    /** The vote on the current song, or null when the room doesn't vote (or nothing plays). */
+    private fun skipVotes(): SkipVotes? {
+        if (!settings.voteSkip || current == null) return null
+        // Everyone here who may skip or vote counts, so votes are a share of the people listening along.
+        val people = members.values.count { it.online && mayVoteOrSkip(it) }
+        val needed = maxOf(1, (people * settings.voteSkipPercent + 99) / 100)
+        return SkipVotes(skipVoters.toList(), needed)
+    }
+
+    /**
+     * Tells everyone when the vote changed (a vote, people coming or going, the settings), and
+     * skips the song once enough people voted. Called with [mutex] held.
+     */
+    private fun updateSkipVotes() {
+        skipVoters.retainAll { id -> members[id]?.let { it.online && mayVoteOrSkip(it) } == true }
+        val votes = skipVotes()
+        if (votes != sentSkipVotes) {
+            sentSkipVotes = votes
+            emit(Event.SkipVotesChanged(votes))
+        }
+        val item = current
+        if (votes == null || item == null || votes.voters.isEmpty() || votes.voters.size < votes.needed) return
+        log.info("Room {}: {} voted to skip \"{}\"", code, votes.voters.size, item.song.title)
+        emit(Event.Notice("Skipped \"${item.song.title}\": enough votes"))
+        retireCurrent(QueueItemResult.SKIPPED)
+        playNextFromQueue()
+        // A new song: no votes yet.
+        updateSkipVotes()
+    }
+
+    /**
+     * The room's queue limits ([RoomSettings]): the songs of [songs] that [member] may add, and
+     * why the others were left out (null: none were). People who can change the room's
+     * settings aren't limited (they could turn the limits off anyway). [countPerPerson]: the
+     * songs stay in the queue (adding), so the songs-per-person limit counts too.
+     */
+    private fun withinLimits(member: Member, songs: List<Song>, countPerPerson: Boolean): Pair<List<Song>, ErrorInfo?> {
+        if (can(member, Permission.CHANGE_SETTINGS)) return songs to null
+        val reasons = ArrayList<Pair<Int, String>>()
+        var ok = songs
+        settings.maxSongMinutes.takeIf { it > 0 }?.let { minutes ->
+            val (tooLong, rest) = ok.partition { it.durationMs > minutes * 60_000L }
+            if (tooLong.isNotEmpty()) reasons += tooLong.size to "longer than $minutes min"
+            ok = rest
+        }
+        settings.noRepeatMinutes.takeIf { it > 0 }?.let { minutes ->
+            val since = clock() - minutes * 60_000L
+            val (recent, rest) = ok.partition { (playedAt[it.id] ?: Long.MIN_VALUE) >= since }
+            if (recent.isNotEmpty()) reasons += recent.size to "played in the last $minutes min"
+            ok = rest
+        }
+        settings.maxSongsPerPerson.takeIf { it > 0 && countPerPerson }?.let { max ->
+            val room = maxOf(0, max - queue.count { it.addedBy == member.id })
+            if (ok.size > room) reasons += (ok.size - room) to "you can have $max songs in the queue at once"
+            ok = ok.take(room)
+        }
+        if (reasons.isEmpty()) return ok to null
+        val why = reasons.joinToString("; ") { (count, reason) -> if (songs.size == 1) reason else "$count $reason" }
+        val message = when {
+            songs.size == 1 -> "Not added: ${why.replaceFirstChar { it.lowercase() }}"
+            ok.isEmpty() -> "None added: $why"
+            else -> "Left out ${songs.size - ok.size} of ${songs.size}: $why"
+        }
+        return ok to ErrorInfo(ErrorCode.INVALID, message)
+    }
+
     // --- playback ---------------------------------------------------------------------
 
     private fun pausePlayback() {
@@ -1194,16 +1414,31 @@ class Room(
     private fun retireCurrent(result: QueueItemResult) {
         val item = current ?: return
         if (item.song.podcast != null) rememberEpisodePosition(item.song, if (result == QueueItemResult.PLAYED) item.song.durationMs else position())
-        // Only songs that actually played count for the listening history.
-        if (streamUrl != null) {
-            val heard = if (result == QueueItemResult.PLAYED) item.song.durationMs else position()
-            val listeners = members.values.filter { it.online }.map {
-                FinishedPlay.Listener(it.id, it.name, it.accountId, it.accountToken, it.hideFromHistory)
-            }
-            onPlayFinished?.invoke(FinishedPlay(item, currentStartedAt, heard, result == QueueItemResult.SKIPPED, code, name, listeners, visibility))
-        }
+        reportFinished(item, result)
         current = null
         appendHistory(item, result)
+    }
+
+    /** For the listening history; only songs that actually played count. */
+    private fun reportFinished(item: QueueItem, result: QueueItemResult) {
+        if (streamUrl == null) return
+        val heard = if (result == QueueItemResult.PLAYED) item.song.durationMs else position()
+        val listeners = members.values.filter { it.online }.map {
+            FinishedPlay.Listener(it.id, it.name, it.accountId, it.accountToken, it.hideFromHistory)
+        }
+        onPlayFinished?.invoke(FinishedPlay(item, currentStartedAt, heard, result == QueueItemResult.SKIPPED, code, name, listeners, visibility))
+    }
+
+    /** Repeat one: the song ended and starts over (it counts as played for the listening history). */
+    private fun replayCurrent() {
+        val item = current ?: return
+        reportFinished(item, QueueItemResult.PLAYED)
+        currentStartedAt = clock()
+        playedAt[item.song.id] = clock()
+        positionAtAnchor = 0
+        anchorTime = clock()
+        skipVoters.clear()
+        emitPlayback()
     }
 
     /** Remembers where an episode was left; one that's (nearly) done or barely started starts over. */
@@ -1221,6 +1456,7 @@ class Room(
     }
 
     private fun playNextFromQueue() {
+        if (queue.isEmpty() && repeat == RepeatMode.QUEUE) requeueRun()
         val next = queue.removeFirstOrNull()?.also { emit(Event.QueueItemRemoved(it.itemId)) }
             ?: autoplay.removeFirstOrNull()?.also { emitAutoplay() }
         // Out of songs, but autoplay is still loading: it starts when it's there.
@@ -1342,6 +1578,8 @@ class Room(
      */
     private fun refillAutoplay() {
         val source = radio ?: return
+        // Repeating the queue, the autoplay queue never plays: no need for more songs.
+        if (repeat == RepeatMode.QUEUE) return
         if (!autoplayActive() || autoplay.size >= AUTOPLAY_LOW || queue.size > 1 || autoplayJob?.isActive == true) return
         val first = (autoplay.lastOrNull() ?: queue.lastOrNull() ?: current ?: history.lastOrNull())?.song ?: return
         // After a podcast episode the room stops, like a podcast app: a music radio from it makes no sense.
@@ -1383,6 +1621,14 @@ class Room(
     private fun setCurrent(item: QueueItem?) {
         resolveJob?.cancel()
         current = item
+        // A run of queue songs (for repeat queue) starts with the first that isn't autoplay's.
+        if (item == null || item.origin == QueueItemOrigin.AUTOPLAY) runStart = null else if (runStart == null) runStart = item.itemId
+        skipVoters.clear()
+        if (item != null) {
+            playedAt.remove(item.song.id)
+            playedAt[item.song.id] = clock()
+            while (playedAt.size > MAX_PLAYED_AT) playedAt.remove(playedAt.keys.first())
+        }
         streamUrl = null
         currentStartedAt = clock()
         // An episode that was left halfway goes on from there.
@@ -1463,6 +1709,10 @@ class Room(
             delay(maxOf(0, remaining))
             mutex.withLock {
                 if (current?.itemId != item.itemId) return@withLock
+                if (repeat == RepeatMode.ONE) {
+                    replayCurrent()
+                    return@withLock
+                }
                 retireCurrent(QueueItemResult.PLAYED)
                 playNextFromQueue()
             }
@@ -1492,6 +1742,8 @@ class Room(
         autoplaySeed = autoplaySeed,
         migration = migration,
         adminless = adminless,
+        repeat = repeat,
+        skipVotes = skipVotes(),
     )
 
     private fun newItem(song: Song, member: Member) =
@@ -1538,6 +1790,9 @@ class Room(
         const val AUTOPLAY_LOW = 5
         /** Radio songs don't repeat anything from the last this many songs. */
         const val RECENT_SONGS = 50
+        /** Repeat queue plays at most this many songs again. */
+        const val MAX_REPEAT_RUN = 500
+        const val MAX_PLAYED_AT = 1000
 
         /** Brings back a room saved with [save]. */
         fun restore(

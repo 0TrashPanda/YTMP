@@ -263,6 +263,16 @@ class RoomFollower {
                 s.copy(participants = if (index >= 0) s.participants.toMutableList().also { it[index] = p } else s.participants + p)
             }
             is Event.ParticipantLeft -> s.copy(participants = s.participants.filter { it.id != e.participantId })
+            // The upcoming songs, so the player can look up the next one ahead of time.
+            is Event.QueueItemsAdded -> s.copy(queue = s.queue.toMutableList().apply { addAll(e.index.coerceIn(0, size), e.items) })
+            is Event.QueueItemRemoved -> s.copy(queue = s.queue.filter { it.itemId != e.itemId })
+            is Event.QueueItemMoved -> {
+                val item = s.queue.firstOrNull { it.itemId == e.itemId }
+                if (item == null) s else s.copy(queue = (s.queue - item).toMutableList().apply { add(e.toIndex.coerceIn(0, size), item) })
+            }
+            is Event.QueueReplaced -> s.copy(queue = e.items)
+            is Event.AutoplayChanged -> s.copy(autoplay = e.items, autoplaySeed = e.seed)
+            is Event.RepeatChanged -> s.copy(repeat = e.mode)
             else -> s
         }
     }

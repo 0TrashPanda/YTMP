@@ -2,9 +2,8 @@
 
 The host keeps **one queue per room**: the list of songs that will be played.
 
-> Status: built are the queue actions, the autoplay queue, radio, queue history and
-> playlists into autoplay. Not built yet: fair ordering, shuffle, repeat, vote to skip and
-> queue limits.
+> Status: all built: the queue actions, the autoplay queue, radio, queue history, playlists
+> into autoplay, fair order, shuffle, repeat, vote to skip and queue limits.
 
 ## Actions
 
@@ -18,7 +17,8 @@ The host keeps **one queue per room**: the list of songs that will be played.
 | Replace the queue / autoplay queue with a radio | *Start radio* / *Autoplay from here* permission |
 | Shuffle the queue | *Reorder* permission |
 | Change repeat mode | *Repeat* permission |
-| Vote to skip | *Vote to skip* permission (when enabled) |
+| Skip right away | *Skip* permission |
+| Vote to skip | *Vote to skip* permission (when the room votes; otherwise it skips right away) |
 
 Permissions are set by room admins. See [room management](room-management.md#permissions).
 
@@ -71,9 +71,10 @@ which follows a person across rooms.
 ### Default
 Songs play in the order they are in the queue.
 
-### Fair / round-robin
+### Fair / round-robin ✅
 The admin can enable an ordering mode that **spreads songs out per person**, so
-one participant cannot take over the queue.
+one participant cannot take over the queue. It's the **Fair order** switch in the room's
+settings (*Queue*), and in your role template, so every room you make starts with it.
 
 Example: P1 added 5 songs, P2 added 3, P3 added 2:
 
@@ -87,45 +88,68 @@ Rules:
   **one song per person** per round. People without songs are skipped.
 - A newly added song goes into the **next round where that person has no song yet**.
   So even if the queue has 50 songs, someone who has no songs queued yet lands near the top.
+- The person whose song is **playing now** has had their turn: their next song comes after
+  everyone else's in the first round.
+- **Play next** puts the song in your next turn too, unless you have *Reorder*.
+- Turning fair order **on** puts the queue in rounds right away (each person's songs keep
+  their order).
 - When someone **leaves the room, their songs stay** in the queue and keep their place in
   the rounds.
 - People with the *Reorder* permission can still **drag songs** to any position. A moved
   song stays where it was put.
 - Radio songs (from **Start radio** and **Autoplay from here**) belong to the **person who started
-  the radio**. So when others add songs, those are spread in between the radio songs
-  instead of waiting behind all of them.
+  the radio**. They're in the autoplay queue, so songs others add play first anyway.
 - Songs from the **autoplay queue** only play when the queue is empty, so fair ordering
   does not apply to them. They still show who started the radio.
 
-## Shuffle
+## Shuffle ✅
 
-**Shuffle** is a one-time action that randomises the order of the **upcoming** songs
+**Shuffle** (next to the controls in the player, like YTM) is a one-time action that randomises the order of the **upcoming** songs
 (like YTM). It does not change the queue history.
 
 - With **fair ordering** on, shuffle keeps the rounds: it randomises each person's
   songs and the order within each round, so nobody gets more turns.
 
-## Repeat
+## Repeat ✅
+
+The repeat button next to the controls goes round, like YTM's: off, repeat queue, repeat one.
 
 | Mode | Behaviour |
 |------|-----------|
 | Off (default) | When the queue ends, the [autoplay queue](#autoplay-queue) takes over |
-| Repeat queue | When the queue ends, the songs from the queue history are queued again |
-| Repeat one | The current song repeats |
+| Repeat queue | When the queue ends, the songs it played are queued again: the songs since the queue last started playing (not autoplay's), at most 500 |
+| Repeat one | The current song starts over when it ends (each time counts as played in the listening history). Skipping still goes to the next song |
 
-## Vote to skip
+With repeat on, speakers and TVs don't move on to the next song by themselves; the room
+tells them what plays next.
 
-A room setting, **off by default**. When on, participants can vote to skip the current
-song. It is skipped once enough people have voted (configurable, for example 50% of
-the participants in the room).
+## Vote to skip ✅
 
-## Queue limits
+A room setting, **off by default** (in the room's settings under *Queue*, and in role
+templates). When on, people with the *Vote to skip* permission (Listeners, by default) vote
+instead of skipping: their Next button becomes a vote, shows the votes so far (like 1/2), and
+pressed again takes the vote back. The song is skipped once enough people voted: a share of
+the people here who may skip or vote (25% to everyone; 50% by default, rounded up). People
+with *Skip* (DJs, Admins, the owner) still skip right away. A new song starts a new vote.
 
-Room settings, **all off by default**:
+- When people leave, fewer votes are needed, which can skip the song right then.
+- With voting off, *Vote to skip* skips right away, so Listeners skip as before.
+- People who may only vote can't go back to the previous song while the room votes.
+- Rooms made before vote to skip: a Listener role nobody changed votes now; any role that
+  could skip may vote too.
+
+## Queue limits ✅
+
+Room settings (*Queue*), **all off by default**:
 
 - **Max songs per person** in the queue at the same time
 - **Max song length** (for example no 1-hour mixes)
 - **No recent repeats**: block songs that were played in the last X minutes
+
+They don't apply to people who can change the room's settings (they could turn them off
+anyway). Songs over a limit are left out and the person is told why, for example "Not
+added: longer than 10 min" or "Left out 2 of 12: 2 longer than 10 min". The length and
+repeat limits also apply to *Play now*.
 
 ## Playlists into autoplay ✅
 

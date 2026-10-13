@@ -20,8 +20,13 @@ enum class Permission {
 
     // Playback
     @SerialName("play_pause") PLAY_PAUSE,
+    /** Skipping right away, also when the room votes to skip. */
     @SerialName("skip") SKIP,
     @SerialName("seek") SEEK,
+    /** Repeat off / the queue / one song. */
+    @SerialName("repeat") REPEAT,
+    /** Skipping by voting when the room has [RoomSettings.voteSkip] on; right away when it's off. */
+    @SerialName("vote_skip") VOTE_SKIP,
 
     // Listening
     @SerialName("listen_locally") LISTEN_LOCALLY,
@@ -68,6 +73,18 @@ data class RoomSettings(
     val openElsewhere: RoomOpenMode? = null,
     /** Never deleted for being empty (a room on a server that's always there). Not in templates. */
     val alwaysOn: Boolean = false,
+    /** Fair order: the queue goes round by round, one song per person per round (docs/features/queue.md). */
+    val fairOrder: Boolean = false,
+    /** People with [Permission.VOTE_SKIP] (and not [Permission.SKIP]) skip by voting. */
+    val voteSkip: Boolean = false,
+    /** Share of the people here (who can skip or vote) whose votes skip the song, 1–100. */
+    val voteSkipPercent: Int = 50,
+    /** At most this many songs per person in the queue at once; 0: no limit. */
+    val maxSongsPerPerson: Int = 0,
+    /** Songs longer than this many minutes can't be added; 0: no limit. */
+    val maxSongMinutes: Int = 0,
+    /** Songs played in the last this many minutes can't be added again; 0: no limit. */
+    val noRepeatMinutes: Int = 0,
 )
 
 /** The roles a room starts with. Saved to an account, so every room you create gets yours. */

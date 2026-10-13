@@ -40,7 +40,7 @@
 	async function play(episode: Episode, now: boolean) {
 		const e = await room.run(now ? { kind: 'PlayNow', song: episode.song } : { kind: 'AddSongs', songs: [episode.song], position: 'next' });
 		if (e) onToast(e.message);
-		else if (!now) onToast(`Playing "${episode.song.title}" next`);
+		else if (!now) onToast(room.playNextText(`"${episode.song.title}"`));
 	}
 
 	function menu(event: MouseEvent, episode: Episode, atPointer: boolean) {

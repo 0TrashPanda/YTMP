@@ -46,7 +46,8 @@ Like YTM:
   next, and a thin progress line. **Tap it or swipe it up** to open the full player.
 - **Full player** ✅: the album art (with its blurred colours behind it), the song (the
   artist, album and podcast open their page), the position (drag to seek), previous,
-  play/pause, next (and back 10 s / ahead 30 s for episodes). At the top: close (˅),
+  play/pause, next (and back 10 s / ahead 30 s for episodes), with **shuffle** and
+  **repeat** on either side for music, like YTM. At the top: close (˅),
   **Play on** (cast icon) and the song menu (⋮). Below the controls it says where the
   music plays ("Playing on this device and Kitchen", or *Not playing here. Tap to
   listen*). **Swipe down**, the ˅ or the phone's **Back** closes it.
@@ -55,8 +56,11 @@ Like YTM:
   scrolled to the top, or tap the handle to close it), next to the album art on desktop. *Up next* is the queue
   (see below); *Related* is [find similar](history-and-recommendations.md#find-similar)
   for the current song. *Lyrics* comes later.
-- **Desktop** ✅: the player bar stays at the bottom (controls, the song, volume, Play
-  on, Play here, ˄ to open the full player); the full player opens above it. Like YTM,
+- **Next when the room votes to skip** ✅: for people who may only vote, Next votes (red
+  while you've voted, pressed again takes it back) and shows the votes so far, like *1/2*.
+  See [vote to skip](queue.md#vote-to-skip).
+- **Desktop** ✅: the player bar stays at the bottom (controls, the song, volume, repeat,
+  shuffle, Play on, Play here, ˄ to open the full player); the full player opens above it. Like YTM,
   **clicking anywhere on the bar** (not on a button) opens or closes the full player, and
   the song shows **Artist • Album • Year**; the artist and album open their page. A **like**
   button sits next to the song. With the full player open, the song is only in the bar (the
@@ -149,8 +153,8 @@ YTMP plays YouTube Music's podcasts like YTM does:
 | **Drag** a song in the queue | Move it | *Reorder* |
 | Long-press / ⋮ | Open the [song menu](#song-menu) | |
 
-With **fair ordering** on, *play next* puts the song in your next fair slot, unless you
-have the *Reorder* permission.
+With **fair ordering** on, *play next* puts the song in your next fair slot (the message
+says "Added … in your next turn"), unless you have the *Reorder* permission.
 
 ## Song menu
 

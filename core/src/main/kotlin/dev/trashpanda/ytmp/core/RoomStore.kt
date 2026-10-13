@@ -9,6 +9,7 @@ import dev.trashpanda.ytmp.protocol.Role
 import dev.trashpanda.ytmp.protocol.RoomSettings
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.QueueItem
+import dev.trashpanda.ytmp.protocol.RepeatMode
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import kotlinx.serialization.Serializable
 
@@ -60,6 +61,9 @@ data class SavedRoom(
     val migration: MigrationOffer? = null,
     /** Joining needs this password ([RoomPasswords]). */
     val passwordHash: String? = null,
+    val repeat: RepeatMode = RepeatMode.OFF,
+    /** The first song of the run of queue songs that repeat queue plays again (an item id). */
+    val runStart: String? = null,
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 

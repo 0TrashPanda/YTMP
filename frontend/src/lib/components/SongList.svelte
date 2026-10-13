@@ -60,7 +60,7 @@
 
 	async function playNext(song: Song) {
 		const error = await room.run({ kind: 'AddSongs', songs: [song], position: 'next' });
-		onToast(error ? error.message : `Playing "${song.title}" next`);
+		onToast(error ? error.message : room.playNextText(`"${song.title}"`));
 	}
 
 	function menu(event: MouseEvent, song: Song, index: number, atPointer: boolean) {

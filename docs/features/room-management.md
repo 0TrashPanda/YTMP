@@ -78,18 +78,20 @@ set individual permissions.
 | Group | Permissions |
 |-------|-------------|
 | **Queue** | Add songs · Send songs from own device · Play now · Remove own songs · Remove others' songs · Reorder · Start radio (replaces queue) · Autoplay from here (replaces autoplay queue) |
-| **Playback control** | Play/pause · Skip · Seek · Repeat · Vote to skip · Host output volume |
+| **Playback control** | Play/pause · Skip (right away) · Vote to skip (right away when the room doesn't vote) · Seek · Repeat · Host output volume |
 | **Listening** | Play audio locally on own device |
 | **Outputs** | Change host outputs |
 | **People** | Kick · Ban / unban · Assign roles · Edit roles |
-| **Room** | Change settings (ordering mode, access control) · Clone room · Send migration message in this room |
+| **Room** | Change settings (name, default roles, autoplay, fair order, vote to skip, queue limits, access control; the limits don't apply to them) · Clone room · Send migration message in this room |
 
 ### Roles
 
 Roles exist on **two levels**:
 
-- **Account role templates**: YTMP ships with **default roles** (*Admin*, *DJ*,
-  *Listener*). Users with a **YTMP account** can edit them and create their own, on their
+- **Account role templates**: YTMP ships with **default roles** (*Admin*: everything;
+  *DJ*: also play now, reorder and shuffle, remove anyone's songs, skip right away, seek,
+  repeat, speakers, radio; *Listener*: add songs, remove their own, play/pause, vote to skip,
+  play on their own device, clone the room). Users with a **YTMP account** can edit them and create their own, on their
   account page (*Your roles*), in the same Discord-style editor.
   These are saved to the account and applied to every room they create, so nobody is
   stuck with defaults they don't like.
@@ -101,14 +103,14 @@ Roles exist on **two levels**:
 - The **default role for new joiners** is a room setting (it can differ for guests and
   account holders). ✅
 - Account holders can save their **preferred room defaults** to their account, applied to
-  every room they create. Built: role templates with default roles and the autoplay
-  setting. Planned: ordering mode, access control, …
+  every room they create. Built: role templates with default roles, autoplay, fair order
+  and vote to skip. Planned: access control, …
 
 ## Room settings
 
-Built: name, visibility (owner), default roles, autoplay, "always on" (servers), and where
-the room opens from your other devices (owner, see [room sync](room-sync.md)). The rest is
-planned. The owner hands the room over with *Make Owner* (see
+Built: name, visibility (owner), default roles, autoplay, password, "always on" (servers),
+where the room opens from your other devices (owner, see [room sync](room-sync.md)), and under
+*Queue*: fair order, vote to skip and the queue limits. The rest is planned. The owner hands the room over with *Make Owner* (see
 [room lifecycle](room-lifecycle.md#changing-the-owner)).
 
 - **Room name**: shown in the room bar and in LAN discovery. The default is the

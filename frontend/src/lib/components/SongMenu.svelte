@@ -73,8 +73,8 @@
 				label: 'Play next',
 				run: () =>
 					fromAutoplay
-						? command({ kind: 'MoveItem', itemId: item!.itemId, list: 'queue', toIndex: 0 }, `Playing "${song.title}" next`)
-						: command({ kind: 'AddSongs', songs: [song], position: 'next' }, `Playing "${song.title}" next`)
+						? command({ kind: 'MoveItem', itemId: item!.itemId, list: 'queue', toIndex: 0 }, room.playNextText(`"${song.title}"`))
+						: command({ kind: 'AddSongs', songs: [song], position: 'next' }, room.playNextText(`"${song.title}"`))
 			});
 			list.push({
 				icon: 'playlistAdd',

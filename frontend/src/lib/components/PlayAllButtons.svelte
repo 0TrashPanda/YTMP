@@ -31,7 +31,7 @@
 	async function addAll(position: 'next' | 'end') {
 		if (!songs?.length) return;
 		const e = await room.run({ kind: 'AddSongs', songs, position });
-		onToast(e ? e.message : position === 'next' ? `Playing ${name} next` : `Added ${name} to the queue`);
+		onToast(e ? e.message : position === 'next' ? room.playNextText(name) : `Added ${name} to the queue`);
 	}
 
 	async function playNow() {

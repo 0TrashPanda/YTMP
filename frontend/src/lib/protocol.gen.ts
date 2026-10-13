@@ -89,7 +89,7 @@ export interface CommandClearQueue {
   kind: "ClearQueue";
 }
 
-export type Permission = "add_songs" | "play_now" | "remove_own" | "remove_others" | "reorder" | "start_radio" | "autoplay_from_here" | "play_pause" | "skip" | "seek" | "listen_locally" | "change_outputs" | "output_volume" | "kick" | "ban" | "assign_roles" | "edit_roles" | "change_settings" | "clone_room" | "send_migration";
+export type Permission = "add_songs" | "play_now" | "remove_own" | "remove_others" | "reorder" | "start_radio" | "autoplay_from_here" | "play_pause" | "skip" | "seek" | "repeat" | "vote_skip" | "listen_locally" | "change_outputs" | "output_volume" | "kick" | "ban" | "assign_roles" | "edit_roles" | "change_settings" | "clone_room" | "send_migration";
 
 export interface CommandCreateRole {
   kind: "CreateRole";
@@ -217,11 +217,22 @@ export interface CommandSetPassword {
   password: string | null;
 }
 
+export type RepeatMode = "off" | "queue" | "one";
+
+export interface CommandSetRepeat {
+  kind: "SetRepeat";
+  mode: RepeatMode;
+}
+
 export type RoomVisibility = "public" | "private";
 
 export interface CommandSetVisibility {
   kind: "SetVisibility";
   visibility: RoomVisibility;
+}
+
+export interface CommandShuffleQueue {
+  kind: "ShuffleQueue";
 }
 
 export interface CommandSkip {
@@ -258,6 +269,17 @@ export interface CommandUpdateSettings {
   defaultAccountRole: string | null;
   autoplay: boolean | null;
   alwaysOn: boolean | null;
+  fairOrder: boolean | null;
+  voteSkip: boolean | null;
+  voteSkipPercent: number | null;
+  maxSongsPerPerson: number | null;
+  maxSongMinutes: number | null;
+  noRepeatMinutes: number | null;
+}
+
+export interface CommandVoteSkip {
+  kind: "VoteSkip";
+  on: boolean;
 }
 
 export type Command =
@@ -291,12 +313,15 @@ export type Command =
   | CommandSetOutputVolume
   | CommandSetParticipantPermissions
   | CommandSetPassword
+  | CommandSetRepeat
   | CommandSetVisibility
+  | CommandShuffleQueue
   | CommandSkip
   | CommandStartRadio
   | CommandUnban
   | CommandUpdateRole
-  | CommandUpdateSettings;
+  | CommandUpdateSettings
+  | CommandVoteSkip;
 
 export interface ClientMessageCommand {
   type: "command";
@@ -481,6 +506,11 @@ export interface EventQueueReplaced {
   items: QueueItem[];
 }
 
+export interface EventRepeatChanged {
+  kind: "RepeatChanged";
+  mode: RepeatMode;
+}
+
 export interface EventRolesChanged {
   kind: "RolesChanged";
   roles: Role[];
@@ -504,11 +534,27 @@ export interface RoomSettings {
   autoplay: boolean;
   openElsewhere: RoomOpenMode | null;
   alwaysOn: boolean;
+  fairOrder: boolean;
+  voteSkip: boolean;
+  voteSkipPercent: number;
+  maxSongsPerPerson: number;
+  maxSongMinutes: number;
+  noRepeatMinutes: number;
 }
 
 export interface EventSettingsChanged {
   kind: "SettingsChanged";
   settings: RoomSettings;
+}
+
+export interface SkipVotes {
+  voters: string[];
+  needed: number;
+}
+
+export interface EventSkipVotesChanged {
+  kind: "SkipVotesChanged";
+  skipVotes: SkipVotes | null;
 }
 
 export interface EventStreamReady {
@@ -536,9 +582,11 @@ export type Event =
   | EventQueueItemRemoved
   | EventQueueItemsAdded
   | EventQueueReplaced
+  | EventRepeatChanged
   | EventRolesChanged
   | EventRoomUpdated
   | EventSettingsChanged
+  | EventSkipVotesChanged
   | EventStreamReady;
 
 export interface ServerMessageEvent {
@@ -599,6 +647,8 @@ export interface RoomState {
   autoplaySeed: Song | null;
   migration: MigrationOffer | null;
   adminless: boolean;
+  repeat: RepeatMode;
+  skipVotes: SkipVotes | null;
 }
 
 export interface ServerMessageSnapshot {

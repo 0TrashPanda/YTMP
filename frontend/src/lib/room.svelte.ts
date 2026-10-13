@@ -111,6 +111,36 @@ export class RoomConnection {
 		return this.permissions.has(permission);
 	}
 
+	/**
+	 * What the Next button does for you: skip right away, vote to skip (the room votes and you
+	 * may only vote), or nothing.
+	 */
+	get skipMode(): 'skip' | 'vote' | 'none' {
+		if (this.can('skip')) return 'skip';
+		if (!this.can('vote_skip')) return 'none';
+		return this.state?.settings.voteSkip ? 'vote' : 'skip';
+	}
+
+	/** Back to the previous song (or the start): for whoever may skip right away. */
+	get canPrevious(): boolean {
+		return this.skipMode === 'skip';
+	}
+
+	/** You voted to skip the current song. */
+	get votedToSkip(): boolean {
+		return !!this.participantId && !!this.state?.skipVotes?.voters.includes(this.participantId);
+	}
+
+	/** Next: skips, or votes (and a second press takes the vote back). */
+	next(): Promise<ErrorInfo | null> {
+		return this.run(this.skipMode === 'vote' ? { kind: 'VoteSkip', on: !this.votedToSkip } : { kind: 'Skip' });
+	}
+
+	/** What "play next" did, for a toast: with fair order a listener's song goes in their next turn. */
+	playNextText(name: string): string {
+		return this.state?.settings.fairOrder && !this.can('reorder') ? `Added ${name} in your next turn` : `Playing ${name} next`;
+	}
+
 	/** The host's current time, as far as we can tell. */
 	hostNow(): number {
 		return Date.now() + this.clockOffset;
@@ -309,6 +339,12 @@ export class RoomConnection {
 				break;
 			case 'AdminlessChanged':
 				s.adminless = e.adminless;
+				break;
+			case 'RepeatChanged':
+				s.repeat = e.mode;
+				break;
+			case 'SkipVotesChanged':
+				s.skipVotes = e.skipVotes;
 				break;
 			default: {
 				// A new event kind that isn't handled here is a type error.

@@ -161,6 +161,29 @@ data class OutputInfo(
     val volume: Double?,
 )
 
+@Serializable
+@SerialName("RepeatMode")
+enum class RepeatMode {
+    /** When the queue ends, the autoplay queue takes over. */
+    @SerialName("off") OFF,
+
+    /** When the queue ends, the songs it played are queued again. */
+    @SerialName("queue") QUEUE,
+
+    /** The current song plays again and again (skipping still moves on). */
+    @SerialName("one") ONE,
+}
+
+/** Votes to skip the current song ([RoomSettings.voteSkip]). */
+@Serializable
+@SerialName("SkipVotes")
+data class SkipVotes(
+    /** Who voted (participant ids). */
+    val voters: List<String>,
+    /** Votes it takes to skip, from the people here now. */
+    val needed: Int,
+)
+
 /** Full room state, sent on connect and on [ClientMessage.RequestSnapshot]. */
 @Serializable
 @SerialName("RoomState")
@@ -184,6 +207,9 @@ data class RoomState(
     val migration: MigrationOffer? = null,
     /** Nobody who runs the room (the owner, or someone with the top role) has been here for a while. */
     val adminless: Boolean = false,
+    val repeat: RepeatMode = RepeatMode.OFF,
+    /** Null when the room doesn't vote to skip (or nothing plays). */
+    val skipVotes: SkipVotes? = null,
 )
 
 /** A room people can be moved to, e.g. a clone of this one. */

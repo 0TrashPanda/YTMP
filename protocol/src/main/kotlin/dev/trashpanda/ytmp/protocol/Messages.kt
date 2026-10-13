@@ -167,6 +167,23 @@ sealed interface Command {
     @SerialName("Seek")
     data class Seek(val positionMs: Long) : Command
 
+    /** Puts the upcoming songs in a random order (with fair order: keeps the rounds). Reorder. */
+    @Serializable
+    @SerialName("ShuffleQueue")
+    data object ShuffleQueue : Command
+
+    @Serializable
+    @SerialName("SetRepeat")
+    data class SetRepeat(val mode: RepeatMode) : Command
+
+    /**
+     * Votes to skip the current song, or takes the vote back. [Skip] from someone who may only
+     * vote is a vote too.
+     */
+    @Serializable
+    @SerialName("VoteSkip")
+    data class VoteSkip(val on: Boolean) : Command
+
     @Serializable
     @SerialName("SetListening")
     data class SetListening(val on: Boolean) : Command
@@ -273,6 +290,13 @@ sealed interface Command {
         val defaultAccountRole: String? = null,
         val autoplay: Boolean? = null,
         val alwaysOn: Boolean? = null,
+        val fairOrder: Boolean? = null,
+        val voteSkip: Boolean? = null,
+        val voteSkipPercent: Int? = null,
+        /** Limits: 0 turns one off. */
+        val maxSongsPerPerson: Int? = null,
+        val maxSongMinutes: Int? = null,
+        val noRepeatMinutes: Int? = null,
     ) : Command
 }
 
@@ -482,6 +506,15 @@ sealed interface Event {
     @Serializable
     @SerialName("AdminlessChanged")
     data class AdminlessChanged(val adminless: Boolean) : Event
+
+    @Serializable
+    @SerialName("RepeatChanged")
+    data class RepeatChanged(val mode: RepeatMode) : Event
+
+    /** Someone voted, took a vote back, or the number of votes needed changed; null: no vote going on. */
+    @Serializable
+    @SerialName("SkipVotesChanged")
+    data class SkipVotesChanged(val skipVotes: SkipVotes?) : Event
 }
 
 /** JSON settings shared by host and tests. Defaults are always encoded, so TS fields are never missing. */

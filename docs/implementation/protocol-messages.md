@@ -45,7 +45,7 @@ generated from them.
 ## Snapshot (`RoomState`)
 
 The real `RoomState` is in `Messages.kt`; the sketch below also has fields for features that
-aren't built yet (repeat, vote to skip).
+aren't built yet. Repeat (`repeat`) and the skip vote (`skipVotes`) are built, as top-level fields.
 
 ```jsonc
 {
@@ -57,9 +57,10 @@ aren't built yet (repeat, vote to skip).
   "autoplay":    { "seed": Song | Artist | Album | Playlist, "items": [ QueueItem ] },
   "history":     [ QueueItem ],          // the last N items; older ones via LoadHistory
   "nowPlaying":  QueueItem | null,
-  "playback":    { "playing", "positionMs", "hostTimeMs", "repeat" },
+  "playback":    { "playing", "positionMs", "hostTimeMs" },
+  "repeat":      "off" | "queue" | "one",                       // ✅
   "outputs":     [ { "id", "name", "active", "volume" } ],
-  "skipVotes":   { "votes", "needed" } | null
+  "skipVotes":   { "voters": [participantId], "needed" } | null   // ✅ null: the room doesn't vote
 }
 
 // QueueItem
@@ -83,7 +84,7 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `MoveItem` ✅ | `itemId`, `list: "history" \| "queue" \| "autoplay"`, `toIndex` | Reorder (autoplay → queue next/last: Add songs) |
 | `ClearQueue` ✅ | – | Remove own / others' songs |
 | `ClearAutoplay` ✅ | – | Autoplay from here |
-| `ShuffleQueue` | – | Reorder |
+| `ShuffleQueue` ✅ | – (with fair order it keeps the rounds) | Reorder |
 | `StartRadio` ✅ (song only so far) | `song`, `songs?` (a radio the sender brings: their own account's, from their server; null: the room's); later `seedId` | Start radio |
 | `AutoplayFromHere` ✅ (song only so far) | `song`; later `seedId` (song, artist, album or playlist) | Autoplay from here |
 | `AutoplaySongs` ✅ | `songs` (a playlist's "Add to autoplay": they replace the autoplay queue, radio continues after them) | Autoplay from here |
@@ -96,8 +97,8 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `Play` / `Pause` ✅ | – | Play/pause |
 | `Skip` / `Previous` ✅ | – | Skip |
 | `Seek` ✅ | `positionMs` | Seek |
-| `SetRepeat` | `mode: "off" \| "queue" \| "one"` | Repeat |
-| `VoteSkip` / `UnvoteSkip` | – | Vote to skip |
+| `SetRepeat` ✅ | `mode: "off" \| "queue" \| "one"` | Repeat |
+| `VoteSkip` ✅ | `on` (false takes the vote back). `Skip` from someone who may only vote is a vote too | Vote to skip |
 | `SetOutput` ✅ | `outputId`, `active` | Change host outputs |
 | `SetOutputVolume` ✅ | `outputId`, `volume` (0–1) | Host output volume |
 
@@ -125,7 +126,7 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `UpdateSettings` ✅ (name, default roles, autoplay) | partial `settings` (later also ordering, access, limits, vote to skip, always on, …) | Change settings |
+| `UpdateSettings` ✅ (name, default roles, autoplay, always on, fair order, vote to skip and its share, the three queue limits) | partial `settings`: null leaves a field as it is; a limit of 0 is off (later also access, …) | Change settings |
 | `SetVisibility` ✅ | `visibility: "public" \| "solo"` | Owner only |
 | `SetOpenElsewhere` ✅ | `mode` (ask / move / move if away) or null for the account's setting, see [room sync](room-sync.md) | Owner only |
 | `ChangeOwner` ✅ | `participantId` | Owner only |
@@ -169,8 +170,8 @@ back (so `addedBy` still points at them), once. Links carry the key in the fragm
 | `HistoryReplaced` ✅ | `items` (a song moved in or out of the history) | everyone |
 | `PlaybackChanged` ✅ | `playback: { playing, positionMs, hostTimeMs }` (on every change) | everyone |
 | `Notice` ✅ | `message` (for example a song that can't be played) | everyone |
-| `RepeatChanged` | `mode` | everyone |
-| `SkipVotesChanged` | `votes`, `needed` | everyone |
+| `RepeatChanged` ✅ | `mode` | everyone |
+| `SkipVotesChanged` ✅ | `skipVotes` (`voters`, `needed`, or null): after a vote, when people come or go, or the settings change | everyone |
 | `OutputsChanged` ✅ | `outputs` (id, name, kind, active, volume) | everyone |
 | `SettingsChanged` ✅ | `settings` | everyone |
 | `RoomUpdated` ✅ | `room` (name, visibility, owner, …) | everyone |

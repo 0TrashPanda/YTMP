@@ -118,6 +118,20 @@
 						</div>
 						<Switch checked={t.settings.autoplay} label="Autoplay" onchange={(on) => save({ ...t, settings: { ...t.settings, autoplay: on } })} />
 					</div>
+					<div class="mt-6 flex items-center gap-4 border-t border-d-line pt-6">
+						<div class="min-w-0 flex-1">
+							<h3 class="text-base font-semibold text-d-head">Fair order</h3>
+							<p class="text-sm text-d-muted">The queue goes round by round, one song per person per round.</p>
+						</div>
+						<Switch checked={t.settings.fairOrder} label="Fair order" onchange={(on) => save({ ...t, settings: { ...t.settings, fairOrder: on } })} />
+					</div>
+					<div class="mt-6 flex items-center gap-4 border-t border-d-line pt-6">
+						<div class="min-w-0 flex-1">
+							<h3 class="text-base font-semibold text-d-head">Vote to skip</h3>
+							<p class="text-sm text-d-muted">People with <em>Vote to Skip</em> vote instead of skipping right away ({t.settings.voteSkipPercent}% needed).</p>
+						</div>
+						<Switch checked={t.settings.voteSkip} label="Vote to skip" onchange={(on) => save({ ...t, settings: { ...t.settings, voteSkip: on } })} />
+					</div>
 				{/if}
 			{:else if !error}
 				<p class="text-d-muted">Loading…</p>

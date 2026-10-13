@@ -392,6 +392,15 @@ class PlaybackService : MediaSessionService() {
             return
         }
         exo.playWhenReady = true
+        if (exo.playbackState == Player.STATE_ENDED) {
+            // At the end, but the room started the song over (repeat one): from where the room is.
+            if (expected < (target.item?.durationMs ?: 0) - SyncCorrection.SEEK_THRESHOLD_MS) {
+                Log.d(TAG, "the room plays this song again -> seek to $expected")
+                exo.seekTo(expected + sync.seekLeadMs)
+                settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
+            }
+            return
+        }
         // Only measure while actually playing, and not right after a seek: the position needs a moment to settle.
         if (!exo.isPlaying) {
             settledAt = maxOf(settledAt, SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS)

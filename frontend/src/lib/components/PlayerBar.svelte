@@ -11,6 +11,9 @@
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
+	import NextButton from './NextButton.svelte';
+	import RepeatButton from './RepeatButton.svelte';
+	import ShuffleButton from './ShuffleButton.svelte';
 	import OutputsSheet from './OutputsSheet.svelte';
 	import Progress from './Progress.svelte';
 	import SkipButtons from './SkipButtons.svelte';
@@ -127,9 +130,7 @@
 			>
 				<Icon name={playback?.playing ? 'pause' : 'play'} size={32} />
 			</button>
-			<button class="shrink-0 rounded-full p-1.5 disabled:opacity-40" aria-label="Next" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Skip' })}>
-				<Icon name="next" size={26} />
-			</button>
+			<NextButton {room} size={26} class="shrink-0 p-1.5" />
 		</div>
 		<!-- At the bottom, between the mini player and the bottom bar, like YTM. -->
 		<div class="h-0.5 bg-white/15">
@@ -142,7 +143,7 @@
 		<Progress {room} {positionMs} />
 		<div class="grid h-18 cursor-pointer grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-4 px-4" role="presentation" onclick={barClick}>
 			<div class="flex items-center justify-self-start">
-				<button class="rounded-full p-2 hover:bg-raised disabled:opacity-40" aria-label="Previous" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Previous' })}>
+				<button class="rounded-full p-2 hover:bg-raised disabled:opacity-40" aria-label="Previous" disabled={!room.canPrevious} onclick={() => room.run({ kind: 'Previous' })}>
 					<Icon name="previous" />
 				</button>
 				{#snippet playPause()}
@@ -161,9 +162,7 @@
 				{:else}
 					{@render playPause()}
 				{/if}
-				<button class="rounded-full p-2 hover:bg-raised disabled:opacity-40" aria-label="Next" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Skip' })}>
-					<Icon name="next" />
-				</button>
+				<NextButton {room} class="p-2 hover:bg-raised" />
 				<span class="pl-2 text-xs text-muted tabular-nums">
 					{formatTime(Math.min(positionMs, duration))} / {formatTime(duration)}
 				</span>
@@ -247,6 +246,9 @@
 						oninput={(e) => player.setVolume(Number(e.currentTarget.value))}
 					/>
 				{/if}
+				<!-- Like YTM: repeat and shuffle next to the volume. -->
+				<RepeatButton {room} size={20} class="hidden p-2 hover:bg-raised md:block" />
+				<ShuffleButton {room} {onToast} size={20} class="hidden p-2 hover:bg-raised md:block" />
 				<button
 					class="rounded-full p-2 hover:bg-raised {activeOutputs ? 'text-accent' : ''}"
 					aria-label="Play on"

@@ -40,6 +40,21 @@ class RoomFollowerTest {
     }
 
     @Test
+    fun `the queue follows the room, so the next song can be looked up ahead`() {
+        val other = item.copy(itemId = "i2")
+        val third = item.copy(itemId = "i3")
+        var s = RoomFollower.apply(empty, Event.QueueItemsAdded(listOf(item, other), 0))
+        s = RoomFollower.apply(s, Event.QueueItemsAdded(listOf(third), 1))
+        assertEquals(listOf("i1", "i3", "i2"), s.queue.map { it.itemId })
+        s = RoomFollower.apply(s, Event.QueueItemMoved("i2", 0))
+        assertEquals(listOf("i2", "i1", "i3"), s.queue.map { it.itemId })
+        s = RoomFollower.apply(s, Event.QueueItemRemoved("i1"))
+        assertEquals(listOf("i2", "i3"), s.queue.map { it.itemId })
+        s = RoomFollower.apply(s, Event.QueueReplaced(listOf(third)))
+        assertEquals(listOf("i3"), s.queue.map { it.itemId })
+    }
+
+    @Test
     fun `alone unless someone else listens or a speaker is on`() {
         assertEquals(true, FollowedRoom(link, "p1", empty, 0.0).alone)
         val friend = Participant("p2", "Friend", isOwner = false, online = true, listening = true)

@@ -22,7 +22,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
 			{ id: 'play_now', name: 'Play Now', description: 'Allows starting a song right away, and jumping to any song in the queue or history.' },
 			{ id: 'remove_own', name: 'Remove Own Songs', description: 'Allows removing songs they added themselves.' },
 			{ id: 'remove_others', name: "Remove Others' Songs", description: 'Allows removing songs that anyone added.' },
-			{ id: 'reorder', name: 'Reorder Queue', description: 'Allows dragging songs to a different place in the queue.' },
+			{ id: 'reorder', name: 'Reorder Queue', description: 'Allows dragging songs to a different place in the queue, shuffling it, and playing songs next with fair order on.' },
 			{ id: 'start_radio', name: 'Start Radio', description: 'Allows clearing the queue and playing a song with a radio of similar songs after it.' },
 			{ id: 'autoplay_from_here', name: 'Autoplay This', description: 'Allows choosing (and clearing) what plays when the queue runs out: the autoplay queue.' }
 		]
@@ -31,8 +31,14 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
 		name: 'Playback',
 		permissions: [
 			{ id: 'play_pause', name: 'Play / Pause', description: 'Allows pausing and resuming the music for everyone.' },
-			{ id: 'skip', name: 'Skip', description: 'Allows skipping to the next song, or back to the previous one.' },
-			{ id: 'seek', name: 'Seek', description: 'Allows jumping to another point in the current song.' }
+			{ id: 'skip', name: 'Skip', description: 'Allows skipping to the next song, or back to the previous one, right away, also when the room votes to skip.' },
+			{
+				id: 'vote_skip',
+				name: 'Vote to Skip',
+				description: 'Allows skipping by voting when the room votes to skip (Queue settings). When it doesn\'t, this skips right away, like Skip.'
+			},
+			{ id: 'seek', name: 'Seek', description: 'Allows jumping to another point in the current song.' },
+			{ id: 'repeat', name: 'Repeat', description: 'Allows repeating the queue or the current song.' }
 		]
 	},
 	{
@@ -60,7 +66,11 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
 	{
 		name: 'Room',
 		permissions: [
-			{ id: 'change_settings', name: 'Manage Room', description: "Allows changing the room's name, the role new people get, and autoplay." },
+			{
+				id: 'change_settings',
+				name: 'Manage Room',
+				description: "Allows changing the room's name, the role new people get, autoplay, fair order, vote to skip and the queue limits (which don't apply to them)."
+			},
 			{ id: 'clone_room', name: 'Clone Room', description: 'Allows making a copy of the room (queue, history, roles) somewhere else, to keep listening there.' },
 			{ id: 'send_migration', name: 'Move Everyone', description: 'Allows inviting everyone to another room, or moving them all there.' }
 		]

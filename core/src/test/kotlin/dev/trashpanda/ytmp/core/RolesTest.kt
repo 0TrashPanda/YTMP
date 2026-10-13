@@ -91,7 +91,8 @@ class RolesTest {
         val guest = room.connect("Guest")
         room.run(owner, Command.AddSongs(listOf(song), QueuePosition.END))
 
-        assertNull(room.run(owner, Command.SetParticipantPermissions(guest.id, allow = listOf(Permission.SEEK), deny = listOf(Permission.SKIP))))
+        // Listeners skip with *Vote to skip* (right away while the room doesn't vote).
+        assertNull(room.run(owner, Command.SetParticipantPermissions(guest.id, allow = listOf(Permission.SEEK), deny = listOf(Permission.VOTE_SKIP))))
         assertNull(room.run(guest, Command.Seek(1000)))
         assertDenied(room.run(guest, Command.Skip))
     }
@@ -196,7 +197,8 @@ class RolesTest {
         val roles = room.state(owner).roles.associateBy { it.id }
         assertTrue(Permission.START_RADIO in roles.getValue("admin").permissions)
         assertTrue(Permission.AUTOPLAY_FROM_HERE in roles.getValue("dj").permissions)
-        assertEquals(custom.permissions, roles.getValue("vip").permissions)
+        // A role that could skip may vote to skip too (that came later than radio).
+        assertEquals(custom.permissions + Permission.VOTE_SKIP, roles.getValue("vip").permissions)
         // Saved again, it knows about radio: nothing is added twice.
         assertEquals(Permission.entries, room.save().knownPermissions)
     }

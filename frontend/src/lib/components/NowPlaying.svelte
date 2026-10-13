@@ -14,6 +14,9 @@
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
+	import NextButton from './NextButton.svelte';
+	import RepeatButton from './RepeatButton.svelte';
+	import ShuffleButton from './ShuffleButton.svelte';
 	import OutputsSheet from './OutputsSheet.svelte';
 	import Progress from './Progress.svelte';
 	import QueuePanel from './QueuePanel.svelte';
@@ -292,7 +295,11 @@
 				<div class="flex w-full max-w-[36rem] shrink-0 flex-col gap-3 lg:hidden">
 					<Progress {room} {positionMs} times />
 					<div class="flex items-center justify-between">
-						<button class="rounded-full p-2 disabled:opacity-40" aria-label="Previous" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Previous' })}>
+						{#if !song.podcast}
+							<!-- Like YTM: shuffle and repeat on either side of the controls. -->
+							<ShuffleButton {room} {onToast} size={26} class="p-2" />
+						{/if}
+						<button class="rounded-full p-2 disabled:opacity-40" aria-label="Previous" disabled={!room.canPrevious} onclick={() => room.run({ kind: 'Previous' })}>
 							<Icon name="previous" size={36} />
 						</button>
 						{#snippet playPause()}
@@ -310,9 +317,10 @@
 						{:else}
 							{@render playPause()}
 						{/if}
-						<button class="rounded-full p-2 disabled:opacity-40" aria-label="Next" disabled={!room.can('skip')} onclick={() => room.run({ kind: 'Skip' })}>
-							<Icon name="next" size={36} />
-						</button>
+						<NextButton {room} size={36} class="p-2" />
+						{#if !song.podcast}
+							<RepeatButton {room} size={26} class="p-2" />
+						{/if}
 					</div>
 					<button
 						class="flex items-center justify-center gap-2 self-center rounded-full px-3 py-1.5 text-sm {playingOn ? 'text-accent' : 'bg-white/10 text-white'}"

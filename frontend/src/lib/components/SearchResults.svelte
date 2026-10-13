@@ -102,7 +102,7 @@
 
 	async function playNext(song: Song) {
 		const e = await room.run({ kind: 'AddSongs', songs: [song], position: 'next' });
-		onToast(e ? e.message : `Playing "${song.title}" next`);
+		onToast(e ? e.message : room.playNextText(`"${song.title}"`));
 	}
 
 	/** The top result, as one big card: a song plays next, anything else opens. */
