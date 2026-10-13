@@ -64,7 +64,7 @@ Music, without Premium, and not tied to a single music service.
   is linked to that server.
 - Listening history (off by default), with search, delete and export.
 - **Sign in to YouTube Music on your phone:** your own Home, a Library with your playlists,
-  liked songs and podcasts, liking and saving to playlists, and search and radio that fit
+  liked songs and podcasts (searchable), liking and saving to playlists, and search and radio that fit
   your taste. The sign-in stays on the phone, and guests in a room on your phone never see it.
 - The same on a **server account**, in every browser you log in with; the phone and the
   server can share one sign-in.

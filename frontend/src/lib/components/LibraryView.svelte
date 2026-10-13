@@ -1,9 +1,11 @@
 <script lang="ts">
 	// Your library, like YTM's: your playlists (Liked music first) and podcasts, through your
-	// YouTube Music sign-in. Signed out, it asks you to sign in.
+	// YouTube Music sign-in. Signed out, it asks you to sign in. The search field filters it by
+	// name (and author), as you type.
 	import { getLibrary } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
 	import type { HomePage } from '../protocol.gen';
+	import type { Card } from './CardGrid.svelte';
 	import { youtube } from '../youtube.svelte';
 	import CardGrid from './CardGrid.svelte';
 	import Icon from './Icon.svelte';
@@ -12,6 +14,17 @@
 
 	let library = $state<HomePage | null>(null);
 	let error = $state<string | null>(null);
+	let query = $state('');
+
+	/** Lowercase, without accents: "cafe" finds "Café". */
+	const plain = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+	const sections = $derived.by(() => {
+		const words = plain(query).split(/\s+/).filter(Boolean);
+		const matches = (card: Card) => words.every((w) => plain(`${card.title} ${card.subtitle ?? ''}`).includes(w));
+		return (library?.sections ?? [])
+			.map((section) => ({ title: section.title, cards: section.items.flatMap((i) => itemCard(i, open) ?? []).filter(matches) }))
+			.filter((section) => section.cards.length);
+	});
 
 	$effect(() => {
 		void youtube.version;
@@ -57,16 +70,20 @@
 			{/each}
 		</div>
 	{:else}
-		{#each library.sections as section, i (section.title + i)}
-			{@const cards = section.items.flatMap((i) => itemCard(i, open) ?? [])}
-			{#if cards.length}
-				<section class="flex flex-col gap-3">
-					<h2 class="px-2 text-xl font-bold sm:text-2xl">{section.title}</h2>
-					<CardGrid {cards} />
-				</section>
+		<label class="mx-2 flex items-center gap-3 rounded-lg bg-raised px-4 py-2 sm:max-w-md">
+			<Icon name="search" size={22} class="shrink-0 text-muted" />
+			<input class="min-w-0 flex-1 bg-transparent py-1 outline-none placeholder:text-muted" type="text" bind:value={query} placeholder="Search your library" aria-label="Search your library" autocapitalize="none" spellcheck="false" enterkeyhint="search" />
+			{#if query}
+				<button class="-my-1 -mr-2 rounded-full p-1.5 text-muted hover:text-white" aria-label="Clear" onclick={() => (query = '')}><Icon name="close" size={20} /></button>
 			{/if}
+		</label>
+		{#each sections as section, i (section.title + i)}
+			<section class="flex flex-col gap-3">
+				<h2 class="px-2 text-xl font-bold sm:text-2xl">{section.title}</h2>
+				<CardGrid cards={section.cards} />
+			</section>
 		{:else}
-			<p class="px-2 text-muted">Your library is empty.</p>
+			<p class="px-2 text-muted">{query.trim() ? `Nothing in your library matches “${query.trim()}”.` : 'Your library is empty.'}</p>
 		{/each}
 	{/if}
 </div>

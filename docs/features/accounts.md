@@ -61,7 +61,8 @@ phone's owner:
 
 - **Home** shows your own suggestions (your quick picks, mixes, listen again).
 - **Library** (bottom bar, like YTM): your playlists (Liked music first) and podcasts
-  (including New episodes); they open like other playlist and podcast pages.
+  (including New episodes); they open like other playlist and podcast pages. A search field at the top finds them
+  by name or author.
 - **Guests** in a room on your phone never see any of it: they get the general Home, and
   your library isn't reachable from other devices.
 - **Like** ✅ (👍 next to the song in the full player; filled when you like it) and **Save to

@@ -31,7 +31,8 @@ Like YTM:
   mixes and playlists (cards that scroll sideways and open their page). Without a linked
   YouTube account these are YTM's general suggestions for the host's country; with one,
   your own (see [accounts](accounts.md#linked-youtube-account)).
-- **Library** ✅ (with a linked YouTube Music account): your playlists and podcasts.
+- **Library** ✅ (with a linked YouTube Music account): your playlists and podcasts, with a
+  search field at the top that finds them by name or author as you type.
 - **Explore** (planned): new releases, charts, moods & genres.
 
 ## Player
