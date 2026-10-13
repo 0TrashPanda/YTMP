@@ -79,15 +79,30 @@ Where small desyncs between devices come from, and what addresses them:
 
 Implemented (A + B), and tested on a Pixel 7:
 
-- **Android (ExoPlayer):** constant speed, drift fixed with a **seek**. Every speed change
-  makes ExoPlayer's reported position jump ~200 ms (audio already buffered at the old
-  speed), so speed-based correction swung back and forth. The position readings also
-  jitter ±120 ms, so decisions use the **median of 8 readings** (2 s). Seeks go slightly
-  ahead of the target by a learned lead (playback resumes a moment after a seek). Result:
-  within about ±50 ms of the room after a few seconds, with a seek about once a minute.
-  See `android/.../SyncCorrection.kt`.
-- **Browser:** plays 3% faster or slower (pitch kept) when more than 40 ms off, back to normal
-  below 10 ms, seeks above 400 ms. See `frontend/src/lib/sync.ts`.
+- **Android (ExoPlayer):** the same rules as the browser (below), since 0.11.2. Before, it
+  only seeked, and in party rooms it kept jumping. Measured in the emulator (2026-10-14):
+  `ExoPlayer.currentPosition` isn't advanced between the playback thread's updates, so it
+  stands still for ~250 ms and then jumps: a ±125 ms sawtooth (the "±120 ms jitter" measured
+  on a Pixel 7 earlier). Read every 250 ms, the median of 8 readings drifted through that
+  sawtooth, crossed the 80 ms tolerance and seeked when nothing was wrong; the same steps
+  looked like ~200 ms jumps after every speed change. Now:
+  - **Position from the audio output** (`AudioClock`, a `ForwardingAudioSink`): the playback
+    thread asks it every few ms; each answer is kept with its exact time (minus the stream
+    offset from `setOutputStreamOffsetUs`) and extrapolated. ±1 ms at a steady speed, and
+    correct right after a seek.
+  - **Speed on the AudioTrack** (`setEnableAudioTrackPlaybackParams`): heard at once.
+    ExoPlayer's own speed change only reaches what you hear after the ~400 ms already
+    buffered (measured: 12–31 ms behind after a 3% change); on the AudioTrack it's within
+    ±15 ms, with one ~30 ms blip in the reading right at the change.
+  - **Clock offset followed gently**: a new estimate from the pings moves the target by at
+    most 2 ms per reading (every 250 ms), so it becomes a speed change, not a seek; more than
+    500 ms is taken at once.
+  - Tested in a party room on the emulator next to a browser listener: after the start (two
+    seeks for a slow start, then 6 s at 0.97×), no correction at all for over 3 minutes, and
+    none after a pause and resume. See `android/.../SyncCorrection.kt`.
+- **Browser and Android:** play 3% faster or slower (pitch kept) when more than 40 ms off, back
+  to normal below 10 ms, seek above 400 ms. Listening alone, only more than 1.5 s is fixed.
+  See `frontend/src/lib/sync.ts`.
 - **Both:** add the device's **sync adjustment** (per device, ±500 ms) for speaker and
   Bluetooth delay, which no player can see.
 

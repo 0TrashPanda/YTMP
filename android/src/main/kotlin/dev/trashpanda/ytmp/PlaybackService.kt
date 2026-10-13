@@ -13,9 +13,13 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import kotlinx.coroutines.CoroutineScope
@@ -55,6 +59,12 @@ class PlaybackService : MediaSessionService() {
 
     private val sync = SyncCorrection()
     private var settledAt = 0L
+
+    /** Where the audio really is (ExoPlayer's own position moves in steps). */
+    private lateinit var audioClock: AudioClock
+
+    /** The room's clock offset as used here: follows the target's gently (see [OFFSET_SLEW_MS][SyncCorrection.OFFSET_SLEW_MS]). */
+    private var clockOffset: Double? = null
 
     private var loadedItemId: String? = null
     private var loadedUrl: String? = null
@@ -121,7 +131,14 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        exo = ExoPlayer.Builder(this)
+        // The speed is set on the AudioTrack, so a correction is heard at once (not only after
+        // the audio already buffered), and [AudioClock] reads where the audio really is.
+        val renderers = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(context: android.content.Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
+                AudioClock(DefaultAudioSink.Builder(context).setEnableFloatOutput(enableFloatOutput).setEnableAudioTrackPlaybackParams(true).build())
+                    .also { audioClock = it }
+        }
+        exo = ExoPlayer.Builder(this, renderers)
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 /* handleAudioFocus = */ true,
@@ -243,6 +260,7 @@ class PlaybackService : MediaSessionService() {
             sourceRoom = target.room
             preferred = Source.DIRECT
             hostItemId = null
+            clockOffset = null
         }
         val item = target?.item
         val from = if (target != null && item != null) sourceFor(target, item) else Source.DIRECT
@@ -275,6 +293,7 @@ class PlaybackService : MediaSessionService() {
                     .build(),
                 expectedPosition(target) + sync.seekLeadMs,
             )
+            exo.playbackParameters = PlaybackParameters(SyncCorrection.NORMAL)
             exo.prepare()
             sync.onLoaded()
             settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
@@ -358,19 +377,18 @@ class PlaybackService : MediaSessionService() {
         if (abs(exo.currentPosition - expected) <= SyncCorrection.ALONE_TOLERANCE_MS) return
         Log.d(TAG, "room jumped -> seek")
         exo.seekTo(expected + sync.seekLeadMs)
-        sync.resetSamples()
         settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
     }
 
-    /** Keeps the local position close to the host's: nudge the speed for small drift, seek for large. */
+    /** Keeps the local position close to the host's: a little faster or slower for small drift, a seek for large. */
     private fun correct(target: PlaybackTarget) {
         if (!target.enabled || target.item?.itemId != loadedItemId) return
+        followClockOffset(target)
         val expected = expectedPosition(target)
-        val reading = exo.currentPosition - expected
 
         if (!target.playing || pausingRoom) {
             exo.playWhenReady = false
-            if (abs(reading) > PAUSED_TOLERANCE_MS) exo.seekTo(expected)
+            if (abs(exo.currentPosition - expected) > PAUSED_TOLERANCE_MS) exo.seekTo(expected)
             return
         }
         exo.playWhenReady = true
@@ -378,11 +396,9 @@ class PlaybackService : MediaSessionService() {
         if (!exo.isPlaying) {
             settledAt = maxOf(settledAt, SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS)
         }
-        if (SystemClock.elapsedRealtime() < settledAt) {
-            sync.resetSamples()
-            return
-        }
-        val drift = sync.addSample(reading) ?: return
+        if (SystemClock.elapsedRealtime() < settledAt) return
+        val speed = exo.playbackParameters.speed
+        val drift = (audioClock.positionMs(speed) ?: return) - expected
 
         if (roomSeekTo != null) roomWontFollow = loadedItemId
         if (target.alone && abs(drift) > SyncCorrection.ALONE_ROOM_TOLERANCE_MS && roomSeekTo == null &&
@@ -400,10 +416,27 @@ class PlaybackService : MediaSessionService() {
         }
         roomSeekTo = null
 
-        val seekTo = sync.onSettledDrift(drift, expected, target.alone) ?: return
-        Log.d(TAG, "drift $drift ms -> seek (lead ${sync.seekLeadMs} ms)")
-        exo.seekTo(seekTo)
-        settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
+        val fix = sync.onDrift(drift, expected, speed, target.alone)
+        if (fix.seekTo != null) {
+            Log.d(TAG, "drift $drift ms -> seek (lead ${sync.seekLeadMs} ms)")
+            exo.playbackParameters = PlaybackParameters(fix.speed)
+            exo.seekTo(fix.seekTo)
+            settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
+        } else if (fix.speed != speed) {
+            Log.d(TAG, "drift $drift ms -> speed ${fix.speed}")
+            exo.playbackParameters = PlaybackParameters(fix.speed)
+        }
+    }
+
+    /**
+     * Moves [clockOffset] toward the room's latest estimate. Estimates from pings differ by
+     * some ms each time; taken at once, each would look like drift to fix.
+     */
+    private fun followClockOffset(target: PlaybackTarget) {
+        val wanted = target.clockOffset
+        val used = clockOffset
+        clockOffset = if (used == null || abs(wanted - used) > SyncCorrection.OFFSET_JUMP_MS) wanted
+        else used + (wanted - used).coerceIn(-SyncCorrection.OFFSET_SLEW_MS, SyncCorrection.OFFSET_SLEW_MS)
     }
 
     private fun holdLocks(hold: Boolean) {
@@ -424,7 +457,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun expectedPosition(target: PlaybackTarget): Long =
-        SyncCorrection.targetPosition(target, System.currentTimeMillis())
+        SyncCorrection.targetPosition(clockOffset?.let { target.copy(clockOffset = it) } ?: target, System.currentTimeMillis())
             .coerceAtMost(maxOf(0, target.item?.durationMs ?: 0))
 
     private fun unload() {

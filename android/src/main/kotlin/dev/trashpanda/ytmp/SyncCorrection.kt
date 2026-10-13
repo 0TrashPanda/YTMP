@@ -3,32 +3,18 @@ package dev.trashpanda.ytmp
 import kotlin.math.abs
 
 /**
- * Keeping ExoPlayer in sync with the room.
+ * Keeping ExoPlayer in sync with the room: the same rules as the browser's
+ * (frontend/src/lib/sync.ts); keep the two in step.
  *
- * Unlike the browser (frontend/src/lib/sync.ts), this never changes the playback speed:
- * after every speed change ExoPlayer's reported position jumps by ~200 ms (audio already
- * buffered at the old speed), so speed-based correction chases a position that isn't
- * real. At constant speed the position is reliable, so drift is fixed with a seek, and
- * after a song change that is usually the only one needed.
- *
- * ExoPlayer's position also jitters by about ±120 ms between readings (measured on a
- * Pixel 7), so single readings are useless for 50 ms corrections: decisions are made on
- * the median of a few seconds of samples.
+ * Small drift is fixed by playing a little faster or slower (pitch kept), big drift with a
+ * seek. This needs the real position, read from the audio output ([AudioClock]), and the
+ * speed set on the AudioTrack itself, which changes what you hear at once. (ExoPlayer's own
+ * `currentPosition` moves in ~250 ms steps, which looked like jumps after every speed change
+ * and made this class seek all the time; see docs/implementation/playback-sync.md.)
  */
 class SyncCorrection {
-    private val samples = ArrayList<Long>()
-
-    /** Adds one drift reading. Returns the median once enough readings are collected, else null. */
-    fun addSample(driftMs: Long): Long? {
-        samples += driftMs
-        if (samples.size < SAMPLES) return null
-        val median = samples.sorted()[samples.size / 2]
-        samples.clear()
-        return median
-    }
-
-    /** Throws away readings, e.g. after a seek. */
-    fun resetSamples() = samples.clear()
+    /** What to do: play at [speed], and seek to [seekTo] first if it isn't null. */
+    data class Fix(val speed: Float, val seekTo: Long? = null)
 
     /**
      * How far ahead of the target to seek: playback resumes a little after a seek, and this
@@ -40,31 +26,52 @@ class SyncCorrection {
     private var checkLeadAfterSeek = false
 
     /**
-     * Called with the drift (positive = ahead) once playback has settled after the last seek.
-     * Returns the position to seek to, or null if no correction is needed.
+     * How to fix [driftMs] (positive = ahead of the room) while playing at [speed]; [targetMs]
+     * is where the room is. Called with every reading once playback has settled.
      */
-    fun onSettledDrift(driftMs: Long, targetMs: Long, alone: Boolean = false): Long? {
+    fun onDrift(driftMs: Long, targetMs: Long, speed: Float, alone: Boolean = false): Fix {
+        val size = abs(driftMs)
         // Nobody to stay in sync with: only fix what's clearly wrong (a seek, a long stall).
-        if (alone) return if (abs(driftMs) > ALONE_TOLERANCE_MS) targetMs + seekLeadMs else null
+        if (alone) return if (size > ALONE_TOLERANCE_MS) seek(targetMs) else Fix(NORMAL)
         if (checkLeadAfterSeek) {
             // After our last seek we ended up [driftMs] off: adjust the lead for next time,
             // by half the error, so one unlucky seek doesn't make it swing back and forth.
             seekLeadMs = (seekLeadMs - driftMs / 2).coerceIn(0, MAX_SEEK_LEAD_MS)
             checkLeadAfterSeek = false
         }
-        if (abs(driftMs) <= TOLERANCE_MS) return null
-        checkLeadAfterSeek = true
-        return targetMs + seekLeadMs
+        if (size > SEEK_THRESHOLD_MS) return seek(targetMs)
+        val correcting = if (driftMs > 0) NORMAL - CORRECTION_RATE else NORMAL + CORRECTION_RATE
+        if (speed != NORMAL) {
+            // Keep going until close enough, or until we overshot to the other side.
+            return Fix(if (size < STOP_CORRECTING_MS || speed != correcting) NORMAL else speed)
+        }
+        return Fix(if (size > START_CORRECTING_MS) correcting else NORMAL)
     }
 
-    /** The player was (re)loaded at [onSettledDrift]'s suggested position; check how well it landed. */
+    private fun seek(targetMs: Long): Fix {
+        checkLeadAfterSeek = true
+        return Fix(NORMAL, targetMs + seekLeadMs)
+    }
+
+    /** The player was (re)loaded at a position from [seekLeadMs]; check how well it landed. */
     fun onLoaded() {
         checkLeadAfterSeek = true
     }
 
     companion object {
-        /** Closer than this counts as in sync. The median of readings still varies ±40 ms. */
-        const val TOLERANCE_MS = 80L
+        const val NORMAL = 1f
+
+        /** Further off than this, seek instead of speeding up or slowing down. */
+        const val SEEK_THRESHOLD_MS = 400L
+
+        /** Start correcting when further off than this… */
+        const val START_CORRECTING_MS = 40L
+
+        /** …and stop once closer than this. The gap avoids flipping speed back and forth. */
+        const val STOP_CORRECTING_MS = 10L
+
+        /** Speed change while correcting: 3% faster or slower. */
+        const val CORRECTION_RATE = 0.03f
 
         /** Listening alone: only drift bigger than this is fixed with a seek here. */
         const val ALONE_TOLERANCE_MS = 1500L
@@ -79,17 +86,25 @@ class SyncCorrection {
         const val MAX_ROOM_FOLLOW_MS = 10_000L
 
         /** Wait this long after a seek or load before measuring again. */
-        const val SETTLE_MS = 1500L
+        const val SETTLE_MS = 1000L
 
-        /** Readings per decision; taken every [SAMPLE_INTERVAL_MS]. */
-        const val SAMPLES = 8
+        /** How often to measure while playing with others. */
         const val SAMPLE_INTERVAL_MS = 250L
 
         /** Listening alone, after [QUICK_MEASURE_MS] of settled playback: one reading per second. */
         const val ALONE_SAMPLE_INTERVAL_MS = 1000L
 
-        /** Long enough for one quick decision ([SAMPLES] readings) after a load or seek. */
-        const val QUICK_MEASURE_MS = SAMPLES * SAMPLE_INTERVAL_MS + 1000L
+        /** Long enough for a few quick readings after a load or seek. */
+        const val QUICK_MEASURE_MS = 2000L
+
+        /**
+         * The room's clock offset (re-estimated from pings) moves at most this much per
+         * reading, so a new estimate becomes a gentle speed change rather than a seek…
+         */
+        const val OFFSET_SLEW_MS = 2.0
+
+        /** …unless it moved this much: then it's a real change, taken at once. */
+        const val OFFSET_JUMP_MS = 500.0
 
         const val INITIAL_SEEK_LEAD_MS = 250L
         const val MAX_SEEK_LEAD_MS = 1500L

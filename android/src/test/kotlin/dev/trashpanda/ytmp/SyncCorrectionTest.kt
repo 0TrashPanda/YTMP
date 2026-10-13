@@ -1,38 +1,48 @@
 package dev.trashpanda.ytmp
 
+import dev.trashpanda.ytmp.SyncCorrection.Companion.CORRECTION_RATE
+import dev.trashpanda.ytmp.SyncCorrection.Companion.NORMAL
+import dev.trashpanda.ytmp.SyncCorrection.Fix
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class SyncCorrectionTest {
+    private val faster = NORMAL + CORRECTION_RATE
+    private val slower = NORMAL - CORRECTION_RATE
+
     @Test
     fun `small drift is left alone`() {
-        assertNull(SyncCorrection().onSettledDrift(driftMs = 40, targetMs = 10_000))
-        assertNull(SyncCorrection().onSettledDrift(driftMs = -40, targetMs = 10_000))
+        assertEquals(Fix(NORMAL), SyncCorrection().onDrift(driftMs = 30, targetMs = 10_000, speed = NORMAL))
+        assertEquals(Fix(NORMAL), SyncCorrection().onDrift(driftMs = -30, targetMs = 10_000, speed = NORMAL))
     }
 
     @Test
-    fun `larger drift seeks a little ahead of the target`() {
+    fun `medium drift plays a little faster or slower instead of jumping`() {
+        assertEquals(Fix(faster), SyncCorrection().onDrift(driftMs = -150, targetMs = 10_000, speed = NORMAL))
+        assertEquals(Fix(slower), SyncCorrection().onDrift(driftMs = 150, targetMs = 10_000, speed = NORMAL))
+    }
+
+    @Test
+    fun `a correction keeps going until close, then plays normally again`() {
         val sync = SyncCorrection()
-        assertEquals(10_000 + SyncCorrection.INITIAL_SEEK_LEAD_MS, sync.onSettledDrift(driftMs = -300, targetMs = 10_000))
+        assertEquals(Fix(faster), sync.onDrift(driftMs = -30, targetMs = 10_000, speed = faster))
+        assertEquals(Fix(NORMAL), sync.onDrift(driftMs = -5, targetMs = 10_000, speed = faster))
+        // Overshot to the other side: stop rather than flip.
+        assertEquals(Fix(NORMAL), sync.onDrift(driftMs = 30, targetMs = 10_000, speed = faster))
+    }
+
+    @Test
+    fun `large drift seeks a little ahead of the target`() {
+        assertEquals(Fix(NORMAL, 10_000 + SyncCorrection.INITIAL_SEEK_LEAD_MS), SyncCorrection().onDrift(driftMs = -600, targetMs = 10_000, speed = faster))
     }
 
     @Test
     fun `the seek lead learns from where the last seek landed`() {
         val sync = SyncCorrection()
-        sync.onSettledDrift(driftMs = -300, targetMs = 10_000)
+        sync.onDrift(driftMs = -600, targetMs = 10_000, speed = NORMAL)
         // Landed 40 ms behind: next time seek half of that further ahead.
-        assertNull(sync.onSettledDrift(driftMs = -40, targetMs = 20_000))
+        sync.onDrift(driftMs = -40, targetMs = 20_000, speed = NORMAL)
         assertEquals(SyncCorrection.INITIAL_SEEK_LEAD_MS + 20, sync.seekLeadMs)
-    }
-
-    @Test
-    fun `decisions use the median of several readings`() {
-        val sync = SyncCorrection()
-        val readings = listOf(-900L, -1050, -1130, -1040, -900, -1000, -1060, -930)
-        val results = readings.map { sync.addSample(it) }
-        assertEquals(List(SyncCorrection.SAMPLES - 1) { null }, results.dropLast(1))
-        assertEquals(-1000L, results.last())
     }
 
     @Test
@@ -48,8 +58,8 @@ class SyncCorrectionTest {
     @Test
     fun `listening alone, small drift is left alone and only big drift is fixed`() {
         val sync = SyncCorrection()
-        assertNull(sync.onSettledDrift(300, 10_000, alone = true))
-        assertNull(sync.onSettledDrift(-1_200, 10_000, alone = true))
-        assertEquals(10_000 + sync.seekLeadMs, sync.onSettledDrift(4_000, 10_000, alone = true))
+        assertEquals(Fix(NORMAL), sync.onDrift(300, 10_000, faster, alone = true))
+        assertEquals(Fix(NORMAL), sync.onDrift(-1_200, 10_000, NORMAL, alone = true))
+        assertEquals(Fix(NORMAL, 10_000 + sync.seekLeadMs), sync.onDrift(4_000, 10_000, NORMAL, alone = true))
     }
 }
