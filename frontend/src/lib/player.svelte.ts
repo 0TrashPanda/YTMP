@@ -129,6 +129,7 @@ class WebPlayer implements RoomPlayer {
 		if (navigator.mediaSession) navigator.mediaSession.playbackState = state.playback.playing ? 'playing' : 'paused';
 		if (this.loadedItemId !== now.item.itemId) {
 			this.loadedItemId = now.item.itemId;
+			this.error = null;
 			this.showMetadata();
 			this.audio.src = this.useProxy ? proxiedAudioUrl(now.item.song.id) : now.streamUrl;
 			this.audio.playbackRate = 1;
@@ -225,6 +226,9 @@ class WebPlayer implements RoomPlayer {
 			this.sync();
 		} else {
 			this.error = `Can't play "${now.item.song.title}" on this device.`;
+			// The host can't help either (it may not stream to this network): the next song tries
+			// its direct link again, which often works, instead of failing the same way.
+			this.useProxy = false;
 		}
 	}
 
