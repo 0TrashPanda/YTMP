@@ -77,6 +77,14 @@
 		});
 	});
 
+	/** The phone's Back button: closes adding members, then a role's page (phones). False: nothing to go back from. */
+	export function back(): boolean {
+		if (adding) adding = false;
+		else if (editing) dirty ? warn() : (editing = false);
+		else return false;
+		return true;
+	}
+
 	function warn() {
 		shake = true;
 		setTimeout(() => (shake = false), 600);

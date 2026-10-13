@@ -49,6 +49,22 @@
 	/** Phones: a section (true) or the list of sections. */
 	// svelte-ignore state_referenced_locally
 	let showingSection = $state(start !== 'list');
+	/** Phones: the list was shown, so Back goes there from a section. */
+	// svelte-ignore state_referenced_locally
+	let cameFromList = $state(start === 'list');
+	let roleEditor = $state<RoleEditor>();
+
+	/** The phone's Back button: one step back (a dialog, a menu, a role, the list). False: close the settings. */
+	export function back(): boolean {
+		if (leaving) leaving = false;
+		else if (permissionsFor) permissionsFor = null;
+		else if (menuFor) menuFor = null;
+		else if (section === 'roles' && roleEditor?.back()) return true;
+		// Wide screens show the list next to the section.
+		else if (showingSection && cameFromList && !matchMedia('(min-width: 768px)').matches) showingSection = false;
+		else return false;
+		return true;
+	}
 
 	async function run(command: Command): Promise<boolean> {
 		return (await room.run(command)) === null;
@@ -160,7 +176,7 @@
 	<div class="{showingSection ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 overflow-hidden">
 		<div class="flex h-full w-full max-w-[740px] min-w-0 flex-col px-4 pt-4 md:px-10 md:pt-[60px]">
 			<div class="mb-5 flex items-center gap-2">
-				<button class="rounded p-1 text-d-muted hover:text-d-head md:hidden" aria-label="Back" onclick={() => (showingSection = false)}>
+				<button class="rounded p-1 text-d-muted hover:text-d-head md:hidden" aria-label="Back" onclick={() => ((showingSection = false), (cameFromList = true))}>
 					<svg viewBox="0 0 24 24" class="h-5 w-5"><path fill="currentColor" d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" /></svg>
 				</button>
 				<h1 class="text-xl font-semibold text-d-head">{sections.find(([id]) => id === section)?.[1] ?? 'Members'}</h1>
@@ -257,6 +273,7 @@
 				</p>
 				<div class="min-h-0 flex-1">
 					<RoleEditor
+						bind:this={roleEditor}
 						{roles}
 						defaultRoleIds={[rs.settings.defaultGuestRole, rs.settings.defaultAccountRole]}
 						canManage={(index) => room.can('edit_roles') && (!!me?.isOwner || index > myRank)}

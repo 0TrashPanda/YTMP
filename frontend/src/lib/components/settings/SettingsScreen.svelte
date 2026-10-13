@@ -71,6 +71,18 @@
 	let showingSection = $state(start !== null);
 	const title = $derived(sections.find(([id]) => id === section)?.[1] ?? 'Settings');
 
+	/** Phones: the list was shown, so Back goes there from a section. */
+	// svelte-ignore state_referenced_locally
+	let cameFromList = $state(start === null);
+
+	/** The phone's Back button: from a section to the list. False: close the settings. */
+	export function back(): boolean {
+		// Wide screens show the list next to the section.
+		if (!showingSection || !cameFromList || matchMedia('(min-width: 768px)').matches) return false;
+		showingSection = false;
+		return true;
+	}
+
 	function open(id: SettingsSection) {
 		section = id;
 		showingSection = true;
@@ -128,7 +140,7 @@
 	<div class="{showingSection ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col overflow-y-auto">
 		<div class="mx-auto flex w-full max-w-xl flex-col gap-5 p-4 md:p-8">
 			<div class="flex items-center gap-2">
-				<button class="rounded-full p-1.5 hover:bg-raised md:hidden" aria-label="Back to settings" onclick={() => (showingSection = false)}><Icon name="back" /></button>
+				<button class="rounded-full p-1.5 hover:bg-raised md:hidden" aria-label="Back to settings" onclick={() => ((showingSection = false), (cameFromList = true))}><Icon name="back" /></button>
 				<h2 class="text-xl font-bold">{title}</h2>
 				<button class="ml-auto hidden rounded-full p-1.5 text-muted hover:bg-raised hover:text-white md:block" aria-label="Close settings" onclick={onClose}>
 					<Icon name="close" />

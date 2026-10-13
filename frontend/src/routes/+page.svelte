@@ -27,6 +27,7 @@
 	let hideFromHistory = $state(saved.hideFromHistory);
 	let profileOpen = $state(false);
 	let settingsAt = $state<SettingsSection | null | undefined>(undefined);
+	let settingsScreen = $state<SettingsScreen>();
 	let toastText = $state<string | null>(null);
 	$effect(() => {
 		saved.hideFromHistory = hideFromHistory;
@@ -51,10 +52,25 @@
 		if (nativeBridge) {
 			nearby = JSON.parse(nativeBridge.nearbyRooms());
 			// The room list is the app's first page: Back from here puts the app away.
-			window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: (rooms) => (nearby = rooms), onBack: () => (profileOpen ? ((profileOpen = false), 'handled') : 'exit') };
+			window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: (rooms) => (nearby = rooms), onBack };
 			youtube.load();
 		}
 	});
+
+	function closeSettings() {
+		settingsAt = undefined;
+		// Logged in or out meanwhile.
+		if (host) me = identity.get(host.authServers);
+	}
+
+	// The phone's Back button: settings go back a step, then close; then the avatar menu.
+	function onBack(): 'handled' | 'exit' {
+		if (settingsAt !== undefined) {
+			if (!settingsScreen?.back()) closeSettings();
+		} else if (profileOpen) profileOpen = false;
+		else return 'exit';
+		return 'handled';
+	}
 
 	onDestroy(() => {
 		if (window.__ytmpNative) window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: undefined, onBack: undefined };
@@ -197,12 +213,9 @@
 {/if}
 {#if settingsAt !== undefined}
 	<SettingsScreen
+		bind:this={settingsScreen}
 		start={settingsAt}
-		onClose={() => {
-			settingsAt = undefined;
-			// Logged in or out meanwhile.
-			if (host) me = identity.get(host.authServers);
-		}}
+		onClose={closeSettings}
 		onToast={(text) => {
 			toastText = text;
 			setTimeout(() => toastText === text && (toastText = null), 3000);

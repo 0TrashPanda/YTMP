@@ -107,6 +107,8 @@
 	let accountOpen = $state(false);
 	/** Settings, at this section (null: the list). */
 	let settingsAt = $state<SettingsSection | null | undefined>(undefined);
+	let settingsScreen = $state<SettingsScreen>();
+	let roomSettings = $state<RoomSettings>();
 	let leaving = $state(false);
 	let playingOn = $state(false);
 	/** Saving this song to one of your YouTube Music playlists. */
@@ -276,6 +278,9 @@
 	// on to the room list, as set in Settings → Playback (separately for solo and party rooms).
 	function onBack(): 'handled' | 'exit' | 'default' {
 		if (!room || room.status === 'rejected') return 'default';
+		// Settings go back a step first (a section to the list, a role to the roles).
+		if (settings && roomSettings?.back()) return 'handled';
+		if (settingsAt !== undefined && settingsScreen?.back()) return 'handled';
 		if (menu || saving || settings || accountOpen || sharing || cloning || leaving || playingOn || settingsAt !== undefined) {
 			menu = saving = settings = null;
 			accountOpen = sharing = cloning = leaving = playingOn = false;
@@ -693,6 +698,7 @@
 
 	{#if settings && room.state}
 		<RoomSettings
+			bind:this={roomSettings}
 			{room}
 			{host}
 			start={settings}
@@ -723,7 +729,7 @@
 	{/if}
 
 	{#if settingsAt !== undefined}
-		<SettingsScreen start={settingsAt} onClose={() => (settingsAt = undefined)} onToast={toast} />
+		<SettingsScreen bind:this={settingsScreen} start={settingsAt} onClose={() => (settingsAt = undefined)} onToast={toast} />
 	{/if}
 
 	{#if leaving && room.state}

@@ -3,6 +3,7 @@
 	import type { HostInfo } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
+	import { getHost } from '../api';
 
 	let {
 		room,
@@ -18,10 +19,16 @@
 	// Friends need an address they can reach: the phone's Wi-Fi address (or its hotspot, a VPN,
 	// … when it has several: pick one), or this page's own.
 	const local = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+	// Asked again on opening: a hotspot or VPN turned on since the page loaded shows up.
+	let fresh = $state<HostInfo | null>(null);
+	getHost()
+		.then((info) => (fresh = info))
+		.catch(() => {});
+	const current = $derived(fresh ?? host);
 	const addresses = $derived.by(() => {
-		const list = [...(host?.shareAddresses ?? [])];
+		const list = [...(current?.shareAddresses ?? [])];
 		const add = (url: string | null | undefined, label: string) => url && !list.some((a) => a.url === url) && list.push({ url, label });
-		add(host?.shareUrl, 'Network');
+		add(current?.shareUrl, 'Network');
 		if (!local) add(location.origin, new URL(location.origin).host);
 		return list;
 	});
