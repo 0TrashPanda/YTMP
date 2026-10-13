@@ -456,6 +456,7 @@ export interface Participant {
   allow: Permission[];
   deny: Permission[];
   tag: string;
+  screen: boolean;
 }
 
 export interface EventParticipantJoined {
@@ -708,6 +709,23 @@ export interface CreateRoomResponse {
   code: string;
   ownerToken: string;
   url: string | null;
+}
+
+export interface ScreenPairing {
+  code: string;
+  secret: string;
+  expiresAt: number;
+}
+
+export interface ScreenLinkRequest {
+  code: string;
+  roomCode: string;
+  guestToken: string;
+}
+
+export interface ScreenLinked {
+  roomCode: string;
+  guestToken: string;
 }
 
 export interface SearchResponse {

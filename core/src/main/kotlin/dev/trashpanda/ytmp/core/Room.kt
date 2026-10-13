@@ -126,6 +126,8 @@ class Room(
         var hideFromHistory: Boolean = false,
         /** When they joined; the longest here gets the room when its owner leaves. */
         val joinedAt: Long = 0,
+        /** A party screen: no role (it only watches), and not a person (votes, "listened with"). */
+        val screen: Boolean = false,
     ) {
         /** Only for them: proves who they were in a clone of this room ([Migrant]). */
         val migrationKey: String by lazy { Ids.sha256("ytmp-migrate:$token") }
@@ -157,7 +159,7 @@ class Room(
 
         fun toParticipant() = Participant(
             id, name, isOwner, online = online, listening = listening, accountId = accountId,
-            roleId = roleId, allow = allow.sorted(), deny = deny.sorted(), tag = tag,
+            roleId = roleId, allow = allow.sorted(), deny = deny.sorted(), tag = tag, screen = screen,
         )
     }
 
@@ -267,7 +269,9 @@ class Room(
      */
     suspend fun join(hello: ClientMessage.Hello, outbox: Outbox, local: Boolean = true, account: AccountIdentity? = null): String? = mutex.withLock {
         val isOwner = hello.ownerToken == ownerToken || (account != null && account.id == ownerAccount)
-        if (visibility == RoomVisibility.PRIVATE && !local && !isOwner) {
+        // A party screen someone here linked (see [addScreen]): it may watch a solo room too.
+        val screen = members.values.firstOrNull { it.screen && it.token == hello.guestToken }
+        if (visibility == RoomVisibility.PRIVATE && !local && !isOwner && screen == null) {
             outbox.send(ServerMessage.Rejected(RejectReason.PRIVATE_ROOM))
             return null
         }
@@ -318,12 +322,12 @@ class Room(
 
         member.outbox?.takeIf { it !== outbox }?.send(ServerMessage.Rejected(RejectReason.REPLACED))
         member.outbox = outbox
-        member.name = account?.displayName ?: name
-        member.accountId = account?.id
+        if (!member.screen) member.name = account?.displayName ?: name
+        member.accountId = account?.id.takeUnless { member.screen }
         member.accountToken = hello.accountToken.takeIf { account != null }
         member.hideFromHistory = hello.hideFromHistory || account?.hideFromHistory == true
         // Logging in later (same guest token, now with the owner's account) makes you the owner.
-        member.isOwner = member.isOwner || isOwner
+        member.isOwner = (member.isOwner || isOwner) && !member.screen
         member.offlineSince = null
         lastActive = clock()
 
@@ -366,6 +370,30 @@ class Room(
         member.attached += outbox
         outbox.send(ServerMessage.Welcome(member.id, member.token, seq, snapshot(), accountId = member.accountId, migrationKey = member.migrationKey))
         member.id
+    }
+
+    /**
+     * Someone here ([byGuestToken]) shows the room on a TV: a party screen participant, which
+     * only watches (no role). Returns the guest token it joins with, or null when [byGuestToken]
+     * isn't anyone here or the room has [MAX_SCREENS] already.
+     */
+    suspend fun addScreen(byGuestToken: String): String? = mutex.withLock {
+        val by = members.values.firstOrNull { it.token == byGuestToken && !it.screen } ?: return@withLock null
+        if (members.values.count { it.screen } >= MAX_SCREENS) return@withLock null
+        val screen = Member(
+            id = Ids.short(), token = Ids.token(), name = SCREEN_NAME, isOwner = false, outbox = null, roleId = "",
+            offlineSince = clock(), joinedAt = clock(), screen = true,
+        )
+        members[screen.id] = screen
+        emit(Event.ParticipantJoined(screen.toParticipant()))
+        emit(Event.Notice("${by.name} shows the room on a TV"))
+        log.info("Room {}: {} linked a party screen", code, by.name)
+        screen.token
+    }
+
+    /** [guestToken] is a party screen's: it may join without an account. */
+    suspend fun isScreen(guestToken: String?): Boolean = mutex.withLock {
+        guestToken != null && members.values.any { it.screen && it.token == guestToken }
     }
 
     suspend fun disconnect(participantId: String, outbox: Outbox) = mutex.withLock {
@@ -451,7 +479,7 @@ class Room(
             name = name,
             ownerToken = ownerToken,
             visibility = visibility,
-            members = members.values.map { SavedMember(it.id, it.token, it.name, it.isOwner, it.accountId, it.roleId, it.allow.sorted(), it.deny.sorted(), it.joinedAt) },
+            members = members.values.map { SavedMember(it.id, it.token, it.name, it.isOwner, it.accountId, it.roleId, it.allow.sorted(), it.deny.sorted(), it.joinedAt, it.screen) },
             queue = queue.toList(),
             history = history.takeLast(SAVED_HISTORY),
             current = current,
@@ -513,11 +541,11 @@ class Room(
         episodePositions += saved.episodePositions
         val roleIds = roles.map { it.id }.toSet()
         for (m in saved.members) {
-            val roleId = m.roleId?.takeIf { it in roleIds }
+            val roleId = m.roleId?.takeIf { it in roleIds || m.screen }
                 ?: if (m.isOwner) roles.first().id else if (m.accountId != null) settings.defaultAccountRole else settings.defaultGuestRole
             members[m.id] = Member(
                 m.id, m.token, m.name, m.isOwner, outbox = null, roleId = roleId, accountId = m.accountId,
-                offlineSince = now, allow = m.allow.toSet(), deny = m.deny.toSet(), joinedAt = m.joinedAt,
+                offlineSince = now, allow = m.allow.toSet(), deny = m.deny.toSet(), joinedAt = m.joinedAt, screen = m.screen,
             )
         }
         queue += saved.queue
@@ -814,6 +842,7 @@ class Room(
                 if (!member.isOwner) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "Only the owner can hand the room over")
                 val target = members[command.participantId] ?: return notFoundPerson()
                 if (target === member) return invalid("You're the owner already")
+                if (target.screen) return invalid("A party screen can't own the room")
                 changeOwner(target)
             }
             is Command.LeaveRoom -> return leave(member, command.newOwnerId, command.stayOwner)
@@ -1423,7 +1452,7 @@ class Room(
     private fun reportFinished(item: QueueItem, result: QueueItemResult) {
         if (streamUrl == null) return
         val heard = if (result == QueueItemResult.PLAYED) item.song.durationMs else position()
-        val listeners = members.values.filter { it.online }.map {
+        val listeners = members.values.filter { it.online && !it.screen }.map {
             FinishedPlay.Listener(it.id, it.name, it.accountId, it.accountToken, it.hideFromHistory)
         }
         onPlayFinished?.invoke(FinishedPlay(item, currentStartedAt, heard, result == QueueItemResult.SKIPPED, code, name, listeners, visibility))
@@ -1767,6 +1796,9 @@ class Room(
         /** A clone's queue (and autoplay queue) keeps at most this many songs. */
         const val MAX_CLONE_QUEUE = 1000
         const val MAX_MIGRANTS = 200
+        /** Party screens one room can have. */
+        const val MAX_SCREENS = 5
+        const val SCREEN_NAME = "Party screen"
         /** A radio someone brings ([Command.StartRadio.songs]) keeps at most this many songs. */
         const val MAX_BROUGHT_RADIO = 100
         /** The last listening device disconnected this long ago: the music pauses (a reload isn't leaving). */

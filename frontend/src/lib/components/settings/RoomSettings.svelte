@@ -419,7 +419,7 @@
 									{#if person.id === me?.id}<span class="text-xs font-normal text-d-faint">(you)</span>{/if}
 								</p>
 								<p class="truncate text-xs text-d-faint">
-									{person.accountId ?? 'Guest'}{person.allow.length || person.deny.length ? ' · own permissions' : ''}
+									{person.screen ? 'Shows the room on a TV' : (person.accountId ?? 'Guest')}{person.allow.length || person.deny.length ? ' · own permissions' : ''}
 								</p>
 							</div>
 							<div class="w-36 max-sm:w-auto">
@@ -436,7 +436,7 @@
 								{:else}
 									<span class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-d-deep px-2 py-0.5 text-xs font-medium">
 										<span class="h-2.5 w-2.5 shrink-0 rounded-full" style:background={role?.color ?? DEFAULT_ROLE_COLOR}></span>
-										<span class="truncate">{person.isOwner ? 'Owner' : (role?.name ?? '—')}</span>
+										<span class="truncate">{person.isOwner ? 'Owner' : person.screen ? 'Screen' : (role?.name ?? '—')}</span>
 									</span>
 								{/if}
 							</div>
@@ -453,7 +453,7 @@
 							</div>
 							{#if menuFor === person.id}
 								<div class="absolute top-11 right-2 z-10 flex w-48 flex-col rounded bg-d-bar p-1.5 shadow-xl">
-									{#if me?.isOwner && person.id !== me.id}
+									{#if me?.isOwner && person.id !== me.id && !person.screen}
 										<button class="rounded px-2 py-1.5 text-left text-sm hover:bg-d-blurple hover:text-white" onclick={() => makeOwner(person)}>Make Owner</button>
 									{/if}
 									{#if manageable && room.can('assign_roles')}

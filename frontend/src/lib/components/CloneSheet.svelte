@@ -44,7 +44,7 @@
 		if (!soloPossible && visibility === 'private') visibility = 'public';
 	});
 
-	const othersHere = $derived(s.participants.filter((p) => p.id !== room.participantId && p.online).length);
+	const othersHere = $derived(s.participants.filter((p) => p.id !== room.participantId && p.online && !p.screen).length);
 	const canBring = $derived(room.can('send_migration') && s.room.visibility === 'public' && visibility === 'public' && othersHere > 0);
 	let bring = $state<'none' | MigrationMode>('invite');
 	let busy = $state(false);
@@ -64,7 +64,7 @@
 			roles: s.roles,
 			settings: { ...s.settings, openElsewhere: null, alwaysOn: false },
 			migrants: s.participants
-				.filter((p) => p.tag)
+				.filter((p) => p.tag && !p.screen)
 				.map((p) => ({ tag: p.tag, id: p.id, name: p.name, roleId: p.isOwner && top ? top : p.roleId, accountId: p.accountId, allow: p.allow, deny: p.deny }))
 		};
 	}

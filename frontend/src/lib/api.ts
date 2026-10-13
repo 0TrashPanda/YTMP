@@ -2,6 +2,9 @@ import type {
 	AlbumPage,
 	ApiError,
 	ArtistPage,
+	ScreenLinked,
+	ScreenLinkRequest,
+	ScreenPairing,
 	CreatePlaylistRequest,
 	CreatePlaylistResponse,
 	CreateRoomResponse,
@@ -58,6 +61,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 		throw new ApiRequestError(body?.error.message ?? `Request failed (${response.status})`);
 	}
 	return (response.status === 204 ? null : response.json()) as Promise<T>;
+}
+
+// --- party screens on a TV (docs/features/ui.md#party-screen) ---
+
+/** The TV: a code to show, and the secret to wait with. */
+export function startScreenPairing(): Promise<ScreenPairing> {
+	return request('/api/screens', { method: 'POST' });
+}
+
+/** The TV: waits ~25 s for someone to link it; null means ask again. Throws when the code expired. */
+export function waitForScreenLink(secret: string): Promise<ScreenLinked | null> {
+	return request(`/api/screens/${encodeURIComponent(secret)}`);
+}
+
+/** In a room: show it on the TV that shows [code]. */
+export async function linkScreen(code: string, roomCode: string, guestToken: string): Promise<void> {
+	await request('/api/screens/link', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ code, roomCode, guestToken } satisfies ScreenLinkRequest)
+	});
 }
 
 /** [accountToken] makes your account the owner, on every device you log in on. */

@@ -36,6 +36,8 @@ Music, without Premium, and not tied to a single music service.
   clear. Played songs stay above the current one; autoplay songs below.
 - Shuffle and repeat (queue or one song), fair order (one song per person per round),
   vote to skip, and limits (songs per person, song length, no recent repeats).
+- A party screen for a TV, laptop or tablet: big album art in its colour, what's next and
+  who added it, and a QR code to join. A TV links with a code, like YouTube's.
 - Everyone who listens stays in sync, with a per-device sync adjustment (for Bluetooth).
 - Hand a room to someone else, clone it (here, onto your phone or onto your server), and
   invite or move everyone to the clone, keeping their roles. Server rooms can be always on.
@@ -89,7 +91,7 @@ Music, without Premium, and not tied to a single music service.
 - New podcast episodes on Home, playback speed, played marks
 - More sources: YouTube, local files, Plex / Jellyfin
 - Learning which songs go together (song graph) for better radio, and recaps
-- YTMP playlists, lyrics, explore page, party screen for a TV, sleep timer
+- YTMP playlists, lyrics, explore page, sleep timer
 
 ## Platforms
 

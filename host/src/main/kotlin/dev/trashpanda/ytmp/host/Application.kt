@@ -38,6 +38,8 @@ import dev.trashpanda.ytmp.protocol.RejectReason
 import dev.trashpanda.ytmp.protocol.RoomListResponse
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.SearchResponse
+import dev.trashpanda.ytmp.protocol.ScreenLinkRequest
+import dev.trashpanda.ytmp.protocol.ScreenLinked
 import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.SuggestionsResponse
 import dev.trashpanda.ytmp.protocol.wireName
@@ -116,6 +118,7 @@ private class ClientLogLimit(private val perMinute: Int) {
 }
 
 private val clientLogLimit = ClientLogLimit(perMinute = 20)
+private val screenCodeLimit = ClientLogLimit(perMinute = 10)
 
 /** Streams a song's audio through the host, for clients whose direct stream URL doesn't work. */
 fun interface AudioProxy {
@@ -163,7 +166,8 @@ data class HostOptions(
 )
 
 /** What works without an account on an accounts-only host: what's needed to log in, and audio (speakers can't log in). */
-private val OPEN_WITHOUT_ACCOUNT = listOf("/api/host", "/api/auth/", "/api/account", "/api/admin/", "/api/audio/")
+// A TV becoming a party screen has no account (/api/screens); linking it needs someone in the room.
+private val OPEN_WITHOUT_ACCOUNT = listOf("/api/host", "/api/auth/", "/api/account", "/api/admin/", "/api/audio/", "/api/screens")
 
 fun isLoopback(call: ApplicationCall): Boolean {
     val address = call.request.origin.remoteAddress
@@ -192,6 +196,7 @@ fun Application.ytmpModule(
     /** Search suggestions while typing. */
     suggestions: SearchSuggestions? = null,
 ) {
+    val screens = ScreenPairings()
     install(ContentNegotiation) { json(ProtocolJson) }
     install(WebSockets) {
         pingPeriod = 20.seconds
@@ -515,6 +520,36 @@ fun Application.ytmpModule(
                 }
                 call.respond(HttpStatusCode.NoContent)
             }
+            // Party screens on a TV: it shows a code, someone in a room enters it (ScreenPairings).
+            post("/screens") {
+                if (!screenCodeLimit.allow(call.request.origin.remoteAddress)) {
+                    throw ApiException(HttpStatusCode.TooManyRequests, ErrorCode.INVALID, "Too many codes, try again in a minute")
+                }
+                call.respond(screens.start())
+            }
+            get("/screens/{secret}") {
+                val linked = try {
+                    screens.await(call.parameters["secret"]!!, SCREEN_WAIT_MS)
+                } catch (e: NoSuchElementException) {
+                    throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, e.message ?: "This code expired")
+                }
+                if (linked == null) call.respond(HttpStatusCode.NoContent) else call.respond(linked)
+            }
+            post("/screens/link") {
+                val request = call.receive<ScreenLinkRequest>()
+                val room = rooms[request.roomCode] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
+                var full = false
+                val linked = screens.link(request.code) {
+                    room.addScreen(request.guestToken)?.let { ScreenLinked(room.code, it) }.also { full = it == null }
+                }
+                if (!linked) {
+                    throw ApiException(
+                        HttpStatusCode.NotFound, ErrorCode.NOT_FOUND,
+                        if (full) "This room can't show on another screen" else "No TV shows that code. Check it, or get a new one on the TV.",
+                    )
+                }
+                call.respond(HttpStatusCode.NoContent)
+            }
             extraApi()
         }
 
@@ -553,7 +588,8 @@ fun Application.ytmpModule(
                 val hello = first as ClientMessage.Hello
                 val account = hello.accountToken?.let { token -> options.auth.verify(token)?.also { options.onAccountToken(token, it) } }
                 if (hello.accountToken != null && account == null) log.info("Room {}: account token not accepted, joining as a guest", room.code)
-                if (account == null && options.accountsOnly) {
+                // A party screen someone in the room linked comes without an account.
+                if (account == null && options.accountsOnly && !room.isScreen(hello.guestToken)) {
                     outbox.send(ServerMessage.Rejected(RejectReason.ACCOUNT_REQUIRED))
                     null
                 } else {
@@ -583,6 +619,9 @@ fun Application.ytmpModule(
         }
     }
 }
+
+/** A TV waiting to be linked asks again after this long. */
+private const val SCREEN_WAIT_MS = 25_000L
 
 /** "community_playlists" -> [SearchType.COMMUNITY_PLAYLISTS]. */
 private fun searchType(value: String): SearchType =

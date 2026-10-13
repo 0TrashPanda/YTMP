@@ -265,7 +265,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - **Output picker** ✅ (host outputs) and a "play on this device" toggle
 - **Recap** pages from your listening history (planned)
 - **Song menu** settings (order, show/hide) (planned)
-- **Party screen** for a TV or laptop (planned)
+- **Party screen** ✅ for a TV, laptop or tablet (see [below](#party-screen))
 
 ## Lyrics
 
@@ -281,21 +281,38 @@ Open it with the **⋮** button or by **right-clicking** the song.
 
 ## Party screen
 
-> Planned.
+> Built.
 
 A full-screen view for a **TV, laptop or tablet** during a party:
 
-- the current song with **large album art**, title and artist, and progress
-- the next few songs in the queue, and who added them
-- a large **QR code** and the **room code** to join
-- a **background colour taken from the album art** (see below)
+- the current song with **large album art**, title and artist, who added it, and progress
+- the next four songs (queue, then autoplay), and who added them
+- a large **QR code** and the **room code** to join, and the address
+- a **background colour taken from the album art** (see below), changing with every song
+- the skip votes so far, and messages like "Skipped …: enough votes"
 
-Any participant can open it, for example in a browser on a TV.
+It only watches: it can't change anything. It keeps the screen on while it shows, and the
+mouse pointer and its buttons (full screen, close) hide when the mouse doesn't move.
+Landscape (a TV) has the art left and the song right; portrait (a tablet) stacks them.
+
+Two ways to open it, from the avatar menu in a room:
+
+- **Party screen**: on this device (a laptop next to the speakers, a tablet). *Esc* or ✕
+  closes it.
+- **Show on a TV**, like YouTube's *Link with TV code*: open **`<server>/tv`** in the TV's
+  browser. It shows a 6-digit code; enter it on your phone and the TV becomes the room's
+  party screen. Any participant can do this. The TV needs no account (also on servers that
+  are for accounts only), remembers the room (switched off and on, it comes back), and shows
+  under *Members* as *Party screen*, where it can be removed. Removed, or when the room is
+  gone, it shows a new code. A room can have 5 screens.
+
+Later: a Chromecast receiver that shows it on a TV without a browser (see
+[future ideas](future-ideas.md#party-screen-on-a-tv-via-chromecast)).
 
 ## Album art colours
 
-> Partly built: the full player shows the album art blurred behind it. Planned: a colour
-> taken from the art.
+> Partly built: the full player shows the album art blurred behind it; the party screen
+> takes a colour from the art. Planned: the colour in the full player too.
 
 Like YTM, the background around the now-playing album art takes its **colour from the
 album art** and changes with every song. This is used in the now-playing view and

@@ -34,6 +34,30 @@ data class SearchResponse(val items: List<Song>)
 @SerialName("SuggestionsResponse")
 data class SuggestionsResponse(val items: List<String>)
 
+/**
+ * `POST /api/screens`: a TV asks for a code to show (docs/features/ui.md#party-screen). It
+ * then waits with [secret] (`GET /api/screens/{secret}`) until someone in a room links it.
+ */
+@Serializable
+@SerialName("ScreenPairing")
+data class ScreenPairing(
+    /** What the TV shows, e.g. `482 913`; entered on a phone in the room. */
+    val code: String,
+    /** Only the TV knows it. */
+    val secret: String,
+    val expiresAt: Long,
+)
+
+/** `POST /api/screens/link`: someone in [roomCode] (by their guest token) shows it on the TV showing [code]. */
+@Serializable
+@SerialName("ScreenLinkRequest")
+data class ScreenLinkRequest(val code: String, val roomCode: String, val guestToken: String)
+
+/** What the TV gets once it's linked: it joins [roomCode] with [guestToken] (a party screen participant). */
+@Serializable
+@SerialName("ScreenLinked")
+data class ScreenLinked(val roomCode: String, val guestToken: String)
+
 /** Error body of every `/api` endpoint. */
 @Serializable
 @SerialName("ApiError")

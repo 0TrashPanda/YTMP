@@ -16,6 +16,8 @@
 		onPlayOn,
 		onClone,
 		onRoomSettings,
+		onPartyScreen,
+		onShowOnTv,
 		onLeave
 	}: {
 		host: HostInfo | null;
@@ -29,6 +31,10 @@
 		onClone?: () => void;
 		/** Only when you may change the room's settings. */
 		onRoomSettings?: () => void;
+		/** The party screen on this device. */
+		onPartyScreen?: () => void;
+		/** Link a TV as the party screen. */
+		onShowOnTv?: () => void;
 		onLeave?: () => void;
 	} = $props();
 
@@ -80,6 +86,8 @@
 			<p class="truncate px-3 pt-1 text-xs font-medium tracking-wide text-muted uppercase">{info.name} · {info.code}</p>
 			{@render item('share', info.visibility === 'private' ? 'Solo room: make it public' : 'Share room', onShare)}
 			{@render item('cast', 'Play on…', onPlayOn)}
+			{@render item('fullscreen', 'Party screen', onPartyScreen)}
+			{@render item('tv', 'Show on a TV', onShowOnTv)}
 			{@render item('copy', 'Clone room', room.can('clone_room') ? onClone : undefined)}
 			{@render item('people', 'Room settings', onRoomSettings)}
 			{@render item('logout', 'Leave room', onLeave, true)}

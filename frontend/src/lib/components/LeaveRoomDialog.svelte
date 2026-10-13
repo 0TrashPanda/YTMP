@@ -9,7 +9,7 @@
 
 	const rs = $derived(room.state!);
 	const me = $derived(room.me);
-	const others = $derived(rs.participants.filter((p) => p.id !== me?.id));
+	const others = $derived(rs.participants.filter((p) => p.id !== me?.id && !p.screen));
 	const asks = $derived(!!me?.isOwner && rs.room.visibility === 'public' && others.length > 0);
 	/** Like the host picks when you don't: the top role, here, the longest (the list is in the order people came). */
 	const suggested = $derived(others.find((p) => p.online && p.roleId === rs.roles[0]?.id) ?? null);

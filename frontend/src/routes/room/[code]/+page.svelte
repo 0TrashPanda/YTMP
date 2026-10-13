@@ -11,6 +11,8 @@
 	import AvatarMenu from '../../../lib/components/AvatarMenu.svelte';
 	import SettingsScreen, { type SettingsSection } from '../../../lib/components/settings/SettingsScreen.svelte';
 	import LeaveRoomDialog from '../../../lib/components/LeaveRoomDialog.svelte';
+	import PartyScreen from '../../../lib/components/PartyScreen.svelte';
+	import TvLinkDialog from '../../../lib/components/TvLinkDialog.svelte';
 	import OutputsSheet from '../../../lib/components/OutputsSheet.svelte';
 	import SaveSheet from '../../../lib/components/SaveSheet.svelte';
 	import { youtube } from '../../../lib/youtube.svelte';
@@ -110,6 +112,9 @@
 	let settingsScreen = $state<SettingsScreen>();
 	let roomSettings = $state<RoomSettings>();
 	let leaving = $state(false);
+	/** The party screen on this device, and linking a TV as one. */
+	let partyScreen = $state(false);
+	let linkingTv = $state(false);
 	let playingOn = $state(false);
 	/** Saving this song to one of your YouTube Music playlists. */
 	let saving = $state<Song | null>(null);
@@ -281,9 +286,9 @@
 		// Settings go back a step first (a section to the list, a role to the roles).
 		if (settings && roomSettings?.back()) return 'handled';
 		if (settingsAt !== undefined && settingsScreen?.back()) return 'handled';
-		if (menu || saving || settings || accountOpen || sharing || cloning || leaving || playingOn || settingsAt !== undefined) {
+		if (menu || saving || settings || accountOpen || sharing || cloning || leaving || playingOn || partyScreen || linkingTv || settingsAt !== undefined) {
 			menu = saving = settings = null;
-			accountOpen = sharing = cloning = leaving = playingOn = false;
+			accountOpen = sharing = cloning = leaving = playingOn = partyScreen = linkingTv = false;
 			settingsAt = undefined;
 			return 'handled';
 		}
@@ -524,12 +529,12 @@
 									aria-label="People in this room"
 									onclick={() => (settings = 'members')}
 									title={room.state?.participants
-										.filter((p: Participant) => p.online)
+										.filter((p: Participant) => p.online && !p.screen)
 										.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
 										.join(', ')}
 								>
 									<Icon name="people" size={20} />
-									<span class="hidden sm:inline">{room.state?.participants.filter((p: Participant) => p.online).length ?? 0}</span>
+									<span class="hidden sm:inline">{room.state?.participants.filter((p: Participant) => p.online && !p.screen).length ?? 0}</span>
 								</button>
 							{/if}
 							<!-- Your account and the settings (YTM keeps them behind the avatar too). -->
@@ -735,6 +740,8 @@
 			onPlayOn={player ? () => (playingOn = true) : undefined}
 			onClone={() => (cloning = true)}
 			onRoomSettings={room.can('change_settings') || room.can('edit_roles') || room.can('kick') || room.can('ban') ? () => (settings = 'list') : undefined}
+			onPartyScreen={() => (partyScreen = true)}
+			onShowOnTv={() => (linkingTv = true)}
 			onLeave={() => (leaving = true)}
 		/>
 	{/if}
@@ -745,6 +752,12 @@
 
 	{#if leaving && room.state}
 		<LeaveRoomDialog {room} onClose={() => (leaving = false)} />
+	{/if}
+	{#if linkingTv}
+		<TvLinkDialog {room} {host} onClose={() => (linkingTv = false)} onToast={toast} />
+	{/if}
+	{#if partyScreen && room.state}
+		<PartyScreen {room} {host} onClose={() => (partyScreen = false)} />
 	{/if}
 
 	{#if playingOn && player}

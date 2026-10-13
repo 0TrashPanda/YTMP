@@ -84,6 +84,8 @@ data class SavedMember(
     val allow: List<Permission> = emptyList(),
     val deny: List<Permission> = emptyList(),
     val joinedAt: Long = 0,
+    /** A party screen ([dev.trashpanda.ytmp.protocol.Participant.screen]). */
+    val screen: Boolean = false,
 )
 
 @Serializable

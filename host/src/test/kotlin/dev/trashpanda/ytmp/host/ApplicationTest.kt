@@ -71,6 +71,12 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import dev.trashpanda.ytmp.protocol.ScreenPairing
+import dev.trashpanda.ytmp.protocol.ScreenLinked
+import dev.trashpanda.ytmp.protocol.ScreenLinkRequest
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import dev.trashpanda.ytmp.protocol.ErrorCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -129,6 +135,58 @@ class ApplicationTest {
             sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Anna", null, created.ownerToken, accountToken = "anna"))
             assertEquals("anna@accounts.example", assertIs<ServerMessage.Welcome>(receiveMessage()).accountId)
         }
+    }
+
+    @Test
+    fun `a TV becomes a party screen with a code entered in the room, also on an accounts-only host`() = testApplication {
+        val auth = object : HostAuth {
+            override fun servers() = listOf(AuthServerRef("https://accounts.example", "accounts.example"))
+            override fun verify(token: String) = if (token == "anna") AccountIdentity("anna@accounts.example", "Anna") else null
+        }
+        application {
+            val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = true))
+        }
+        val client = jsonClient()
+        val created = client.post("/api/rooms") {
+            header(HttpHeaders.Authorization, "Bearer anna"); contentType(ContentType.Application.Json); setBody(CreateRoomRequest("Party"))
+        }.body<CreateRoomResponse>()
+        var annaToken = ""
+        client.webSocket("/ws") {
+            sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Anna", null, created.ownerToken, accountToken = "anna"))
+            annaToken = assertIs<ServerMessage.Welcome>(receiveMessage()).guestToken
+        }
+
+        // The TV (no account) gets a code and waits.
+        val pairing = client.post("/api/screens").body<ScreenPairing>()
+        assertEquals(6, pairing.code.length)
+        val linked = coroutineScope {
+            val waiting = async { client.get("/api/screens/${pairing.secret}") }
+            // A wrong code, or someone who isn't in the room, doesn't link it.
+            val wrong = if (pairing.code == "000000") "111111" else "000000"
+            assertEquals(HttpStatusCode.NotFound, client.post("/api/screens/link") { contentType(ContentType.Application.Json); setBody(ScreenLinkRequest(wrong, created.code, annaToken)) }.status)
+            assertEquals(HttpStatusCode.NotFound, client.post("/api/screens/link") { contentType(ContentType.Application.Json); setBody(ScreenLinkRequest(pairing.code, created.code, "nobody")) }.status)
+            // Anna enters it (spaces are fine).
+            val code = pairing.code.chunked(3).joinToString(" ")
+            assertEquals(HttpStatusCode.NoContent, client.post("/api/screens/link") { contentType(ContentType.Application.Json); setBody(ScreenLinkRequest(code, created.code, annaToken)) }.status)
+            waiting.await().body<ScreenLinked>()
+        }
+        assertEquals(created.code, linked.roomCode)
+
+        // It joins without an account, as a screen that only watches.
+        client.webSocket("/ws") {
+            sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Living room TV", linked.guestToken, null))
+            val welcome = assertIs<ServerMessage.Welcome>(receiveMessage())
+            val me = welcome.state.participants.single { it.id == welcome.participantId }
+            assertEquals(true, me.screen)
+            assertEquals("Party screen", me.name)
+            sendMessage(ClientMessage.CommandMessage("c1", Command.AddSongs(listOf(song), QueuePosition.END)))
+            var result: ServerMessage
+            do result = receiveMessage() while (result !is ServerMessage.Result)
+            assertEquals(ErrorCode.PERMISSION_DENIED, result.error?.code)
+        }
+        // The code is used up.
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/screens/${pairing.secret}").status)
     }
 
     @Test

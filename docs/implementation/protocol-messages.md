@@ -149,6 +149,18 @@ the old room's people as `migrants` (tag, old id, name, role, overrides). Joinin
 `hello.migrationKey` whose hash matches a tag gives that person's role, overrides and old id
 back (so `addedBy` still points at them), once. Links carry the key in the fragment
 (`#migrate=…`, also `#owner=…` and `#name=…`), which never reaches a server.
+
+**Party screens** ✅ ([ui](../features/ui.md#party-screen)) aren't commands either. A TV
+(`/tv` page, no account) asks `POST /api/screens` for a 6-digit `code` and a `secret`, then
+long-polls `GET /api/screens/{secret}` (25 s; 204: ask again, 404: expired after 10 min).
+Someone in the room sends `POST /api/screens/link` with the code, the room code and their
+guest token; the room adds a participant with `screen: true`, no role (it may do nothing),
+named *Party screen*, and the TV gets `{ roomCode, guestToken }` and joins with a normal
+`hello` as that participant. It comes in without an account on accounts-only hosts and into
+solo rooms, isn't counted for votes or "listened with", can't be made owner, and is saved
+with the room (so a TV that's switched off comes back to it). `/api/screens` is open without
+an account; codes are in memory only (`ScreenPairings`), at most 200 waiting, 10 new ones per
+minute per address.
 | `request_snapshot` ✅ | – (a message type, not a command) | – |
 
 ## Events (host → client)

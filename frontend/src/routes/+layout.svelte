@@ -10,7 +10,8 @@
 
 	// A host that doesn't know you yet (your phone, in your laptop's browser): first see whether
 	// you're logged in on your server, before the page asks your name.
-	const known = !!identity.stored;
+	// A TV becoming a party screen (/tv) has no account, and doesn't need one.
+	const known = !!identity.stored || location.pathname.startsWith('/tv');
 	let ready = $state(known);
 	if (!known) {
 		getHost()

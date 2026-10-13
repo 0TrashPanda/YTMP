@@ -102,6 +102,8 @@ data class Participant(
      * migration key ([ServerMessage.Welcome.migrationKey]), which only they get.
      */
     val tag: String = "",
+    /** A party screen (a TV showing the room): it only watches, and doesn't count as a person here. */
+    val screen: Boolean = false,
 )
 
 @Serializable
