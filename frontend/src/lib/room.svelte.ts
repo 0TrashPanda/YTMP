@@ -53,6 +53,12 @@ export class RoomConnection {
 	/** Host clock minus our clock, in ms. */
 	clockOffset = $state(0);
 
+	/**
+	 * Joins as this participant instead of the one saved in this browser: a party screen on a
+	 * Chromecast, whose page may not be allowed to keep anything (it runs in DashCast's frame).
+	 */
+	guestToken: string | null = null;
+
 	private socket: WebSocket | null = null;
 	private seq = 0;
 	private waitingForSnapshot = false;
@@ -161,7 +167,7 @@ export class RoomConnection {
 				protocolVersion: PROTOCOL_VERSION,
 				roomCode: this.roomCode,
 				guestName: this.name,
-				guestToken: saved.guestToken(this.roomCode),
+				guestToken: this.guestToken ?? saved.guestToken(this.roomCode),
 				ownerToken: saved.ownerToken(this.roomCode),
 				accountToken,
 				hideFromHistory: saved.hideFromHistory,

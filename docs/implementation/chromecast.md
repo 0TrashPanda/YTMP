@@ -58,10 +58,33 @@ The Chromecast plays on its own clock, with a few seconds of buffering. It's con
 like any output (play, pause, seek, volume), and the host keeps it roughly in sync through
 the receiver's media status. It is not sample-accurate with client playback.
 
+## The party screen on a TV ✅
+
+*Play on → Show the party screen* (`SetOutput(screen = true)`, Chromecast outputs only) shows
+the [party screen](../features/ui.md#party-screen) instead of Google's player. YTMP has no Cast
+app of its own (that needs a registration with Google): it uses **DashCast** (app id
+`84912283`, namespace `urn:x-cast:com.madmod.dashcast`), an existing receiver that opens any
+URL in a frame, as Home Assistant's pychromecast does (`CastWebPage` in cast/).
+
+- The room adds a screen participant for the output (named after the device, no role, but
+  allowed to *play on its own device*), and `RoomView.screens` gives the driver its guest
+  token. `CastSession.showScreen` starts DashCast (waiting until its namespace is up) and
+  sends `{ url, force: false }` with `<base>/tv#cast=CODE.TOKEN`.
+- A device runs one app at a time, so DashCast replaces Google's player: the `/tv` page plays
+  the music itself (the browser player, in sync, at full volume; the device volume is the
+  room's slider, as before). It joins with the token directly (`RoomConnection.guestToken`),
+  since a framed page may not keep storage.
+- The base address: DashCast is an `https` page and can only frame `https` pages, so a server
+  uses its public address (`accounts.url` / `YTMP_URL`) when that's `https`; otherwise (and on
+  a phone) the address the device reached us at, which may not show.
+- Every 10 s the driver checks that DashCast still runs; another app instead means someone
+  else uses the TV (the room lets go, as with music). Switching back to music only, or off,
+  stops DashCast and the screen participant leaves.
+- Not tested on a real TV yet (the receiver's autoplay inside its frame especially).
+
 ## Later
 
-- A **custom Cast receiver** (a small web app that runs on the Chromecast) could show the
-  [party screen](../features/ui.md#party-screen) on a TV.
+- Our own registered Cast receiver, if DashCast goes away or doesn't play well.
 
 ## The device's own skip buttons
 

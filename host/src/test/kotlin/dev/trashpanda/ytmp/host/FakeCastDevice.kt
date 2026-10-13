@@ -30,8 +30,13 @@ class FakeCastDevice : AutoCloseable {
     /** Another app (Spotify, YouTube, …) runs instead of the media player. */
     @Volatile private var otherApp: String? = null
 
+    /** DashCast runs (instead of the media player), and the page it was asked to show. */
+    @Volatile var dashCastRunning = false
+    @Volatile var dashCastUrl: String? = null
+
     private fun appsJson(): String = listOfNotNull(
         """{"appId":"CC1AD845","transportId":"web-1","sessionId":"s-1"}""".takeIf { appRunning },
+        """{"appId":"84912283","transportId":"dash-1","sessionId":"s-3","namespaces":[{"name":"urn:x-cast:com.madmod.dashcast"}]}""".takeIf { dashCastRunning },
         otherApp?.let { """{"appId":"$it","transportId":"other-1","sessionId":"s-2"}""" },
     ).joinToString(",", "[", "]")
 
@@ -143,6 +148,10 @@ class FakeCastDevice : AutoCloseable {
         requests.filter { it.first == namespace }.mapNotNull { it.second["type"]?.jsonPrimitive?.content }
 
     private fun answer(namespace: String, request: JsonObject): String? {
+        if (namespace == "urn:x-cast:com.madmod.dashcast") {
+            dashCastUrl = request["url"]?.jsonPrimitive?.content
+            return null
+        }
         val type = request["type"]?.jsonPrimitive?.content ?: return null
         val id = request["requestId"]?.jsonPrimitive?.content
         if (namespace == CastChannel.NS_HEARTBEAT) return if (type == "PING") """{"type":"PONG"}""" else null
@@ -152,10 +161,14 @@ class FakeCastDevice : AutoCloseable {
             CastChannel.NS_RECEIVER -> {
                 when (type) {
                     "LAUNCH" -> {
-                        appRunning = true
+                        // One app at a time.
+                        val dashCast = request["appId"]?.jsonPrimitive?.content == "84912283"
+                        appRunning = !dashCast
+                        dashCastRunning = dashCast
+                        if (!dashCast) dashCastUrl = null
                         otherApp = null
                     }
-                    "STOP" -> appRunning = false
+                    "STOP" -> if (request["sessionId"]?.jsonPrimitive?.content == "s-3") dashCastRunning = false else appRunning = false
                     "SET_VOLUME" -> request["volume"]!!.jsonObject["level"]!!.jsonPrimitive.doubleOrNull?.let { volume = it }
                 }
                 val apps = appsJson()

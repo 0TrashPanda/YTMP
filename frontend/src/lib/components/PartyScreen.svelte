@@ -12,7 +12,18 @@
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
 
-	let { room, host, onClose }: { room: RoomConnection; host: HostInfo | null; onClose?: () => void } = $props();
+	let {
+		room,
+		host,
+		onClose,
+		cast = false
+	}: {
+		room: RoomConnection;
+		host: HostInfo | null;
+		onClose?: () => void;
+		/** On a Chromecast: no mouse, no buttons. */
+		cast?: unknown;
+	} = $props();
 
 	const s = $derived(room.state);
 	const current = $derived(s?.nowPlaying?.item ?? null);
@@ -107,7 +118,7 @@
 		<Icon name="tv" size={20} />
 		<span class="truncate">{s?.room.name ?? ''}</span>
 		{#if room.status !== 'connected'}<span class="rounded-full bg-black/40 px-3 py-1 text-white/80">Reconnecting…</span>{/if}
-		<div class="ml-auto flex gap-2 transition-opacity duration-300 {active ? 'opacity-100' : 'pointer-events-none opacity-0'}">
+		<div class="ml-auto flex gap-2 transition-opacity duration-300 {active && !cast ? 'opacity-100' : 'pointer-events-none opacity-0'}">
 			<button class="rounded-full bg-black/30 p-2.5 hover:bg-black/50" aria-label="Full screen" title="Full screen (F)" onclick={fullscreen}>
 				<Icon name="fullscreen" />
 			</button>

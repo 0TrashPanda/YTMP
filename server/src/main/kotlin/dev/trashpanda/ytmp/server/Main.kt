@@ -67,9 +67,12 @@ fun main(args: Array<String>) {
     log.info("Streaming audio through the server: {}", audioProxy.name.lowercase())
 
     embeddedServer(Netty, port = config.server.port, host = config.server.host) {
-        val casts = CastOutputs(this) { localAddress ->
+        val audioBase = { localAddress: java.net.InetAddress ->
             config.cast.audioBaseUrl.trimEnd('/').ifEmpty { "http://${localAddress.hostAddress}:${config.server.port}" }
         }
+        // A TV shows the party screen in DashCast, an https page: it needs the server's https address.
+        val publicUrl = normalizeOrigin(config.accounts.url)?.takeIf { it.startsWith("https://") }
+        val casts = CastOutputs(this, pageBaseUrl = { localAddress -> publicUrl ?: audioBase(localAddress) }, audioBaseUrl = audioBase)
         casts.addConfigured(config.cast.devices)
         if (config.cast.discovery) casts.discover()
         val sonos = SonosOutputs(this) { localAddress ->

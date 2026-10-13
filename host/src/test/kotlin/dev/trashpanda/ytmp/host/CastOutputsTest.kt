@@ -67,6 +67,44 @@ class CastOutputsTest {
     }
 
     @Test
+    fun `a TV shows the party screen with DashCast, and goes back to only the music`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        FakeCastDevice().use { device ->
+            val casts = CastOutputs(scope, pageBaseUrl = { "https://ytmp.example.com" }) { address -> "http://${address.hostAddress}:8765" }
+            casts.add(CastDeviceAddress("cast:fake", "Living room TV", "127.0.0.1", device.port))
+            val rooms = RoomManager({ "https://stream/$it" }, scope, outputs = casts.devices)
+            casts.attach(rooms)
+
+            val room = rooms.create("Party")
+            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { })!!
+            suspend fun run(command: Command) = room.handle(me, ClientMessage.CommandMessage("c", command))
+            run(Command.AddSongs(listOf(song), QueuePosition.END))
+            eventually { casts.devices.value.isNotEmpty() }
+
+            run(Command.SetOutput("cast:fake", active = true))
+            eventually { device.playerState == "PLAYING" }
+
+            // The party screen: DashCast replaces the media player and opens the room's /tv page, signed in as the screen.
+            run(Command.SetOutput("cast:fake", active = true, screen = true))
+            eventually { device.dashCastUrl != null }
+            val token = room.view().screens.getValue("cast:fake")
+            assertEquals("https://ytmp.example.com/tv#cast=${room.code}.$token", device.dashCastUrl)
+            assertTrue(room.isScreen(token))
+            val screen = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "TV", token, null), Outbox { })!!
+            room.handle(screen, ClientMessage.CommandMessage("l", Command.SetListening(true))) // it may play the music
+
+            // Back to only the music: the media player starts again and the screen participant goes.
+            run(Command.SetOutput("cast:fake", active = true, screen = false))
+            eventually { !device.dashCastRunning && device.playerState == "PLAYING" }
+            assertTrue(!room.isScreen(token))
+
+            run(Command.SetOutput("cast:fake", active = false))
+            eventually { "STOP" in device.types(CastChannel.NS_RECEIVER) }
+        }
+        scope.cancel()
+    }
+
+    @Test
     fun `when another app is cast to the device, the room lets go of it`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         FakeCastDevice().use { device ->

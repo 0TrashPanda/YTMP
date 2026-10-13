@@ -4,6 +4,7 @@ import dev.trashpanda.ytmp.cast.CastChannel
 import dev.trashpanda.ytmp.cast.CastMediaPlayer
 import dev.trashpanda.ytmp.cast.CastMetadata
 import dev.trashpanda.ytmp.cast.CastQueueItem
+import dev.trashpanda.ytmp.cast.CastWebPage
 import dev.trashpanda.ytmp.core.OutputDevice
 import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager
@@ -37,9 +38,17 @@ data class CastDeviceAddress(val id: String, val name: String, val host: String,
  * Cast devices fetch the audio themselves: first the direct stream URL (saves the host the
  * traffic), and if a device can't play that, from the host's `/api/audio/…` proxy for the rest
  * of the session. So [audioBaseUrl] must be an address the device can reach.
+ *
+ * A TV or display can show the party screen instead ([RoomView.screens]): DashCast opens the
+ * host's `/tv` page there, which plays the music itself (docs/features/ui.md#party-screen).
  */
 class CastOutputs(
     private val scope: CoroutineScope,
+    /**
+     * Where a TV opens the party screen page; null: [audioBaseUrl]. DashCast is an `https`
+     * page, which can only show `https` pages: a server's public address works best.
+     */
+    private val pageBaseUrl: ((localAddress: InetAddress) -> String)? = null,
     /** Base URL of this host as seen from a device that reached us at [InetAddress] (our side of the connection). */
     private val audioBaseUrl: (localAddress: InetAddress) -> String,
 ) {
@@ -90,7 +99,7 @@ class CastOutputs(
                     val device = known.value[id] ?: continue
                     val session = sessions.getOrPut(id) { CastSession(device, resuming = id in playedOn) }
                     try {
-                        session.sync(view, volume, report = room::notice, skipped = room::outputSkipped) { actual -> room.reportOutputVolume(id, actual) }
+                        session.sync(view, volume, room.code, report = room::notice, skipped = room::outputSkipped) { actual -> room.reportOutputVolume(id, actual) }
                         if (session.loadedSomething) playedOn += id
                     } catch (e: CancellationException) {
                         throw e
@@ -140,10 +149,18 @@ class CastOutputs(
         suspend fun sync(
             view: RoomView,
             wantedVolume: Double?,
+            roomCode: String,
             report: suspend (String) -> Unit,
             skipped: suspend (fromItemId: String, forward: Boolean) -> Unit,
             reportVolume: suspend (Double) -> Unit,
         ) {
+            val screen = view.screens[device.id]
+            if (screen != null) return showScreen(roomCode, screen, wantedVolume, reportVolume)
+            if (shownUrl != null) {
+                // Back from the party screen to only the music: Google's player starts again.
+                shownUrl = null
+                close()
+            }
             val player = connect(reportVolume)
             if (wantedVolume != null && wantedVolume != appliedVolume) {
                 player.setVolume(wantedVolume)
@@ -262,14 +279,48 @@ class CastOutputs(
             }
         }
 
-        private suspend fun connect(reportVolume: suspend (Double) -> Unit): CastMediaPlayer {
-            player?.takeIf { channel?.isOpen == true }?.let { return it }
+        /** The page the device shows with DashCast (party screen), or null while it plays music with Google's player. */
+        private var shownUrl: String? = null
+        private var pageCheckedAt = 0L
+
+        /** The party screen on the device: DashCast with the host's `/tv` page, signed in as the room's screen participant. */
+        private suspend fun showScreen(roomCode: String, guestToken: String, wantedVolume: Double?, reportVolume: suspend (Double) -> Unit) {
+            val (channel, player) = open(reportVolume)
+            if (wantedVolume != null && wantedVolume != appliedVolume) {
+                player.setVolume(wantedVolume)
+                appliedVolume = wantedVolume
+            }
+            val page = CastWebPage(channel)
+            val url = (pageBaseUrl ?: audioBaseUrl)(channel.localAddress) + "/tv#cast=" + URLEncoder.encode(roomCode, Charsets.UTF_8) + "." + URLEncoder.encode(guestToken, Charsets.UTF_8)
+            val now = System.currentTimeMillis()
+            if (shownUrl != url) {
+                log.info("Cast device {}: showing the party screen of {}", device.name, roomCode)
+                page.show(url)
+                shownUrl = url
+                loadedSomething = true
+                pageCheckedAt = now + SETTLE_MS
+            } else if (now >= pageCheckedAt) {
+                pageCheckedAt = now + PAGE_CHECK_MS
+                if (!page.isShowing()) {
+                    // Someone cast something else, or the TV closed it: theirs now, or show it again.
+                    val other = player.receiverStatus().runningAppIds.firstOrNull { it !in OUR_APPS }
+                    if (other != null) throw OutputTakenOver("another app took it ($other)")
+                    shownUrl = null
+                }
+            }
+        }
+
+        /** The connection to the device, with its volume followed, without starting an app. */
+        private suspend fun open(reportVolume: suspend (Double) -> Unit): Pair<CastChannel, CastMediaPlayer> {
+            val open = channel?.takeIf { it.isOpen }
+            val current = player
+            if (open != null && current != null) return open to current
             close()
             val channel = CastChannel.open(device.host, device.port).also { channel = it }
             val player = CastMediaPlayer(channel).also { player = it }
             if (resuming || loadedSomething) {
-                // Our player was closed: if another app runs there now (someone cast to it), it's theirs.
-                val other = player.receiverStatus().runningAppIds.firstOrNull { it != CastMediaPlayer.DEFAULT_MEDIA_RECEIVER && it != BACKDROP_APP }
+                // Our app was closed: if another app runs there now (someone cast to it), it's theirs.
+                val other = player.receiverStatus().runningAppIds.firstOrNull { it !in OUR_APPS }
                 if (other != null) throw OutputTakenOver("another app took it ($other)")
             }
             // Follow volume changes made elsewhere (the device's buttons or app), so the room's
@@ -280,23 +331,34 @@ class CastOutputs(
                     reportVolume(volume)
                 }
             }
-            player.launch()
             player.receiverStatus().volume?.let { volume ->
                 val rounded = Math.round(volume * 100) / 100.0
                 appliedVolume = rounded
                 reportVolume(rounded)
             }
+            return channel to player
+        }
+
+        private suspend fun connect(reportVolume: suspend (Double) -> Unit): CastMediaPlayer {
+            if (launched) player?.takeIf { channel?.isOpen == true }?.let { return it }
+            val (_, player) = open(reportVolume)
+            player.launch()
+            launched = true
             loadedItemId = null
             log.info("Playing on Cast device {} ({})", device.name, device.host)
             return player
         }
 
+        /** Google's player runs on the device (this connection started it). */
+        private var launched = false
+
         suspend fun stop() {
-            runCatching { player?.stop() }
+            runCatching { if (shownUrl != null) channel?.let { CastWebPage(it).stop() } else player?.stop() }
             close()
         }
 
         fun close() {
+            launched = false
             volumeWatcher?.cancel()
             volumeWatcher = null
             channel?.close()
@@ -313,6 +375,12 @@ class CastOutputs(
         private const val LOAD_LEAD_MS = 1_000L
         private const val SETTLE_MS = 5_000L
         private const val MAX_DRIFT_MS = 2_000L
+
+        /** How often to check that the party screen still shows. */
+        private const val PAGE_CHECK_MS = 10_000L
+
+        /** Apps of ours (and the idle screen): anything else running means someone else uses the device. */
+        private val OUR_APPS = setOf(CastMediaPlayer.DEFAULT_MEDIA_RECEIVER, CastWebPage.APP_ID, BACKDROP_APP)
     }
 }
 

@@ -161,6 +161,8 @@ data class OutputInfo(
     val active: Boolean,
     /** 0.0–1.0, or null if unknown (not active). */
     val volume: Double?,
+    /** It shows the party screen (and plays the music with it). */
+    val screen: Boolean = false,
 )
 
 @Serializable

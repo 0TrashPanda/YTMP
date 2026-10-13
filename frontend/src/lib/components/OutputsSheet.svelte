@@ -16,8 +16,8 @@
 	const outputs = $derived(room.state?.outputs ?? []);
 	const phone = new MediaQuery('max-width: 639px');
 
-	async function toggle(outputId: string, active: boolean) {
-		const error = await room.run({ kind: 'SetOutput', outputId, active });
+	async function toggle(outputId: string, active: boolean, screen = false) {
+		const error = await room.run({ kind: 'SetOutput', outputId, active, screen });
 		if (error) onToast(error.message);
 	}
 
@@ -112,9 +112,22 @@
 						class="h-5 w-5 accent-accent"
 						checked={output.active}
 						disabled={!room.can('change_outputs')}
-						onchange={(e) => toggle(output.id, e.currentTarget.checked)}
+						onchange={(e) => toggle(output.id, e.currentTarget.checked, false)}
 					/>
 				</label>
+				{#if output.kind === 'chromecast'}
+					<!-- TVs and displays: the party screen, which plays the music too (docs/features/ui.md#party-screen). -->
+					<label class="flex items-center gap-3 pl-8 text-sm">
+						<span class="min-w-0 flex-1 {output.screen ? 'text-white' : 'text-muted'}">Show the party screen (TVs and displays)</span>
+						<input
+							type="checkbox"
+							class="h-4 w-4 accent-accent"
+							checked={output.screen}
+							disabled={!room.can('change_outputs')}
+							onchange={(e) => toggle(output.id, e.currentTarget.checked || output.active, e.currentTarget.checked)}
+						/>
+					</label>
+				{/if}
 				{#if output.active && output.volume !== null}
 					<input
 						type="range"

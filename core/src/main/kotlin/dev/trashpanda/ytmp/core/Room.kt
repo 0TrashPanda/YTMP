@@ -12,6 +12,7 @@ import dev.trashpanda.ytmp.protocol.MigrationMode
 import dev.trashpanda.ytmp.protocol.MigrationOffer
 import dev.trashpanda.ytmp.protocol.NowPlaying
 import dev.trashpanda.ytmp.protocol.OutputInfo
+import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.Participant
 import dev.trashpanda.ytmp.protocol.Permission
@@ -236,6 +237,8 @@ class Room(
     /** Outputs the host found, and the ones this room plays on (with their wanted volume). */
     private var availableOutputs: List<OutputDevice> = emptyList()
     private val activeOutputs = LinkedHashMap<String, Double?>()
+    /** Outputs that show the party screen, with the screen participant (its id) whose page runs there. */
+    private val screenOutputs = HashMap<String, String>()
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
 
     private var resolveJob: Job? = null
@@ -380,15 +383,31 @@ class Room(
     suspend fun addScreen(byGuestToken: String): String? = mutex.withLock {
         val by = members.values.firstOrNull { it.token == byGuestToken && !it.screen } ?: return@withLock null
         if (members.values.count { it.screen } >= MAX_SCREENS) return@withLock null
-        val screen = Member(
-            id = Ids.short(), token = Ids.token(), name = SCREEN_NAME, isOwner = false, outbox = null, roleId = "",
-            offlineSince = clock(), joinedAt = clock(), screen = true,
-        )
-        members[screen.id] = screen
-        emit(Event.ParticipantJoined(screen.toParticipant()))
+        val screen = newScreen(SCREEN_NAME, plays = false)
         emit(Event.Notice("${by.name} shows the room on a TV"))
         log.info("Room {}: {} linked a party screen", code, by.name)
         screen.token
+    }
+
+    /** A party screen participant; [plays]: its page plays the music too (a Chromecast output). */
+    private fun newScreen(name: String, plays: Boolean): Member {
+        val screen = Member(
+            id = Ids.short(), token = Ids.token(), name = name.take(MAX_NAME_LENGTH), isOwner = false, outbox = null, roleId = "",
+            offlineSince = clock(), joinedAt = clock(), screen = true,
+            allow = if (plays) setOf(Permission.LISTEN_LOCALLY) else emptySet(),
+        )
+        members[screen.id] = screen
+        emit(Event.ParticipantJoined(screen.toParticipant()))
+        return screen
+    }
+
+    /** An output stops showing the party screen: its screen participant goes. */
+    private fun dropScreenOutput(outputId: String) {
+        val screen = screenOutputs.remove(outputId)?.let(members::remove) ?: return
+        screen.send(ServerMessage.Rejected(RejectReason.KICKED))
+        screen.outbox = null
+        screen.attached.clear()
+        emit(Event.ParticipantLeft(screen.id))
     }
 
     /** [guestToken] is a party screen's: it may join without an account. */
@@ -572,6 +591,7 @@ class Room(
     suspend fun setAvailableOutputs(devices: List<OutputDevice>) = mutex.withLock {
         availableOutputs = devices
         activeOutputs.keys.retainAll(devices.map { it.id }.toSet())
+        for (gone in screenOutputs.keys - activeOutputs.keys) dropScreenOutput(gone)
         emit(Event.OutputsChanged(outputInfos()))
     }
 
@@ -590,6 +610,7 @@ class Room(
     suspend fun outputTakenOver(outputId: String) = mutex.withLock {
         if (outputId !in activeOutputs) return@withLock
         activeOutputs.remove(outputId)
+        dropScreenOutput(outputId)
         val name = availableOutputs.firstOrNull { it.id == outputId }?.name ?: "A speaker"
         log.info("Room {}: {} plays something else now, letting go of it", code, name)
         emit(Event.OutputsChanged(outputInfos()))
@@ -613,6 +634,7 @@ class Room(
             positionMs = position(),
             hostTimeMs = clock(),
             activeOutputs = LinkedHashMap(activeOutputs),
+            screens = screenOutputs.mapNotNull { (output, id) -> members[id]?.let { output to it.token } }.toMap(),
             previous = history.lastOrNull(),
             // Speakers move on to the next song by themselves (and the room follows them). With
             // repeat one, or repeat queue at the end of the queue, the room decides what comes next.
@@ -643,7 +665,7 @@ class Room(
     }
 
     private fun outputInfos(): List<OutputInfo> = availableOutputs.map {
-        OutputInfo(it.id, it.name, it.kind, active = it.id in activeOutputs, volume = activeOutputs[it.id])
+        OutputInfo(it.id, it.name, it.kind, active = it.id in activeOutputs, volume = activeOutputs[it.id], screen = it.id in screenOutputs)
     }
 
     // --- commands ---------------------------------------------------------------------
@@ -812,8 +834,15 @@ class Room(
             }
             is Command.SetOutput -> {
                 need(member, Permission.CHANGE_OUTPUTS)?.let { return it }
-                if (availableOutputs.none { it.id == command.outputId }) return ErrorInfo(ErrorCode.NOT_FOUND, "That speaker isn't available")
+                val device = availableOutputs.firstOrNull { it.id == command.outputId } ?: return ErrorInfo(ErrorCode.NOT_FOUND, "That speaker isn't available")
+                if (command.active && command.screen && device.kind != OutputKind.CHROMECAST) return invalid("Only TVs and displays with Chromecast can show the party screen")
                 if (command.active) activeOutputs.putIfAbsent(command.outputId, null) else activeOutputs.remove(command.outputId)
+                // The party screen plays the music itself, as a screen participant that may listen.
+                if (command.active && command.screen) {
+                    if (command.outputId !in screenOutputs) screenOutputs[command.outputId] = newScreen(device.name, plays = true).id
+                } else {
+                    dropScreenOutput(command.outputId)
+                }
                 emit(Event.OutputsChanged(outputInfos()))
                 if (command.active) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }

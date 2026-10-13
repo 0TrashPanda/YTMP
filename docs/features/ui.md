@@ -306,8 +306,10 @@ Two ways to open it, from the avatar menu in a room:
   under *Members* as *Party screen*, where it can be removed. Removed, or when the room is
   gone, it shows a new code. A room can have 5 screens.
 
-Later: a Chromecast receiver that shows it on a TV without a browser (see
-[future ideas](future-ideas.md#party-screen-on-a-tv-via-chromecast)).
+- **On a TV with Chromecast** (or a display like a Nest Hub): *Play on*, then **Show the
+  party screen** under the device. The TV shows the party screen and plays the music (it
+  replaces Google's player there), with no browser or code needed. It works best on a server
+  with an `https` address; see [Chromecast](../implementation/chromecast.md#the-party-screen-on-a-tv-).
 
 ## Album art colours
 

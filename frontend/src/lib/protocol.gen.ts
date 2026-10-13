@@ -197,6 +197,7 @@ export interface CommandSetOutput {
   kind: "SetOutput";
   outputId: string;
   active: boolean;
+  screen: boolean;
 }
 
 export interface CommandSetOutputVolume {
@@ -438,6 +439,7 @@ export interface OutputInfo {
   kind: OutputKind;
   active: boolean;
   volume: number | null;
+  screen: boolean;
 }
 
 export interface EventOutputsChanged {

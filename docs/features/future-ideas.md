@@ -77,10 +77,6 @@ Spotify account (library, likes), and **importing Spotify playlists**.
   use Spotify for **search and metadata only**, and [match](../implementation/storage.md#song-matching)
   each song to a playable source (mostly YTM).
 
-## Party screen on a TV via Chromecast
-
-A custom Cast receiver that shows the [party screen](ui.md#party-screen) on a TV.
-
 ## Automatic sync with the microphone
 
 Devices in the same room can drift apart audibly, mostly because of speaker and Bluetooth

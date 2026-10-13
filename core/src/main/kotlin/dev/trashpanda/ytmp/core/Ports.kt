@@ -159,6 +159,8 @@ data class RoomView(
     /** The last played song and the song after the current one, so a speaker can skip back and forth itself. */
     val previous: QueueItem? = null,
     val next: QueueItem? = null,
+    /** Outputs that show the party screen: the guest token its page joins with, by output id. */
+    val screens: Map<String, String> = emptyMap(),
 ) {
     fun positionAt(timeMs: Long): Long = if (playing) positionMs + (timeMs - hostTimeMs) else positionMs
 }

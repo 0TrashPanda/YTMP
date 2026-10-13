@@ -188,10 +188,13 @@ sealed interface Command {
     @SerialName("SetListening")
     data class SetListening(val on: Boolean) : Command
 
-    /** Plays the room on a speaker or TV, or stops playing on it. */
+    /**
+     * Plays the room on a speaker or TV, or stops playing on it. [screen]: a TV or display
+     * with Chromecast shows the party screen too, which plays the music itself.
+     */
     @Serializable
     @SerialName("SetOutput")
-    data class SetOutput(val outputId: String, val active: Boolean) : Command
+    data class SetOutput(val outputId: String, val active: Boolean, val screen: Boolean = false) : Command
 
     @Serializable
     @SerialName("SetOutputVolume")

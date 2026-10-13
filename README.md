@@ -37,7 +37,8 @@ Music, without Premium, and not tied to a single music service.
 - Shuffle and repeat (queue or one song), fair order (one song per person per round),
   vote to skip, and limits (songs per person, song length, no recent repeats).
 - A party screen for a TV, laptop or tablet: big album art in its colour, what's next and
-  who added it, and a QR code to join. A TV links with a code, like YouTube's.
+  who added it, and a QR code to join. A TV links with a code, like YouTube's, and a TV with
+  Chromecast shows it from *Play on* (it plays the music too).
 - Everyone who listens stays in sync, with a per-device sync adjustment (for Bluetooth).
 - Hand a room to someone else, clone it (here, onto your phone or onto your server), and
   invite or move everyone to the clone, keeping their roles. Server rooms can be always on.
