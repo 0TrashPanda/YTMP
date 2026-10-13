@@ -4,6 +4,7 @@
 	// name (and author), as you type.
 	import { getLibrary } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
+	import { fuzzyFind } from '../format';
 	import type { HomePage } from '../protocol.gen';
 	import type { Card } from './CardGrid.svelte';
 	import { youtube } from '../youtube.svelte';
@@ -16,15 +17,18 @@
 	let error = $state<string | null>(null);
 	let query = $state('');
 
-	/** Lowercase, without accents: "cafe" finds "Café". */
-	const plain = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
-	const sections = $derived.by(() => {
-		const words = plain(query).split(/\s+/).filter(Boolean);
-		const matches = (card: Card) => words.every((w) => plain(`${card.title} ${card.subtitle ?? ''}`).includes(w));
-		return (library?.sections ?? [])
-			.map((section) => ({ title: section.title, cards: section.items.flatMap((i) => itemCard(i, open) ?? []).filter(matches) }))
-			.filter((section) => section.cards.length);
-	});
+	const sections = $derived(
+		(library?.sections ?? [])
+			.map((section) => ({
+				title: section.title,
+				cards: fuzzyFind(
+					section.items.flatMap((i) => itemCard(i, open) ?? []),
+					query,
+					(card: Card) => `${card.title} ${card.subtitle ?? ''}`
+				)
+			}))
+			.filter((section) => section.cards.length)
+	);
 
 	$effect(() => {
 		void youtube.version;

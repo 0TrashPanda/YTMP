@@ -17,3 +17,78 @@ export function artistNames(song: Song): string {
 export function artUrl(song: Song, size: number): string | null {
 	return thumbUrl(song.thumbnails, size) ?? null;
 }
+
+/** Lowercase, without accents: "cafe" finds "Café". */
+const plain = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+/** Edits (a letter added, removed, changed, or two swapped) between [a] and [b]. */
+function editDistance(a: string, b: string): number {
+	const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
+	for (let j = 1; j <= b.length; j++) d[0][j] = j;
+	for (let i = 1; i <= a.length; i++) {
+		for (let j = 1; j <= b.length; j++) {
+			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+			d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+			if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+		}
+	}
+	return d[a.length][b.length];
+}
+
+/** [word]'s letters in order, starting at the start of a word, not too spread out ("rt" in "road trip"). */
+function inOrder(word: string, text: string): boolean {
+	for (let start = 0; start < text.length; start++) {
+		if (text[start] !== word[0] || (start > 0 && /[\p{L}\p{N}]/u.test(text[start - 1]))) continue;
+		let at = start;
+		for (const letter of word.slice(1)) {
+			at = text.indexOf(letter, at + 1);
+			if (at < 0) break;
+		}
+		if (at >= 0 && at - start < word.length * 4) return true;
+	}
+	return false;
+}
+
+/** How well one typed word fits [text] (higher is better), or null when it doesn't. */
+function wordScore(word: string, text: string, words: string[]): number | null {
+	if (words.includes(word)) return 100;
+	if (words.some((w) => w.startsWith(word))) return 80;
+	if (text.includes(word)) return 60;
+	// Typos: one mistake per 4 letters, in a whole word or the start of one.
+	const allowed = Math.floor(word.length / 4);
+	if (allowed > 0) {
+		const close = words.some((w) =>
+			[w, w.slice(0, word.length - 1), w.slice(0, word.length), w.slice(0, word.length + 1)].some((part) => part.length && editDistance(word, part) <= allowed)
+		);
+		if (close) return 40;
+	}
+	if (word.length >= 2 && inOrder(word, text)) return 20;
+	return null;
+}
+
+/**
+ * Forgiving search for what you type, for finding things in a list (your library): every
+ * typed word must fit somewhere, as a word, the start of one, part of one, with a typo or
+ * two, or its letters in order ("rt" finds "Road trip"). Capitals and accents don't matter.
+ * Returns the matching [items], best first (ties keep their order).
+ */
+export function fuzzyFind<T>(items: T[], query: string, text: (item: T) => string): T[] {
+	const typed = plain(query).split(/\s+/).filter(Boolean);
+	if (!typed.length) return items;
+	const scored: [T, number][] = [];
+	for (const item of items) {
+		const haystack = plain(text(item));
+		const words = haystack.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+		let total = 0;
+		for (const word of typed) {
+			const score = wordScore(word, haystack, words);
+			if (score === null) {
+				total = -1;
+				break;
+			}
+			total += score;
+		}
+		if (total >= 0) scored.push([item, total]);
+	}
+	return scored.sort((a, b) => b[1] - a[1]).map(([item]) => item);
+}

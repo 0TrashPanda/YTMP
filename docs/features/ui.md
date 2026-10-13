@@ -32,7 +32,10 @@ Like YTM:
   YouTube account these are YTM's general suggestions for the host's country; with one,
   your own (see [accounts](accounts.md#linked-youtube-account)).
 - **Library** ✅ (with a linked YouTube Music account): your playlists and podcasts, with a
-  search field at the top that finds them by name or author as you type.
+  search field at the top that finds them by name or author as you type. It's forgiving:
+  typos ("chlil"), letters in order or initials ("rdtrip", "rt" for *Road trip*), no
+  accents needed; best matches first. The same search is above your playlists in the
+  desktop left side.
 - **Explore** (planned): new releases, charts, moods & genres.
 
 ## Player
@@ -73,7 +76,7 @@ Like YTM:
 - **The logo** ✅ always goes to Home (closing the full player); on Home already, it loads new
   suggestions, like pulling down.
 - **Desktop layout** ✅, like YTM: a **left side** with the logo, Home, Library and (wide
-  screens) your playlists; narrower screens get YTM's mini version (icons with small
+  screens) your playlists, with a search field above them; narrower screens get YTM's mini version (icons with small
   labels). No bottom bar on desktop, and the search box starts where the page does.
 - **Space plays and pauses** ✅ the room, like YTM (not while typing). A button you click
   doesn't stay focused, so Space never presses it again; one reached with **Tab** does, and
