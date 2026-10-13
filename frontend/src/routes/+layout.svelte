@@ -20,7 +20,21 @@
 	}
 
 	let { children } = $props();
+
+	const CONTROLS = 'button, a[href], [role="button"], [role="radio"], [role="switch"], [role="tab"], input[type="checkbox"], input[type="radio"], input[type="range"]';
+
+	/**
+	 * A button clicked with the mouse or a finger doesn't stay focused: Space would press it
+	 * again instead of playing or pausing. Reached with Tab, it stays focused.
+	 */
+	function dropMouseFocus(event: MouseEvent) {
+		if (event.detail === 0) return; // Enter or Space on a focused button.
+		const control = (event.target as Element | null)?.closest?.(CONTROLS);
+		if (control instanceof HTMLElement && control === document.activeElement && !control.matches(':focus-visible')) control.blur();
+	}
 </script>
+
+<svelte:window onclick={dropMouseFocus} />
 
 <svelte:head>
 	<link rel="icon" href={favicon} />

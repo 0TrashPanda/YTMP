@@ -75,6 +75,9 @@ Like YTM:
 - **Desktop layout** ✅, like YTM: a **left side** with the logo, Home, Library and (wide
   screens) your playlists; narrower screens get YTM's mini version (icons with small
   labels). No bottom bar on desktop, and the search box starts where the page does.
+- **Space plays and pauses** ✅ the room, like YTM (not while typing). A button you click
+  doesn't stay focused, so Space never presses it again; one reached with **Tab** does, and
+  Space presses it.
 - **Later: smoother swipe-down** of the full player. Now it only follows the finger and
   jumps closed (or back) on release; it should feel like YTM's: the player shrinks into
   the mini player as you drag, with momentum (a quick flick closes it), and an animated

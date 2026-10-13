@@ -309,6 +309,16 @@
 		return 'handled';
 	}
 
+	/** Space plays or pauses the room, like YTM; not while typing, or on a control reached with Tab. */
+	function onKeydown(event: KeyboardEvent) {
+		if (event.key !== ' ' || event.ctrlKey || event.metaKey || event.altKey || !room?.state?.nowPlaying) return;
+		const target = event.target as HTMLElement;
+		if (target.closest('input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, select, [contenteditable]')) return;
+		if (target !== document.body && target.matches(':focus-visible')) return;
+		event.preventDefault();
+		if (!event.repeat) room.run({ kind: room.state.playback.playing ? 'Pause' : 'Play' });
+	}
+
 	// A changed setting (e.g. what unplugging headphones does) goes to the app's player.
 	const onSettings = () => player?.sync();
 	onMount(() => {
@@ -364,6 +374,7 @@
 </script>
 
 <svelte:document bind:visibilityState={visibility} />
+<svelte:window onkeydown={onKeydown} />
 
 <svelte:head>
 	<title>{room?.state ? `${room.state.room.name} · YTMP` : 'YTMP'}</title>
