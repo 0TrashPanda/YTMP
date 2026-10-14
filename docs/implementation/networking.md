@@ -41,6 +41,13 @@ case the browser wants a tap) or continue in the browser; it doesn't join the ro
 - **Chosen codes** ✅ (`CreateRoomRequest.code`, `RoomManager.create(chosenCode)`): `ROOM_CODE`,
   3–12 of `A–Z 0–9`, stored uppercase. Taken (a room here has it, or a room that moved away
   still forwards people by it): `409`, shown at the field; not valid: `400`.
+- **Changing a room's code** ✅ (`Command.SetRoomCode`, change settings): `RoomManager.claim`
+  re-keys the room; its old code goes to `Room.formerCodes` (last 10, saved with the room)
+  and `RoomManager.get` finds a room by those too, so old links, QR codes, saved logins and
+  the app's own connections keep working without a redirect. A former code is taken for
+  other rooms (also for random new codes). Clients follow `RoomUpdated` (or the welcome
+  state when they joined by an old code): `saved.renameRoom` moves the guest/owner token
+  and solo setting, and the room page replaces its address.
 - Server config:
 
   ```toml

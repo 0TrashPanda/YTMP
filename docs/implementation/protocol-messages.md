@@ -108,6 +108,7 @@ Each command lists the permission it needs (see [room management](../features/ro
 |---------|--------|------------|
 | `SetListening` ✅ | `on`, `startsTogether` (the player sends `PlayerReady`) | Play audio locally |
 | `SetSpeakers` ✅ | `names` (speakers near the phone that play the room, from the app; empty: none), `startsTogether` | Play audio locally |
+| `SetRoomCode` ✅ | `code` (3–12 letters and digits; the old codes keep leading to the room) | Change settings |
 | `PlayerReady` ✅ | `itemId`, `speakers` (this player, or all the phone's speakers, loaded a starting song; see [starting together](playback-sync.md#starting-a-song-together)) | — |
 
 No command is needed for the proxied stream: when the direct URL fails, the client uses

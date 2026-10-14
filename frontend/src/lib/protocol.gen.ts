@@ -232,6 +232,11 @@ export interface CommandSetRepeat {
   mode: RepeatMode;
 }
 
+export interface CommandSetRoomCode {
+  kind: "SetRoomCode";
+  code: string;
+}
+
 export interface CommandSetSpeakers {
   kind: "SetSpeakers";
   names: string[];
@@ -331,6 +336,7 @@ export type Command =
   | CommandSetParticipantPermissions
   | CommandSetPassword
   | CommandSetRepeat
+  | CommandSetRoomCode
   | CommandSetSpeakers
   | CommandSetVisibility
   | CommandShuffleQueue

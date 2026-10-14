@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto, pushState } from '$app/navigation';
+	import { goto, pushState, replaceState } from '$app/navigation';
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import Icon from '../../../lib/components/Icon.svelte';
 	import PlayerBar from '../../../lib/components/PlayerBar.svelte';
@@ -36,7 +36,10 @@
 	import { identity, logInOnce, session } from '../../../lib/account';
 	import type { Participant } from '../../../lib/protocol.gen';
 
-	const code = page.params.code!.toUpperCase();
+	/** The code in the link this page was opened with. */
+	const linkCode = page.params.code!.toUpperCase();
+	/** The room's code: the link's, then the room's own (it can change, see SetRoomCode). */
+	let code = $state(linkCode);
 
 	// A link from cloning or a move to this room: #owner=… (I made it: the proof), #migrate=…
 	// (my key from the old room, to get my role back) and #name=… (my name there, for a page that
@@ -45,7 +48,7 @@
 	if (location.hash.length > 1) {
 		const fragment = new URLSearchParams(location.hash.slice(1));
 		const owner = fragment.get('owner');
-		if (owner) saved.setOwnerToken(code, owner);
+		if (owner) saved.setOwnerToken(linkCode, owner);
 		arrivingWithKey = fragment.get('migrate');
 		const nameThere = fragment.get('name')?.trim();
 		if (nameThere && !saved.displayName.trim()) saved.displayName = nameThere.slice(0, 32);
@@ -56,6 +59,13 @@
 	const initialName = identity.stored?.account.displayName ?? session.current?.account.displayName ?? saved.displayName;
 	let name = $state(initialName);
 	let room = $state<RoomConnection | null>(null);
+	// The room got another code (or was opened by an earlier one): the address follows.
+	$effect(() => {
+		const now = room?.roomCode;
+		if (!now || now === code) return;
+		code = now;
+		replaceState(`/room/${now}${location.search}`, page.state);
+	});
 	let player = $state<RoomPlayer | null>(null);
 	// The search chip: stays as picked for the next search.
 	let searchType = $state<SearchType>('all');
@@ -175,8 +185,8 @@
 	// The room's password, when it has one (the join form asks; not needed by its owner).
 	let password = $state('');
 	let needsPassword = $state(false);
-	getRoom(code)
-		.then((info) => (needsPassword = info.hasPassword && !saved.ownerToken(code)))
+	getRoom(linkCode)
+		.then((info) => (needsPassword = info.hasPassword && !saved.ownerToken(linkCode)))
 		.catch(() => {});
 	let retryPassword = $state('');
 

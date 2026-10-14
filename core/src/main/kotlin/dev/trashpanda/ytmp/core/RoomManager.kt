@@ -84,6 +84,8 @@ class RoomManager(
     private val onRoomDisowned: (account: String, syncId: String) -> Unit = { _, _ -> },
 ) {
     private val rooms = ConcurrentHashMap<String, Room>()
+    /** Rooms by the codes they had before ([Room.formerCodes]): links and QR codes with them still work. */
+    private val former = ConcurrentHashMap<String, Room>()
     private val random = SecureRandom()
     private val _list = MutableStateFlow<List<RoomInfo>>(emptyList())
     private val _hosting = MutableStateFlow<List<RoomInfo>>(emptyList())
@@ -108,7 +110,7 @@ class RoomManager(
             for (s in saved) {
                 lateinit var room: Room
                 room = Room.restore(
-                    s, streams, scope, onInfoChanged = { roomChanged(s.code) }, onOwnerChanged = ::disowned, clock = clock,
+                    s, streams, scope, onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, clock = clock,
                     radio = radioFor { room.ownerAccount },
                 )
                 add(room)
@@ -140,14 +142,15 @@ class RoomManager(
     ): Room {
         val chosen = chosenCode?.let(::normalize)
         require(chosen == null || ROOM_CODE.matches(chosen)) { "Room codes are 3 to 12 letters and digits" }
-        // A room that moved away keeps sending people after it by its code.
-        if (chosen != null && chosen in moved) throw RoomCodeTaken(chosen)
+        // A room that moved away keeps sending people after it by its code, and a room still
+        // takes people in by its earlier codes.
+        if (chosen != null && (chosen in moved || former.containsKey(chosen))) throw RoomCodeTaken(chosen)
         while (true) {
-            val code = chosen ?: newCode()
+            val code = chosen ?: newCode().takeIf { !former.containsKey(it) && it !in moved } ?: continue
             lateinit var room: Room
             room = Room(
                 code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radioFor { room.ownerAccount },
-                onInfoChanged = { roomChanged(code) }, onOwnerChanged = ::disowned, clock = clock,
+                onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, clock = clock,
             )
             if (clone != null) room.startFrom(clone)
             if (passwordHash != null) room.startWithPassword(passwordHash)
@@ -161,6 +164,8 @@ class RoomManager(
 
     private fun add(room: Room): Boolean {
         if (rooms.putIfAbsent(room.code, room) != null) return false
+        for (old in room.formerCodes) if (!rooms.containsKey(old)) former.putIfAbsent(old, room)
+        room.claimCode = { code -> claim(room, code) }
         room.addChangeListener { roomChanged(room.code) }
         room.onPlayFinished = onPlayFinished
         scope.launch { room.setAvailableOutputs(outputs.value) }
@@ -175,7 +180,24 @@ class RoomManager(
         }
     }
 
-    operator fun get(code: String): Room? = rooms[normalize(code)]
+    /** The room with this code, or that had it before. */
+    operator fun get(code: String): Room? = normalize(code).let { rooms[it] ?: former[it] }
+
+    /**
+     * [room] gets the code [code] ([Command.SetRoomCode]); its current one keeps leading to it.
+     * Throws [RoomCodeTaken] when another room has it, had it, or moved away from it.
+     */
+    @Synchronized
+    private fun claim(room: Room, code: String) {
+        if (code in moved || former[code].let { it != null && it !== room }) throw RoomCodeTaken(code)
+        if (rooms.putIfAbsent(code, room) != null) throw RoomCodeTaken(code)
+        val old = room.code
+        rooms.remove(old, room)
+        former.remove(code)
+        former[old] = room
+        // Saved under its new code once it says it changed (onInfoChanged).
+        if (store != null) scope.launch(storeContext) { runCatching { store.delete(old) }.onFailure { log.warn("Couldn't delete room {}", old, it) } }
+    }
 
     /** All rooms right now. */
     fun all(): List<Room> = rooms.values.toList()
@@ -202,7 +224,7 @@ class RoomManager(
         while (true) {
             lateinit var room: Room
             room = Room.restore(
-                state, streams, scope, onInfoChanged = { roomChanged(code) }, onOwnerChanged = ::disowned, radio = radioFor { room.ownerAccount },
+                state, streams, scope, onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, radio = radioFor { room.ownerAccount },
                 clock = clock, code = code, epoch = epoch,
             )
             if (add(room)) {
@@ -236,6 +258,7 @@ class RoomManager(
     private val moved = java.util.Collections.synchronizedMap(LinkedHashMap<String, String>())
 
     private fun remove(room: Room, closedHere: Boolean = true) {
+        former.values.removeIf { it === room }
         if (closedHere && room.syncId != null) onRoomClosed(room)
         room.close()
         refreshList()

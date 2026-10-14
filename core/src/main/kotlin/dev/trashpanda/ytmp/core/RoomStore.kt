@@ -64,6 +64,8 @@ data class SavedRoom(
     val repeat: RepeatMode = RepeatMode.OFF,
     /** The first song of the run of queue songs that repeat queue plays again (an item id). */
     val runStart: String? = null,
+    /** Codes the room had before ([Command.SetRoomCode]): they still lead to it. Newest first. */
+    val formerCodes: List<String> = emptyList(),
 ) {
     fun toJson(): String = ProtocolJson.encodeToString(serializer(), this)
 

@@ -71,14 +71,19 @@ export class RoomConnection {
 	private noticeId = 0;
 	private sentAccountToken = false;
 
+	/** The room's code; it follows the room when it changes (SetRoomCode). */
+	roomCode = $state('');
+
 	constructor(
-		readonly roomCode: string,
+		roomCode: string,
 		private readonly name: string,
 		/** Moved here from another room: the key from there, to get my role back (sent until I'm in). */
 		private arrivingWithKey: string | null = null,
 		/** The room's password, if it has one. */
 		private password: string | null = null
-	) {}
+	) {
+		this.roomCode = roomCode;
+	}
 
 	/** Tries again with the room's password (after `password_required` or `wrong_password`). */
 	retryWithPassword(password: string): void {
@@ -222,6 +227,14 @@ export class RoomConnection {
 		this.socket?.send(JSON.stringify(message));
 	}
 
+	/** The room has another code now (or was joined by an earlier one): follow it, with what's saved for it. */
+	private followCode(state: RoomState): void {
+		const now = state.room.code;
+		if (now === this.roomCode) return;
+		saved.renameRoom(this.roomCode, now);
+		this.roomCode = now;
+	}
+
 	private receive(message: ServerMessage): void {
 		switch (message.type) {
 			case 'welcome':
@@ -230,6 +243,7 @@ export class RoomConnection {
 				this.migrationKey = message.migrationKey;
 				this.participantId = message.participantId;
 				this.state = message.state;
+				this.followCode(message.state);
 				if (this.sentAccountToken && !message.accountId) {
 					// Expired, or from an auth server this host doesn't trust (any more).
 					identity.forget();
@@ -242,6 +256,7 @@ export class RoomConnection {
 				break;
 			case 'snapshot':
 				this.state = message.state;
+				this.followCode(message.state);
 				this.seq = message.seq;
 				this.waitingForSnapshot = false;
 				break;
@@ -321,6 +336,7 @@ export class RoomConnection {
 				break;
 			case 'RoomUpdated':
 				s.room = e.room;
+				this.followCode(s);
 				break;
 			case 'QueueReplaced':
 				s.queue = e.items;

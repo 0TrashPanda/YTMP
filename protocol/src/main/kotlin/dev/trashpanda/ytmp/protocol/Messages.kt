@@ -250,6 +250,14 @@ sealed interface Command {
     @SerialName("SendMigration")
     data class SendMigration(val target: MigrationTarget, val mode: MigrationMode) : Command
 
+    /**
+     * Gives the room another code ([ROOM_CODE]). Its earlier codes keep leading to it, so links
+     * and QR codes that are out there still work. Change settings.
+     */
+    @Serializable
+    @SerialName("SetRoomCode")
+    data class SetRoomCode(val code: String) : Command
+
     /** Sets the room's password (needed to join), or removes it (null). Manage room. */
     @Serializable
     @SerialName("SetPassword")

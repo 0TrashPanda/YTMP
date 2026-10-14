@@ -29,8 +29,13 @@ A code is never reused while its room exists.
 When you host a room you can **choose its code** instead (*Room code (optional)*, under the
 room's name): 3 to 12 letters and digits, like `PARTY` or `TREESEE42`. Any letters work
 here, look-alikes too, since you pick it yourself. If another room on that phone or server
-has it, you're told it's taken. It's set when the room is made; it can't be changed later
-(links, QR codes and everyone's saved login for the room go by the code).
+has it, you're told it's taken.
+
+**Changing it later** ✅: *Room settings → Overview → Room Code* (for people who may change
+the room's settings). Everyone in the room follows along (their address and their saved
+login for the room move to the new code), and the **old code keeps working**: links, QR
+codes on paper and anyone typing it still end up in the room, also after a restart. A room
+keeps leading from its last 10 codes, so another room can't take them.
 
 ## Joining a phone-hosted room on the local network
 

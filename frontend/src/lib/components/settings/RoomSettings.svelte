@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Room settings, laid out like Discord's server settings: a sidebar of sections on the
 	// left, the section on the right, ESC to close.
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { DEFAULT_ROLE_COLOR, rank } from '../../permissions';
 	import type { Command, HostInfo, Participant, Permission, Role, RoomOpenMode } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
@@ -163,6 +163,21 @@
 	const choices = (values: number[], current: number) => [...new Set([0, ...values, current])].sort((a, b) => a - b);
 	const minutes = (m: number) => (m % 60 === 0 && m >= 60 ? `${m / 60} hour${m === 60 ? '' : 's'}` : `${m} min`);
 
+	// --- the room's code: links and QR codes with the old one keep working ---
+	let newCode = $state(untrack(() => rs.room.code));
+	let codeBusy = $state(false);
+	let codeError = $state<string | null>(null);
+	const codeValid = $derived(/^[A-Za-z0-9]{3,12}$/.test(newCode.trim()));
+	const codeChanged = $derived(newCode.trim().toUpperCase() !== rs.room.code);
+	async function changeCode() {
+		codeBusy = true;
+		codeError = null;
+		const error = await room.run({ kind: 'SetRoomCode', code: newCode.trim().toUpperCase() });
+		codeBusy = false;
+		if (error) codeError = error.message;
+		else newCode = newCode.trim().toUpperCase();
+	}
+
 	// --- password ---
 	let newPassword = $state('');
 	let changingPassword = $state(false);
@@ -237,6 +252,30 @@
 						<span class={label}>Room Name</span>
 						<input class={input} bind:value={name} maxlength="64" />
 					</label>
+					<div class="mb-6">
+						<span class={label}>Room Code</span>
+						<form
+							class="flex gap-2"
+							onsubmit={(e) => {
+								e.preventDefault();
+								changeCode();
+							}}
+						>
+							<input
+								class="{input} flex-1 font-mono tracking-[0.2em] uppercase"
+								bind:value={newCode}
+								oninput={() => (codeError = null)}
+								maxlength="12"
+								aria-label="Room code"
+								autocomplete="off"
+								spellcheck="false"
+							/>
+							<button class="rounded bg-d-blurple px-4 text-sm font-medium text-white disabled:opacity-50" disabled={codeBusy || !codeChanged || !codeValid}>Change</button>
+						</form>
+						<p class="mt-1 text-sm {codeError || !codeValid ? 'text-[#f23f43]' : 'text-d-muted'}">
+							{codeError ?? (codeValid ? 'Links and QR codes with the old code keep working.' : '3 to 12 letters and digits')}
+						</p>
+					</div>
 					<div class="mb-6 h-px bg-d-line"></div>
 					<h3 class="mb-1 text-base font-semibold text-d-head">Default Roles</h3>
 					<p class="mb-4 text-sm text-d-muted">The role people get when they join. You can change anyone's role later under Members.</p>

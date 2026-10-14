@@ -17,6 +17,14 @@ function write(key: string, value: string): void {
 	}
 }
 
+function remove(key: string): void {
+	try {
+		localStorage.removeItem(key);
+	} catch {
+		// Nothing saved anyway.
+	}
+}
+
 const code = (roomCode: string) => roomCode.toUpperCase();
 
 /** How far the phone's Back button goes in a room: its home page, or out to the room list. */
@@ -52,6 +60,15 @@ export const saved = {
 			localStorage.removeItem(`ytmp.owner.${code(roomCode)}`);
 		} catch {
 			// Nothing saved anyway.
+		}
+	},
+	/** The room's code changed: what's saved for it here goes along (the old code still leads to it). */
+	renameRoom: (from: string, to: string) => {
+		for (const kind of ['guest', 'owner', 'soloOff']) {
+			const value = read(`ytmp.${kind}.${code(from)}`);
+			if (value === null) continue;
+			if (read(`ytmp.${kind}.${code(to)}`) === null) write(`ytmp.${kind}.${code(to)}`, value);
+			remove(`ytmp.${kind}.${code(from)}`);
 		}
 	},
 	/** Codes of the rooms made in this browser (it has their owner tokens). */

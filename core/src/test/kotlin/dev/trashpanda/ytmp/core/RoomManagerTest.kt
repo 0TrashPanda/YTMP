@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp.core
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
+import dev.trashpanda.ytmp.protocol.ErrorInfo
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.QueuePosition
@@ -10,8 +11,11 @@ import dev.trashpanda.ytmp.protocol.RoomState
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
+import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -45,11 +49,13 @@ class RoomManagerTest {
     private class Client : Outbox {
         var welcome: ServerMessage.Welcome? = null
         val events = mutableListOf<Event>()
+        var lastError: ErrorInfo? = null
 
         override fun send(message: ServerMessage) {
             when (message) {
                 is ServerMessage.Welcome -> welcome = message
                 is ServerMessage.EventMessage -> events += message.event
+                is ServerMessage.Result -> lastError = message.error
                 else -> Unit
             }
         }
@@ -78,6 +84,51 @@ class RoomManagerTest {
 
     private suspend fun Room.run(client: Client, command: Command) =
         handle(client.welcome!!.participantId, ClientMessage.CommandMessage("c", command))
+
+    @Test
+    fun `a room's code can change, and its earlier codes still lead to it, also after a restart`() = runTest {
+        val store = MemoryStore()
+        val rooms = manager(store)
+        val room = rooms.create("Party", chosenCode = "FIRST")
+        val other = rooms.create("Other", chosenCode = "OTHER")
+        val anna = room.connect("Anna", ownerToken = room.ownerToken)
+        val guest = room.connect("Guest")
+
+        room.run(anna, Command.SetRoomCode(" second "))
+        assertNull(anna.lastError)
+        assertEquals("SECOND", room.code)
+        assertEquals("SECOND", (guest.events.last() as Event.RoomUpdated).room.code)
+        assertSame(room, rooms["SECOND"])
+        assertSame(room, rooms["first"])
+        assertEquals(listOf("Other", "Party"), rooms.list.value.map { it.name })
+        assertEquals("SECOND", rooms.list.value.single { it.name == "Party" }.code)
+
+        // Taken: another room's code, or a code another room had; not a code at all.
+        room.run(anna, Command.SetRoomCode("OTHER"))
+        assertNotNull(anna.lastError)
+        other.run(other.connect("Owner", ownerToken = other.ownerToken), Command.SetRoomCode("FIRST")).let { }
+        assertSame(room, rooms["FIRST"])
+        assertFailsWith<RoomCodeTaken> { rooms.create("New", chosenCode = "FIRST") }
+        room.run(anna, Command.SetRoomCode("A B"))
+        assertNotNull(anna.lastError)
+        // Only for people who may change the settings.
+        room.run(guest, Command.SetRoomCode("GUESTS"))
+        assertNotNull(guest.lastError)
+
+        // Its own earlier code is fine again.
+        room.run(anna, Command.SetRoomCode("THIRD"))
+        room.run(anna, Command.SetRoomCode("FIRST"))
+        assertNull(anna.lastError)
+        assertEquals(listOf("THIRD", "SECOND"), room.formerCodes)
+
+        // After a restart: saved under its code now, found by the earlier ones.
+        rooms.saveAll()
+        advanceUntilIdle()
+        assertEquals(setOf("FIRST", "OTHER"), store.rooms.keys)
+        val after = manager(store)
+        assertEquals("FIRST", after["second"]?.code)
+        assertEquals("FIRST", after["THIRD"]?.code)
+    }
 
     @Test
     fun `a room comes back after a restart, paused where it was`() = runTest {

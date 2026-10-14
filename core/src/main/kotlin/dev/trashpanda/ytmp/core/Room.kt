@@ -22,6 +22,7 @@ import dev.trashpanda.ytmp.protocol.QueueItem
 import dev.trashpanda.ytmp.protocol.QueueItemOrigin
 import dev.trashpanda.ytmp.protocol.QueueItemResult
 import dev.trashpanda.ytmp.protocol.QueuePosition
+import dev.trashpanda.ytmp.protocol.ROOM_CODE
 import dev.trashpanda.ytmp.protocol.RejectReason
 import dev.trashpanda.ytmp.protocol.RepeatMode
 import dev.trashpanda.ytmp.protocol.Role
@@ -53,7 +54,7 @@ import org.slf4j.LoggerFactory
  * only follow [PlaybackStatus].
  */
 class Room(
-    override val code: String,
+    code: String,
     name: String,
     ownerToken: String,
     visibility: RoomVisibility,
@@ -107,6 +108,22 @@ class Room(
         private set
 
     val info: RoomInfo get() = RoomInfo(code, name, visibility, hasPassword = passwordHash != null)
+
+    /** The room's code; it can change ([Command.SetRoomCode]). */
+    @Volatile
+    override var code: String = code
+        private set
+
+    /** Codes the room had before, newest first: they still lead to it ([RoomManager.get]). */
+    @Volatile
+    var formerCodes: List<String> = emptyList()
+        private set
+
+    /**
+     * Takes the new code for the room where it lives (its [RoomManager]), or throws
+     * [RoomCodeTaken]. Null: the code can't change (a room on its own, in tests).
+     */
+    internal var claimCode: ((String) -> Unit)? = null
 
     /** Joining needs this password (hashed, see [RoomPasswords]); null: none. */
     @Volatile
@@ -541,6 +558,7 @@ class Room(
     suspend fun save(): SavedRoom = mutex.withLock {
         SavedRoom(
             code = code,
+            formerCodes = formerCodes,
             name = name,
             ownerToken = ownerToken,
             visibility = visibility,
@@ -597,6 +615,7 @@ class Room(
         }
         migrants += saved.migrants
         migration = saved.migration
+        formerCodes = saved.formerCodes.filter { it != code }.distinct().take(MAX_FORMER_CODES)
         passwordHash = saved.passwordHash
         repeat = saved.repeat
         runStart = saved.runStart
@@ -936,6 +955,23 @@ class Room(
                 changeOwner(target)
             }
             is Command.LeaveRoom -> return leave(member, command.newOwnerId, command.stayOwner)
+            is Command.SetRoomCode -> {
+                need(member, Permission.CHANGE_SETTINGS)?.let { return it }
+                val wanted = command.code.trim().uppercase()
+                if (!ROOM_CODE.matches(wanted)) return invalid("Room codes are 3 to 12 letters and digits")
+                if (wanted == code) return null
+                val claim = claimCode ?: return invalid("This room's code can't be changed here")
+                try {
+                    claim(wanted)
+                } catch (e: RoomCodeTaken) {
+                    return invalid("The code $wanted is taken. Pick another one")
+                }
+                log.info("Room {} is now {}", code, wanted)
+                formerCodes = (listOf(code) + formerCodes - wanted).take(MAX_FORMER_CODES)
+                code = wanted
+                emit(Event.RoomUpdated(info))
+                onInfoChanged()
+            }
             is Command.SetPassword -> {
                 need(member, Permission.CHANGE_SETTINGS)?.let { return it }
                 val password = command.password
@@ -1978,6 +2014,8 @@ class Room(
         const val RECENT_SONGS = 50
         /** Repeat queue plays at most this many songs again. */
         const val MAX_REPEAT_RUN = 500
+        /** Earlier codes a room keeps leading to. */
+        const val MAX_FORMER_CODES = 10
         const val MAX_PLAYED_AT = 1000
 
         /** Brings back a room saved with [save]. */
