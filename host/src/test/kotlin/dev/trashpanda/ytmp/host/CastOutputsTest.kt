@@ -57,6 +57,8 @@ class CastOutputsTest {
             eventually { device.volume == 0.3 }
 
             // Turned up on the device itself: the room's slider follows.
+            // A message with text where other messages have objects (a Nest Hub's) changes nothing.
+            device.broadcast("""{"type":"LAUNCH_STATUS","requestId":0,"status":"USER_ALLOWED"}""")
             device.changeVolumeExternally(0.65000000596)
             eventually { room.view().activeOutputs["cast:fake"] == 0.65 }
 

@@ -66,11 +66,12 @@ class CastMediaPlayer(private val channel: CastChannel) {
      */
     val volumeChanges: Flow<Double> = channel.messages
         .mapNotNull { (namespace, json) ->
+            // Not every message has objects there: a Nest Hub's LAUNCH_STATUS has `"status": "USER_ALLOWED"`.
             when (namespace) {
-                NS_RECEIVER -> json["status"]?.jsonObject?.get("volume")?.jsonObject
-                NS_MULTIZONE -> json["device"]?.jsonObject?.get("volume")?.jsonObject
+                NS_RECEIVER -> (json["status"] as? JsonObject)?.get("volume") as? JsonObject
+                NS_MULTIZONE -> (json["device"] as? JsonObject)?.get("volume") as? JsonObject
                 else -> null
-            }?.get("level")?.jsonPrimitive?.doubleOrNull
+            }?.let { it["level"] as? JsonPrimitive }?.doubleOrNull
         }
         .map { Math.round(it * 100) / 100.0 }
         .distinctUntilChanged()
@@ -238,7 +239,7 @@ class CastMediaPlayer(private val channel: CastChannel) {
         status["status"]?.jsonObject?.get("applications")?.jsonArray?.map { it.jsonObject }.orEmpty()
 
     private fun parseReceiver(status: JsonObject): ReceiverStatus {
-        val volume = status["status"]?.jsonObject?.get("volume")?.jsonObject
+        val volume = (status["status"] as? JsonObject)?.get("volume") as? JsonObject
         return ReceiverStatus(
             volume = volume?.get("level")?.jsonPrimitive?.doubleOrNull,
             muted = volume?.get("muted")?.jsonPrimitive?.booleanOrNull,

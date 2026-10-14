@@ -114,7 +114,11 @@ class FakeCastDevice : AutoCloseable {
     fun changeVolumeExternally(level: Double) {
         volume = level
         val apps = appsJson()
-        val status = """{"type":"RECEIVER_STATUS","requestId":0,"status":{"volume":{"level":$level,"muted":false},"applications":$apps}}"""
+        broadcast("""{"type":"RECEIVER_STATUS","requestId":0,"status":{"volume":{"level":$level,"muted":false},"applications":$apps}}""")
+    }
+
+    /** Sends a receiver message to every sender, like a Nest Hub's `{"type":"LAUNCH_STATUS","status":"USER_ALLOWED"}`. */
+    fun broadcast(status: String) {
         for (output in connections) {
             synchronized(output) {
                 output.write(CastMessage("receiver-0", "*", CastChannel.NS_RECEIVER, status).encode())
