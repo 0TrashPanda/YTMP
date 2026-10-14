@@ -1,8 +1,9 @@
 <script lang="ts">
 	// A song's lyrics (docs/features/ui.md#lyrics). Timed ones follow the song, with the line
 	// being sung highlighted (tap a line to go there); plain ones are text. [large]: karaoke mode,
-	// on the party screen and in the full player: the line being sung big, with the line before
-	// and the next ones; plain lyrics scroll along with the song.
+	// on the party screen and in the full player: big lines that glide up as the song goes, the
+	// line being sung bright in the middle; plain lyrics scroll along with the song.
+	import { tick } from 'svelte';
 	import { getLyrics } from '../api';
 	import type { Lyrics, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -62,53 +63,78 @@
 		if (line) list.scrollTo({ top: line.offsetTop - list.clientHeight / 2 + line.offsetHeight / 2, behavior: 'smooth' });
 	});
 
-	// Karaoke with plain lyrics: they scroll through as the song goes.
-	$effect(() => {
-		if (!list || !large || !lyrics || lyrics.synced || song.durationMs <= 0) return;
-		const share = Math.min(1, Math.max(0, positionMs / song.durationMs));
-		list.scrollTop = share * (list.scrollHeight - list.clientHeight);
-	});
+	// --- karaoke (large) ---------------------------------------------------------------------
+	// Sizes in pixels from the space it has: the party screen runs on a Chromecast's old Chrome,
+	// which has no container units. Only transform and opacity move, so it stays smooth there.
 
-	/** Karaoke: the line before, the line being sung, and the next two. */
-	const shown = $derived.by(() => {
-		const lines = lyrics?.synced ?? [];
-		const from = Math.max(0, current - 1);
-		return lines.slice(from, from + (current < 0 ? 3 : 4)).map((line, i) => ({ ...line, index: from + i }));
+	let boxWidth = $state(0);
+	let boxHeight = $state(0);
+	const fontPx = $derived(Math.round(Math.max(18, Math.min(120, boxHeight * 0.14, boxWidth * 0.09))));
+	let column = $state<HTMLElement>();
+	/** How far the column of lines is moved up, so the line being sung is in the middle. */
+	let offset = $state(0);
+	$effect(() => {
+		void [current, fontPx, boxHeight, boxWidth, lyrics];
+		if (!large) return;
+		tick().then(() => {
+			if (!column) return;
+			if (lyrics?.synced) {
+				const line = column.querySelector<HTMLElement>(`[data-line="${Math.max(0, current)}"]`);
+				if (line) offset = boxHeight / 2 - (line.offsetTop + line.offsetHeight / 2);
+			}
+		});
 	});
+	// Plain lyrics: they scroll through as the song goes.
+	const plainOffset = $derived.by(() => {
+		if (!large || !column || lyrics?.synced || song.durationMs <= 0) return 0;
+		void fontPx;
+		const share = Math.min(1, Math.max(0, positionMs / song.durationMs));
+		return -share * Math.max(0, column.offsetHeight - boxHeight / 2) + boxHeight / 4;
+	});
+	/** Lines further from the one being sung fade out. */
+	const opacity = (index: number) => (index === current ? 1 : Math.max(0.15, 0.55 - 0.15 * (Math.abs(index - current) - 1)));
+	const FADE = 'linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent)';
 </script>
 
-<!-- Karaoke is sized to the space it has (container units), on a TV as in the player. -->
-<div class="h-full w-full {large ? '[container-type:size]' : ''}">
+<!-- Karaoke is sized to the space it has. -->
+<div class="relative h-full w-full {large ? 'overflow-hidden' : ''}" bind:clientWidth={boxWidth} bind:clientHeight={boxHeight}>
 	{#if lyrics === undefined && !failed}
 		<p class="p-6 text-center text-muted">Loading lyrics…</p>
 	{:else if failed}
 		<p class="p-6 text-center text-muted">Couldn't load the lyrics.</p>
 	{:else if !lyrics}
 		<p class="p-6 text-center text-muted">No lyrics for this song.</p>
-	{:else if large && lyrics.synced}
-		<div class="flex h-full w-full flex-col justify-center gap-[4cqh] overflow-hidden text-center">
-			{#each shown as line (line.index)}
-				<button
-					class="leading-tight font-bold transition-all duration-300 {line.index === current
-						? 'text-[min(16cqh,9cqw)] text-white'
-						: line.index < current
-							? 'text-[min(8cqh,5.5cqw)] text-white/30'
-							: 'text-[min(9cqh,6cqw)] text-white/55'} {canSeek ? '' : 'cursor-default'}"
-					onclick={() => seek(line.timeMs)}
-				>
-					{line.text || '♪'}
-				</button>
-			{/each}
+	{:else if large}
+		<!-- Fades out at the top and bottom (-webkit- for older Chrome, like a Chromecast's). -->
+		<div class="absolute inset-0" style:-webkit-mask-image={FADE} style:mask-image={FADE}>
+			<div
+				bind:this={column}
+				class="absolute inset-x-0 top-0 flex flex-col items-center px-[4%] text-center font-bold"
+				style:transform="translateY({lyrics.synced ? offset : plainOffset}px)"
+				style:transition="transform {lyrics.synced ? 600 : 300}ms {lyrics.synced ? 'cubic-bezier(0.25, 0.8, 0.3, 1)' : 'linear'}"
+				style:font-size="{fontPx}px"
+			>
+				{#if lyrics.synced}
+					{#each lyrics.synced as line, i (i)}
+						<button
+							data-line={i}
+							class="block leading-tight {canSeek ? '' : 'cursor-default'}"
+							style:padding="{Math.round(fontPx * 0.18)}px 0"
+							style:opacity={opacity(i)}
+							style:transform="scale({i === current ? 1 : 0.82})"
+							style:transition="opacity 500ms ease, transform 500ms ease"
+							onclick={() => seek(line.timeMs)}
+						>
+							{line.text || '♪'}
+						</button>
+					{/each}
+				{:else}
+					<p class="leading-snug whitespace-pre-line text-white/85" style:font-size="{Math.round(fontPx * 0.6)}px">{lyrics.plain}</p>
+				{/if}
+			</div>
 		</div>
 	{:else}
-		<div
-			bind:this={list}
-			role="region"
-			aria-label="Lyrics"
-			class="h-full overflow-y-auto {large ? 'px-[4cqw] text-center text-[min(5cqh,4cqw)]' : 'px-4 py-6'}"
-			onwheel={userScrolled}
-			ontouchmove={userScrolled}
-		>
+		<div bind:this={list} role="region" aria-label="Lyrics" class="h-full overflow-y-auto px-4 py-6" onwheel={userScrolled} ontouchmove={userScrolled}>
 			{#if lyrics.synced}
 				{#each lyrics.synced as line, i (i)}
 					<button
@@ -122,11 +148,9 @@
 					</button>
 				{/each}
 			{:else}
-				<p class="leading-relaxed font-medium whitespace-pre-line {large ? 'py-[40cqh] text-white/85' : 'text-lg text-white/85'}">{lyrics.plain}</p>
+				<p class="text-lg leading-relaxed font-medium whitespace-pre-line text-white/85">{lyrics.plain}</p>
 			{/if}
-			{#if !large}
-				<p class="pt-6 pb-2 text-xs text-muted">Lyrics: {lyrics.source}</p>
-			{/if}
+			<p class="pt-6 pb-2 text-xs text-muted">Lyrics: {lyrics.source}</p>
 		</div>
 	{/if}
 </div>

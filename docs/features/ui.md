@@ -281,9 +281,12 @@ Open it with the **⋮** button or by **right-clicking** the song.
   often timed too). Timed lyrics win over plain ones.
 - **Karaoke mode** (a room switch: *Karaoke* in the Lyrics tab, or in the room settings, for
   people who may change them): the **party screen** and everyone's **full player** show the
-  lyrics large instead of the album art: the line being sung big, the one before and the
-  next two smaller. Plain lyrics scroll along with the song. The party screen keeps the
-  song, its progress and the code to join, and leaves out what's next.
+  lyrics large instead of the album art: big lines that glide up as the song goes, the line
+  being sung bright in the middle and the others dimmer, fading out at the top and bottom.
+  Plain lyrics scroll along with the song. The party screen keeps the song, its progress
+  and a smaller code to join, and leaves out what's next. Sizes are set in pixels from the
+  space there is (a Chromecast's old Chrome has no container units), and only transform and
+  opacity animate, so it stays smooth on a TV.
 
 ## Party screen
 

@@ -149,7 +149,7 @@
 					<p class="truncate text-[min(2.8vh,2.1vw)] text-white/70 portrait:text-[min(2.2vh,4vw)]">{artistNames(song)} · Added by {addedBy(current)}</p>
 					{#if duration > 0}
 						<div class="mt-[1vh] h-[max(3px,0.5vh)] overflow-hidden rounded-full bg-white/20">
-							<div class="h-full rounded-full bg-white" style:width="{(position / duration) * 100}%"></div>
+							<div class="h-full rounded-full bg-white transition-[width] duration-[250ms] ease-linear" style:width="{(position / duration) * 100}%"></div>
 						</div>
 					{/if}
 				</div>
@@ -173,7 +173,7 @@
 				<p class="truncate text-[min(3.6vh,2.6vw)] text-white/75 portrait:text-[min(2.6vh,4.5vw)]">{artistNames(song)}</p>
 				{#if duration > 0}
 					<div class="mt-[2vh] h-[max(4px,0.7vh)] overflow-hidden rounded-full bg-white/20">
-						<div class="h-full rounded-full bg-white" style:width="{(position / duration) * 100}%"></div>
+						<div class="h-full rounded-full bg-white transition-[width] duration-[250ms] ease-linear" style:width="{(position / duration) * 100}%"></div>
 					</div>
 					<div class="flex justify-between text-[max(13px,1.9vh)] text-white/60 tabular-nums">
 						<span>{formatTime(position)}</span><span>{formatTime(duration)}</span>
@@ -192,7 +192,7 @@
 	{/if}
 
 	<!-- Bottom: up next, and how to join. -->
-	<div class="flex shrink-0 items-end gap-[3vw] px-[4vw] pb-[4vh] portrait:flex-col portrait:items-stretch portrait:gap-[2vh]">
+	<div class="flex shrink-0 items-end gap-[3vw] px-[4vw] {karaoke ? 'pb-[2.5vh]' : 'pb-[4vh]'} portrait:flex-col portrait:items-stretch portrait:gap-[2vh]">
 		<div class="min-w-0 flex-1">
 			{#if upNext.length && !karaoke}
 				<p class="mb-[1.5vh] text-[max(13px,1.9vh)] font-medium tracking-[0.2em] text-white/55 uppercase">Up next</p>
@@ -212,7 +212,14 @@
 		</div>
 		{#if s}
 			<div class="flex shrink-0 items-center gap-[1.5vw] rounded-[1.5vmin] bg-black/35 p-[1.5vmin] portrait:gap-[4vw]">
-				<div class="h-[18vh] w-[18vh] overflow-hidden rounded-[1vmin] bg-white portrait:h-[14vh] portrait:w-[14vh] [&>svg]:h-full [&>svg]:w-full">{@html qr}</div>
+				<!-- Karaoke: smaller, so the lyrics get more room. -->
+				<div
+					class="overflow-hidden rounded-[1vmin] bg-white [&>svg]:h-full [&>svg]:w-full {karaoke
+						? 'h-[12vh] w-[12vh]'
+						: 'h-[18vh] w-[18vh] portrait:h-[14vh] portrait:w-[14vh]'}"
+				>
+					{@html qr}
+				</div>
 				<div class="min-w-0 text-[max(13px,1.9vh)]">
 					<p class="text-white/70">Scan to add songs</p>
 					<p class="mt-[0.5vh] font-mono text-[min(6vh,4vw)] leading-none font-bold tracking-[0.15em] portrait:text-[min(5vh,9vw)]">{s.room.code}</p>
