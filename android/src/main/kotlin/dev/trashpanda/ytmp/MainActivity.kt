@@ -146,10 +146,15 @@ class MainActivity : ComponentActivity() {
 
         // For development: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080`
         intent.getStringExtra("server")?.let { server = normalize(it) }
+        val link = roomLink(intent)
         when {
             savedInstanceState != null -> webView.restoreState(savedInstanceState)
             intent.hasExtra("server") -> openServer()
-            else -> openHome()
+            link != null && isAppPage(link) -> webView.loadUrl(link.toString())
+            else -> {
+                openHome()
+                link?.let(::openLink)
+            }
         }
 
         // A new version: asked once per app start (not when the screen is only recreated).
@@ -170,6 +175,28 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        roomLink(intent)?.let(::openLink)
+    }
+
+    /** A room link the browser handed over (`ytmp://open?url=…`, see frontend/src/lib/openInApp.ts), or null. */
+    private fun roomLink(intent: Intent?): Uri? {
+        val data = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.data ?: return null
+        if (data.scheme != "ytmp" || data.host != "open") return null
+        val url = data.getQueryParameter("url")?.let(Uri::parse) ?: return null
+        return url.takeIf { it.scheme == "http" || it.scheme == "https" }
+    }
+
+    /**
+     * Shows a room link: in the app when it's one of the app's pages (a phone on this network,
+     * your server); else back in the browser, which then stays with it (`web=1`).
+     */
+    private fun openLink(url: Uri) {
+        if (isAppPage(url)) webView.loadUrl(url.toString())
+        else startActivity(Intent(Intent.ACTION_VIEW, url.buildUpon().appendQueryParameter("web", "1").build()))
     }
 
     override fun onStart() {

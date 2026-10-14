@@ -31,7 +31,8 @@ Music, without Premium, and not tied to a single music service.
 
 **Rooms**
 - Party rooms that friends join from a browser or the app (room code, QR code, or rooms
-  nearby on the same Wi-Fi), and solo rooms just for you. Rooms survive restarts.
+  nearby on the same Wi-Fi), and solo rooms just for you. Rooms survive restarts. A scanned
+  QR code or a room link opens in the app on an Android phone that has it.
 - One shared queue: add, play next, drag to reorder, swipe to remove, jump to any song,
   clear. Played songs stay above the current one; autoplay songs below.
 - Shuffle and repeat (queue or one song), fair order (one song per person per round),

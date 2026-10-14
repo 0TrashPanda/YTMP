@@ -18,8 +18,17 @@ The share sheet's QR code (and link) is the room's URL: `http://192.168.1.23:876
 for a phone host, `https://ytmp.example.com/room/KQFM` on a server (`ShareSheet.svelte`).
 Scanned with a camera app, the browser opens the web UI served by the host.
 
-Not built yet: the app registering as the handler for these URLs, so a scan on a phone with
-YTMP installed opens the app instead of the browser.
+**Opening in the app:** Android only opens an app for an `http(s)` link when the app is
+verified for that domain (Android 12+), which can't be done for phone hosts (IP addresses)
+or other people's servers. So the link opens in the browser first, and the page hands it
+over (`frontend/src/lib/openInApp.ts`, `+layout.svelte`): in an Android Chrome-based browser
+(not a WebView), a `/room/CODE` page goes to
+`intent://open?url=<link>#Intent;scheme=ytmp;package=dev.trashpanda.ytmp;S.browser_fallback_url=<link?web=1>;end`.
+With the app, `MainActivity` gets `ytmp://open?url=<link>` and shows the link if it's one of
+its pages (a private address, your server, the account server), else sends it back to the
+browser with `web=1`. Without the app, the browser loads the fallback, and `web=1` keeps it
+there. Meanwhile the page shows *Opening in the YTMP app…* with buttons to open the app (in
+case the browser wants a tap) or continue in the browser; it doesn't join the room.
 
 ## Room code generation
 
