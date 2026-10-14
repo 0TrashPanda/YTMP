@@ -164,8 +164,11 @@ class WebPlayer implements RoomPlayer {
 		if (fix.seek) this.audio.currentTime = expectedMs / 1000;
 		if (this.audio.playbackRate !== fix.rate) this.audio.playbackRate = fix.rate;
 		if (this.audio.paused) {
-			this.audio.play().catch(() => {
-				this.error = 'Tap "Play here" again to allow audio.';
+			this.audio.play().catch((e: unknown) => {
+				// Only a missing tap blocks it (NotAllowedError); anything else says what it was.
+				const name = e instanceof DOMException ? e.name : '';
+				if (name === 'NotAllowedError') this.error = 'Tap "Play here" again to allow audio.';
+				else if (name !== 'AbortError') this.error = `Couldn't play this song (${name || String(e)}).`;
 			});
 		}
 	}

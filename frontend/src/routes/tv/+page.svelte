@@ -111,6 +111,18 @@
 
 	if (cast) {
 		const [, castCode, token] = cast;
+		// What this TV's browser is and allows, in the host's log: tells why sound or the page
+		// doesn't work there. Whether it may start sound by itself: try a moment of silence.
+		const silence = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=');
+		silence.play().then(
+			() => 'allowed',
+			(e: unknown) => (e instanceof DOMException ? e.name : String(e))
+		).then((autoplay) =>
+			reportProblem(
+				`party screen on a Chromecast opened: sound by itself ${autoplay}, ${top === self ? 'whole page' : 'in a frame'}, ${navigator.userAgent}`,
+				decodeURIComponent(castCode)
+			)
+		);
 		saved.setGuestToken(decodeURIComponent(castCode), decodeURIComponent(token));
 		show(decodeURIComponent(castCode));
 	} else {
