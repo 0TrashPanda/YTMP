@@ -38,6 +38,9 @@
 			out.push({ kind: 'header', key: 'autoplay-header' });
 			for (const item of s.autoplay) out.push({ kind: 'item', place: 'autoplay', item, key: `a:${item.itemId}` });
 		}
+		// A dropped song stays where it was dropped while the host moves it.
+		const from = dropped ? out.findIndex((slot) => slot.key === dropped!.key) : -1;
+		if (from >= 0) out.splice(dropped!.to, 0, ...out.splice(from, 1));
 		return out;
 	});
 
@@ -63,6 +66,18 @@
 	);
 	/** Scrolls the list while the pointer is near its top or bottom edge. */
 	let edgeScroll = 0;
+	/** The song just dropped (by its key) and where, until the host has moved it. */
+	let dropped = $state<{ key: string; to: number } | null>(null);
+	/**
+	 * Songs gliding to their places after the list changed order (see [slide]): first each one
+	 * is put back where it was shown (`dy`, by its id), then they all glide to 0 (`moving`).
+	 * [lift]: the song that was dragged, above the others while it glides.
+	 */
+	let glide = $state<{ dy: Record<string, number>; moving: boolean; lift: string | null } | null>(null);
+	/** Counts glides: a newer one (or a new drag) takes over from an older one. */
+	let glides = 0;
+	/** How long the host may take to move a dropped song before it goes back. */
+	const MOVE_TIMEOUT_MS = 5000;
 
 	/** Where the dragged song lands, as an index in the list without it. */
 	const drop = $derived.by(() => {
@@ -73,6 +88,8 @@
 
 	function startDrag(event: PointerEvent, index: number) {
 		event.preventDefault();
+		glide = null;
+		glides++;
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 		const elements = [...(list?.querySelectorAll<HTMLElement>('[data-slot]') ?? [])];
 		drag = {
@@ -111,16 +128,77 @@
 		edgeScroll = requestAnimationFrame(scrollNearEdges);
 	}
 
-	function endDrag() {
+	async function endDrag() {
 		cancelAnimationFrame(edgeScroll);
 		const d = drag;
 		const p = drop;
-		drag = null;
-		if (!d || p === d.from) return;
+		if (!d) return;
 		const slot = slots[d.from];
-		if (slot.kind === 'header') return;
+		if (p === d.from || slot.kind === 'header') {
+			drag = null;
+			return;
+		}
 		const target = landing(d.from, p);
-		room.run({ kind: 'MoveItem', itemId: slot.item.itemId, list: target.list, toIndex: target.index });
+		const done = room.run({ kind: 'MoveItem', itemId: slot.item.itemId, list: target.list, toIndex: target.index });
+		const id = slot.item.itemId;
+		// The song glides from under the finger into its new place, and stays there for now.
+		await slide(id, () => {
+			dropped = { key: slot.key, to: p };
+			drag = null;
+		});
+		// Then the room's own order: the same when the host moved it; back where it was when it
+		// didn't (not allowed, or no answer); or wherever someone else's change put it.
+		await Promise.race([done, new Promise((resolve) => setTimeout(resolve, MOVE_TIMEOUT_MS))]);
+		if (dropped?.key !== slot.key) return;
+		// Already dragging the next song: no gliding under it.
+		if (drag) dropped = null;
+		else await slide(id, () => (dropped = null));
+	}
+
+	/** Where every slot is shown now (with its transform), by id, in the list's own coordinates. */
+	function shownAt(): Map<string, number> {
+		const top = (list?.getBoundingClientRect().top ?? 0) - (list?.scrollTop ?? 0);
+		const at = new Map<string, number>();
+		for (const el of list?.querySelectorAll<HTMLElement>('[data-slot]') ?? []) at.set(el.dataset.id!, el.getBoundingClientRect().top - top);
+		return at;
+	}
+
+	/**
+	 * Changes the list's order with [change], and every song that moves glides from where it's
+	 * shown now to its new place, instead of jumping (or sliding back first). [lift]: the
+	 * dragged song, kept above the others.
+	 */
+	async function slide(lift: string, change: () => void) {
+		const before = shownAt();
+		// No transitions while the order changes and the songs are measured.
+		const mine = ++glides;
+		glide = { dy: {}, moving: false, lift };
+		change();
+		await tick();
+		// Not painted yet: put every song back where it was shown, then let them all glide.
+		const dy: Record<string, number> = {};
+		for (const el of list?.querySelectorAll<HTMLElement>('[data-slot]') ?? []) {
+			const was = before.get(el.dataset.id!);
+			if (was !== undefined && Math.abs(was - el.offsetTop) > 0.5) dy[el.dataset.id!] = was - el.offsetTop;
+		}
+		if (Object.keys(dy).length === 0) {
+			glide = null;
+			return;
+		}
+		glide = { dy, moving: false, lift };
+		await tick();
+		await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+		if (glides !== mine) return;
+		glide = { dy: {}, moving: true, lift };
+		await new Promise((resolve) => setTimeout(resolve, 200));
+		if (glides === mine) glide = null;
+	}
+
+	/** How far slot [index] (with [id]) is moved from its place: dragged, gliding, or making room. */
+	function offsetOf(id: string, index: number): number {
+		if (drag?.from === index) return drag.offset;
+		if (glide && !glide.moving) return glide.dy[id] ?? 0;
+		return shift(index);
 	}
 
 	/** Which list (and where in it) position [p] is, in the list without the dragged slot. */
@@ -238,11 +316,14 @@
 	<div bind:this={list} onscroll={follow} class="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">
 		{#each slots as slot, index (slot.key)}
 			{@const dragging = drag?.from === index}
+			{@const id = slot.kind === 'header' ? slot.key : slot.item.itemId}
+			{@const instant = dragging || (!!glide && !glide.moving)}
 			{#if slot.kind === 'header'}
 				<div
 					data-slot
-					class="flex h-10 items-end gap-2 px-2 pb-1 transition-transform"
-					style:transform="translateY({shift(index)}px)"
+					data-id={id}
+					class="flex h-10 items-end gap-2 px-2 pb-1 {instant ? '' : 'transition-transform'}"
+					style:transform="translateY({offsetOf(id, index)}px)"
 				>
 					<h3 class="text-sm font-medium tracking-wide text-muted uppercase">Autoplay</h3>
 					<span class="min-w-0 flex-1 truncate text-xs text-muted">
@@ -259,9 +340,10 @@
 				{@const swiping = swipe?.key === slot.key && swipe.horizontal}
 				<div
 					data-slot
+					data-id={id}
 					data-current={slot.kind === 'current' ? '' : undefined}
-					class="group relative h-16 overflow-hidden rounded-md {dragging ? 'z-10 shadow-xl' : 'transition-transform'}"
-					style:transform="translateY({dragging ? drag!.offset : shift(index)}px)"
+					class="group relative h-16 overflow-hidden rounded-md {dragging || glide?.lift === id ? 'z-10 shadow-xl' : ''} {instant ? '' : 'transition-transform'}"
+					style:transform="translateY({offsetOf(id, index)}px)"
 				>
 					<!-- Shown under the song while it is swiped away. -->
 					{#if swiping || removing === slot.key}
