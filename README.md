@@ -41,7 +41,8 @@ Music, without Premium, and not tied to a single music service.
   who added it, and a QR code to join. A TV links with a code, like YouTube's, and a TV with
   Chromecast shows it from *Play on* (it plays the music too), also a TV at your place in a
   room on a server, from the app.
-- Everyone who listens stays in sync, with a per-device sync adjustment (for Bluetooth).
+- Everyone who listens stays in sync, with a per-device sync adjustment (for Bluetooth). A
+  new song waits until every phone, browser, TV and speaker has it, so nobody misses its start.
 - Hand a room to someone else, clone it (here, onto your phone or onto your server), and
   invite or move everyone to the clone, keeping their roles. Server rooms can be always on.
 

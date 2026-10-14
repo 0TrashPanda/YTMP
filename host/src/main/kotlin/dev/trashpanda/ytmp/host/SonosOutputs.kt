@@ -107,7 +107,7 @@ class SonosOutputs(
                     val device = known.value[id] ?: continue
                     val session = sessions.getOrPut(id) { Session(device) }
                     try {
-                        session.sync(view, volume, report = room::notice) { actual -> room.reportOutputVolume(id, actual) }
+                        session.sync(view, volume, report = room::notice, ready = { room.outputReady(id, it) }) { actual -> room.reportOutputVolume(id, actual) }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: OutputTakenOver) {
@@ -118,6 +118,8 @@ class SonosOutputs(
                     } catch (e: Exception) {
                         log.warn("Sonos {} failed: {}", device.name, e.message)
                         session.failedAt = System.currentTimeMillis()
+                        // A new song doesn't wait for it.
+                        if (view.starting) view.current?.let { room.outputReady(id, it.itemId) }
                     }
                 }
             }
@@ -135,8 +137,16 @@ class SonosOutputs(
         private var lastVolumeCheck = 0L
         private var failed = false
         var failedAt = 0L
+        /** Loaded while the room waited for everyone to load the song: it plays when the room starts it. */
+        private var waitingToStart = false
 
-        suspend fun sync(view: RoomView, wantedVolume: Double?, report: suspend (String) -> Unit, reportVolume: suspend (Double) -> Unit) {
+        suspend fun sync(
+            view: RoomView,
+            wantedVolume: Double?,
+            report: suspend (String) -> Unit,
+            ready: suspend (itemId: String) -> Unit,
+            reportVolume: suspend (Double) -> Unit,
+        ) {
             val now = System.currentTimeMillis()
             if (now - failedAt < RETRY_AFTER_MS) return
             if (appliedVolume == null) {
@@ -177,16 +187,27 @@ class SonosOutputs(
                         artUrl = item.song.thumbnails.maxByOrNull { it.width }?.url,
                         durationMs = item.song.durationMs,
                     )
+                    waitingToStart = view.starting
                     if (view.playing) player.play()
-                    if (expected > SEEK_THRESHOLD_MS) player.seek(expected + LOAD_LEAD_MS)
+                    if (expected > SEEK_THRESHOLD_MS) player.seek(expected + if (view.starting) 0 else LOAD_LEAD_MS)
                 } catch (e: SonosException) {
                     failed = true
                     log.warn("Sonos {} couldn't play {}: {}", device.name, item.song.title, e.message)
                     report("${device.name} couldn't play \"${item.song.title}\": ${e.message}")
                 }
+                // Loaded or failed: a new song doesn't wait for it any longer.
+                if (view.starting) ready(item.itemId)
                 return
             }
             if (failed) return
+            if (waitingToStart) {
+                if (!view.playing) return
+                // Everyone has the song: it starts now.
+                waitingToStart = false
+                player.play()
+                settledAt = now + SETTLE_MS
+                return
+            }
 
             val status = player.status()
             // Playing something that isn't ours (Spotify, the Sonos app, …): someone else took it.

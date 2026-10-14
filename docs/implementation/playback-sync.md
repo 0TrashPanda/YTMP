@@ -108,6 +108,36 @@ Implemented (A + B), and tested on a Pixel 7:
 - **Both:** add the device's **sync adjustment** (per device, ±500 ms) for speaker and
   Bluetooth delay, which no player can see.
 
+## Starting a song together
+
+A new song's clock used to start as soon as the host had its stream. Every player then still
+had to load it (a phone in a server room first looks the song up itself, a Chromecast buffers
+for a second or two) and seeked to where the song "already was": the first seconds were
+skipped, most on a TV. Now a new song waits for the players, like Sonos or Spotify Jam:
+
+- After `StreamReady`, the room is **starting** (`PlaybackStatus.starting`, `RoomView.starting`):
+  `playing` is false and the position stays at the start. Players load the song paused there
+  and say so: `PlayerReady(itemId)` from a participant's player, `PlayerReady(itemId,
+  speakers = true)` from a phone once all its speakers near it have it
+  (`NearbySpeakers.outputReady`), and `OutputRoom.outputReady` from the host's own Chromecasts
+  and Sonos speakers. A player that can't play the song says so too, so nobody waits for it.
+- When everyone is ready, the song starts for all of them at that moment (`Room.startTogether`);
+  they start within the time a message takes, and the usual sync takes it from there. The
+  room waits at most `Room.MAX_START_WAIT_MS` (8 s) for a slow player, which then joins late,
+  as before.
+- **Who's waited for:** online participants listening with `SetListening(startsTogether =
+  true)`, phones with `SetSpeakers(startsTogether = true)`, and the host's active outputs
+  (not a TV showing the party screen: its page is a participant). Older apps don't send the
+  flag (the page asks the app for bridge version 9), so they're not waited for. Someone who
+  stops listening while the room waits isn't waited for either (checked every 250 ms).
+- Pausing or seeking while it waits ends the wait. The song ends by its length counted from
+  when it started, not from when its stream was ready. Pages show a starting song as playing
+  (and loading).
+- The browser loads it paused and reports at `canplay`; Android (`PlaybackService.reportReady`)
+  at `STATE_READY`, over its own room connection; a Chromecast after `LOAD` (exactly at the
+  start, without the usual 1 s lead); Sonos after `SetAVTransportURI`, playing when the room
+  starts.
+
 For sub-millisecond multi-room sync, the plan is a [Snapcast output](../features/future-ideas.md#snapcast-output)
 rather than building it into YTMP.
 

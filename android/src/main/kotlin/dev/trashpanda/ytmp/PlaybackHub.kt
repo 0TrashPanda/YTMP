@@ -17,6 +17,11 @@ data class PlaybackTarget(
     val playing: Boolean,
     val positionMs: Long,
     val hostTimeMs: Long,
+    /**
+     * The room waits for its players to load [item] (PlaybackStatus.starting): load it paused
+     * at [positionMs] and say so (`PlayerReady`); [playing] turns true when everyone can start.
+     */
+    val starting: Boolean = false,
     /** Host clock minus device clock, in ms. */
     val clockOffset: Double,
     /** This device's sync adjustment; positive plays earlier (for speaker/Bluetooth delay). */

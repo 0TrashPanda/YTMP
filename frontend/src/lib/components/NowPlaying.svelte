@@ -50,8 +50,10 @@
 	const current = $derived(room.state?.nowPlaying ?? null);
 	const song = $derived(current?.item.song ?? null);
 	const playback = $derived(room.state?.playback);
+	// A new song that waits for everyone's players to load it counts as playing (and loading).
+	const playing = $derived(!!playback?.playing || !!playback?.starting);
 	// A paused room may not have the stream yet (a restored room gets it on play): only loading while playing.
-	const loading = $derived(current !== null && current.streamUrl === null && !!playback?.playing);
+	const loading = $derived(current !== null && (current.streamUrl === null || !!playback?.starting) && playing);
 
 	/** Desktop shows the tabs next to the art, always open. */
 	const wide = new MediaQuery('min-width: 1024px');
@@ -60,7 +62,7 @@
 	// Desktop: clicking the art plays or pauses, and shows which for a moment ([flash], a new object per click).
 	let flash = $state<{ icon: 'play' | 'pause' } | null>(null);
 	function artClick() {
-		const pausing = !!playback?.playing;
+		const pausing = playing;
 		flash = { icon: pausing ? 'pause' : 'play' };
 		room.run({ kind: pausing ? 'Pause' : 'Play' });
 	}
@@ -226,7 +228,7 @@
 					<button
 						class="relative size-[min(100cqw,100cqh)] rounded-lg disabled:cursor-default"
 						disabled={!room.can('play_pause') || !song}
-						aria-label={playback?.playing ? 'Pause' : 'Play'}
+						aria-label={playing ? 'Pause' : 'Play'}
 						onclick={artClick}
 					>
 						<Art {song} size={1200} class="h-full w-full rounded-lg shadow-2xl" />
@@ -306,10 +308,10 @@
 							<button
 								class="mx-2 grid h-18 w-18 place-items-center rounded-full bg-white text-black disabled:opacity-40"
 								disabled={!room.can('play_pause')}
-								aria-label={playback?.playing ? 'Pause' : 'Play'}
-								onclick={() => room.run({ kind: playback?.playing ? 'Pause' : 'Play' })}
+								aria-label={playing ? 'Pause' : 'Play'}
+								onclick={() => room.run({ kind: playing ? 'Pause' : 'Play' })}
 							>
-								<Icon name={playback?.playing ? 'pause' : 'play'} size={40} />
+								<Icon name={playing ? 'pause' : 'play'} size={40} />
 							</button>
 						{/snippet}
 						{#if song.podcast}

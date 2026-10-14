@@ -115,6 +115,11 @@ data class PlaybackStatus(
     /** Position at [hostTimeMs]. While playing, the position moves on from there. */
     val positionMs: Long,
     val hostTimeMs: Long,
+    /**
+     * A new song is loading on the players: [playing] is false until they all have it (or a
+     * few seconds passed), then everyone starts it together from [positionMs]. Show it as playing.
+     */
+    val starting: Boolean = false,
 )
 
 @Serializable

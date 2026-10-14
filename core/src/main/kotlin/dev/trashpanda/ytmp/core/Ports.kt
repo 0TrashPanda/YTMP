@@ -168,6 +168,9 @@ interface OutputRoom {
 
     /** The device skipped by itself (its own buttons) from [fromItemId]. */
     suspend fun outputSkipped(fromItemId: String, forward: Boolean)
+
+    /** The device has loaded [itemId] (or couldn't): a [RoomView.starting] song can start for it. */
+    suspend fun outputReady(outputId: String, itemId: String)
 }
 
 /** What an output driver needs to follow a room. */
@@ -186,6 +189,11 @@ data class RoomView(
     val next: QueueItem? = null,
     /** Outputs that show the party screen: the guest token its page joins with, by output id. */
     val screens: Map<String, String> = emptyMap(),
+    /**
+     * [current] is loading on the players: load it paused at [positionMs] and say so
+     * ([OutputRoom.outputReady]); [playing] turns true when everyone can start.
+     */
+    val starting: Boolean = false,
 ) {
     fun positionAt(timeMs: Long): Long = if (playing) positionMs + (timeMs - hostTimeMs) else positionMs
 }

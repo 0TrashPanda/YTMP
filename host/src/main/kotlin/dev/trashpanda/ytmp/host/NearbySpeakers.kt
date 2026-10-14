@@ -79,6 +79,9 @@ class NearbySpeakers(
         private val speakers = MutableStateFlow<Map<String, Pair<String, Double?>>>(emptyMap())
         private val listeners = CopyOnWriteArrayList<() -> Unit>()
         private val jobs = ArrayList<Job>()
+        /** The speakers that loaded the song [readyItem] while the room waits for everyone. */
+        private var readyItem: String? = null
+        private val readySpeakers = HashSet<String>()
 
         /** The room's last known state (kept while the connection is briefly down), with host clock minus ours. */
         @Volatile
@@ -94,7 +97,7 @@ class NearbySpeakers(
             // Tell the room on every (re)connection and every change: it forgets when we're gone.
             jobs += scope.launch {
                 combine(source.room.map { it != null }.distinctUntilChanged(), speakers.map { all -> all.values.map { it.first } }.distinctUntilChanged()) { connected, names -> connected to names }
-                    .collect { (connected, names) -> if (connected) source.command(Command.SetSpeakers(names)) }
+                    .collect { (connected, names) -> if (connected) source.command(Command.SetSpeakers(names, startsTogether = true)) }
             }
             jobs += casts.play(this)
             jobs += sonos.play(this)
@@ -168,6 +171,19 @@ class NearbySpeakers(
             turnOff(outputId)
         }
 
+        /** The room waits for a new song until all these speakers have it. */
+        override suspend fun outputReady(outputId: String, itemId: String) {
+            val all = synchronized(readySpeakers) {
+                if (readyItem != itemId) {
+                    readyItem = itemId
+                    readySpeakers.clear()
+                }
+                readySpeakers += outputId
+                readySpeakers.containsAll(speakers.value.keys)
+            }
+            if (all) source.command(Command.PlayerReady(itemId, speakers = true))
+        }
+
         override suspend fun outputSkipped(fromItemId: String, forward: Boolean) {
             // Only if that's still the current song, so a skip isn't done twice.
             if (last?.first?.nowPlaying?.item?.itemId != fromItemId) return
@@ -216,6 +232,7 @@ fun RoomState.outputView(clockOffset: Double, activeOutputs: Map<String, Double?
         playing = playback.playing && current != null,
         positionMs = playback.positionMs,
         hostTimeMs = (playback.hostTimeMs - clockOffset).roundToLong(),
+        starting = playback.starting && current != null,
         activeOutputs = activeOutputs,
         previous = history.lastOrNull(),
         next = when {

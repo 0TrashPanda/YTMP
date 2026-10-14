@@ -153,6 +153,12 @@ export interface CommandPlayNow {
   song: Song;
 }
 
+export interface CommandPlayerReady {
+  kind: "PlayerReady";
+  itemId: string;
+  speakers: boolean;
+}
+
 export interface CommandPrevious {
   kind: "Previous";
 }
@@ -184,6 +190,7 @@ export interface CommandSendMigration {
 export interface CommandSetListening {
   kind: "SetListening";
   on: boolean;
+  startsTogether: boolean;
 }
 
 export type RoomOpenMode = "ask" | "move" | "move_if_away";
@@ -228,6 +235,7 @@ export interface CommandSetRepeat {
 export interface CommandSetSpeakers {
   kind: "SetSpeakers";
   names: string[];
+  startsTogether: boolean;
 }
 
 export type RoomVisibility = "public" | "private";
@@ -309,6 +317,7 @@ export type Command =
   | CommandPause
   | CommandPlay
   | CommandPlayNow
+  | CommandPlayerReady
   | CommandPrevious
   | CommandRemoveQueueItem
   | CommandSeek
@@ -487,6 +496,7 @@ export interface PlaybackStatus {
   playing: boolean;
   positionMs: number;
   hostTimeMs: number;
+  starting: boolean;
 }
 
 export interface EventPlaybackChanged {

@@ -8,6 +8,9 @@ Audio can be played in two kinds of places: on **host outputs** and on **clients
 permissions say otherwise (permission: *Play audio locally*).
 
 - All playing clients stay **in sync** with the room's playback position.
+- **A new song starts together** ✅: it waits (a few seconds at most) until every phone,
+  browser, TV and speaker playing the room has loaded it, then starts for all of them from
+  the beginning. Nobody misses its first seconds.
 - This is the main way to hear a **server-hosted** room, because the server may be a
   remote machine without speakers.
 - Each client can turn local playback on or off at any time, and controls its own

@@ -57,7 +57,7 @@ aren't built yet. Repeat (`repeat`) and the skip vote (`skipVotes`) are built, a
   "autoplay":    { "seed": Song | Artist | Album | Playlist, "items": [ QueueItem ] },
   "history":     [ QueueItem ],          // the last N items; older ones via LoadHistory
   "nowPlaying":  QueueItem | null,
-  "playback":    { "playing", "positionMs", "hostTimeMs" },
+  "playback":    { "playing", "positionMs", "hostTimeMs", "starting" },
   "repeat":      "off" | "queue" | "one",                       // ✅
   "outputs":     [ { "id", "name", "active", "volume" } ],
   "skipVotes":   { "voters": [participantId], "needed" } | null   // ✅ null: the room doesn't vote
@@ -106,8 +106,9 @@ Each command lists the permission it needs (see [room management](../features/ro
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `SetListening` ✅ | `on` | Play audio locally |
-| `SetSpeakers` ✅ | `names` (speakers near the phone that play the room, from the app; empty: none) | Play audio locally |
+| `SetListening` ✅ | `on`, `startsTogether` (the player sends `PlayerReady`) | Play audio locally |
+| `SetSpeakers` ✅ | `names` (speakers near the phone that play the room, from the app; empty: none), `startsTogether` | Play audio locally |
+| `PlayerReady` ✅ | `itemId`, `speakers` (this player, or all the phone's speakers, loaded a starting song; see [starting together](playback-sync.md#starting-a-song-together)) | — |
 
 No command is needed for the proxied stream: when the direct URL fails, the client uses
 `/api/audio/{songId}` on the host.
@@ -183,7 +184,7 @@ network) gets its screen from `POST /api/screens/cast` instead, and leaves with
 | `HistoryAppended` ✅ | `item` (with `result: played/skipped`) | everyone |
 | `HistoryItemRemoved` ✅ | `itemId` (when jumping back) | everyone |
 | `HistoryReplaced` ✅ | `items` (a song moved in or out of the history) | everyone |
-| `PlaybackChanged` ✅ | `playback: { playing, positionMs, hostTimeMs }` (on every change) | everyone |
+| `PlaybackChanged` ✅ | `playback: { playing, positionMs, hostTimeMs, starting }` (on every change; `starting`: a new song waits for the players) | everyone |
 | `Notice` ✅ | `message` (for example a song that can't be played) | everyone |
 | `RepeatChanged` ✅ | `mode` | everyone |
 | `SkipVotesChanged` ✅ | `skipVotes` (`voters`, `needed`, or null): after a vote, when people come or go, or the settings change | everyone |

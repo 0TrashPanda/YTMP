@@ -321,7 +321,7 @@
 		if (target.closest('input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, select, [contenteditable]')) return;
 		if (target !== document.body && target.matches(':focus-visible')) return;
 		event.preventDefault();
-		if (!event.repeat) room.run({ kind: room.state.playback.playing ? 'Pause' : 'Play' });
+		if (!event.repeat) room.run({ kind: room.state.playback.playing || room.state.playback.starting ? 'Pause' : 'Play' });
 	}
 
 	// A changed setting (e.g. what unplugging headphones does) goes to the app's player.

@@ -113,7 +113,8 @@ class WebPlayer implements RoomPlayer {
 		this.sync();
 		clearInterval(this.timer);
 		this.timer = setInterval(() => this.sync(), 500);
-		await this.room.run({ kind: 'SetListening', on: true });
+		// New songs wait for this player to load them (see reportReady).
+		await this.room.run({ kind: 'SetListening', on: true, startsTogether: true });
 	}
 
 	disable(chosen = true): void {
@@ -123,7 +124,7 @@ class WebPlayer implements RoomPlayer {
 		clearInterval(this.timer);
 		this.audio.pause();
 		this.setMediaKeys(false);
-		this.room.run({ kind: 'SetListening', on: false });
+		this.room.run({ kind: 'SetListening', on: false, startsTogether: false });
 	}
 
 	setVolume(value: number): void {
@@ -174,6 +175,8 @@ class WebPlayer implements RoomPlayer {
 		if (!playback.playing) {
 			if (!this.audio.paused) this.audio.pause();
 			if (Math.abs(this.audio.currentTime * 1000 - expectedMs) > 250) this.audio.currentTime = expectedMs / 1000;
+			// A new song: ready to start, at its start, when the room starts it for everyone.
+			else if (playback.starting && this.audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) this.reportReady(now.item.itemId);
 			return;
 		}
 
@@ -321,6 +324,16 @@ class WebPlayer implements RoomPlayer {
 		);
 	}
 
+	/** The song this player told the room it has loaded. */
+	private readySent: string | null = null;
+
+	/** The room waits for its players to load a new song (`playback.starting`): this one has it (or can't play it). */
+	private reportReady(itemId: string): void {
+		if (!this.room.state?.playback.starting || this.readySent === itemId) return;
+		this.readySent = itemId;
+		this.room.run({ kind: 'PlayerReady', itemId, speakers: false });
+	}
+
 	private onError(): void {
 		const now = this.room.state?.nowPlaying;
 		if (!this.enabled || !now) return;
@@ -349,6 +362,8 @@ class WebPlayer implements RoomPlayer {
 			this.sync();
 		} else {
 			this.error = `Can't play "${now.item.song.title}" on this device.`;
+			// The room doesn't wait for it.
+			this.reportReady(now.item.itemId);
 			// The host can't help either (it may not stream to this network): the next song tries
 			// its direct link again, which often works, instead of failing the same way.
 			if (this.preferred === 'host') this.preferred = 'direct';
@@ -400,7 +415,8 @@ class NativePlayer implements RoomPlayer {
 		saved.listening = true;
 		saved.setSoloOff(this.room.roomCode, false);
 		this.sync();
-		await this.room.run({ kind: 'SetListening', on: true });
+		// The app says when it has loaded a new song (bridge version 9), so new songs wait for it.
+		await this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9 });
 	}
 
 	disable(chosen = true): void {
@@ -408,7 +424,7 @@ class NativePlayer implements RoomPlayer {
 		saved.listening = false;
 		if (chosen && this.room.state?.room.visibility === 'private') saved.setSoloOff(this.room.roomCode, true);
 		this.sync();
-		this.room.run({ kind: 'SetListening', on: false });
+		this.room.run({ kind: 'SetListening', on: false, startsTogether: false });
 	}
 
 	setVolume(value: number): void {
@@ -444,6 +460,7 @@ class NativePlayer implements RoomPlayer {
 				streamUrl: now?.streamUrl ?? null,
 				proxyUrl: song ? new URL(proxiedAudioUrl(song.id), location.href).href : null,
 				playing: state?.playback.playing ?? false,
+				starting: state?.playback.starting ?? false,
 				positionMs: state?.playback.positionMs ?? 0,
 				hostTimeMs: state?.playback.hostTimeMs ?? 0,
 				clockOffset: this.room.clockOffset,

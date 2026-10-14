@@ -108,7 +108,9 @@ class CastOutputs(
                     val device = known.value[id] ?: continue
                     val session = sessions.getOrPut(id) { CastSession(device, resuming = id in playedOn) }
                     try {
-                        session.sync(view, volume, room.code, report = room::notice, skipped = room::outputSkipped) { actual -> room.reportOutputVolume(id, actual) }
+                        session.sync(view, volume, room.code, report = room::notice, skipped = room::outputSkipped, ready = { room.outputReady(id, it) }) { actual ->
+                            room.reportOutputVolume(id, actual)
+                        }
                         if (session.loadedSomething) playedOn += id
                     } catch (e: CancellationException) {
                         throw e
@@ -123,6 +125,8 @@ class CastOutputs(
                         log.warn("Cast device {} failed", device.name, e)
                         session.close()
                         sessions.remove(id) // Reconnect on the next round.
+                        // A new song doesn't wait for it.
+                        if (view.starting) view.current?.let { room.outputReady(id, it.itemId) }
                     }
                 }
             }
@@ -161,6 +165,7 @@ class CastOutputs(
             roomCode: String,
             report: suspend (String) -> Unit,
             skipped: suspend (fromItemId: String, forward: Boolean) -> Unit,
+            ready: suspend (itemId: String) -> Unit,
             reportVolume: suspend (Double) -> Unit,
         ) {
             val screen = view.screens[device.id]
@@ -198,6 +203,8 @@ class CastOutputs(
             if (item.itemId != loadedItemId) {
                 load(player, item, view, expected, report)
                 loadedSomething = true
+                // Loaded (paused) or failed: a new song doesn't wait for it any longer.
+                if (view.starting) ready(item.itemId)
                 return
             }
             if (failed || status == null) return
@@ -266,7 +273,10 @@ class CastOutputs(
             // The current song with the ones before and after it, so the device's own buttons can skip.
             suspend fun loadWith(url: String?) {
                 val items = listOfNotNull(view.previous?.let { castItem(it) }, castItem(item, url), view.next?.let { castItem(it) })
-                player.loadQueue(items, startIndex = if (view.previous != null) 1 else 0, positionMs + LOAD_LEAD_MS, autoplay = view.playing)
+                // A new song waits for everyone to load it (paused, exactly at its start); one
+                // that's already playing moves on while the device loads it.
+                val start = if (view.starting) positionMs else positionMs + LOAD_LEAD_MS
+                player.loadQueue(items, startIndex = if (view.previous != null) 1 else 0, start, autoplay = view.playing)
                 neighbors = view.previous?.itemId to view.next?.itemId
             }
             try {

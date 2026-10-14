@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.cast.CastChannel
 import dev.trashpanda.ytmp.core.Outbox
+import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ClientMessage
@@ -40,7 +41,7 @@ class CastOutputsTest {
 
             run(Command.AddSongs(listOf(song), QueuePosition.END))
             eventually { room.view().activeOutputs.isEmpty() && casts.devices.value.isNotEmpty() }
-            run(Command.SetOutput("cast:fake", active = true))
+            room.turnOn(me, "cast:fake")
 
             // The device starts its media player and loads the song's direct stream URL, playing.
             eventually { "QUEUE_LOAD" in device.types(CastChannel.NS_MEDIA) }
@@ -83,7 +84,7 @@ class CastOutputsTest {
             run(Command.AddSongs(listOf(song), QueuePosition.END))
             eventually { casts.devices.value.isNotEmpty() }
 
-            run(Command.SetOutput("cast:fake", active = true))
+            room.turnOn(me, "cast:fake")
             eventually { device.playerState == "PLAYING" }
 
             // The party screen: DashCast replaces the media player and opens the room's /tv page, signed in as the screen.
@@ -122,7 +123,7 @@ class CastOutputsTest {
             run(Command.AddSongs(listOf(song), QueuePosition.END))
             eventually { casts.devices.value.isNotEmpty() }
 
-            run(Command.SetOutput("cast:fake", active = true))
+            room.turnOn(me, "cast:fake")
             eventually { device.playerState == "PLAYING" }
             run(Command.SetOutput("cast:fake", active = true, screen = true))
             eventually { device.dashCastUrl != null }
@@ -145,7 +146,7 @@ class CastOutputsTest {
             suspend fun run(command: Command) = room.handle(me, ClientMessage.CommandMessage("c", command))
             run(Command.AddSongs(listOf(song, song.copy(id = "ytm:def", title = "Next")), QueuePosition.END))
             eventually { casts.devices.value.isNotEmpty() }
-            run(Command.SetOutput("cast:fake", active = true))
+            room.turnOn(me, "cast:fake")
             eventually { "QUEUE_LOAD" in device.types(CastChannel.NS_MEDIA) }
             val launches = device.types(CastChannel.NS_RECEIVER).count { it == "LAUNCH" }
 
@@ -178,7 +179,7 @@ class CastOutputsTest {
 
             run(Command.AddSongs(songs, QueuePosition.END))
             eventually { casts.devices.value.isNotEmpty() && room.view().current != null }
-            run(Command.SetOutput("cast:fake", active = true))
+            room.turnOn(me, "cast:fake")
 
             // The device gets the current song with the next one in its own queue.
             eventually { device.queueTags.size == 2 }
@@ -214,7 +215,7 @@ class CastOutputsTest {
         val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { })!!
         room.handle(me, ClientMessage.CommandMessage("a", Command.AddSongs(listOf(song), QueuePosition.END)))
         eventually { casts.devices.value.isNotEmpty() && room.view().current != null }
-        room.handle(me, ClientMessage.CommandMessage("b", Command.SetOutput("cast:fake", active = true)))
+        room.turnOn(me, "cast:fake")
     }
 
     @Test
@@ -239,6 +240,15 @@ class CastOutputsTest {
             eventually(timeoutMs = 20_000) { device.contentId == "http://127.0.0.1:8765/api/audio/ytm%3Aabc" }
         }
         scope.cancel()
+    }
+
+    /**
+     * Turns a device on in the room. Found devices reach the room a moment after [CastOutputs]
+     * lists them; until then the room says it isn't available, so try until it's on.
+     */
+    private suspend fun Room.turnOn(me: String, outputId: String) = eventually {
+        handle(me, ClientMessage.CommandMessage("on", Command.SetOutput(outputId, active = true)))
+        outputId in view().activeOutputs
     }
 
     // Generous: with the whole build running at once, a Cast connection can take a while.

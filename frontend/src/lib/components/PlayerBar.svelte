@@ -51,8 +51,10 @@
 	const current = $derived(room.state?.nowPlaying ?? null);
 	const playback = $derived(room.state?.playback);
 	const duration = $derived(current?.item.song.durationMs ?? 0);
+	// A new song that waits for everyone's players to load it counts as playing (and loading).
+	const playing = $derived(!!playback?.playing || !!playback?.starting);
 	// A paused room may not have the stream yet (a restored room gets it on play): only loading while playing.
-	const loading = $derived(current !== null && current.streamUrl === null && !!playback?.playing);
+	const loading = $derived(current !== null && (current.streamUrl === null || !!playback?.starting) && playing);
 	const status = $derived(loading ? ' • loading…' : player.buffering ? ' • buffering…' : '');
 
 	// Phones: swipe the mini player up to open the full player (a tap opens it too).
@@ -125,10 +127,10 @@
 			<button
 				class="shrink-0 rounded-full p-1.5 disabled:opacity-40"
 				disabled={!room.can('play_pause')}
-				aria-label={playback?.playing ? 'Pause' : 'Play'}
-				onclick={() => room.run({ kind: playback?.playing ? 'Pause' : 'Play' })}
+				aria-label={playing ? 'Pause' : 'Play'}
+				onclick={() => room.run({ kind: playing ? 'Pause' : 'Play' })}
 			>
-				<Icon name={playback?.playing ? 'pause' : 'play'} size={32} />
+				<Icon name={playing ? 'pause' : 'play'} size={32} />
 			</button>
 			<NextButton {room} size={26} class="shrink-0 p-1.5" />
 		</div>
@@ -150,10 +152,10 @@
 					<button
 						class="rounded-full p-2 hover:bg-raised disabled:opacity-40"
 						disabled={!room.can('play_pause')}
-						aria-label={playback?.playing ? 'Pause' : 'Play'}
-						onclick={() => room.run({ kind: playback?.playing ? 'Pause' : 'Play' })}
+						aria-label={playing ? 'Pause' : 'Play'}
+						onclick={() => room.run({ kind: playing ? 'Pause' : 'Play' })}
 					>
-						<Icon name={playback?.playing ? 'pause' : 'play'} size={36} />
+						<Icon name={playing ? 'pause' : 'play'} size={36} />
 					</button>
 				{/snippet}
 				{#if current?.item.song.podcast}

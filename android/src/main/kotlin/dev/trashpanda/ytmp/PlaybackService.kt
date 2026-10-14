@@ -34,6 +34,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import org.json.JSONObject
 
 /**
  * Plays the room's audio with ExoPlayer, in sync with the host.
@@ -67,6 +68,8 @@ class PlaybackService : MediaSessionService() {
     private var clockOffset: Double? = null
 
     private var loadedItemId: String? = null
+    /** The song this phone told the room it has loaded ([reportReady]). */
+    private var readySent: String? = null
     private var loadedUrl: String? = null
 
     /** Where songs in this room come from, after what worked so far. */
@@ -218,6 +221,7 @@ class PlaybackService : MediaSessionService() {
                 playing = room.state.playback.playing,
                 positionMs = room.state.playback.positionMs,
                 hostTimeMs = room.state.playback.hostTimeMs,
+                starting = room.state.playback.starting,
                 clockOffset = room.clockOffset,
                 alone = room.alone,
             )
@@ -291,7 +295,8 @@ class PlaybackService : MediaSessionService() {
                             .build(),
                     )
                     .build(),
-                expectedPosition(target) + sync.seekLeadMs,
+                // A song the room starts once everyone has it: exactly from its start.
+                expectedPosition(target) + if (target.starting) 0 else sync.seekLeadMs,
             )
             exo.playbackParameters = PlaybackParameters(SyncCorrection.NORMAL)
             exo.prepare()
@@ -303,6 +308,17 @@ class PlaybackService : MediaSessionService() {
         if (!target.playing || !target.alone) pausingRoom = false
         followRoomJump(target)
         correct(target)
+        if (exo.playbackState == Player.STATE_READY) reportReady()
+    }
+
+    /** The room waits for its players to load a new song ([PlaybackTarget.starting]): this phone has it. */
+    private fun reportReady() {
+        val target = current ?: return
+        val itemId = loadedItemId ?: return
+        if (!target.enabled || !target.starting || target.item?.itemId != itemId || readySent == itemId) return
+        readySent = itemId
+        Log.d(TAG, "ready to start $itemId")
+        PlaybackHub.command("""{"kind":"PlayerReady","itemId":${JSONObject.quote(itemId)}}""")
     }
 
     private fun sourceFor(target: PlaybackTarget, item: TargetItem): Source = when {
@@ -508,6 +524,8 @@ class PlaybackService : MediaSessionService() {
             } else {
                 report(target, "app: can't play ${target.item?.songId} through the host either (${error.errorCodeName}: ${error.message})")
                 PlaybackHub.status("error")
+                // It won't load: the room doesn't wait for it.
+                reportReady()
             }
         }
 
@@ -537,6 +555,7 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             PlaybackHub.status(if (playbackState == Player.STATE_BUFFERING) "buffering" else "ready")
+            if (playbackState == Player.STATE_READY) reportReady()
             val now = SystemClock.elapsedRealtime()
             if (playbackState == Player.STATE_BUFFERING) {
                 if (bufferingSince == null) bufferingSince = now

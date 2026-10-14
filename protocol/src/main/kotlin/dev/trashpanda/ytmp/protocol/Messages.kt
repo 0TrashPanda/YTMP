@@ -184,9 +184,13 @@ sealed interface Command {
     @SerialName("VoteSkip")
     data class VoteSkip(val on: Boolean) : Command
 
+    /**
+     * [startsTogether]: this player tells the host when it has loaded a new song
+     * ([PlayerReady]), so the room waits for it before the song starts (see [PlaybackStatus.starting]).
+     */
     @Serializable
     @SerialName("SetListening")
-    data class SetListening(val on: Boolean) : Command
+    data class SetListening(val on: Boolean, val startsTogether: Boolean = false) : Command
 
     /**
      * Plays the room on speakers near this participant's phone ([names], empty: none), which
@@ -195,7 +199,15 @@ sealed interface Command {
      */
     @Serializable
     @SerialName("SetSpeakers")
-    data class SetSpeakers(val names: List<String>) : Command
+    data class SetSpeakers(val names: List<String>, val startsTogether: Boolean = false) : Command
+
+    /**
+     * This participant's player ([speakers]: its speakers, all of them) has loaded the song
+     * [itemId] and can start it. Only sent while the song is [PlaybackStatus.starting].
+     */
+    @Serializable
+    @SerialName("PlayerReady")
+    data class PlayerReady(val itemId: String, val speakers: Boolean = false) : Command
 
     /**
      * Plays the room on a speaker or TV, or stops playing on it. [screen]: a TV or display

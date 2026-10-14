@@ -120,8 +120,11 @@ class Room(
         var roleId: String,
         var accountId: String? = null,
         var listening: Boolean = false,
+        /** Their player says when it has a new song ([Command.PlayerReady]): songs wait for it. */
+        var startsTogether: Boolean = false,
         /** Speakers near their phone that they play the room on ([Command.SetSpeakers]). */
         var speakers: List<String> = emptyList(),
+        var speakersStartTogether: Boolean = false,
         var offlineSince: Long? = null,
         var allow: Set<Permission> = emptySet(),
         var deny: Set<Permission> = emptySet(),
@@ -233,6 +236,15 @@ class Room(
 
     /** The user wants music to play. It actually plays once the stream is resolved. */
     private var wantPlaying = false
+    /**
+     * A new song waits for the players to load it ([Command.PlayerReady], [outputReady]), so
+     * nobody misses its start; then everyone starts it together. At most [MAX_START_WAIT_MS].
+     */
+    private var starting = false
+    private var waitingSince = 0L
+    /** Who has the starting song: a participant's player (their id), their speakers (`id:speakers`), an output (`o:id`). */
+    private val readyFor = HashSet<String>()
+    private var startJob: Job? = null
     private var positionAtAnchor = 0L
     private var anchorTime = 0L
 
@@ -663,9 +675,10 @@ class Room(
         RoomView(
             current = current.takeIf { streamUrl != null },
             streamUrl = streamUrl,
-            playing = wantPlaying && streamUrl != null,
+            playing = playingNow(),
             positionMs = position(),
             hostTimeMs = clock(),
+            starting = starting,
             activeOutputs = LinkedHashMap(activeOutputs),
             screens = screenOutputs.mapNotNull { (output, id) -> members[id]?.let { output to it.token } }.toMap(),
             previous = history.lastOrNull(),
@@ -685,6 +698,8 @@ class Room(
      * if [fromItemId] is still the current song, so a skip isn't done twice. A speaker moving
      * on at the very end of a song counts as the song having played.
      */
+    override suspend fun outputReady(outputId: String, itemId: String): Unit = mutex.withLock { ready(itemId, "o:$outputId") }
+
     override suspend fun outputSkipped(fromItemId: String, forward: Boolean): Unit = mutex.withLock {
         val item = current ?: return@withLock
         if (item.itemId != fromItemId) return@withLock
@@ -862,6 +877,7 @@ class Room(
             is Command.SetListening -> {
                 if (command.on) need(member, Permission.LISTEN_LOCALLY)?.let { return it }
                 member.listening = command.on
+                member.startsTogether = command.on && command.startsTogether
                 emit(Event.ParticipantUpdated(member.toParticipant()))
                 if (command.on) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
@@ -869,11 +885,13 @@ class Room(
                 val names = command.names.map { it.trim().take(MAX_NAME_LENGTH) }.filter { it.isNotEmpty() }.distinct()
                 if (names.isNotEmpty()) need(member, Permission.LISTEN_LOCALLY)?.let { return it }
                 if (names.size > MAX_SPEAKERS) return invalid("Too many speakers")
+                member.speakersStartTogether = command.startsTogether
                 if (names == member.speakers) return null
                 member.speakers = names
                 emit(Event.ParticipantUpdated(member.toParticipant()))
                 if (names.isNotEmpty()) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
+            is Command.PlayerReady -> ready(command.itemId, if (command.speakers) "${member.id}:speakers" else member.id)
             is Command.SetOutput -> {
                 need(member, Permission.CHANGE_OUTPUTS)?.let { return it }
                 val device = availableOutputs.firstOrNull { it.id == command.outputId } ?: return ErrorInfo(ErrorCode.NOT_FOUND, "That speaker isn't available")
@@ -1496,19 +1514,73 @@ class Room(
         positionAtAnchor = position()
         anchorTime = clock()
         wantPlaying = false
+        stopWaiting()
         emitPlayback()
     }
 
-    private fun position(): Long {
-        val playing = wantPlaying && streamUrl != null
-        return if (playing) positionAtAnchor + (clock() - anchorTime) else positionAtAnchor
-    }
+    /** The song plays now (not paused, its stream is ready, and it isn't waiting for the players). */
+    private fun playingNow() = wantPlaying && streamUrl != null && !starting
+
+    private fun position(): Long =
+        if (playingNow()) positionAtAnchor + (clock() - anchorTime) else positionAtAnchor
 
     private fun seek(positionMs: Long) {
         val duration = current?.song?.durationMs ?: 0
         positionAtAnchor = positionMs.coerceIn(0, maxOf(0, duration))
         anchorTime = clock()
+        // Seeking while it waits for the players: it plays from there now.
+        stopWaiting()
         emitPlayback()
+    }
+
+    /** Players and outputs that should load a starting song and haven't said so yet. */
+    private fun notReady(): List<String> = buildList {
+        for (m in members.values) {
+            if (!m.online) continue
+            if (m.listening && m.startsTogether) add(m.id)
+            if (m.speakers.isNotEmpty() && m.speakersStartTogether) add("${m.id}:speakers")
+        }
+        // A TV showing the party screen plays through its page, a participant.
+        for (id in activeOutputs.keys) if (id !in screenOutputs) add("o:$id")
+    }.filter { it !in readyFor }
+
+    /** The new song's stream is ready: wait for the players to load it, if any will say so. */
+    private fun waitForPlayers() {
+        stopWaiting()
+        readyFor.clear()
+        if (!wantPlaying || notReady().isEmpty()) return
+        starting = true
+        waitingSince = clock()
+        startJob = scope.launch {
+            while (starting) {
+                delay(START_CHECK_MS)
+                mutex.withLock {
+                    val late = notReady()
+                    // Someone left or stopped listening (late is empty then), or it waited long enough.
+                    if (starting && (late.isEmpty() || clock() - waitingSince >= MAX_START_WAIT_MS)) startTogether(late)
+                }
+            }
+        }
+    }
+
+    private fun ready(itemId: String, who: String) {
+        if (!starting || current?.itemId != itemId) return
+        readyFor += who
+        if (notReady().isEmpty()) startTogether(emptyList())
+    }
+
+    /** Everyone has the song (or it waited long enough for [late]): it starts now, for all of them. */
+    private fun startTogether(late: List<String>) {
+        log.info("Room {}: starts {} after {} ms{}", code, current?.song?.id, clock() - waitingSince, if (late.isEmpty()) "" else " without $late")
+        stopWaiting()
+        anchorTime = clock()
+        emitPlayback()
+    }
+
+    private fun stopWaiting() {
+        starting = false
+        startJob?.cancel()
+        startJob = null
     }
 
     private fun retireCurrent(result: QueueItemResult) {
@@ -1730,6 +1802,7 @@ class Room(
             while (playedAt.size > MAX_PLAYED_AT) playedAt.remove(playedAt.keys.first())
         }
         streamUrl = null
+        stopWaiting()
         currentStartedAt = clock()
         // An episode that was left halfway goes on from there.
         positionAtAnchor = item?.song?.takeIf { it.podcast != null }?.let { episodePositions[it.id] } ?: 0
@@ -1757,6 +1830,7 @@ class Room(
                     streamUrl = it.url
                     anchorTime = clock()
                     emit(Event.StreamReady(item.itemId, it.url))
+                    waitForPlayers()
                     emitPlayback()
                 }.onFailure { e ->
                     if (e is CancellationException) throw e
@@ -1803,7 +1877,7 @@ class Room(
         endJob?.cancel()
         val item = current ?: return
         // Without a known duration the song can't end on its own; it plays until skipped.
-        if (!wantPlaying || streamUrl == null || item.song.durationMs <= 0) return
+        if (!playingNow() || item.song.durationMs <= 0) return
         val remaining = item.song.durationMs - position()
         endJob = scope.launch {
             delay(maxOf(0, remaining))
@@ -1822,9 +1896,10 @@ class Room(
     // --- helpers ----------------------------------------------------------------------
 
     private fun playbackStatus() = PlaybackStatus(
-        playing = wantPlaying && streamUrl != null,
+        playing = playingNow(),
         positionMs = position(),
         hostTimeMs = clock(),
+        starting = starting,
     )
 
     private fun snapshot() = RoomState(
@@ -1867,6 +1942,9 @@ class Room(
         /** A clone's queue (and autoplay queue) keeps at most this many songs. */
         const val MAX_CLONE_QUEUE = 1000
         const val MAX_MIGRANTS = 200
+        /** The longest a new song waits for the players to load it ([starting]). */
+        const val MAX_START_WAIT_MS = 8_000L
+        private const val START_CHECK_MS = 250L
         /** Party screens one room can have. */
         const val MAX_SCREENS = 5
         /** Speakers one person plays the room on near their phone ([Command.SetSpeakers]). */

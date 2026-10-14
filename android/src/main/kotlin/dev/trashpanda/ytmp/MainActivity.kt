@@ -598,7 +598,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 8
+        const val BRIDGE_VERSION = 9
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }
