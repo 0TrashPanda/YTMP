@@ -72,6 +72,8 @@ data class CastMessage(
                 val field = key ushr 3
                 when (key and 7) {
                     0 -> varint()
+                    1 -> i += 8
+                    5 -> i += 4
                     2 -> {
                         val length = varint().toInt()
                         val text = String(bytes, i, length, Charsets.UTF_8)

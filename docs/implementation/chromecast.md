@@ -69,22 +69,22 @@ URL in a frame, as Home Assistant's pychromecast does (`CastWebPage` in cast/).
 - The room adds a screen participant for the output (named after the device, no role, but
   allowed to *play on its own device*), and `RoomView.screens` gives the driver its guest
   token. `CastSession.showScreen` starts DashCast (waiting until its namespace is up) and
-  sends `{ url, force: false }` with `<base>/tv#cast=CODE.TOKEN`.
+  sends `{ url, force: true }` with `<base>/tv#cast=CODE.TOKEN`.
+- `force`: DashCast replaces its own page with ours instead of showing it in its frame. In
+  the frame the page shows but can't play sound by itself (tested on a TV and a Nest Hub:
+  `play()` is refused, as the frame has no autoplay permission, and nobody can tap a TV).
+  DashCast no longer hears messages after that, so showing another page stops DashCast and
+  starts it afresh.
 - A device runs one app at a time, so DashCast replaces Google's player: the `/tv` page plays
   the music itself (the browser player, in sync, at full volume; the device volume is the
-  room's slider, as before). It joins with the token directly (`RoomConnection.guestToken`),
-  since a framed page may not keep storage.
-- The base address: DashCast is an `https` page and can only frame `https` pages, so a server
-  uses its public address (`accounts.url` / `YTMP_URL`) when that's `https`; otherwise (and on
-  a phone) the address the device reached us at. DashCast leaves an `http` page in its frame
-  blank (mixed content: it stays on *Loading:*), so `CastWebPage` sends that one with
-  `force: true`: DashCast then replaces its own page with it. It no longer hears messages
-  after that, so showing another page stops DashCast and starts it afresh.
+  room's slider, as before). It joins with the token directly (`RoomConnection.guestToken`).
+- The base address: a server uses its public address (`accounts.url` / `YTMP_URL`) when
+  that's `https`; otherwise (and on a phone) the address the device reached us at.
 - Every 10 s the driver checks that DashCast still runs; another app instead means someone
   else uses the TV (the room lets go, as with music). Switching back to music only, or off,
   stops DashCast and the screen participant leaves.
-- Not tested on a real TV yet (the receiver's autoplay inside its frame especially, and
-  whether a forced `http` page keeps DashCast's session running).
+- Still to see on a real TV: that the page plays sound as the whole page, and that the TV
+  keeps DashCast running once its own page is gone.
 
 ### From the app, in a room on another host ✅
 

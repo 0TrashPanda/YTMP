@@ -31,6 +31,7 @@ import javax.net.ssl.SSLSocket
 import javax.net.ssl.X509TrustManager
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import org.slf4j.LoggerFactory
 
 /**
  * A connection to one Cast device: TLS to port 8009, framed [CastMessage]s, heartbeats, and
@@ -111,6 +112,9 @@ class CastChannel private constructor(private val socket: SSLSocket) {
             }
         } catch (_: IOException) {
             // Connection lost.
+        } catch (e: Exception) {
+            // Something we can't read (on Android an exception escaping here would crash the app).
+            log.warn("Cast connection: unreadable message, closing it: {}", e.toString())
         } finally {
             close()
         }
@@ -125,6 +129,7 @@ class CastChannel private constructor(private val socket: SSLSocket) {
     }
 
     companion object {
+        private val log = LoggerFactory.getLogger(CastChannel::class.java)
         const val RECEIVER = "receiver-0"
         private const val SENDER = "sender-ytmp"
         const val NS_CONNECTION = "urn:x-cast:com.google.cast.tp.connection"

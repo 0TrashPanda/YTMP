@@ -329,9 +329,16 @@ class CastOutputs(
             // Follow volume changes made elsewhere (the device's buttons or app), so the room's
             // slider shows the real volume.
             volumeWatcher = scope.launch {
-                player.volumeChanges.collect { volume ->
-                    appliedVolume = volume
-                    reportVolume(volume)
+                try {
+                    player.volumeChanges.collect { volume ->
+                        appliedVolume = volume
+                        reportVolume(volume)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Not fatal (on Android an exception escaping here would crash the app).
+                    log.warn("Cast device {}: stopped following its volume: {}", device.name, e.toString())
                 }
             }
             player.receiverStatus().volume?.let { volume ->

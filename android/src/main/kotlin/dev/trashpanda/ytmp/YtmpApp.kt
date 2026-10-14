@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp
 
 import android.app.Application
+import ch.qos.logback.classic.LoggerContext
 import dev.trashpanda.ytmp.host.HostService
 import dev.trashpanda.ytmp.host.LocalHost
 import dev.trashpanda.ytmp.host.Nearby
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 
 /** Starts the phone's own host when the app starts, and keeps hosting alive while it is needed. */
 class YtmpApp : Application() {
@@ -35,8 +37,21 @@ class YtmpApp : Application() {
     /** Looked for a new version since the app started (see [Updates]). */
     var checkedForUpdate = false
 
+    /** A crash goes into the log files too (written out before the app stops), so *Send logs* shows why. */
+    private fun logCrashes() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            runCatching {
+                Log.e("YtmpApp", "Crashed on thread ${thread.name}", error)
+                (LoggerFactory.getILoggerFactory() as? LoggerContext)?.stop()
+            }
+            previous?.uncaughtException(thread, error)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
+        logCrashes()
         Log.i("YtmpApp", "YTMP ${Updates.installedVersion(this)} starting")
         host = LocalHost(this).also { it.start() }
         nearby = Nearby(this)

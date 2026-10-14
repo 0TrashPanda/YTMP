@@ -19,24 +19,20 @@ class CastWebPage(private val channel: CastChannel) {
     private var transportId: String? = null
 
     /**
-     * Starts DashCast (or reuses it) and opens [url] in it. DashCast is an `https` page, which
-     * can only frame `https` pages: an `http` page (a phone's address) replaces DashCast's page
-     * instead (`force`), after which DashCast no longer hears us, so that starts it afresh.
+     * Starts DashCast and opens [url] in it, as the whole page (`force`) rather than in
+     * DashCast's frame: a page in that frame may not play sound by itself (the frame has no
+     * autoplay permission), and an `http` page (a phone's address) may not show there at all.
+     * DashCast no longer hears us after that, so a running DashCast is stopped and started afresh.
      */
     suspend fun show(url: String) {
-        val force = url.startsWith("http://")
-        var app = dashCast(status())
-        if (app != null && force) {
-            channel.request(NS_RECEIVER, RECEIVER, payload("STOP", "sessionId" to JsonPrimitive(app.sessionId)))
-            app = null
+        dashCast(status())?.let { running ->
+            channel.request(NS_RECEIVER, RECEIVER, payload("STOP", "sessionId" to JsonPrimitive(running.sessionId)))
         }
-        if (app == null) {
-            channel.request(NS_RECEIVER, RECEIVER, payload("LAUNCH", "appId" to JsonPrimitive(APP_ID)))
-            app = dashCast(status()) ?: error("The Cast device didn't start DashCast")
-        }
+        channel.request(NS_RECEIVER, RECEIVER, payload("LAUNCH", "appId" to JsonPrimitive(APP_ID)))
+        var app = dashCast(status()) ?: error("The Cast device didn't start DashCast")
         // A just-started app only hears messages once it has set up its namespace.
         var tries = 0
-        while (NAMESPACE !in app!!.namespaces) {
+        while (NAMESPACE !in app.namespaces) {
             if (++tries > READY_TRIES) error("DashCast didn't get ready on the Cast device")
             delay(READY_WAIT_MS)
             app = dashCast(status()) ?: error("DashCast stopped on the Cast device")
@@ -44,10 +40,9 @@ class CastWebPage(private val channel: CastChannel) {
         val transport = app.transportId
         transportId = transport
         channel.connect(transport)
-        // In its own frame where possible: then DashCast keeps its Cast connection.
         channel.send(
             NAMESPACE, transport,
-            JsonObject(mapOf("url" to JsonPrimitive(url), "force" to JsonPrimitive(force), "reload" to JsonPrimitive(false), "reload_time" to JsonPrimitive(0))),
+            JsonObject(mapOf("url" to JsonPrimitive(url), "force" to JsonPrimitive(true), "reload" to JsonPrimitive(false), "reload_time" to JsonPrimitive(0))),
         )
     }
 

@@ -26,4 +26,14 @@ class CastMessageTest {
         val expected = byteArrayOf(0x08, 0x00, 0x12, 0x01, 's'.code.toByte(), 0x1a, 0x01, 'd'.code.toByte(), 0x22, 0x01, 'n'.code.toByte(), 0x28, 0x00, 0x32, 0x02, '{'.code.toByte(), '}'.code.toByte())
         assertEquals(expected.toList(), CastMessage("s", "d", "n", "{}").encode().drop(4))
     }
+
+    @Test
+    fun `skips fixed-size fields it doesn't know`() {
+        // A 64-bit field (15) and a 32-bit field (14) between the namespace and the payload.
+        val fixed = byteArrayOf((15 shl 3 or 1).toByte(), 1, 2, 3, 4, 5, 6, 7, 8, (14 shl 3 or 5).toByte(), 1, 2, 3, 4)
+        val bytes = CastMessage("s", "d", "n", "{}").encode().drop(4)
+        val split = bytes.indexOf(0x28.toByte())
+        val decoded = CastMessage.decode((bytes.take(split) + fixed.toList() + bytes.drop(split)).toByteArray())
+        assertEquals(CastMessage("s", "d", "n", "{}"), decoded)
+    }
 }

@@ -26,11 +26,10 @@ class CastScreensTest {
             val ended = CopyOnWriteArrayList<ShownScreen>()
             val screens = CastScreens(scope, casts, checkMs = 100) { ended += it }
 
-            // The server's https page: in DashCast's frame.
             val url = "https://ytmp.example.com/tv#cast=ABCD.tok%2Ben"
             screens.show("cast:tv", url)
             eventually { device.dashCastUrl == url }
-            assertEquals(false, device.dashCastForce)
+            assertEquals(true, device.dashCastForce)
             assertEquals(listOf(ShownScreen("cast:tv", "Living room TV", url)), screens.shown.value)
 
             screens.stop("cast:tv")
@@ -48,7 +47,7 @@ class CastScreensTest {
     }
 
     @Test
-    fun `an http page (a phone's address) replaces DashCast's own page, which can't frame it`() = runBlocking {
+    fun `a page replaces DashCast's own page (whose frame may not play sound), so showing another starts DashCast afresh`() = runBlocking {
         FakeCastDevice().use { device ->
             val channel = CastChannel.open("127.0.0.1", device.port)
             val page = CastWebPage(channel)
