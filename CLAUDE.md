@@ -47,7 +47,7 @@ what's planned is marked there.
 - Docs are in English, features (what) separate from implementation (how); keep them in step
   with the code, and the README's *what works* / *what's next* too. Plain language in what
   users see.
-- Reply in the language the owner writes in.
+- Reply in English, also when the owner writes in Dutch, unless asked to answer in Dutch.
 
 ## Gotchas
 
