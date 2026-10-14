@@ -3,7 +3,9 @@ import type {
 	ApiError,
 	ArtistPage,
 	ScreenLinked,
+	ScreenCastRequest,
 	ScreenLinkRequest,
+	ScreenUnlinkRequest,
 	ScreenPairing,
 	CreatePlaylistRequest,
 	CreatePlaylistResponse,
@@ -81,6 +83,24 @@ export async function linkScreen(code: string, roomCode: string, guestToken: str
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ code, roomCode, guestToken } satisfies ScreenLinkRequest)
+	});
+}
+
+/** A party screen for a TV on your own network, which the app starts (it plays the music too). */
+export async function castScreen(roomCode: string, guestToken: string, name: string): Promise<ScreenLinked> {
+	return request<ScreenLinked>('/api/screens/cast', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ roomCode, guestToken, name } satisfies ScreenCastRequest)
+	});
+}
+
+/** That screen stopped: it leaves the room. */
+export async function unlinkScreen(roomCode: string, guestToken: string): Promise<void> {
+	await request('/api/screens/unlink', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ roomCode, guestToken } satisfies ScreenUnlinkRequest)
 	});
 }
 

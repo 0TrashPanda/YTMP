@@ -730,6 +730,17 @@ export interface ScreenLinked {
   guestToken: string;
 }
 
+export interface ScreenCastRequest {
+  roomCode: string;
+  guestToken: string;
+  name: string;
+}
+
+export interface ScreenUnlinkRequest {
+  roomCode: string;
+  guestToken: string;
+}
+
 export interface SearchResponse {
   items: Song[];
 }

@@ -36,6 +36,7 @@ import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.RoomListResponse
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
+import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.RejectReason
@@ -74,12 +75,15 @@ import kotlinx.coroutines.SupervisorJob
 import dev.trashpanda.ytmp.protocol.ScreenPairing
 import dev.trashpanda.ytmp.protocol.ScreenLinked
 import dev.trashpanda.ytmp.protocol.ScreenLinkRequest
+import dev.trashpanda.ytmp.protocol.ScreenCastRequest
+import dev.trashpanda.ytmp.protocol.ScreenUnlinkRequest
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ApplicationTest {
     private val song = Song("ytm:abc", "One More Time", listOf(ArtistRef(null, "Daft Punk")), null, 320_000, emptyList())
@@ -187,6 +191,34 @@ class ApplicationTest {
         }
         // The code is used up.
         assertEquals(HttpStatusCode.NotFound, client.get("/api/screens/${pairing.secret}").status)
+    }
+
+    @Test
+    fun `the app shows the party screen on your own TV, which plays and leaves again`() = testApplication {
+        setup()
+        val client = jsonClient()
+        val created = client.post("/api/rooms") { contentType(ContentType.Application.Json); setBody(CreateRoomRequest("Party")) }.body<CreateRoomResponse>()
+        var annaToken = ""
+        client.webSocket("/ws") {
+            sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Anna", null, created.ownerToken))
+            annaToken = assertIs<ServerMessage.Welcome>(receiveMessage()).guestToken
+        }
+        suspend fun cast(by: String) = client.post("/api/screens/cast") { contentType(ContentType.Application.Json); setBody(ScreenCastRequest(created.code, by, "Living room TV")) }
+        assertEquals(HttpStatusCode.NotFound, cast("nobody").status)
+        val linked = cast(annaToken).body<ScreenLinked>()
+
+        client.webSocket("/ws") {
+            sendMessage(ClientMessage.Hello(PROTOCOL_VERSION, created.code, "Party screen", linked.guestToken, null))
+            val welcome = assertIs<ServerMessage.Welcome>(receiveMessage())
+            val me = welcome.state.participants.single { it.id == welcome.participantId }
+            assertEquals(true, me.screen)
+            assertEquals("Living room TV", me.name)
+            assertTrue(Permission.LISTEN_LOCALLY in me.allow)
+        }
+        suspend fun unlink(token: String) = client.post("/api/screens/unlink") { contentType(ContentType.Application.Json); setBody(ScreenUnlinkRequest(created.code, token)) }.status
+        assertEquals(HttpStatusCode.NotFound, unlink(annaToken))
+        assertEquals(HttpStatusCode.NoContent, unlink(linked.guestToken))
+        assertEquals(HttpStatusCode.NotFound, unlink(linked.guestToken))
     }
 
     @Test

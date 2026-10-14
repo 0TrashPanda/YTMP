@@ -4,9 +4,11 @@ import dev.trashpanda.ytmp.protocol.ApiError
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
+import dev.trashpanda.ytmp.protocol.ScreenCastRequest
 import dev.trashpanda.ytmp.protocol.ScreenLinkRequest
 import dev.trashpanda.ytmp.protocol.ScreenLinked
 import dev.trashpanda.ytmp.protocol.ScreenPairing
+import dev.trashpanda.ytmp.protocol.ScreenUnlinkRequest
 import dev.trashpanda.ytmp.protocol.HostInfo
 import dev.trashpanda.ytmp.protocol.RoomListResponse
 import dev.trashpanda.ytmp.protocol.AuthServerInfo
@@ -172,6 +174,8 @@ fun main(args: Array<String>) {
     generator.addRoot(ScreenPairing.serializer().descriptor)
     generator.addRoot(ScreenLinkRequest.serializer().descriptor)
     generator.addRoot(ScreenLinked.serializer().descriptor)
+    generator.addRoot(ScreenCastRequest.serializer().descriptor)
+    generator.addRoot(ScreenUnlinkRequest.serializer().descriptor)
     generator.addRoot(SearchResponse.serializer().descriptor)
     generator.addRoot(ApiError.serializer().descriptor)
     generator.addRoot(HostInfo.serializer().descriptor)

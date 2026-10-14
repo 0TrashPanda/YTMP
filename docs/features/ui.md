@@ -308,8 +308,13 @@ Two ways to open it, from the avatar menu in a room:
 
 - **On a TV with Chromecast** (or a display like a Nest Hub): *Play on*, then **Show the
   party screen** under the device. The TV shows the party screen and plays the music (it
-  replaces Google's player there), with no browser or code needed. It works best on a server
-  with an `https` address; see [Chromecast](../implementation/chromecast.md#the-party-screen-on-a-tv-).
+  replaces Google's player there), with no browser or code needed. See
+  [Chromecast](../implementation/chromecast.md#the-party-screen-on-a-tv-).
+- **On your own TV, in a room on a server** (with the app): the server can't reach the TVs
+  at your place, but the app can. *Play on* lists the Chromecasts the phone finds (the ones
+  the host doesn't offer itself), each with a switch that shows the party screen there,
+  which plays the music too. It needs *play on your own device*. Switched off, cast over by
+  someone else, or the TV turned off, the screen leaves the room.
 
 ## Album art colours
 

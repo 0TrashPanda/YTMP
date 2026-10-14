@@ -42,6 +42,15 @@ export interface NativeBridge {
 	 * CreateRoomResponse as JSON (`url`: its link on the local network), or `{ error }`.
 	 */
 	cloneRoom?(requestJson: string): string;
+	/** The Chromecasts on the phone's network and the party screens it shows there (bridge version 7), JSON CastScreenState. */
+	castScreens?(): string;
+	/**
+	 * Shows a room's party screen on a TV on the phone's network (bridge version 7): `url` is
+	 * this site's `/tv#cast=CODE.TOKEN`. The answer comes as onCastScreenShown.
+	 */
+	showCastScreen?(deviceId: string, url: string): void;
+	/** Stops it again; the app tells the room (bridge version 7). */
+	stopCastScreen?(deviceId: string): void;
 }
 
 /** Callbacks the app calls on the page. */
@@ -61,6 +70,16 @@ export interface NativeCallbacks {
 	onBack?(): 'handled' | 'exit' | 'default';
 	/** The list of rooms found on the local network changed. */
 	onNearbyRooms?(rooms: NearbyRoom[]): void;
+	/** The TVs the phone found, or what it shows on them, changed. */
+	onCastScreens?(state: CastScreenState): void;
+	/** Back from showCastScreen: null when the TV shows it, else why not. */
+	onCastScreenShown?(deviceId: string, error: string | null): void;
+}
+
+/** Chromecasts on the phone's own network, and the party screens it shows there (android/.../MainActivity.kt). */
+export interface CastScreenState {
+	devices: { id: string; name: string }[];
+	shown: { deviceId: string; name: string; url: string }[];
 }
 
 /** A room another phone on the same network is hosting (android/.../Nearby.kt). */

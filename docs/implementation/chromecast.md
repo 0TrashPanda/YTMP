@@ -76,11 +76,34 @@ URL in a frame, as Home Assistant's pychromecast does (`CastWebPage` in cast/).
   since a framed page may not keep storage.
 - The base address: DashCast is an `https` page and can only frame `https` pages, so a server
   uses its public address (`accounts.url` / `YTMP_URL`) when that's `https`; otherwise (and on
-  a phone) the address the device reached us at, which may not show.
+  a phone) the address the device reached us at. DashCast leaves an `http` page in its frame
+  blank (mixed content: it stays on *Loading:*), so `CastWebPage` sends that one with
+  `force: true`: DashCast then replaces its own page with it. It no longer hears messages
+  after that, so showing another page stops DashCast and starts it afresh.
 - Every 10 s the driver checks that DashCast still runs; another app instead means someone
   else uses the TV (the room lets go, as with music). Switching back to music only, or off,
   stops DashCast and the screen participant leaves.
-- Not tested on a real TV yet (the receiver's autoplay inside its frame especially).
+- Not tested on a real TV yet (the receiver's autoplay inside its frame especially, and
+  whether a forced `http` page keeps DashCast's session running).
+
+### From the app, in a room on another host ✅
+
+A server can't reach the Chromecasts at your place, the phone can (`CastFinder`). In a room
+on another host, the app's *Play on* lists the phone's Chromecasts that aren't the host's
+outputs (same `cast:<id>`), with a switch for the party screen:
+
+- The page asks the room for a screen participant: `POST /api/screens/cast`
+  `{ roomCode, guestToken, name }` (needs `listen_locally`, max 5 screens) answers
+  `{ roomCode, guestToken }`, a screen named after the TV that may play.
+- Then bridge v7 `showCastScreen(deviceId, url)` with the page's own
+  `<origin>/tv#cast=CODE.TOKEN` (the app only takes its own page's origin); `CastScreens` (host/)
+  starts DashCast there, keeps the connection open and checks every 10 s that it still runs.
+  The answer comes as `onCastScreenShown(deviceId, error)`; a failure unlinks the screen again.
+- `castScreens()` / `onCastScreens` give the page the phone's devices and what it shows.
+- Switched off (`stopCastScreen`), another app on the TV, or 3 failed checks (TV off): the app
+  stops it and sends `POST /api/screens/unlink { roomCode, guestToken }` itself, so the screen
+  leaves the room.
+- Volume: the TV's own (remote, buttons); the page plays at full volume.
 
 ## Later
 

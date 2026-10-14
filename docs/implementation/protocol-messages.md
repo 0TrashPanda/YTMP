@@ -160,7 +160,9 @@ named *Party screen*, and the TV gets `{ roomCode, guestToken }` and joins with 
 solo rooms, isn't counted for votes or "listened with", can't be made owner, and is saved
 with the room (so a TV that's switched off comes back to it). `/api/screens` is open without
 an account; codes are in memory only (`ScreenPairings`), at most 200 waiting, 10 new ones per
-minute per address.
+minute per address. A TV the app shows the party screen on (a Chromecast on the phone's
+network) gets its screen from `POST /api/screens/cast` instead, and leaves with
+`POST /api/screens/unlink` ([chromecast](chromecast.md#from-the-app-in-a-room-on-another-host-)).
 | `request_snapshot` ✅ | – (a message type, not a command) | – |
 
 ## Events (host → client)

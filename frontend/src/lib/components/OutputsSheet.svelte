@@ -2,8 +2,11 @@
 	import { wheelAdjust } from '../wheel';
 	// "Play on": this device (with its sync adjustment and volume) and the speakers and TVs the host found.
 	import { MediaQuery } from 'svelte/reactivity';
+	import { castScreen, unlinkScreen } from '../api';
+	import { nativeBridge, type CastScreenState } from '../native';
 	import type { RoomPlayer } from '../player.svelte';
 	import type { RoomConnection } from '../room.svelte';
+	import { saved } from '../storage';
 	import Icon from './Icon.svelte';
 
 	let {
@@ -23,6 +26,70 @@
 
 	function setVolume(outputId: string, volume: number) {
 		room.run({ kind: 'SetOutputVolume', outputId, volume });
+	}
+
+	// TVs on this phone's own network that the host can't reach (a room on a server): the app
+	// shows the party screen there itself, which plays the music too (docs/features/ui.md#party-screen).
+	function readPhoneCasts(): CastScreenState | null {
+		try {
+			return nativeBridge?.castScreens ? (JSON.parse(nativeBridge.castScreens()) as CastScreenState) : null;
+		} catch {
+			return null;
+		}
+	}
+	let phoneCasts = $state(readPhoneCasts());
+	const phoneTvs = $derived(
+		room.can('listen_locally') ? (phoneCasts?.devices ?? []).filter((d) => !outputs.some((o) => o.id === d.id)) : []
+	);
+	const ourPage = $derived(`${location.origin}/tv#cast=${encodeURIComponent(room.roomCode)}.`);
+	let starting = $state<string | null>(null);
+	const answers = new Map<string, (error: string | null) => void>();
+
+	$effect(() => {
+		if (!nativeBridge?.castScreens) return;
+		window.__ytmpNative = {
+			...window.__ytmpNative,
+			onCastScreens: (state) => (phoneCasts = state),
+			onCastScreenShown: (deviceId, error) => {
+				answers.get(deviceId)?.(error);
+				answers.delete(deviceId);
+			}
+		};
+		return () => {
+			window.__ytmpNative = { ...window.__ytmpNative, onCastScreens: undefined, onCastScreenShown: undefined };
+			for (const answer of answers.values()) answer(null);
+			answers.clear();
+		};
+	});
+
+	function shownHere(deviceId: string) {
+		return phoneCasts?.shown.find((s) => s.deviceId === deviceId) ?? null;
+	}
+
+	async function showOnTv(device: { id: string; name: string }, on: boolean) {
+		if (!on) {
+			nativeBridge?.stopCastScreen?.(device.id);
+			return;
+		}
+		const guestToken = saved.guestToken(room.roomCode);
+		if (!guestToken || !nativeBridge?.showCastScreen) return;
+		starting = device.id;
+		try {
+			const screen = await castScreen(room.roomCode, guestToken, device.name);
+			const url = `${location.origin}/tv#cast=${encodeURIComponent(screen.roomCode)}.${encodeURIComponent(screen.guestToken)}`;
+			const error = await new Promise<string | null>((resolve) => {
+				answers.set(device.id, resolve);
+				nativeBridge?.showCastScreen?.(device.id, url);
+			});
+			if (error) {
+				onToast(`${device.name} didn't show it: ${error}`);
+				unlinkScreen(screen.roomCode, screen.guestToken).catch(() => {});
+			}
+		} catch (e) {
+			onToast(e instanceof Error ? e.message : String(e));
+		} finally {
+			starting = null;
+		}
 	}
 
 	let showSync = $state(false);
@@ -143,11 +210,38 @@
 					/>
 				{/if}
 			</div>
-		{:else}
+		{/each}
+		{#each phoneTvs as tv (tv.id)}
+			{@const shown = shownHere(tv.id)}
+			{@const here = !!shown?.url.startsWith(ourPage)}
+			<div class="flex flex-col gap-1 rounded-xl bg-raised p-3">
+				<label class="flex items-center gap-3">
+					<Icon name="tv" size={20} class={here ? 'text-accent' : 'text-muted'} />
+					<span class="min-w-0 flex-1 truncate">{tv.name}</span>
+					<input
+						type="checkbox"
+						class="h-5 w-5 accent-accent"
+						checked={here}
+						disabled={starting !== null}
+						onchange={(e) => showOnTv(tv, e.currentTarget.checked)}
+					/>
+				</label>
+				<p class="pl-8 text-xs text-muted">
+					{#if starting === tv.id}
+						Starting on the TV…
+					{:else if shown && !here}
+						Shows another room now. Switch on to show this one.
+					{:else}
+						Shows the party screen and plays the music. Found by this phone.
+					{/if}
+				</p>
+			</div>
+		{/each}
+		{#if outputs.length === 0 && phoneTvs.length === 0}
 			<p class="text-sm text-muted">
 				No speakers or TVs found. Chromecasts (and speakers with Chromecast built in) and Sonos speakers on the host's network show up here.
 			</p>
-		{/each}
+		{/if}
 		<p class="text-xs text-muted">Speakers and TVs play for everyone in the room. This device only plays for you.</p>
 	</div>
 </div>

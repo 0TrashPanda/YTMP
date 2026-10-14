@@ -389,6 +389,31 @@ class Room(
         screen.token
     }
 
+    /**
+     * Someone here ([byGuestToken]) shows the room on a TV on their own network, with the app
+     * (a Chromecast the host can't reach): a party screen named [name] that plays the music
+     * too, like their own device, so they need *play on their own device*. Returns its guest
+     * token, or why not.
+     */
+    suspend fun addPlayingScreen(byGuestToken: String, name: String): Result<String> = mutex.withLock {
+        val by = members.values.firstOrNull { it.token == byGuestToken && !it.screen }
+            ?: return@withLock Result.failure(ScreenRefused(ErrorInfo(ErrorCode.NOT_FOUND, "You're not in this room")))
+        need(by, Permission.LISTEN_LOCALLY)?.let { return@withLock Result.failure(ScreenRefused(it)) }
+        if (members.values.count { it.screen } >= MAX_SCREENS) return@withLock Result.failure(ScreenRefused(invalid("This room can't show on another screen")))
+        val screen = newScreen(name.trim().ifEmpty { SCREEN_NAME }, plays = true)
+        emit(Event.Notice("${by.name} shows the room on ${screen.name}"))
+        log.info("Room {}: {} shows the party screen on their own TV", code, by.name)
+        Result.success(screen.token)
+    }
+
+    /** The party screen with [screenToken] goes (its TV stopped showing it). False if there's none. */
+    suspend fun removeScreen(screenToken: String): Boolean = mutex.withLock {
+        val screen = members.values.firstOrNull { it.screen && it.token == screenToken } ?: return@withLock false
+        screenOutputs.entries.removeIf { it.value == screen.id }
+        dropScreen(screen)
+        true
+    }
+
     /** A party screen participant; [plays]: its page plays the music too (a Chromecast output). */
     private fun newScreen(name: String, plays: Boolean): Member {
         val screen = Member(
@@ -403,7 +428,12 @@ class Room(
 
     /** An output stops showing the party screen: its screen participant goes. */
     private fun dropScreenOutput(outputId: String) {
-        val screen = screenOutputs.remove(outputId)?.let(members::remove) ?: return
+        val screen = screenOutputs.remove(outputId)?.let(members::get) ?: return
+        dropScreen(screen)
+    }
+
+    private fun dropScreen(screen: Member) {
+        members.remove(screen.id)
         screen.send(ServerMessage.Rejected(RejectReason.KICKED))
         screen.outbox = null
         screen.attached.clear()
@@ -1877,3 +1907,6 @@ class Room(
         ).apply { restore(saved) }
     }
 }
+
+/** A party screen can't be added: [error] says why. */
+class ScreenRefused(val error: ErrorInfo) : Exception(error.message)

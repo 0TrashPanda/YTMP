@@ -44,7 +44,9 @@ The host can also send audio to **output modules**. Outputs are **modular**.
 | … | Future output modules |
 
 Outputs like Sonos and Chromecast must be on the **same network as the host**. A phone
-host or a home server can use them, a server in a datacenter can't.
+host or a home server can use them, a server in a datacenter can't. One exception: in the
+app, a TV with Chromecast on your phone's network can show a server room's
+[party screen](ui.md#party-screen), which plays the music too.
 
 Changing host outputs is a permission (see [room management](room-management.md#permissions)).
 

@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp.host
 import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.core.Outbox
 import dev.trashpanda.ytmp.core.RadioSource
+import dev.trashpanda.ytmp.core.ScreenRefused
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.core.personalized
@@ -38,8 +39,10 @@ import dev.trashpanda.ytmp.protocol.RejectReason
 import dev.trashpanda.ytmp.protocol.RoomListResponse
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.SearchResponse
+import dev.trashpanda.ytmp.protocol.ScreenCastRequest
 import dev.trashpanda.ytmp.protocol.ScreenLinkRequest
 import dev.trashpanda.ytmp.protocol.ScreenLinked
+import dev.trashpanda.ytmp.protocol.ScreenUnlinkRequest
 import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.SuggestionsResponse
 import dev.trashpanda.ytmp.protocol.wireName
@@ -548,6 +551,27 @@ fun Application.ytmpModule(
                         if (full) "This room can't show on another screen" else "No TV shows that code. Check it, or get a new one on the TV.",
                     )
                 }
+                call.respond(HttpStatusCode.NoContent)
+            }
+            // A TV on your own network shows the party screen, started by the app (CastScreens there).
+            post("/screens/cast") {
+                val request = call.receive<ScreenCastRequest>()
+                val room = rooms[request.roomCode] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
+                val token = room.addPlayingScreen(request.guestToken, request.name).getOrElse { e ->
+                    val error = (e as ScreenRefused).error
+                    val status = when (error.code) {
+                        ErrorCode.PERMISSION_DENIED -> HttpStatusCode.Forbidden
+                        ErrorCode.NOT_FOUND -> HttpStatusCode.NotFound
+                        else -> HttpStatusCode.Conflict
+                    }
+                    throw ApiException(status, error.code, error.message)
+                }
+                call.respond(ScreenLinked(room.code, token))
+            }
+            post("/screens/unlink") {
+                val request = call.receive<ScreenUnlinkRequest>()
+                val room = rooms[request.roomCode] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
+                if (!room.removeScreen(request.guestToken)) throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No such screen in this room")
                 call.respond(HttpStatusCode.NoContent)
             }
             extraApi()

@@ -75,6 +75,10 @@
   opens it there (`http://127.0.0.1:8765/room/CODE#owner=…`). From the phone's own page onto
   your server: `POST /api/rooms/clone-to-server`, forwarded with your host token (`RoomSync`).
   See [room lifecycle](../features/room-lifecycle.md#cloning-a-room).
+- **Party screen on your own TV** (bridge `castScreens`, `showCastScreen`, `stopCastScreen`,
+  version 7): in a room on another host, the phone's Chromecasts show that room's `/tv` page
+  with DashCast (`LocalHost.castScreens`), see
+  [chromecast](chromecast.md#from-the-app-in-a-room-on-another-host-).
 - **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
   account holders of that server can join its rooms (see [auth](auth.md)). The WebView keeps
   that server's pages in the app, for logging in.

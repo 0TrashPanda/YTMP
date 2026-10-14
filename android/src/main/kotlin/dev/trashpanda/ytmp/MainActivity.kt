@@ -34,13 +34,18 @@ import dev.trashpanda.ytmp.host.createFor
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.host.NearbyRoom
+import dev.trashpanda.ytmp.host.ShownScreen
+import dev.trashpanda.ytmp.core.OutputDevice
 import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.combine
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
@@ -54,6 +59,7 @@ class MainActivity : ComponentActivity() {
     private var controller: ListenableFuture<MediaController>? = null
     private var askedForNotifications = false
     private var nearbyUpdates: Job? = null
+    private var castUpdates: Job? = null
     private val app get() = application as YtmpApp
 
     private val prefs by lazy { getSharedPreferences("ytmp", MODE_PRIVATE) }
@@ -174,6 +180,11 @@ class MainActivity : ComponentActivity() {
                 js("window.__ytmpNative && window.__ytmpNative.onNearbyRooms && window.__ytmpNative.onNearbyRooms($list)")
             }
         }
+        castUpdates = lifecycleScope.launch {
+            castState().collect { state ->
+                js("window.__ytmpNative && window.__ytmpNative.onCastScreens && window.__ytmpNative.onCastScreens(${json.encodeToString(CastScreenState.serializer(), state)})")
+            }
+        }
         // Binding a controller starts the playback service, so it can go to the foreground when playing.
         controller = MediaController.Builder(this, SessionToken(this, ComponentName(this, PlaybackService::class.java))).buildAsync()
     }
@@ -181,6 +192,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         app.visible.value = false
         nearbyUpdates?.cancel()
+        castUpdates?.cancel()
         app.nearby.stopDiscovery()
         controller?.let(MediaController::releaseFuture)
         controller = null
@@ -222,6 +234,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun js(code: String) = webView.post { webView.evaluateJavascript(code, null) }
+
+    /** The TVs this phone found, and the party screens it shows on them (bridge `castScreens`). */
+    private fun castState() = combine(app.host.casts.devices, app.host.castScreens.shown, ::castState)
+
+    private fun castState(devices: List<OutputDevice>, shown: List<ShownScreen>) =
+        CastScreenState(devices.map { CastScreenDevice(it.id, it.name) }, shown)
 
     private fun isServerUrl(uri: Uri): Boolean {
         val server = server?.let(Uri::parse) ?: return false
@@ -436,6 +454,48 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        /**
+         * The Chromecasts on this phone's network, and the party screens it shows there (bridge
+         * version 7), as JSON [CastScreenState]. Changes come as `onCastScreens`.
+         */
+        @JavascriptInterface
+        fun castScreens(): String =
+            json.encodeToString(CastScreenState.serializer(), castState(app.host.casts.devices.value, app.host.castScreens.shown.value))
+
+        /**
+         * Shows a room's party screen on a TV on this phone's network (bridge version 7): [url]
+         * is the page's own `/tv#cast=CODE.TOKEN` (the room made that screen participant). The
+         * answer comes as `onCastScreenShown(deviceId, error)`, error null when it shows.
+         */
+        @JavascriptInterface
+        fun showCastScreen(deviceId: String, url: String) {
+            val from = currentUrl
+            val page = Uri.parse(url)
+            val sameSite = from != null && isAppPage(from) && page.scheme == from.scheme && page.host == from.host && page.port == from.port
+            if (!sameSite || !ShownScreen.CAST_PAGE.matches(url)) {
+                js("window.__ytmpNative && window.__ytmpNative.onCastScreenShown && window.__ytmpNative.onCastScreenShown(${JSONObject.quote(deviceId)}, \"Not from this page\")")
+                return
+            }
+            lifecycleScope.launch {
+                val error = try {
+                    app.host.castScreens.show(deviceId, url)
+                    null
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    Log.w("YtmpCast", "Couldn't show the party screen on $deviceId", e)
+                    e.message ?: "The TV didn't answer"
+                }
+                js("window.__ytmpNative && window.__ytmpNative.onCastScreenShown && window.__ytmpNative.onCastScreenShown(${JSONObject.quote(deviceId)}, ${error?.let(JSONObject::quote) ?: "null"})")
+            }
+        }
+
+        /** Stops the party screen this phone shows on [deviceId] (bridge version 7); the room hears so. */
+        @JavascriptInterface
+        fun stopCastScreen(deviceId: String) {
+            if (currentUrl?.let(::isAppPage) != true) return
+            lifecycleScope.launch { app.host.castScreens.stop(deviceId) }
+        }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -454,7 +514,14 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 6
+        const val BRIDGE_VERSION = 7
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }
+
+/** For the page (bridge `castScreens`): the TVs this phone found, and what it shows there. */
+@Serializable
+private data class CastScreenState(val devices: List<CastScreenDevice>, val shown: List<ShownScreen>)
+
+@Serializable
+private data class CastScreenDevice(val id: String, val name: String)

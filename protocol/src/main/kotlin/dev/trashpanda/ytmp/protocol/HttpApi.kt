@@ -58,6 +58,20 @@ data class ScreenLinkRequest(val code: String, val roomCode: String, val guestTo
 @SerialName("ScreenLinked")
 data class ScreenLinked(val roomCode: String, val guestToken: String)
 
+/**
+ * `POST /api/screens/cast`: someone in [roomCode] (by their guest token) shows the party
+ * screen on a TV on their own network, named [name], with the app (it starts DashCast there
+ * with `/tv#cast=…`). The screen plays the music too. Answers [ScreenLinked].
+ */
+@Serializable
+@SerialName("ScreenCastRequest")
+data class ScreenCastRequest(val roomCode: String, val guestToken: String, val name: String)
+
+/** `POST /api/screens/unlink`: the TV showing the party screen with [guestToken] stopped; it leaves [roomCode]. */
+@Serializable
+@SerialName("ScreenUnlinkRequest")
+data class ScreenUnlinkRequest(val roomCode: String, val guestToken: String)
+
 /** Error body of every `/api` endpoint. */
 @Serializable
 @SerialName("ApiError")

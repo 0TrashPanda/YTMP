@@ -33,6 +33,8 @@ class FakeCastDevice : AutoCloseable {
     /** DashCast runs (instead of the media player), and the page it was asked to show. */
     @Volatile var dashCastRunning = false
     @Volatile var dashCastUrl: String? = null
+    /** DashCast was asked to replace its own page with it (instead of framing it). */
+    @Volatile var dashCastForce: Boolean? = null
 
     private fun appsJson(): String = listOfNotNull(
         """{"appId":"CC1AD845","transportId":"web-1","sessionId":"s-1"}""".takeIf { appRunning },
@@ -44,6 +46,7 @@ class FakeCastDevice : AutoCloseable {
     fun takenOverBy(appId: String) {
         otherApp = appId
         appRunning = false
+        dashCastRunning = false
         playerState = "IDLE"
         for (output in connections) runCatching { output.close() }
         connections.clear()
@@ -150,6 +153,7 @@ class FakeCastDevice : AutoCloseable {
     private fun answer(namespace: String, request: JsonObject): String? {
         if (namespace == "urn:x-cast:com.madmod.dashcast") {
             dashCastUrl = request["url"]?.jsonPrimitive?.content
+            dashCastForce = request["force"]?.jsonPrimitive?.booleanOrNull
             return null
         }
         val type = request["type"]?.jsonPrimitive?.content ?: return null

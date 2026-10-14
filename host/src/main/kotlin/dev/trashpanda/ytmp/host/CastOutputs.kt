@@ -68,6 +68,9 @@ class CastOutputs(
         known.update { it - id }
     }
 
+    /** Where the device with [id] is, if it was found. */
+    fun address(id: String): CastDeviceAddress? = known.value[id]
+
     /** Starts a driver for every room, now and as rooms are created. */
     fun attach(rooms: RoomManager) {
         scope.launch {

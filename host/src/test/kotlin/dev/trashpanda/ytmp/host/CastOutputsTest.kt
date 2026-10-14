@@ -89,6 +89,7 @@ class CastOutputsTest {
             eventually { device.dashCastUrl != null }
             val token = room.view().screens.getValue("cast:fake")
             assertEquals("https://ytmp.example.com/tv#cast=${room.code}.$token", device.dashCastUrl)
+            assertEquals(false, device.dashCastForce) // https: in DashCast's frame
             assertTrue(room.isScreen(token))
             val screen = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "TV", token, null), Outbox { })!!
             room.handle(screen, ClientMessage.CommandMessage("l", Command.SetListening(true))) // it may play the music

@@ -18,9 +18,18 @@ import kotlinx.serialization.json.jsonPrimitive
 class CastWebPage(private val channel: CastChannel) {
     private var transportId: String? = null
 
-    /** Starts DashCast (or reuses it) and opens [url] in it. */
+    /**
+     * Starts DashCast (or reuses it) and opens [url] in it. DashCast is an `https` page, which
+     * can only frame `https` pages: an `http` page (a phone's address) replaces DashCast's page
+     * instead (`force`), after which DashCast no longer hears us, so that starts it afresh.
+     */
     suspend fun show(url: String) {
+        val force = url.startsWith("http://")
         var app = dashCast(status())
+        if (app != null && force) {
+            channel.request(NS_RECEIVER, RECEIVER, payload("STOP", "sessionId" to JsonPrimitive(app.sessionId)))
+            app = null
+        }
         if (app == null) {
             channel.request(NS_RECEIVER, RECEIVER, payload("LAUNCH", "appId" to JsonPrimitive(APP_ID)))
             app = dashCast(status()) ?: error("The Cast device didn't start DashCast")
@@ -35,10 +44,10 @@ class CastWebPage(private val channel: CastChannel) {
         val transport = app.transportId
         transportId = transport
         channel.connect(transport)
-        // In its own frame (force = false): the page can be framed, and keeps DashCast's Cast connection.
+        // In its own frame where possible: then DashCast keeps its Cast connection.
         channel.send(
             NAMESPACE, transport,
-            JsonObject(mapOf("url" to JsonPrimitive(url), "force" to JsonPrimitive(false), "reload" to JsonPrimitive(false), "reload_time" to JsonPrimitive(0))),
+            JsonObject(mapOf("url" to JsonPrimitive(url), "force" to JsonPrimitive(force), "reload" to JsonPrimitive(false), "reload_time" to JsonPrimitive(0))),
         )
     }
 

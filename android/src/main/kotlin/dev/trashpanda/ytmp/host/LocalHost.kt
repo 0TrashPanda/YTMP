@@ -11,7 +11,9 @@ import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ShareAddress
+import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.RoomVisibility
+import dev.trashpanda.ytmp.protocol.ScreenUnlinkRequest
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
@@ -20,10 +22,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URI
 import java.net.Inet4Address
 
 /**
@@ -38,6 +43,28 @@ class LocalHost(private val context: Context) {
     /** Chromecasts on the network; they fetch the audio from this phone. */
     val casts = CastOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
     val castFinder = CastFinder(context, casts)
+
+    /**
+     * The party screen of a room on a server, on a TV here that the server can't reach. When it
+     * ends, the room hears so (best effort: else the screen just stays offline there).
+     */
+    val castScreens = CastScreens(scope, casts) { screen ->
+        val (url, request) = screen.unlink() ?: return@CastScreens
+        withContext(Dispatchers.IO) {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = 5_000
+                connection.readTimeout = 5_000
+                connection.requestMethod = "POST"
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.outputStream.use { it.write(ProtocolJson.encodeToString(ScreenUnlinkRequest.serializer(), request).toByteArray()) }
+                connection.responseCode
+            } finally {
+                connection.disconnect()
+            }
+        }
+    }
 
     /** Sonos speakers on the network; they fetch the audio from this phone too. */
     val sonos = SonosOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
