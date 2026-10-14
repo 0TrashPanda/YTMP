@@ -44,9 +44,17 @@ The host can also send audio to **output modules**. Outputs are **modular**.
 | … | Future output modules |
 
 Outputs like Sonos and Chromecast must be on the **same network as the host**. A phone
-host or a home server can use them, a server in a datacenter can't. One exception: in the
-app, a TV with Chromecast on your phone's network can show a server room's
-[party screen](ui.md#party-screen), which plays the music too.
+host or a home server can use them, a server in a datacenter can't.
+
+**Speakers near your phone** ✅: in a room on another host (a server), the app's *Play on*
+also lists the Sonos speakers and Chromecasts on your phone's network that the host doesn't
+offer itself, under *Near this phone*. Switched on, the phone plays the room there: it
+follows the room, looks the songs up itself and serves them to the speaker, so it works
+wherever the server is. They have their own volume slider, and a Chromecast TV can show the
+[party screen](ui.md#party-screen) instead. It needs *play on your own device*; the room
+keeps playing while they play, and everyone sees *plays on Woonkamer* next to your name.
+The phone must stay on that Wi-Fi with the app running (it shows a notification, like
+hosting); when it goes away, so do its speakers.
 
 Changing host outputs is a permission (see [room management](room-management.md#permissions)).
 

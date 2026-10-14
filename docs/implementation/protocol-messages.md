@@ -107,6 +107,7 @@ Each command lists the permission it needs (see [room management](../features/ro
 | Command | Fields | Permission |
 |---------|--------|------------|
 | `SetListening` ✅ | `on` | Play audio locally |
+| `SetSpeakers` ✅ | `names` (speakers near the phone that play the room, from the app; empty: none) | Play audio locally |
 
 No command is needed for the proxied stream: when the direct URL fails, the client uses
 `/api/audio/{songId}` on the host.

@@ -1,6 +1,8 @@
 package dev.trashpanda.ytmp
 
+import dev.trashpanda.ytmp.host.RoomSource
 import dev.trashpanda.ytmp.protocol.ClientMessage
+import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.NowPlaying
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
@@ -22,6 +24,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -39,7 +44,7 @@ data class FollowedRoom(
 ) {
     /** Nobody else plays along (like the web app's `listeningAlone`). */
     val alone: Boolean
-        get() = state.participants.none { it.id != participantId && it.online && it.listening } && state.outputs.none { it.active }
+        get() = state.participants.none { (it.id != participantId && it.online && it.listening) || it.speakers.isNotEmpty() } && state.outputs.none { it.active }
 }
 
 /**
@@ -271,9 +276,32 @@ class RoomFollower {
                 if (item == null) s else s.copy(queue = (s.queue - item).toMutableList().apply { add(e.toIndex.coerceIn(0, size), item) })
             }
             is Event.QueueReplaced -> s.copy(queue = e.items)
+            // The last played song, so speakers near the phone can skip back by themselves (NearbySpeakers).
+            is Event.HistoryAppended -> s.copy(history = s.history + e.item)
+            is Event.HistoryItemRemoved -> s.copy(history = s.history.filter { it.itemId != e.itemId })
+            is Event.HistoryReplaced -> s.copy(history = e.items)
             is Event.AutoplayChanged -> s.copy(autoplay = e.items, autoplaySeed = e.seed)
             is Event.RepeatChanged -> s.copy(repeat = e.mode)
             else -> s
         }
+    }
+}
+
+/**
+ * [NearbySpeakers]' own connection to a room on another host: like the player's, attached as
+ * the page's participant, so it keeps going while Android freezes the page.
+ */
+class FollowerSource(link: RoomLink) : RoomSource {
+    private val scope = CoroutineScope(Dispatchers.Default)
+    private val follower = RoomFollower().also { it.follow(link) }
+
+    override val room: StateFlow<Pair<RoomState, Double>?> =
+        follower.room.map { it?.let { r -> r.state to r.clockOffset } }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    override fun command(command: Command): Boolean = follower.command(ProtocolJson.encodeToString(Command.serializer(), command))
+
+    override fun close() {
+        follower.close()
+        scope.cancel()
     }
 }

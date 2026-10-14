@@ -105,7 +105,11 @@ export class RoomConnection {
 	get listeningAlone(): boolean {
 		const s = this.state;
 		if (!s) return true;
-		return !s.participants.some((p) => p.id !== this.participantId && p.online && p.listening) && !s.outputs.some((o) => o.active);
+		// Speakers near a phone (also our own) play along too.
+		return (
+			!s.participants.some((p) => (p.id !== this.participantId && p.online && p.listening) || p.speakers.length > 0) &&
+			!s.outputs.some((o) => o.active)
+		);
 	}
 
 	/** What I may do here (see permissions.ts). */

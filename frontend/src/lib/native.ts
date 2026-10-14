@@ -51,6 +51,13 @@ export interface NativeBridge {
 	showCastScreen?(deviceId: string, url: string): void;
 	/** Stops it again; the app tells the room (bridge version 7). */
 	stopCastScreen?(deviceId: string): void;
+	/** The speakers and TVs on the phone's network, what they show and play (bridge version 8), JSON NearbyState. */
+	nearby?(): string;
+	/** Plays this page's room on a speaker on the phone's network (bridge version 8): `roomJson` is { hostUrl, code, guestToken }. */
+	playNearby?(deviceId: string, roomJson: string): void;
+	stopNearby?(deviceId: string): void;
+	/** 0–1. */
+	setNearbyVolume?(deviceId: string, volume: number): void;
 }
 
 /** Callbacks the app calls on the page. */
@@ -74,6 +81,18 @@ export interface NativeCallbacks {
 	onCastScreens?(state: CastScreenState): void;
 	/** Back from showCastScreen: null when the TV shows it, else why not. */
 	onCastScreenShown?(deviceId: string, error: string | null): void;
+	/** The speakers on the phone's network, or what they do, changed. */
+	onNearby?(state: NearbyState): void;
+	/** A speaker near the phone had a problem (couldn't play a song, another app took it). */
+	onNearbyNotice?(text: string): void;
+}
+
+/** Speakers and TVs on the phone's own network (android/.../MainActivity.kt), for a room on another host. */
+export interface NearbyState {
+	devices: { id: string; name: string; kind: 'chromecast' | 'sonos' }[];
+	shown: { deviceId: string; name: string; url: string }[];
+	/** The room playing on speakers here, with them; null when none plays. */
+	playing: { roomCode: string; speakers: { id: string; name: string; volume: number | null }[] } | null;
 }
 
 /** Chromecasts on the phone's own network, and the party screens it shows there (android/.../MainActivity.kt). */

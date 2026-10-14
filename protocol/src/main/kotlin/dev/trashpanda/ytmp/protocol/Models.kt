@@ -104,6 +104,8 @@ data class Participant(
     val tag: String = "",
     /** A party screen (a TV showing the room): it only watches, and doesn't count as a person here. */
     val screen: Boolean = false,
+    /** Speakers near their phone that they play the room on ([Command.SetSpeakers]). */
+    val speakers: List<String> = emptyList(),
 )
 
 @Serializable

@@ -145,6 +145,31 @@ suspend fun PersonalCatalog.personalized(): PersonalCatalog? = takeIf { personal
 /** A speaker or TV the host found, that rooms can play on. */
 data class OutputDevice(val id: String, val name: String, val kind: OutputKind)
 
+/**
+ * A room as speaker drivers see it: the host's own [Room], or a room on another host that
+ * this device plays on speakers near it (a phone in a server room).
+ */
+interface OutputRoom {
+    val code: String
+
+    suspend fun view(): RoomView
+
+    /** [listener] is called (on any thread, without waiting) after every change. */
+    fun addChangeListener(listener: () -> Unit)
+
+    /** Tells the room about a problem, e.g. a speaker that couldn't play a song. */
+    suspend fun notice(message: String)
+
+    /** The volume the device actually has. */
+    suspend fun reportOutputVolume(outputId: String, volume: Double)
+
+    /** The device plays something else now (another app took it): let go of it. */
+    suspend fun outputTakenOver(outputId: String)
+
+    /** The device skipped by itself (its own buttons) from [fromItemId]. */
+    suspend fun outputSkipped(fromItemId: String, forward: Boolean)
+}
+
 /** What an output driver needs to follow a room. */
 data class RoomView(
     val current: QueueItem?,

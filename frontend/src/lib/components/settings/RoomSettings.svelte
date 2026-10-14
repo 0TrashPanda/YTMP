@@ -419,7 +419,7 @@
 									{#if person.id === me?.id}<span class="text-xs font-normal text-d-faint">(you)</span>{/if}
 								</p>
 								<p class="truncate text-xs text-d-faint">
-									{person.screen ? 'Shows the room on a TV' : (person.accountId ?? 'Guest')}{person.allow.length || person.deny.length ? ' · own permissions' : ''}
+									{person.screen ? 'Shows the room on a TV' : (person.accountId ?? 'Guest')}{person.speakers.length ? ` · plays on ${person.speakers.join(', ')}` : ''}{person.allow.length || person.deny.length ? ' · own permissions' : ''}
 								</p>
 							</div>
 							<div class="w-36 max-sm:w-auto">

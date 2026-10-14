@@ -79,6 +79,10 @@
   version 7): in a room on another host, the phone's Chromecasts show that room's `/tv` page
   with DashCast (`LocalHost.castScreens`), see
   [chromecast](chromecast.md#from-the-app-in-a-room-on-another-host-).
+- **Speakers near the phone** (bridge `nearby`, `playNearby`, `stopNearby`,
+  `setNearbyVolume`, version 8): in a room on another host, the phone plays the room on its
+  Sonos speakers and Chromecasts itself (`LocalHost.nearby`), see
+  [chromecast](chromecast.md#speakers-near-the-phone-in-a-room-on-another-host-).
 - **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
   account holders of that server can join its rooms (see [auth](auth.md)). The WebView keeps
   that server's pages in the app, for logging in.

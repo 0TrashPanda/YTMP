@@ -57,13 +57,18 @@ class YtmpApp : Application() {
         nearby = Nearby(this)
         scope.launch { host.rooms.list.collect { nearby.announce(it) } }
         scope.launch {
-            combine(host.rooms.hosting, host.rooms.playing, ::Pair).distinctUntilChanged().collect { (rooms, playing) ->
-                if (rooms.isEmpty()) {
+            combine(host.rooms.hosting, host.rooms.playing, host.nearby.playing, ::Triple).distinctUntilChanged().collect { (rooms, playing, speakers) ->
+                // Speakers here playing a server's room: the phone serves them the audio, also with the screen off.
+                val nearbyText = speakers?.let { "Playing on ${it.speakers.joinToString { s -> s.name }}" }
+                if (rooms.isEmpty() && nearbyText == null) {
                     HostService.stop(this@YtmpApp)
                 } else {
-                    val text = rooms.singleOrNull()?.let { "Hosting ${it.name} (${it.code})" } ?: "Hosting ${rooms.size} rooms"
+                    val text = rooms.singleOrNull()?.let { "Hosting ${it.name} (${it.code})" }
+                        ?: rooms.takeIf { it.isNotEmpty() }?.let { "Hosting ${it.size} rooms" }
+                        ?: nearbyText!!
                     // Both while a room plays, also solo: the next song must load with the screen off.
-                    runCatching { HostService.update(this@YtmpApp, text, wakeLock = playing.isNotEmpty(), wifiLock = playing.isNotEmpty()) }
+                    val busy = playing.isNotEmpty() || speakers != null
+                    runCatching { HostService.update(this@YtmpApp, text, wakeLock = busy, wifiLock = busy) }
                 }
             }
         }

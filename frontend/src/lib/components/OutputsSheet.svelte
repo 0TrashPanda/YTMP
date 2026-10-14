@@ -3,7 +3,7 @@
 	// "Play on": this device (with its sync adjustment and volume) and the speakers and TVs the host found.
 	import { MediaQuery } from 'svelte/reactivity';
 	import { castScreen, unlinkScreen } from '../api';
-	import { nativeBridge, type CastScreenState } from '../native';
+	import { nativeBridge, type CastScreenState, type NearbyState } from '../native';
 	import type { RoomPlayer } from '../player.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import { saved } from '../storage';
@@ -28,42 +28,73 @@
 		room.run({ kind: 'SetOutputVolume', outputId, volume });
 	}
 
-	// TVs on this phone's own network that the host can't reach (a room on a server): the app
-	// shows the party screen there itself, which plays the music too (docs/features/ui.md#party-screen).
-	function readPhoneCasts(): CastScreenState | null {
+	// Speakers and TVs on this phone's own network that the host can't reach (a room on a
+	// server): the app plays the room there itself, getting the audio from the phone, and a TV
+	// can show the party screen instead (docs/features/playback-and-outputs.md#host-outputs).
+	// Older apps (bridge 7) only know the TVs, for the party screen.
+	function readNearby(): NearbyState | null {
 		try {
-			return nativeBridge?.castScreens ? (JSON.parse(nativeBridge.castScreens()) as CastScreenState) : null;
+			if (nativeBridge?.nearby) return JSON.parse(nativeBridge.nearby()) as NearbyState;
+			if (nativeBridge?.castScreens) {
+				const old = JSON.parse(nativeBridge.castScreens()) as CastScreenState;
+				return { devices: old.devices.map((d) => ({ ...d, kind: 'chromecast' as const })), shown: old.shown, playing: null };
+			}
 		} catch {
-			return null;
+			// No app, or an app that doesn't know.
 		}
+		return null;
 	}
-	let phoneCasts = $state(readPhoneCasts());
-	const phoneTvs = $derived(
-		room.can('listen_locally') ? (phoneCasts?.devices ?? []).filter((d) => !outputs.some((o) => o.id === d.id)) : []
+	let near = $state(readNearby());
+	const canPlayNear = !!nativeBridge?.playNearby;
+	const nearDevices = $derived(
+		room.can('listen_locally')
+			? (near?.devices ?? []).filter((d) => !outputs.some((o) => o.id === d.id) && (canPlayNear || d.kind === 'chromecast'))
+			: []
 	);
 	const ourPage = $derived(`${location.origin}/tv#cast=${encodeURIComponent(room.roomCode)}.`);
 	let starting = $state<string | null>(null);
 	const answers = new Map<string, (error: string | null) => void>();
 
 	$effect(() => {
-		if (!nativeBridge?.castScreens) return;
+		if (!near) return;
 		window.__ytmpNative = {
 			...window.__ytmpNative,
-			onCastScreens: (state) => (phoneCasts = state),
+			onNearby: (state) => (near = state),
+			onCastScreens: (state) => {
+				if (!canPlayNear) near = { devices: state.devices.map((d) => ({ ...d, kind: 'chromecast' })), shown: state.shown, playing: null };
+			},
 			onCastScreenShown: (deviceId, error) => {
 				answers.get(deviceId)?.(error);
 				answers.delete(deviceId);
 			}
 		};
 		return () => {
-			window.__ytmpNative = { ...window.__ytmpNative, onCastScreens: undefined, onCastScreenShown: undefined };
+			window.__ytmpNative = { ...window.__ytmpNative, onNearby: undefined, onCastScreens: undefined, onCastScreenShown: undefined };
 			for (const answer of answers.values()) answer(null);
 			answers.clear();
 		};
 	});
 
 	function shownHere(deviceId: string) {
-		return phoneCasts?.shown.find((s) => s.deviceId === deviceId) ?? null;
+		return near?.shown.find((s) => s.deviceId === deviceId) ?? null;
+	}
+
+	/** The speaker plays a room from this phone: this one (with its volume), or another. */
+	function playingOn(deviceId: string) {
+		const speaker = near?.playing?.speakers.find((s) => s.id === deviceId);
+		return speaker ? { here: near?.playing?.roomCode === room.roomCode, volume: speaker.volume } : null;
+	}
+
+	function playNear(device: { id: string }, on: boolean) {
+		if (!on) {
+			nativeBridge?.stopNearby?.(device.id);
+			return;
+		}
+		const guestToken = saved.guestToken(room.roomCode);
+		if (!guestToken) return;
+		// A TV does one thing at a time: the music here instead of the party screen.
+		if (shownHere(device.id)) nativeBridge?.stopCastScreen?.(device.id);
+		nativeBridge?.playNearby?.(device.id, JSON.stringify({ hostUrl: location.origin, code: room.roomCode, guestToken }));
 	}
 
 	async function showOnTv(device: { id: string; name: string }, on: boolean) {
@@ -73,6 +104,8 @@
 		}
 		const guestToken = saved.guestToken(room.roomCode);
 		if (!guestToken || !nativeBridge?.showCastScreen) return;
+		// The party screen plays the music itself.
+		if (playingOn(device.id)) nativeBridge?.stopNearby?.(device.id);
 		starting = device.id;
 		try {
 			const screen = await castScreen(room.roomCode, guestToken, device.name);
@@ -211,33 +244,65 @@
 				{/if}
 			</div>
 		{/each}
-		{#each phoneTvs as tv (tv.id)}
-			{@const shown = shownHere(tv.id)}
-			{@const here = !!shown?.url.startsWith(ourPage)}
-			<div class="flex flex-col gap-1 rounded-xl bg-raised p-3">
-				<label class="flex items-center gap-3">
-					<Icon name="tv" size={20} class={here ? 'text-accent' : 'text-muted'} />
-					<span class="min-w-0 flex-1 truncate">{tv.name}</span>
+		{#if nearDevices.length > 0}
+			<p class="-mb-1 mt-1 text-xs font-medium text-muted">Near this phone (it plays from here)</p>
+		{/if}
+		{#each nearDevices as device (device.id)}
+			{@const shown = shownHere(device.id)}
+			{@const showsHere = !!shown?.url.startsWith(ourPage)}
+			{@const plays = playingOn(device.id)}
+			<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">
+				{#if canPlayNear}
+					<label class="flex items-center gap-3">
+						<Icon name={device.kind === 'sonos' ? 'speaker' : 'cast'} size={20} class={plays?.here || showsHere ? 'text-accent' : 'text-muted'} />
+						<span class="min-w-0 flex-1 truncate">{device.name}</span>
+						<input
+							type="checkbox"
+							class="h-5 w-5 accent-accent"
+							checked={!!plays?.here}
+							disabled={starting === device.id}
+							onchange={(e) => playNear(device, e.currentTarget.checked)}
+						/>
+					</label>
+				{/if}
+				{#if device.kind === 'chromecast'}
+					<label class="flex items-center gap-3 {canPlayNear ? 'pl-8 text-sm' : ''}">
+						{#if !canPlayNear}<Icon name="tv" size={20} class={showsHere ? 'text-accent' : 'text-muted'} />{/if}
+						<span class="min-w-0 flex-1 {canPlayNear ? (showsHere ? 'text-white' : 'text-muted') : 'truncate'}">
+							{canPlayNear ? 'Show the party screen (TVs and displays)' : device.name}
+						</span>
+						<input
+							type="checkbox"
+							class={canPlayNear ? 'h-4 w-4 accent-accent' : 'h-5 w-5 accent-accent'}
+							checked={showsHere}
+							disabled={starting !== null}
+							onchange={(e) => showOnTv(device, e.currentTarget.checked)}
+						/>
+					</label>
+				{/if}
+				{#if plays?.here && plays.volume !== null}
 					<input
-						type="checkbox"
-						class="h-5 w-5 accent-accent"
-						checked={here}
-						disabled={starting !== null}
-						onchange={(e) => showOnTv(tv, e.currentTarget.checked)}
+						type="range"
+						class="w-full accent-white"
+						min="0"
+						max="1"
+						step="0.02"
+						value={plays.volume}
+						aria-label="Volume of {device.name}"
+						use:wheelAdjust
+						onchange={(e) => nativeBridge?.setNearbyVolume?.(device.id, Number(e.currentTarget.value))}
 					/>
-				</label>
-				<p class="pl-8 text-xs text-muted">
-					{#if starting === tv.id}
-						Starting on the TV…
-					{:else if shown && !here}
-						Shows another room now. Switch on to show this one.
-					{:else}
-						Shows the party screen and plays the music. Found by this phone.
-					{/if}
-				</p>
+				{/if}
+				{#if starting === device.id}
+					<p class="pl-8 text-xs text-muted">Starting on the TV…</p>
+				{:else if (plays && !plays.here) || (shown && !showsHere)}
+					<p class="pl-8 text-xs text-muted">Plays another room now. Switch on for this one.</p>
+				{:else if !canPlayNear}
+					<p class="pl-8 text-xs text-muted">Shows the party screen and plays the music. Found by this phone.</p>
+				{/if}
 			</div>
 		{/each}
-		{#if outputs.length === 0 && phoneTvs.length === 0}
+		{#if outputs.length === 0 && nearDevices.length === 0}
 			<p class="text-sm text-muted">
 				No speakers or TVs found. Chromecasts (and speakers with Chromecast built in) and Sonos speakers on the host's network show up here.
 			</p>

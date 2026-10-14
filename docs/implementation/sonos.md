@@ -31,6 +31,12 @@ host's `/api/audio/…` (e.g. `x-sonos-spotify:…`) means another app took it: 
 its session without `Stop` and calls `Room.outputTakenOver`, which switches the output off in
 the room with a notice.
 
+## From a phone, in a room on another host
+
+The app can drive the Sonos speakers on its own network for a room on a server, with the same
+driver (`SonosOutputs.play` with the followed room); the speaker gets the audio from the
+phone. See [chromecast](chromecast.md#speakers-near-the-phone-in-a-room-on-another-host-).
+
 ## Not yet
 
 - **Groups**: commands go to the speaker itself. A speaker that's part of a Sonos group

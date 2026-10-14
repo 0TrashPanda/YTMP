@@ -327,10 +327,13 @@
 	// A changed setting (e.g. what unplugging headphones does) goes to the app's player.
 	const onSettings = () => player?.sync();
 	onMount(() => {
-		if (nativeBridge) window.__ytmpNative = { ...window.__ytmpNative, onBack };
+		// Speakers near the phone that play this room (the app drives them) tell about problems here.
+		const onNearbyNotice = (text: string) => toast(text);
+		if (nativeBridge) window.__ytmpNative = { ...window.__ytmpNative, onBack, onNearbyNotice };
 		window.addEventListener('ytmp:settings', onSettings);
 		return () => {
 			if (window.__ytmpNative?.onBack === onBack) window.__ytmpNative = { ...window.__ytmpNative, onBack: undefined };
+			if (window.__ytmpNative?.onNearbyNotice === onNearbyNotice) window.__ytmpNative = { ...window.__ytmpNative, onNearbyNotice: undefined };
 			window.removeEventListener('ytmp:settings', onSettings);
 		};
 	});
@@ -530,7 +533,7 @@
 									onclick={() => (settings = 'members')}
 									title={room.state?.participants
 										.filter((p: Participant) => p.online && !p.screen)
-										.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : ''))
+										.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : '') + (p.speakers.length ? ` 🔊 ${p.speakers.join(', ')}` : ''))
 										.join(', ')}
 								>
 									<Icon name="people" size={20} />

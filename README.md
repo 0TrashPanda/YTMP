@@ -57,7 +57,8 @@ Music, without Premium, and not tied to a single music service.
 - A mini player that opens a full player (tap or swipe up): album art, controls, like,
   save to playlist, and Up next / Related tabs.
 - Play on this device, on Chromecasts (including speakers with Chromecast built in) and on
-  Sonos speakers, with their volume.
+  Sonos speakers, with their volume. In a room on a server, the app also plays on the
+  speakers near your phone (the phone looks the songs up and serves them).
 - Android: lock screen and notification controls, keeps playing with the screen off.
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app
   looks songs up itself, and a browser can use a YouTube Music module on your own computer

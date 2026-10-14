@@ -105,6 +105,27 @@ class RoomTest {
     }
 
     @Test
+    fun `speakers near someone's phone keep the music going, until they go offline`() = runTest {
+        val room = newRoom()
+        val page = room.connect()
+        val other = room.connect("Ben")
+        room.run(page, Command.AddSongs(listOf(song(1)), QueuePosition.END))
+        room.run(page, Command.SetListening(true))
+        room.run(page, Command.SetSpeakers(listOf("Woonkamer", " Woonkamer ", "")))
+        room.run(page, Command.SetListening(false))
+        runCurrent()
+        assertTrue(other.state.playback.playing)
+        assertEquals(listOf("Woonkamer"), other.state.participants.single { it.id == page.participantId }.speakers)
+
+        // The phone goes: its speakers can't play the room any more.
+        room.disconnect(page.participantId, page)
+        assertEquals(emptyList(), other.state.participants.single { it.id == page.participantId }.speakers)
+        advanceTimeBy(5 * 60_000L)
+        runCurrent()
+        assertFalse(other.state.playback.playing)
+    }
+
+    @Test
     fun `adding to an empty room starts playing`() = runTest {
         val room = newRoom()
         val client = room.connect()

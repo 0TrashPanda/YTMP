@@ -189,6 +189,15 @@ sealed interface Command {
     data class SetListening(val on: Boolean) : Command
 
     /**
+     * Plays the room on speakers near this participant's phone ([names], empty: none), which
+     * the app drives itself: a room on another host can't reach them. Like [SetListening], it
+     * keeps the music going and needs *play on your own device*.
+     */
+    @Serializable
+    @SerialName("SetSpeakers")
+    data class SetSpeakers(val names: List<String>) : Command
+
+    /**
      * Plays the room on a speaker or TV, or stops playing on it. [screen]: a TV or display
      * with Chromecast shows the party screen too, which plays the music itself.
      */

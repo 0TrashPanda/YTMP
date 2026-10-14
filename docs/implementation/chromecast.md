@@ -86,6 +86,29 @@ URL in a frame, as Home Assistant's pychromecast does (`CastWebPage` in cast/).
 - Still to see on a real TV: that the page plays sound as the whole page, and that the TV
   keeps DashCast running once its own page is gone.
 
+### Speakers near the phone, in a room on another host ✅
+
+A server can't reach the speakers at your place, the phone can (`CastFinder`, `SonosFinder`).
+`NearbySpeakers` (host/) plays a room on another host on them, with the same drivers as the
+phone's own rooms: `CastOutputs.play` / `SonosOutputs.play` take any `OutputRoom` (core/), the
+interface `Room` implements for its host's drivers.
+
+- The app follows the room itself (`FollowerSource`: a `RoomFollower` attached as the page's
+  participant), and turns its state into a `RoomView` (`RoomState.outputView`): times in the
+  phone's clock (minus the clock offset), and no stream link, since the host's links are tied
+  to the host's internet connection; the speakers get `/api/audio/…` from the phone, which
+  looks the song up itself (`OnDeviceAudioProxy`).
+- On every (re)connection and change the app sends `SetSpeakers { names }`: the room counts
+  that participant as playing (it doesn't pause because nobody hears) and shows the names.
+  A participant going offline loses them.
+- Volume and *another app took it* stay on the phone (`NearbySpeakers.playing`, notices to
+  the page); the device's own skip buttons send `Skip` / `Previous`.
+- Bridge v8: `nearby()` / `onNearby` (devices with their kind, party screens, what plays),
+  `playNearby(deviceId, { hostUrl, code, guestToken })` (only the page's own site),
+  `stopNearby`, `setNearbyVolume`, `onNearbyNotice`. While speakers play, the app keeps its
+  foreground service (wake and Wi-Fi locks), like hosting.
+- One room at a time: switching a speaker on for another room stops the first room's.
+
 ### From the app, in a room on another host ✅
 
 A server can't reach the Chromecasts at your place, the phone can (`CastFinder`). In a room

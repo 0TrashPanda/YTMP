@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory
  * only follow [PlaybackStatus].
  */
 class Room(
-    val code: String,
+    override val code: String,
     name: String,
     ownerToken: String,
     visibility: RoomVisibility,
@@ -79,7 +79,7 @@ class Room(
      */
     private val onOwnerChanged: (oldAccount: String?, oldSyncId: String?) -> Unit = { _, _ -> },
     private val clock: () -> Long = System::currentTimeMillis,
-) {
+) : OutputRoom {
     /** Proves the owner (given to whoever created the room, and to a new owner). Changes when the owner does. */
     @Volatile
     var ownerToken: String = ownerToken
@@ -120,6 +120,8 @@ class Room(
         var roleId: String,
         var accountId: String? = null,
         var listening: Boolean = false,
+        /** Speakers near their phone that they play the room on ([Command.SetSpeakers]). */
+        var speakers: List<String> = emptyList(),
         var offlineSince: Long? = null,
         var allow: Set<Permission> = emptySet(),
         var deny: Set<Permission> = emptySet(),
@@ -160,7 +162,7 @@ class Room(
 
         fun toParticipant() = Participant(
             id, name, isOwner, online = online, listening = listening, accountId = accountId,
-            roleId = roleId, allow = allow.sorted(), deny = deny.sorted(), tag = tag, screen = screen,
+            roleId = roleId, allow = allow.sorted(), deny = deny.sorted(), tag = tag, screen = screen, speakers = speakers,
         )
     }
 
@@ -455,14 +457,15 @@ class Room(
         // Still connected another way (the app's player while its page is frozen): still here.
         if (member.online) return@withLock
         member.listening = false
+        member.speakers = emptyList()
         member.offlineSince = clock()
         emit(Event.ParticipantUpdated(member.toParticipant()))
         pauseWhenNobodyHears(GONE_PAUSE_MS)
         updateSkipVotes()
     }
 
-    /** Something plays the room's music: a device with "Play here" on, or a speaker or TV. */
-    private fun heard() = members.values.any { it.online && it.listening } || activeOutputs.isNotEmpty()
+    /** Something plays the room's music: a device with "Play here" on, speakers near someone's phone, or a speaker or TV. */
+    private fun heard() = members.values.any { it.online && (it.listening || it.speakers.isNotEmpty()) } || activeOutputs.isNotEmpty()
 
     /**
      * The last device or speaker playing the music went: the music pauses after [afterMs] (0
@@ -626,7 +629,7 @@ class Room(
     }
 
     /** Called by an output driver with the volume the device actually has. */
-    suspend fun reportOutputVolume(outputId: String, volume: Double) = mutex.withLock {
+    override suspend fun reportOutputVolume(outputId: String, volume: Double): Unit = mutex.withLock {
         if (outputId in activeOutputs && activeOutputs[outputId] != volume) {
             activeOutputs[outputId] = volume
             emit(Event.OutputsChanged(outputInfos()))
@@ -637,7 +640,7 @@ class Room(
      * A speaker or TV started playing something else (another app, like Spotify, took it):
      * the room lets go of it instead of taking it back at the next song.
      */
-    suspend fun outputTakenOver(outputId: String) = mutex.withLock {
+    override suspend fun outputTakenOver(outputId: String): Unit = mutex.withLock {
         if (outputId !in activeOutputs) return@withLock
         activeOutputs.remove(outputId)
         dropScreenOutput(outputId)
@@ -649,14 +652,14 @@ class Room(
     }
 
     /** Tells everyone in the room about a problem, e.g. a speaker that couldn't play a song. */
-    suspend fun notice(message: String) = mutex.withLock { emit(Event.Notice(message)) }
+    override suspend fun notice(message: String): Unit = mutex.withLock { emit(Event.Notice(message)) }
 
     /** [listener] is called (on any thread, without waiting) after every change. Read [view] to see what changed. */
-    fun addChangeListener(listener: () -> Unit) {
+    override fun addChangeListener(listener: () -> Unit) {
         changeListeners += listener
     }
 
-    suspend fun view(): RoomView = mutex.withLock {
+    override suspend fun view(): RoomView = mutex.withLock {
         RoomView(
             current = current.takeIf { streamUrl != null },
             streamUrl = streamUrl,
@@ -682,7 +685,7 @@ class Room(
      * if [fromItemId] is still the current song, so a skip isn't done twice. A speaker moving
      * on at the very end of a song counts as the song having played.
      */
-    suspend fun outputSkipped(fromItemId: String, forward: Boolean) = mutex.withLock {
+    override suspend fun outputSkipped(fromItemId: String, forward: Boolean): Unit = mutex.withLock {
         val item = current ?: return@withLock
         if (item.itemId != fromItemId) return@withLock
         if (forward) {
@@ -861,6 +864,15 @@ class Room(
                 member.listening = command.on
                 emit(Event.ParticipantUpdated(member.toParticipant()))
                 if (command.on) emptyJob?.cancel() else pauseWhenNobodyHears(0)
+            }
+            is Command.SetSpeakers -> {
+                val names = command.names.map { it.trim().take(MAX_NAME_LENGTH) }.filter { it.isNotEmpty() }.distinct()
+                if (names.isNotEmpty()) need(member, Permission.LISTEN_LOCALLY)?.let { return it }
+                if (names.size > MAX_SPEAKERS) return invalid("Too many speakers")
+                if (names == member.speakers) return null
+                member.speakers = names
+                emit(Event.ParticipantUpdated(member.toParticipant()))
+                if (names.isNotEmpty()) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
             is Command.SetOutput -> {
                 need(member, Permission.CHANGE_OUTPUTS)?.let { return it }
@@ -1857,6 +1869,8 @@ class Room(
         const val MAX_MIGRANTS = 200
         /** Party screens one room can have. */
         const val MAX_SCREENS = 5
+        /** Speakers one person plays the room on near their phone ([Command.SetSpeakers]). */
+        const val MAX_SPEAKERS = 10
         const val SCREEN_NAME = "Party screen"
         /** A radio someone brings ([Command.StartRadio.songs]) keeps at most this many songs. */
         const val MAX_BROUGHT_RADIO = 100

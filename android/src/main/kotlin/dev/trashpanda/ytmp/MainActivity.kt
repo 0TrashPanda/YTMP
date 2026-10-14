@@ -35,6 +35,8 @@ import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.host.NearbyRoom
 import dev.trashpanda.ytmp.host.ShownScreen
+import dev.trashpanda.ytmp.host.NearbyPlaying
+import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.core.OutputDevice
 import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
@@ -181,8 +183,18 @@ class MainActivity : ComponentActivity() {
             }
         }
         castUpdates = lifecycleScope.launch {
-            castState().collect { state ->
-                js("window.__ytmpNative && window.__ytmpNative.onCastScreens && window.__ytmpNative.onCastScreens(${json.encodeToString(CastScreenState.serializer(), state)})")
+            launch {
+                castState().collect { state ->
+                    js("window.__ytmpNative && window.__ytmpNative.onCastScreens && window.__ytmpNative.onCastScreens(${json.encodeToString(CastScreenState.serializer(), state)})")
+                }
+            }
+            launch {
+                nearbyState().collect { state ->
+                    js("window.__ytmpNative && window.__ytmpNative.onNearby && window.__ytmpNative.onNearby(${json.encodeToString(NearbyState.serializer(), state)})")
+                }
+            }
+            app.host.nearby.notices.collect { text ->
+                js("window.__ytmpNative && window.__ytmpNative.onNearbyNotice && window.__ytmpNative.onNearbyNotice(${JSONObject.quote(text)})")
             }
         }
         // Binding a controller starts the playback service, so it can go to the foreground when playing.
@@ -240,6 +252,18 @@ class MainActivity : ComponentActivity() {
 
     private fun castState(devices: List<OutputDevice>, shown: List<ShownScreen>) =
         CastScreenState(devices.map { CastScreenDevice(it.id, it.name) }, shown)
+
+    /** The speakers and TVs this phone found, the party screens it shows, and what plays on them (bridge `nearby`). */
+    private fun nearbyState() = combine(app.host.casts.devices, app.host.sonos.devices, app.host.castScreens.shown, app.host.nearby.playing, ::NearbyState)
+
+    private fun nearbyDevices(): List<OutputDevice> = app.host.casts.devices.value + app.host.sonos.devices.value
+
+    /** [url] is on the site of the page shown now (one of the app's pages): only that page may use it. */
+    private fun fromThisPage(url: String): Boolean {
+        val from = currentUrl ?: return false
+        val page = Uri.parse(url)
+        return isAppPage(from) && page.scheme == from.scheme && page.host == from.host && page.port == from.port
+    }
 
     private fun isServerUrl(uri: Uri): Boolean {
         val server = server?.let(Uri::parse) ?: return false
@@ -469,10 +493,7 @@ class MainActivity : ComponentActivity() {
          */
         @JavascriptInterface
         fun showCastScreen(deviceId: String, url: String) {
-            val from = currentUrl
-            val page = Uri.parse(url)
-            val sameSite = from != null && isAppPage(from) && page.scheme == from.scheme && page.host == from.host && page.port == from.port
-            if (!sameSite || !ShownScreen.CAST_PAGE.matches(url)) {
+            if (!fromThisPage(url) || !ShownScreen.CAST_PAGE.matches(url)) {
                 js("window.__ytmpNative && window.__ytmpNative.onCastScreenShown && window.__ytmpNative.onCastScreenShown(${JSONObject.quote(deviceId)}, \"Not from this page\")")
                 return
             }
@@ -496,6 +517,42 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch { app.host.castScreens.stop(deviceId) }
         }
 
+        /**
+         * The Sonos speakers and Chromecasts on this phone's network, the party screens shown
+         * there, and the room playing on them (bridge version 8), as JSON [NearbyState].
+         * Changes come as `onNearby`, problems as `onNearbyNotice(text)`.
+         */
+        @JavascriptInterface
+        fun nearby(): String = json.encodeToString(
+            NearbyState.serializer(),
+            NearbyState(app.host.casts.devices.value, app.host.sonos.devices.value, app.host.castScreens.shown.value, app.host.nearby.playing.value),
+        )
+
+        /**
+         * Plays the page's room on the speaker [deviceId] near this phone (bridge version 8):
+         * [roomJson] is a [RoomLink] to the page's own host, with the page's guest token. The
+         * app follows the room itself and serves the speaker the audio.
+         */
+        @JavascriptInterface
+        fun playNearby(deviceId: String, roomJson: String) {
+            val link = runCatching { json.decodeFromString(RoomLink.serializer(), roomJson) }.getOrNull() ?: return
+            if (!fromThisPage(link.hostUrl)) return
+            val device = nearbyDevices().firstOrNull { it.id == deviceId } ?: return
+            app.host.nearby.turnOn(link.code, deviceId, device.name) { FollowerSource(link) }
+        }
+
+        /** Stops playing on the speaker [deviceId] (bridge version 8). */
+        @JavascriptInterface
+        fun stopNearby(deviceId: String) {
+            if (currentUrl?.let(::isAppPage) == true) app.host.nearby.turnOff(deviceId)
+        }
+
+        /** The volume (0–1) of the speaker [deviceId] that plays the room (bridge version 8). */
+        @JavascriptInterface
+        fun setNearbyVolume(deviceId: String, volume: Double) {
+            if (currentUrl?.let(::isAppPage) == true) app.host.nearby.setVolume(deviceId, volume)
+        }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -514,7 +571,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 7
+        const val BRIDGE_VERSION = 8
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }
@@ -525,3 +582,13 @@ private data class CastScreenState(val devices: List<CastScreenDevice>, val show
 
 @Serializable
 private data class CastScreenDevice(val id: String, val name: String)
+
+/** For the page (bridge `nearby`): the speakers and TVs this phone found, and what it does with them. */
+@Serializable
+private data class NearbyState(val devices: List<NearbyDevice>, val shown: List<ShownScreen>, val playing: NearbyPlaying?) {
+    constructor(casts: List<OutputDevice>, sonos: List<OutputDevice>, shown: List<ShownScreen>, playing: NearbyPlaying?) :
+        this((casts + sonos).map { NearbyDevice(it.id, it.name, it.kind) }, shown, playing)
+}
+
+@Serializable
+private data class NearbyDevice(val id: String, val name: String, val kind: OutputKind)

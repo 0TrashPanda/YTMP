@@ -1,7 +1,7 @@
 package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.core.OutputDevice
-import dev.trashpanda.ytmp.core.Room
+import dev.trashpanda.ytmp.core.OutputRoom
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.RoomView
 import dev.trashpanda.ytmp.protocol.OutputKind
@@ -88,7 +88,13 @@ class SonosOutputs(
         }
     }
 
-    private suspend fun drive(room: Room) {
+    /**
+     * Plays a room on these devices (the ones in its [RoomView.activeOutputs]) until the job is
+     * cancelled: a room on another host that this phone plays on speakers near it.
+     */
+    fun play(room: OutputRoom): Job = scope.launch { drive(room) }
+
+    private suspend fun drive(room: OutputRoom) {
         val changed = Channel<Unit>(Channel.CONFLATED)
         room.addChangeListener { changed.trySend(Unit) }
         val sessions = HashMap<String, Session>()

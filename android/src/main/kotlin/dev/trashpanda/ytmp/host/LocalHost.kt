@@ -69,6 +69,8 @@ class LocalHost(private val context: Context) {
     /** Sonos speakers on the network; they fetch the audio from this phone too. */
     val sonos = SonosOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
     val sonosFinder = SonosFinder(context, sonos)
+    /** Speakers here that play a room on another host (a server), which can't reach them. */
+    val nearby = NearbySpeakers(scope, casts, sonos)
     private val outputs = combine(casts.devices, sonos.devices) { a, b -> a + b }.stateIn(scope, SharingStarted.Eagerly, emptyList())
     val authLink = AuthLink(context, PORT)
     /** The phone owner's YouTube Music account. */

@@ -225,6 +225,11 @@ export interface CommandSetRepeat {
   mode: RepeatMode;
 }
 
+export interface CommandSetSpeakers {
+  kind: "SetSpeakers";
+  names: string[];
+}
+
 export type RoomVisibility = "public" | "private";
 
 export interface CommandSetVisibility {
@@ -315,6 +320,7 @@ export type Command =
   | CommandSetParticipantPermissions
   | CommandSetPassword
   | CommandSetRepeat
+  | CommandSetSpeakers
   | CommandSetVisibility
   | CommandShuffleQueue
   | CommandSkip
@@ -459,6 +465,7 @@ export interface Participant {
   deny: Permission[];
   tag: string;
   screen: boolean;
+  speakers: string[];
 }
 
 export interface EventParticipantJoined {
