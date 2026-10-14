@@ -36,12 +36,21 @@
 	let error = $state<string | null>(null);
 	let showDescription = $state(false);
 
+	// Liked music (on Home, in Listen again) is always yours: only your sign-in can open it.
+	const mine = $derived(personal || (id === 'LM' && !!youtube.account));
+
 	let version = $state(0);
 	$effect(() => {
 		const playlistId = id;
+		const own = mine;
 		void version;
 		error = null;
-		getPlaylist(playlistId, personal)
+		getPlaylist(playlistId, own)
+			// One of your private playlists (on Home or in search): through your sign-in.
+			.catch((e) => {
+				if (own || !youtube.account) throw e;
+				return getPlaylist(playlistId, true).catch(() => Promise.reject(e));
+			})
 			.then((p) => playlistId === id && (playlist = p))
 			.catch((e) => (error = e instanceof Error ? e.message : "Couldn't load the playlist"));
 	});
@@ -53,7 +62,7 @@
 	const reload = () => version++;
 
 	// Your own playlists: move songs, rename, delete. Liked music: remove (unlike).
-	const likedMusic = $derived(personal && id === 'LM');
+	const likedMusic = $derived(mine && id === 'LM');
 	// From your server in a room on another host, playlists can't be changed (only there).
 	const editable = $derived(!!playlist?.owned && !youtube.from);
 	let menuOpen = $state(false);

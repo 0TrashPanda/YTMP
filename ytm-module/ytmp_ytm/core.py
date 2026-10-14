@@ -301,7 +301,9 @@ class YtmCore:
         try:
             p = ytm.get_playlist(playlist_id, limit=None if personal else _PLAYLIST_SONGS)
         except Exception as e:
-            raise NotFound(str(e)) from e
+            # ytmusicapi's message is about YouTube's page layout: keep it for the log only.
+            log.info("playlist %s: %s", playlist_id, e)
+            raise NotFound("Couldn't find this playlist (it may be private)") from e
         author = p.get("author")
         tracks = [(t, s) for t in p.get("tracks") or [] if (s := _song_from_search(t))]
         owned = bool(personal and p.get("owned"))

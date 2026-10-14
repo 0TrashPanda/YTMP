@@ -305,6 +305,20 @@ def test_own_playlists_come_with_their_items(monkeypatch):
     assert [s["id"] for s in page["songs"]] == ["ytm:aaaaaaaaaaa", "ytm:bbbbbbbbbbb"]
 
 
+def test_a_playlist_youtube_wont_show_says_so_plainly():
+    import pytest
+
+    class _SignedOut:
+        def get_playlist(self, playlist_id, limit=None):
+            # What ytmusicapi raises for Liked music without a sign-in.
+            raise KeyError("Unable to find 'twoColumnBrowseResultsRenderer' using path [...]")
+
+    ytm = core.YtmCore.__new__(core.YtmCore)
+    ytm._ytm = _SignedOut()
+    with pytest.raises(core.NotFound, match=r"^Couldn't find this playlist"):
+        ytm.playlist("LM")
+
+
 def test_editing_an_own_playlist(monkeypatch):
     ytm, user = _signed_in_core(monkeypatch)
     ytm.remove_from_playlist("PLmine", [{"songId": "ytm:aaaaaaaaaaa", "itemId": "S1"}])
