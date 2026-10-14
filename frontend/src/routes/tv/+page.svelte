@@ -51,7 +51,7 @@
 		room = new RoomConnection(code, 'Party screen');
 		if (cast) {
 			room.guestToken = decodeURIComponent(cast[2]);
-			player = createPlayer(room);
+			player = createPlayer(room, { loose: true });
 		}
 		room.connect();
 	}

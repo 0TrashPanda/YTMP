@@ -93,7 +93,12 @@ URL in a frame, as Home Assistant's pychromecast does (`CastWebPage` in cast/).
 - What the page tells the host's log (nobody can open a console on a TV): whether it may
   start sound by itself, whole page or framed, the browser; joining the room; the first
   sound of each song; 15 s of silence while the room plays (with the player's state); a tap;
-  and a crash of any page of the web app (`hooks.client.ts`). DashCast's steps are logged
+  a jump to stay in sync; a sum of its buffering pauses every 30 s; and a crash of any page of
+  the web app (`hooks.client.ts`).
+- In sync loosely, like a Cast device the host drives: no speed changes, a jump only when
+  more than 1 s off, then 8 s to settle (`looseCorrection` in `sync.ts`). A tester heard a
+  stutter every 2 s with the phone's close sync (speed changes and jumps make a Chromecast
+  buffer). DashCast's steps are logged
   by `CastWebPage`, a TV loading `/tv` and failed requests by the host.
 
 ### Speakers near the phone, in a room on another host ✅

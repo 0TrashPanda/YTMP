@@ -17,6 +17,14 @@ export const CORRECTION_RATE = 0.03;
  */
 export const ALONE_TOLERANCE_MS = 1500;
 
+/**
+ * A Chromecast showing the party screen: like a Cast device the host drives, it can't be synced
+ * closely, and every jump makes it buffer. Only fix clearly audible drift, by jumping, and then
+ * let it settle before looking again.
+ */
+export const LOOSE_TOLERANCE_MS = 1000;
+export const LOOSE_SETTLE_MS = 8000;
+
 export interface Correction {
 	seek: boolean;
 	rate: number;
@@ -38,6 +46,11 @@ export function correction(driftMs: number, currentRate: number, alone = false):
 		return { seek: false, rate: size < STOP_CORRECTING_MS || currentRate !== correctingRate ? 1 : currentRate };
 	}
 	return { seek: false, rate: size > START_CORRECTING_MS ? correctingRate : 1 };
+}
+
+/** [correction] for a Chromecast ([LOOSE_TOLERANCE_MS]); [settling]: it jumped a moment ago. */
+export function looseCorrection(driftMs: number, settling: boolean): Correction {
+	return { seek: !settling && Math.abs(driftMs) > LOOSE_TOLERANCE_MS, rate: 1 };
 }
 
 /**

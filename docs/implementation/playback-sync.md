@@ -102,6 +102,8 @@ Implemented (A + B), and tested on a Pixel 7:
     none after a pause and resume. See `android/.../SyncCorrection.kt`.
 - **Browser and Android:** play 3% faster or slower (pitch kept) when more than 40 ms off, back
   to normal below 10 ms, seek above 400 ms. Listening alone, only more than 1.5 s is fixed.
+  The party screen on a Chromecast syncs loosely instead (`looseCorrection`): no speed
+  changes, a jump only beyond 1 s, then 8 s to settle, since every jump makes it buffer.
   See `frontend/src/lib/sync.ts`.
 - **Both:** add the device's **sync adjustment** (per device, ±500 ms) for speaker and
   Bluetooth delay, which no player can see.

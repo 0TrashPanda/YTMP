@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.cast.CastWebPage
 import dev.trashpanda.ytmp.protocol.ScreenUnlinkRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
@@ -40,27 +42,32 @@ class CastScreens(
     /** What the TVs show now. */
     val shown: StateFlow<List<ShownScreen>> = _shown
 
-    /** Shows [url] (a room's `/tv#cast=…` page) on the device [deviceId], instead of what it showed. */
-    suspend fun show(deviceId: String, url: String) = lock.withLock {
-        val device = devices.address(deviceId) ?: throw IllegalArgumentException("That TV isn't on this network any more")
-        sessions[deviceId]?.let { end(it, stopApp = false) }
-        val channel = CastChannel.open(device.host, device.port)
-        try {
-            CastWebPage(channel).show(url)
-        } catch (e: Exception) {
-            channel.close()
-            throw e
+    /**
+     * Shows [url] (a room's `/tv#cast=…` page) on the device [deviceId], instead of what it
+     * showed. Off the caller's thread: Android doesn't allow network on its main thread.
+     */
+    suspend fun show(deviceId: String, url: String): Unit = withContext(Dispatchers.IO) {
+        lock.withLock {
+            val device = devices.address(deviceId) ?: throw IllegalArgumentException("That TV isn't on this network any more")
+            sessions[deviceId]?.let { end(it, stopApp = false) }
+            val channel = CastChannel.open(device.host, device.port)
+            try {
+                CastWebPage(channel).show(url)
+            } catch (e: Exception) {
+                channel.close()
+                throw e
+            }
+            val screen = ShownScreen(deviceId, device.name, url)
+            val watcher = scope.launch { watch(screen, channel) }
+            sessions[deviceId] = Session(screen, channel, watcher)
+            publish()
+            log.info("Showing a party screen on {}", device.name)
         }
-        val screen = ShownScreen(deviceId, device.name, url)
-        val watcher = scope.launch { watch(screen, channel) }
-        sessions[deviceId] = Session(screen, channel, watcher)
-        publish()
-        log.info("Showing a party screen on {}", device.name)
     }
 
     /** Stops the party screen on [deviceId] (DashCast closes there). */
-    suspend fun stop(deviceId: String) = lock.withLock {
-        sessions[deviceId]?.let { end(it, stopApp = true) }
+    suspend fun stop(deviceId: String): Unit = withContext(Dispatchers.IO) {
+        lock.withLock { sessions[deviceId]?.let { end(it, stopApp = true) } }
     }
 
     /** Checks every while that DashCast still runs there; when it doesn't, the screen ended. */

@@ -5,7 +5,7 @@ import { forgetOwnStream, isYoutubeSong, ownStreamUrl, prefetchOwnStream } from 
 import type { NowPlaying } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 import { saved } from './storage';
-import { correction, targetPosition } from './sync';
+import { correction, looseCorrection, LOOSE_SETTLE_MS, targetPosition } from './sync';
 
 /** Plays the room's audio on this device. */
 export interface RoomPlayer {
@@ -33,14 +33,17 @@ export interface RoomPlayer {
 
 /** Buffering this long (ms) is reported to the host. */
 const LONG_BUFFERING_MS = 3000;
+/** How often a Chromecast sums up its short buffering pauses for the host's log. */
+const STALL_REPORT_MS = 30_000;
 const MEDIA_ERRORS: Record<number, string> = { 1: 'aborted', 2: 'network error', 3: 'decode error', 4: 'not supported (link refused?)' };
 
 /** Where the audio comes from: the room's link, a link from your own module, or the host streaming it. */
 type Source = 'direct' | 'own' | 'host';
 const SOURCE_NAMES: Record<Source, string> = { direct: 'the direct link', own: 'your own module', host: 'through the host' };
 
-export function createPlayer(room: RoomConnection): RoomPlayer {
-	return nativeBridge ? new NativePlayer(room, nativeBridge) : new WebPlayer(room);
+/** [loose]: on a Chromecast, which can't be synced closely (see [looseCorrection]). */
+export function createPlayer(room: RoomConnection, options: { loose?: boolean } = {}): RoomPlayer {
+	return nativeBridge ? new NativePlayer(room, nativeBridge) : new WebPlayer(room, options.loose ?? false);
 }
 
 /**
@@ -73,7 +76,13 @@ class WebPlayer implements RoomPlayer {
 	/** When the current wait for data started (performance.now()), to report long buffering. */
 	private waitingSince: number | null = null;
 
-	constructor(private readonly room: RoomConnection) {
+	/** Loose sync only: no jump before this (performance.now()). */
+	private settledAt = 0;
+
+	constructor(
+		private readonly room: RoomConnection,
+		private readonly loose = false
+	) {
 		this.audio.preload = 'auto';
 		this.audio.volume = this.volume;
 		this.audio.addEventListener('waiting', () => {
@@ -140,6 +149,7 @@ class WebPlayer implements RoomPlayer {
 	/** Brings the audio element in line with the room. Called on every state change and every second. */
 	sync(): void {
 		if (!this.enabled) return;
+		if (this.loose) this.reportStalls();
 		const state = this.room.state;
 		const now = state?.nowPlaying;
 		if (!state || !now || !now.streamUrl) {
@@ -167,8 +177,20 @@ class WebPlayer implements RoomPlayer {
 			return;
 		}
 
-		const fix = correction(this.audio.currentTime * 1000 - expectedMs, this.audio.playbackRate, this.room.listeningAlone);
-		if (fix.seek) this.audio.currentTime = expectedMs / 1000;
+		const drift = this.audio.currentTime * 1000 - expectedMs;
+		const fix = this.loose
+			? looseCorrection(drift, performance.now() < this.settledAt)
+			: correction(drift, this.audio.playbackRate, this.room.listeningAlone);
+		if (fix.seek) {
+			const wasPlaying = !this.audio.paused;
+			this.audio.currentTime = expectedMs / 1000;
+			if (this.loose) {
+				this.settledAt = performance.now() + LOOSE_SETTLE_MS;
+				// A jump on a Chromecast is audible (it buffers): the host's log hears about each one
+				// (not the one into a song that starts).
+				if (wasPlaying) reportProblem(`browser jumped ${Math.round(drift)} ms to stay in sync in ${this.room.state?.nowPlaying?.item.song.id} (${SOURCE_NAMES[this.source]})`, this.room.roomCode);
+			}
+		}
 		if (this.audio.playbackRate !== fix.rate) this.audio.playbackRate = fix.rate;
 		if (this.audio.paused) {
 			this.audio.play().catch((e: unknown) => {
@@ -256,11 +278,28 @@ class WebPlayer implements RoomPlayer {
 	}
 
 	/** Buffering long enough to hear goes to the host's log, to find out where streams get slow. */
+	/** Loose sync only (a Chromecast): every buffering pause, summed up for the host's log now and then. */
+	private stalls = { count: 0, ms: 0, since: performance.now() };
+
+	private reportStalls(): void {
+		const s = this.stalls;
+		if (s.count === 0 || performance.now() - s.since < STALL_REPORT_MS) return;
+		reportProblem(
+			`browser buffered ${s.count} times (${(s.ms / 1000).toFixed(1)} s) in the last ${Math.round((performance.now() - s.since) / 1000)} s, from ${SOURCE_NAMES[this.source]}`,
+			this.room.roomCode
+		);
+		this.stalls = { count: 0, ms: 0, since: performance.now() };
+	}
+
 	private reportBuffering(): void {
 		const since = this.waitingSince;
 		this.waitingSince = null;
 		if (since === null || !this.enabled) return;
 		const ms = performance.now() - since;
+		if (this.loose) {
+			this.stalls.count++;
+			this.stalls.ms += ms;
+		}
 		const song = this.room.state?.nowPlaying?.item.song;
 		if (ms < LONG_BUFFERING_MS || !song) return;
 		reportProblem(
