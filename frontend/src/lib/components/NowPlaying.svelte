@@ -6,6 +6,7 @@
 	import { fly } from 'svelte/transition';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { prefetch } from '../api';
+	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { PageHandlers } from '../cards';
@@ -60,11 +61,20 @@
 	const wide = new MediaQuery('min-width: 1024px');
 	type Tab = 'queue' | 'lyrics' | 'related';
 	let tab = $state<Tab>('queue');
-	const TABS: [Tab, string][] = [
-		['queue', 'Up next'],
-		['lyrics', 'Lyrics'],
-		['related', 'Related']
-	];
+	// Up next first like YTM, or swapped with Related (a setting).
+	const TABS = $derived<[Tab, string][]>(
+		images.tabOrder === 'related'
+			? [
+					['related', 'Related'],
+					['lyrics', 'Lyrics'],
+					['queue', 'Up next']
+				]
+			: [
+					['queue', 'Up next'],
+					['lyrics', 'Lyrics'],
+					['related', 'Related']
+				]
+	);
 
 	// Karaoke mode (a room setting): the lyrics take the album art's place, large.
 	const karaoke = $derived(!!room.state?.settings.karaoke);
@@ -406,7 +416,9 @@
 			if (dy > 30 && dy > Math.abs(e.touches[0].clientX - tabsSwipe.x)) {
 				// The tab under the finger.
 				const label = (document.elementFromPoint(tabsSwipe.x, tabsSwipe.y) as HTMLElement | null)?.closest('[role=tab]');
-				const pick = TABS.find(([, name]) => name.toLowerCase() === label?.textContent?.trim().toLowerCase())?.[0] ?? 'queue';
+				// Or always Up next (a setting).
+				const pick =
+					images.swipeOpens === 'upnext' ? 'queue' : (TABS.find(([, name]) => name.toLowerCase() === label?.textContent?.trim().toLowerCase())?.[0] ?? 'queue');
 				tabsSwipe = null;
 				tab = pick;
 				sheet = true;

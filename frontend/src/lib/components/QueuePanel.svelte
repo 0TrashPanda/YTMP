@@ -44,13 +44,16 @@
 		return out;
 	});
 
-	// Keep the current song in view, with the history above it (like YTM).
+	// Keep the current song in view, with the history above it (like YTM): there right away
+	// when the list opens, gliding along when the song changes.
+	let placed = false;
 	$effect(() => {
 		roomState?.nowPlaying?.item.itemId;
 		tick().then(() => {
 			if (!list || list.scrollHeight <= list.clientHeight) return;
 			const current = list.querySelector<HTMLElement>('[data-current]');
-			if (current) list.scrollTo({ top: current.offsetTop - list.clientHeight / 2, behavior: 'smooth' });
+			if (current) list.scrollTo({ top: current.offsetTop - list.clientHeight / 2, behavior: placed ? 'smooth' : 'instant' });
+			placed = true;
 		});
 	});
 

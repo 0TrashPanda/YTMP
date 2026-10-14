@@ -34,6 +34,10 @@ export type BackLimit = 'home' | 'rooms';
 export type HeadphonesAction = 'pause' | 'stop' | 'keep';
 /** How the dislike button in the player bar looks. */
 export type DislikeButton = 'normal' | 'dim' | 'hidden';
+/** Swiping up on the full player's tabs opens the tab under the finger, or always Up next. */
+export type SwipeOpens = 'tab' | 'upnext';
+/** Which comes first in the full player's tabs: Up next (like YTM) or Related. */
+export type TabOrder = 'upnext' | 'related';
 export type ImageQuality = 'high' | 'low';
 export type VideoArt = 'crop' | 'fit';
 /** A YouTube Music module on this computer, to get stream links from your own internet connection. */
@@ -139,6 +143,18 @@ export const saved = {
 	},
 	set dislikeButton(look: DislikeButton) {
 		write('ytmp.dislikeButton', look);
+	},
+	get swipeOpens(): SwipeOpens {
+		return pick('ytmp.swipeOpens', ['tab', 'upnext'], 'tab');
+	},
+	set swipeOpens(value: SwipeOpens) {
+		write('ytmp.swipeOpens', value);
+	},
+	get tabOrder(): TabOrder {
+		return pick('ytmp.tabOrder', ['upnext', 'related'], 'upnext');
+	},
+	set tabOrder(value: TabOrder) {
+		write('ytmp.tabOrder', value);
 	},
 	/** Sharp pictures, or small ones to save data (see images.svelte.ts). */
 	get imageQuality(): ImageQuality {

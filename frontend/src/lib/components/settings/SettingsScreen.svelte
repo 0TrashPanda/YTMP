@@ -8,10 +8,10 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { authServer } from '../../account';
 	import { getHost } from '../../api';
-	import { images, setDislikeButton, setImageQuality, setVideoArt } from '../../images.svelte';
+	import { images, setDislikeButton, setImageQuality, setSwipeOpens, setTabOrder, setVideoArt } from '../../images.svelte';
 	import { nativeBridge } from '../../native';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
-	import { saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type VideoArt } from '../../storage';
+	import { saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type VideoArt } from '../../storage';
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
 	import AccountSection from './AccountSection.svelte';
@@ -212,6 +212,26 @@
 					] as [DislikeButton, string][]}
 					value={images.dislikeButton}
 					onchange={setDislikeButton}
+				/>
+				<Choice
+					label="Swiping up on the player's tabs"
+					hint="On a phone, swiping up on Up next, Lyrics or Related at the bottom of the player opens that tab, or always Up next."
+					options={[
+						['tab', 'That tab'],
+						['upnext', 'Always Up next']
+					] as [SwipeOpens, string][]}
+					value={images.swipeOpens}
+					onchange={setSwipeOpens}
+				/>
+				<Choice
+					label="Order of the player's tabs"
+					hint="Up next first, like YouTube Music, or Related first (they swap places)."
+					options={[
+						['upnext', 'Up next first'],
+						['related', 'Related first']
+					] as [TabOrder, string][]}
+					value={images.tabOrder}
+					onchange={setTabOrder}
 				/>
 				<p class="text-xs text-muted">Saved on this {inApp ? 'phone' : 'device'}.</p>
 			{:else if section === 'app' && nativeBridge?.appVersion}

@@ -74,6 +74,12 @@ Like YTM:
   pictures, to save data.
 - **Dislike button in the player bar** ✅ (Settings → Look, per device): Normal, Dimmed
   (darker until you point at it) or Hidden.
+- **Swiping up on the player's tabs** ✅ (Settings → Look, per device): opens **that tab**
+  (default) or **always Up next**, wherever on the tabs you swipe.
+- **Order of the player's tabs** ✅ (Settings → Look, per device): **Up next first** (default,
+  like YTM: Up next · Lyrics · Related) or **Related first** (Related · Lyrics · Up next).
+- **Up next opens at the current song** ✅, right away (no scrolling down to it); when the
+  song changes while it's open, it glides along.
 - **Video pictures** ✅ (Settings → Look, per device): songs from a music video only have a
   wide picture. **Crop** (default, like YTM) fills the square; **Fit** shows all of it, with
   bars above and below.
