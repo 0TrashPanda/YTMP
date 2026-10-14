@@ -85,6 +85,12 @@
 		const me = room.me;
 		reportProblem(`party screen on a Chromecast: ${status}${me ? ` as ${me.name}, may play: ${room.can('listen_locally')}` : ''}`, room.roomCode);
 	});
+	function tapToPlay() {
+		if (!player || !room) return;
+		reportProblem('party screen on a Chromecast: tapped to start the sound', room.roomCode);
+		player.enable().catch(() => {});
+	}
+
 	let silentSince: number | null = null;
 	let soundReported: string | null = null;
 	let silenceReported: string | null = null;
@@ -178,9 +184,21 @@
 </script>
 
 <svelte:head><title>YTMP party screen</title></svelte:head>
+<!-- A display that may not start sound by itself: a tap anywhere on its screen starts it. -->
+<svelte:window onpointerdown={() => cast && player?.error?.startsWith('Tap') && tapToPlay()} />
 
 {#if room}
 	<PartyScreen {room} {host} {cast} />
+	{#if cast && player?.error?.startsWith('Tap')}
+		<!-- A display that may not start sound by itself (a Nest Hub): one tap on its screen does. -->
+		<button
+			class="fixed inset-x-0 bottom-[8vh] z-[80] mx-auto flex w-fit items-center gap-[1.5vh] rounded-full bg-white px-[4vh] py-[2vh] text-[max(18px,3.5vh)] font-bold text-black shadow-2xl"
+			onclick={tapToPlay}
+		>
+			<Icon name="play" size={36} />
+			Tap to play the music here
+		</button>
+	{/if}
 {:else}
 	<main class="flex min-h-screen flex-col items-center justify-center gap-[4vh] bg-bg px-6 text-center">
 		<div class="flex items-center gap-3 text-[max(18px,3vh)] text-muted">

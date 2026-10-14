@@ -83,8 +83,18 @@ URL in a frame, as Home Assistant's pychromecast does (`CastWebPage` in cast/).
 - Every 10 s the driver checks that DashCast still runs; another app instead means someone
   else uses the TV (the room lets go, as with music). Switching back to music only, or off,
   stops DashCast and the screen participant leaves.
-- Still to see on a real TV: that the page plays sound as the whole page, and that the TV
-  keeps DashCast running once its own page is gone.
+- Tested on real devices (from the page's own reports): an older Chromecast (Chrome 90) may
+  start sound by itself; a Nest Hub (Chrome 150) may not, so the page shows *Tap to play the
+  music here*, and a tap anywhere on its screen starts it.
+- Older Chromecasts run Chrome 90: the web app is built for it (`build.target` chrome90, the
+  few newer built-ins in `src/lib/polyfills.ts`), and Tailwind's `@layer` styles, which
+  Chrome before 99 ignores, are repeated without layers for browsers older than Chrome 111
+  (`frontend/legacy-css.ts`).
+- What the page tells the host's log (nobody can open a console on a TV): whether it may
+  start sound by itself, whole page or framed, the browser; joining the room; the first
+  sound of each song; 15 s of silence while the room plays (with the player's state); a tap;
+  and a crash of any page of the web app (`hooks.client.ts`). DashCast's steps are logged
+  by `CastWebPage`, a TV loading `/tv` and failed requests by the host.
 
 ### Speakers near the phone, in a room on another host ✅
 

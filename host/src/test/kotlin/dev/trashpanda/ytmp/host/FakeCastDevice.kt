@@ -30,6 +30,9 @@ class FakeCastDevice : AutoCloseable {
     /** Another app (Spotify, YouTube, …) runs instead of the media player. */
     @Volatile private var otherApp: String? = null
 
+    /** Like a Nest Hub: a launch is answered with LAUNCH_STATUS, and the app runs a moment later. */
+    @Volatile var launchSlowly = false
+
     /** DashCast runs (instead of the media player), and the page it was asked to show. */
     @Volatile var dashCastRunning = false
     @Volatile var dashCastUrl: String? = null
@@ -171,10 +174,19 @@ class FakeCastDevice : AutoCloseable {
                     "LAUNCH" -> {
                         // One app at a time.
                         val dashCast = request["appId"]?.jsonPrimitive?.content == "84912283"
-                        appRunning = !dashCast
-                        dashCastRunning = dashCast
-                        if (!dashCast) dashCastUrl = null
-                        otherApp = null
+                        val start = {
+                            appRunning = !dashCast
+                            dashCastRunning = dashCast
+                            if (!dashCast) dashCastUrl = null
+                            otherApp = null
+                        }
+                        if (launchSlowly) {
+                            appRunning = false
+                            dashCastRunning = false
+                            thread { Thread.sleep(1_200); start() }
+                            return """{"type":"LAUNCH_STATUS","requestId":$id,"status":"USER_ALLOWED"}"""
+                        }
+                        start()
                     }
                     "STOP" -> if (request["sessionId"]?.jsonPrimitive?.content == "s-3") dashCastRunning = false else appRunning = false
                     "SET_VOLUME" -> request["volume"]!!.jsonObject["level"]!!.jsonPrimitive.doubleOrNull?.let { volume = it }

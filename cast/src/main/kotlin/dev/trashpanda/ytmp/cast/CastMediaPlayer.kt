@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -82,7 +83,15 @@ class CastMediaPlayer(private val channel: CastChannel) {
         var app = runningMediaApp(status)
         if (app == null) {
             status = channel.request(NS_RECEIVER, RECEIVER, payload("LAUNCH", "appId" to JsonPrimitive(DEFAULT_MEDIA_RECEIVER)))
-            app = runningMediaApp(status) ?: error("The Cast device didn't start its media player")
+            app = runningMediaApp(status)
+            // A Nest Hub first answers LAUNCH_STATUS ("USER_ALLOWED"), and an app that runs
+            // there (DashCast) takes a moment to make way: ask again for a while.
+            var tries = 0
+            while (app == null && ++tries <= LAUNCH_TRIES) {
+                delay(LAUNCH_WAIT_MS)
+                app = runningMediaApp(channel.request(NS_RECEIVER, RECEIVER, payload("GET_STATUS")))
+            }
+            if (app == null) error("The Cast device didn't start its media player")
         }
         transportId = app
         channel.connect(app)
@@ -268,6 +277,8 @@ class CastMediaPlayer(private val channel: CastChannel) {
         JsonObject(mapOf("type" to JsonPrimitive(type)) + fields)
 
     companion object {
+        private const val LAUNCH_TRIES = 20
+        private const val LAUNCH_WAIT_MS = 500L
         /** Google's built-in media player app, available on every Cast device. */
         const val DEFAULT_MEDIA_RECEIVER = "CC1AD845"
         private const val LOAD_TIMEOUT_MS = 20_000L

@@ -82,6 +82,8 @@ class WebPlayer implements RoomPlayer {
 		});
 		this.audio.addEventListener('playing', () => {
 			this.buffering = false;
+			// It plays after all (e.g. after a tap): the "tap to allow audio" is done.
+			if (this.error?.startsWith('Tap')) this.error = null;
 			this.reportBuffering();
 		});
 		// Paused while waiting: that time isn't buffering.
@@ -100,6 +102,7 @@ class WebPlayer implements RoomPlayer {
 		this.audio.play().catch(() => {});
 		this.setMediaKeys(true);
 		this.sync();
+		clearInterval(this.timer);
 		this.timer = setInterval(() => this.sync(), 500);
 		await this.room.run({ kind: 'SetListening', on: true });
 	}

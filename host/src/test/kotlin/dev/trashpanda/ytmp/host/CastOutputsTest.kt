@@ -108,6 +108,31 @@ class CastOutputsTest {
     }
 
     @Test
+    fun `a device that starts apps slowly (a Nest Hub) still plays, and shows the party screen`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        FakeCastDevice().use { device ->
+            device.launchSlowly = true
+            val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
+            casts.add(CastDeviceAddress("cast:fake", "Nest Hub", "127.0.0.1", device.port))
+            val rooms = RoomManager({ "https://stream/$it" }, scope, outputs = casts.devices)
+            casts.attach(rooms)
+            val room = rooms.create("Party")
+            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { })!!
+            suspend fun run(command: Command) = room.handle(me, ClientMessage.CommandMessage("c", command))
+            run(Command.AddSongs(listOf(song), QueuePosition.END))
+            eventually { casts.devices.value.isNotEmpty() }
+
+            run(Command.SetOutput("cast:fake", active = true))
+            eventually { device.playerState == "PLAYING" }
+            run(Command.SetOutput("cast:fake", active = true, screen = true))
+            eventually { device.dashCastUrl != null }
+            run(Command.SetOutput("cast:fake", active = true, screen = false))
+            eventually { !device.dashCastRunning && device.playerState == "PLAYING" }
+        }
+        scope.cancel()
+    }
+
+    @Test
     fun `when another app is cast to the device, the room lets go of it`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         FakeCastDevice().use { device ->
@@ -216,7 +241,8 @@ class CastOutputsTest {
         scope.cancel()
     }
 
-    private suspend fun eventually(timeoutMs: Long = 10_000, check: suspend () -> Boolean) {
+    // Generous: with the whole build running at once, a Cast connection can take a while.
+    private suspend fun eventually(timeoutMs: Long = 20_000, check: suspend () -> Boolean) {
         withTimeout(timeoutMs) {
             while (!check()) delay(50)
         }

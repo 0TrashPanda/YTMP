@@ -1,3 +1,5 @@
+// First, before anything else runs: what older browsers (Chrome 90 on a Chromecast) lack.
+import './lib/polyfills';
 import type { HandleClientError } from '@sveltejs/kit/hooks';
 import { reportProblem } from './lib/api';
 

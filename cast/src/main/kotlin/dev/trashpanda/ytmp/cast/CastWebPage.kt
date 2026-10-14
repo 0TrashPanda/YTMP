@@ -35,7 +35,14 @@ class CastWebPage(private val channel: CastChannel) {
         }
         val launched = channel.request(NS_RECEIVER, RECEIVER, payload("LAUNCH", "appId" to JsonPrimitive(APP_ID)))
         if (launched.type != "RECEIVER_STATUS") log.info("DashCast: the device answered the launch with {}", launched)
-        var app = dashCast(status()) ?: error("The Cast device didn't start DashCast (running: ${appIds(status())})")
+        // A Nest Hub first answers LAUNCH_STATUS, and the app that ran there takes a moment to make way.
+        var found = dashCast(status())
+        var waits = 0
+        while (found == null && ++waits <= READY_TRIES) {
+            delay(READY_WAIT_MS)
+            found = dashCast(status())
+        }
+        var app = found ?: error("The Cast device didn't start DashCast (running: ${appIds(status())})")
         // A just-started app only hears messages once it has set up its namespace.
         var tries = 0
         while (NAMESPACE !in app.namespaces) {
