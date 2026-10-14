@@ -10,10 +10,11 @@
 	import { youtube } from '../youtube.svelte';
 	import type { PageHandlers } from '../cards';
 	import type { RoomPlayer } from '../player.svelte';
-	import type { Song } from '../protocol.gen';
+	import type { CommandUpdateSettings, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
+	import Lyrics from './Lyrics.svelte';
 	import NextButton from './NextButton.svelte';
 	import RepeatButton from './RepeatButton.svelte';
 	import ShuffleButton from './ShuffleButton.svelte';
@@ -57,7 +58,34 @@
 
 	/** Desktop shows the tabs next to the art, always open. */
 	const wide = new MediaQuery('min-width: 1024px');
-	let tab = $state<'queue' | 'related'>('queue');
+	type Tab = 'queue' | 'lyrics' | 'related';
+	let tab = $state<Tab>('queue');
+	const TABS: [Tab, string][] = [
+		['queue', 'Up next'],
+		['lyrics', 'Lyrics'],
+		['related', 'Related']
+	];
+
+	// Karaoke mode (a room setting): the lyrics take the album art's place, large.
+	const karaoke = $derived(!!room.state?.settings.karaoke);
+	function setKaraoke(on: boolean) {
+		const unchanged: Omit<CommandUpdateSettings, 'karaoke'> = {
+			kind: 'UpdateSettings',
+			name: null,
+			defaultGuestRole: null,
+			defaultAccountRole: null,
+			autoplay: null,
+			alwaysOn: null,
+			fairOrder: null,
+			voteSkip: null,
+			voteSkipPercent: null,
+			maxSongsPerPerson: null,
+			maxSongMinutes: null,
+			noRepeatMinutes: null,
+			startWaitSeconds: null
+		};
+		room.run({ ...unchanged, karaoke: on });
+	}
 
 	// Desktop: clicking the art plays or pauses, and shows which for a moment ([flash], a new object per click).
 	let flash = $state<{ icon: 'play' | 'pause' } | null>(null);
@@ -136,7 +164,7 @@
 		sheetSwipe = null;
 	}
 
-	function pickTab(next: 'queue' | 'related') {
+	function pickTab(next: Tab) {
 		if (sheet && tab === next) sheet = false;
 		else {
 			tab = next;
@@ -153,7 +181,7 @@
 <!-- [bottom]: the phone's tabs under the player, with more room to tap. -->
 {#snippet tabs(bottom = false)}
 	<div class="flex shrink-0 {bottom ? 'pb-2' : 'border-b border-white/10'}" role="tablist">
-		{#each [['queue', 'Up next'], ['related', 'Related']] as const as [value, label] (value)}
+		{#each TABS as [value, label] (value)}
 			<button
 				class="flex-1 {bottom ? 'py-5' : 'py-4'} text-sm font-medium tracking-wide uppercase {tab === value && (sheet || wide.current) ? 'border-b-2 border-white text-white' : 'text-muted'}"
 				role="tab"
@@ -167,6 +195,24 @@
 {#snippet tabContent()}
 	{#if tab === 'queue'}
 		<QueuePanel {room} {onMenu} title={false} />
+	{:else if tab === 'lyrics' && song}
+		<div class="flex h-full flex-col">
+			{#if room.can('change_settings')}
+				<div class="flex shrink-0 justify-end px-3 pt-3">
+					<button
+						class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium {karaoke ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20'}"
+						aria-pressed={karaoke}
+						title="Karaoke mode: the lyrics large on the party screen and in everyone's player"
+						onclick={() => setKaraoke(!karaoke)}
+					>
+						<Icon name="mic" size={18} /> Karaoke
+					</button>
+				</div>
+			{/if}
+			<div class="min-h-0 flex-1">
+				<Lyrics {room} {song} {positionMs} />
+			</div>
+		</div>
 	{:else if song}
 		<div class="h-full overflow-y-auto p-2">
 			<SearchResults {room} query="" similarTo={song} {onToast} {onMenu} />
@@ -223,7 +269,9 @@
 		>
 			<!-- Always square: as big as both the width and the height allow (desktop: no other limit, the song is in the player bar). -->
 			<div class="flex min-h-0 w-full flex-1 items-center justify-center [container-type:size]" role="presentation" oncontextmenu={onSongMenu}>
-				{#if wide.current}
+				{#if karaoke && song && !song.podcast}
+					<Lyrics {room} {song} {positionMs} large />
+				{:else if wide.current}
 					<!-- Desktop, like YTM: click the art to play or pause. -->
 					<button
 						class="relative size-[min(100cqw,100cqh)] rounded-lg disabled:cursor-default"
@@ -358,7 +406,7 @@
 			if (dy > 30 && dy > Math.abs(e.touches[0].clientX - tabsSwipe.x)) {
 				// The tab under the finger.
 				const label = (document.elementFromPoint(tabsSwipe.x, tabsSwipe.y) as HTMLElement | null)?.closest('[role=tab]');
-				const pick = label?.textContent?.trim().toLowerCase() === 'related' ? 'related' : 'queue';
+				const pick = TABS.find(([, name]) => name.toLowerCase() === label?.textContent?.trim().toLowerCase())?.[0] ?? 'queue';
 				tabsSwipe = null;
 				tab = pick;
 				sheet = true;

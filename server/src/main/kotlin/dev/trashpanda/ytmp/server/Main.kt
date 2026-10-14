@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.core.RoomTimeouts
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
+import dev.trashpanda.ytmp.host.LyricsLookup
 import dev.trashpanda.ytmp.host.SonosOutputs
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -148,6 +149,7 @@ fun main(args: Array<String>) {
             similar = cached,
             catalog = cached,
             suggestions = cached,
+            lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
             // Your account's YouTube Music, when you're logged in with an account of this server.
             // Also from the pages of rooms on other hosts, with a token just for that (see AccountApi.youtubeToken).
             personalFor = { call ->

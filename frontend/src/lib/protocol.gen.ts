@@ -290,6 +290,7 @@ export interface CommandUpdateSettings {
   maxSongMinutes: number | null;
   noRepeatMinutes: number | null;
   startWaitSeconds: number | null;
+  karaoke: boolean | null;
 }
 
 export interface CommandVoteSkip {
@@ -562,6 +563,7 @@ export interface RoomSettings {
   maxSongMinutes: number;
   noRepeatMinutes: number;
   startWaitSeconds: number;
+  karaoke: boolean;
 }
 
 export interface EventSettingsChanged {
@@ -1142,4 +1144,15 @@ export interface CreatePlaylistResponse {
 
 export interface SuggestionsResponse {
   items: string[];
+}
+
+export interface LyricLine {
+  timeMs: number;
+  text: string;
+}
+
+export interface Lyrics {
+  plain: string;
+  synced: LyricLine[] | null;
+  source: string;
 }

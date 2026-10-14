@@ -323,6 +323,7 @@ sealed interface Command {
         val noRepeatMinutes: Int? = null,
         /** 0 to [MAX_START_WAIT_SECONDS]. */
         val startWaitSeconds: Int? = null,
+        val karaoke: Boolean? = null,
     ) : Command
 }
 

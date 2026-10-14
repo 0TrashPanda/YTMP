@@ -51,6 +51,8 @@ Music, without Premium, and not tied to a single music service.
 - Search with suggestions while typing and YouTube Music's chips: songs, videos, albums,
   artists, playlists, podcasts, episodes.
 - Artist, album, playlist and podcast pages.
+- Lyrics, synced line by line (from LRCLIB or YouTube Music), and a karaoke mode that shows
+  them large on the party screen and in everyone's player.
 - Radio from a song, autoplay when the queue runs out, find similar.
 - Podcasts: exact episode lengths, resume where you stopped, back 10 s / ahead 30 s, no
   music radio after an episode.
@@ -96,7 +98,7 @@ Music, without Premium, and not tied to a single music service.
 - New podcast episodes on Home, playback speed, played marks
 - More sources: YouTube, local files, Plex / Jellyfin
 - Learning which songs go together (song graph) for better radio, and recaps
-- YTMP playlists, lyrics, explore page, sleep timer
+- YTMP playlists, explore page, sleep timer
 
 ## Platforms
 

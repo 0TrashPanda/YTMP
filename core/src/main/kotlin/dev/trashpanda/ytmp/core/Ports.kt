@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp.core
 
 import dev.trashpanda.ytmp.protocol.PlaylistItemRef
 import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.Lyrics
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.OutputKind
@@ -37,6 +38,11 @@ fun interface SongSearch {
 /** Search suggestions while typing, e.g. "daft p" -> "daft punk one more time". */
 fun interface SearchSuggestions {
     suspend fun suggestions(query: String): List<String>
+}
+
+/** A source's own lyrics for its songs (YTM's), or null when it has none. */
+fun interface LyricsSource {
+    suspend fun lyrics(song: Song): Lyrics?
 }
 
 /** Songs similar to a seed song (YTM's radio), for Start radio and the autoplay queue. */

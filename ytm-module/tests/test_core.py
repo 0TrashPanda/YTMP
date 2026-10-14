@@ -342,3 +342,37 @@ def test_dislikes(monkeypatch):
     ytm.set_rating("ytm:aaaaaaaaaaa", "dislike")
     ytm.set_rating("ytm:aaaaaaaaaaa", "none")
     assert [c[2].name for c in user.calls] == ["DISLIKE", "INDIFFERENT"]
+
+
+class _LyricsYtm:
+    """YTMusic as far as lyrics go: [timed] lyrics, untimed ones, or none."""
+
+    def __init__(self, kind):
+        self.kind = kind
+
+    def get_watch_playlist(self, videoId, limit):
+        return {"lyrics": None if self.kind == "none" else "MPLYt_x"}
+
+    def get_lyrics(self, browse_id, timestamps=False):
+        from types import SimpleNamespace as Line
+        if self.kind == "timed":
+            return {"lyrics": [Line(text="One more time", start_time=1200), Line(text="We're gonna celebrate", start_time=3400)],
+                    "source": "Source: LyricFind", "hasTimestamps": True}
+        return {"lyrics": "One more time\nWe're gonna celebrate", "source": "Source: Musixmatch", "hasTimestamps": False}
+
+
+def test_lyrics_come_synced_when_youtube_music_has_them_timed():
+    import pytest
+
+    ytm = core.YtmCore.__new__(core.YtmCore)
+    ytm._ytm = _LyricsYtm("timed")
+    assert ytm.lyrics("ytm:abcdefghijk") == {
+        "plain": "One more time\nWe're gonna celebrate",
+        "synced": [{"timeMs": 1200, "text": "One more time"}, {"timeMs": 3400, "text": "We're gonna celebrate"}],
+        "source": "YouTube Music (LyricFind)",
+    }
+    ytm._ytm = _LyricsYtm("plain")
+    assert ytm.lyrics("ytm:abcdefghijk") == {"plain": "One more time\nWe're gonna celebrate", "synced": None, "source": "YouTube Music (Musixmatch)"}
+    ytm._ytm = _LyricsYtm("none")
+    with pytest.raises(core.NotFound):
+        ytm.lyrics("ytm:abcdefghijk")

@@ -128,7 +128,7 @@ No command is needed for the proxied stream: when the direct URL fails, the clie
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `UpdateSettings` ✅ (name, default roles, autoplay, always on, how long a new song waits for the players (`startWaitSeconds`, 0–10), fair order, vote to skip and its share, the three queue limits) | partial `settings`: null leaves a field as it is; a limit of 0 is off (later also access, …) | Change settings |
+| `UpdateSettings` ✅ (name, default roles, autoplay, always on, how long a new song waits for the players (`startWaitSeconds`, 0–10), karaoke mode (`karaoke`), fair order, vote to skip and its share, the three queue limits) | partial `settings`: null leaves a field as it is; a limit of 0 is off (later also access, …) | Change settings |
 | `SetVisibility` ✅ | `visibility: "public" \| "solo"` | Owner only |
 | `SetOpenElsewhere` ✅ | `mode` (ask / move / move if away) or null for the account's setting, see [room sync](room-sync.md) | Owner only |
 | `ChangeOwner` ✅ | `participantId` | Owner only |

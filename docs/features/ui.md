@@ -55,7 +55,7 @@ Like YTM:
   slides it up over the player, and so does **swiping a tab up**; swipe it down, from the tabs or from the list once it is
   scrolled to the top, or tap the handle to close it), next to the album art on desktop. *Up next* is the queue
   (see below); *Related* is [find similar](history-and-recommendations.md#find-similar)
-  for the current song. *Lyrics* comes later.
+  for the current song. *Lyrics* ✅ sits between them (see [lyrics](#lyrics)).
 - **Next when the room votes to skip** ✅: for people who may only vote, Next votes (red
   while you've voted, pressed again takes it back) and shows the votes so far, like *1/2*.
   See [vote to skip](queue.md#vote-to-skip).
@@ -269,15 +269,21 @@ Open it with the **⋮** button or by **right-clicking** the song.
 
 ## Lyrics
 
-> Planned.
+> Built.
 
-- Lyrics for the current song, **synced** (the current line is highlighted and scrolls
-  along) when available, otherwise plain text.
-- Works for **every source**, including local files and media servers.
+- The **Lyrics** tab of the full player (between *Up next* and *Related*, like YTM): the
+  current song's lyrics, **synced** when they're timed (the line being sung is white and the
+  list scrolls along; tap a line to go there, if you may seek), otherwise plain text. It
+  says where they're from. Not for podcast episodes.
+- Works for **every source**, including local files and media servers later.
 - Sources: **[LRCLIB](https://lrclib.net)** (free, synced lyrics, looked up by title,
-  artist, album and duration) first, then the source module's own lyrics (for example
-  YTM) as a fallback.
-- Optionally shown on the party screen.
+  artist, album and duration) first, then the source module's own lyrics (YouTube Music's,
+  often timed too). Timed lyrics win over plain ones.
+- **Karaoke mode** (a room switch: *Karaoke* in the Lyrics tab, or in the room settings, for
+  people who may change them): the **party screen** and everyone's **full player** show the
+  lyrics large instead of the album art: the line being sung big, the one before and the
+  next two smaller. Plain lyrics scroll along with the song. The party screen keeps the
+  song, its progress and the code to join, and leaves out what's next.
 
 ## Party screen
 

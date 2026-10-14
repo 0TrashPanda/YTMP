@@ -186,11 +186,20 @@ The host stores every radio/related result as **YTM edges** in the song graph (s
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/songs/{id}/lyrics` | `{ plain, synced: [{ timeMs, text }] \| null, source }` |
+| GET | `/songs/{id}/lyrics` | ✅ `{ plain, synced: [{ timeMs, text }] \| null, source }`; 404 when there are none |
 
 Lyrics from modules are a **fallback**. The host first looks up the song on **LRCLIB**
 itself (by title, artist, album and duration), so synced lyrics work for every source,
-including local files.
+including local files. The YTM module asks YouTube Music for the song's lyrics (from
+`get_watch_playlist`, then `get_lyrics(timestamps=True)`; timed when YouTube Music has them,
+e.g. from LyricFind).
+
+Host side (`host/.../LyricsLookup.kt`): `GET /api/lyrics?id&title&artist&album&durationMs`
+(the page sends the song as it knows it). LRCLIB's `/api/get` (exact title, first artist,
+album, length in seconds), else `/api/search` by title (without "(Official Video)" and the
+like) and artist, taking one within 3 s of the length, timed ones first. Then the source's
+lyrics (`ytm:` songs: the module's `/songs/{id}/lyrics`, on a phone through Chaquopy). Timed
+lyrics win; results (also "none") are kept 6 hours, unless a lookup failed.
 
 ### Library (user-scoped, needs `X-Ytm-Cookie`)
 

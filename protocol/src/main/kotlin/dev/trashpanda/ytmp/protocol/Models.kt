@@ -283,3 +283,19 @@ data class RoomClone(
     val settings: RoomSettings? = null,
     val migrants: List<Migrant> = emptyList(),
 )
+
+/** A song's lyrics (`GET /api/lyrics`). */
+@Serializable
+@SerialName("Lyrics")
+data class Lyrics(
+    /** The whole text, a line per line. */
+    val plain: String,
+    /** Each line with when it starts, when the lyrics are timed; null: only [plain]. */
+    val synced: List<LyricLine>?,
+    /** Where they're from, to credit it: "LRCLIB", "YouTube Music (LyricFind)". */
+    val source: String,
+)
+
+@Serializable
+@SerialName("LyricLine")
+data class LyricLine(val timeMs: Long, val text: String)

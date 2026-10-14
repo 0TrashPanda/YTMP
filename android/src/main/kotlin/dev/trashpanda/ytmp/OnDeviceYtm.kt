@@ -7,6 +7,7 @@ import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.Lyrics
 import dev.trashpanda.ytmp.protocol.PlaylistItemRef
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
@@ -106,6 +107,15 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
 
     override suspend fun home(): HomePage = python {
         ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("home")).toString())
+    }
+
+    /** YouTube Music's lyrics for the song, or null when it has none. */
+    suspend fun lyrics(songId: String): Lyrics? = python {
+        try {
+            ProtocolJson.decodeFromString(Lyrics.serializer(), json.callAttr("dumps", core.callAttr("lyrics", songId)).toString())
+        } catch (e: PyException) {
+            if (e.message.orEmpty().startsWith("NotFound")) null else throw e
+        }
     }
 
     // The owner's YouTube Music account (see PhoneYoutubeAccount).

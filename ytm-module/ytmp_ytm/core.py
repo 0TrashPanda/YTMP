@@ -340,6 +340,29 @@ class YtmCore:
             ],
         }
 
+    def lyrics(self, song_id: str) -> dict:
+        """The song's lyrics in YouTube Music: {plain, synced: [{timeMs, text}] or None, source}.
+
+        Synced (each line with its start) when YouTube Music has them timed. NotFound when it
+        has none.
+        """
+        vid = video_id(song_id)
+        try:
+            browse_id = self._ytm.get_watch_playlist(videoId=vid, limit=1).get("lyrics")
+            found = self._ytm.get_lyrics(browse_id, timestamps=True) if browse_id else None
+        except Exception as e:
+            log.info("lyrics %s: %s", vid, e)
+            raise NotFound("No lyrics for this song") from e
+        if not found or not found.get("lyrics"):
+            raise NotFound("No lyrics for this song")
+        # "Source: LyricFind": who YouTube Music has them from.
+        provider = str(found.get("source") or "").removeprefix("Source:").strip()
+        source = f"YouTube Music ({provider})" if provider else "YouTube Music"
+        if found.get("hasTimestamps"):
+            synced = [{"timeMs": int(line.start_time), "text": line.text} for line in found["lyrics"]]
+            return {"plain": "\n".join(line["text"] for line in synced), "synced": synced, "source": source}
+        return {"plain": str(found["lyrics"]), "synced": None, "source": source}
+
     def rating(self, song_id: str) -> str:
         """The signed-in account's thumbs on this song: "like", "dislike" or "none"."""
         vid = video_id(song_id)

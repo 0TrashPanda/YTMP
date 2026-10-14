@@ -94,6 +94,7 @@
 	let autoplay = $state(true);
 	let alwaysOn = $state(false);
 	let startWaitSeconds = $state(2);
+	let karaoke = $state(false);
 	let overviewBusy = $state(false);
 	function resetOverview() {
 		name = rs.room.name;
@@ -102,6 +103,7 @@
 		autoplay = rs.settings.autoplay;
 		alwaysOn = rs.settings.alwaysOn;
 		startWaitSeconds = rs.settings.startWaitSeconds;
+		karaoke = rs.settings.karaoke;
 	}
 	resetOverview();
 	const overviewDirty = $derived(
@@ -110,7 +112,8 @@
 			accountRole !== rs.settings.defaultAccountRole ||
 			autoplay !== rs.settings.autoplay ||
 			alwaysOn !== rs.settings.alwaysOn ||
-			startWaitSeconds !== rs.settings.startWaitSeconds
+			startWaitSeconds !== rs.settings.startWaitSeconds ||
+			karaoke !== rs.settings.karaoke
 	);
 	async function saveOverview() {
 		overviewBusy = true;
@@ -122,6 +125,7 @@
 			autoplay,
 			alwaysOn,
 			startWaitSeconds,
+			karaoke,
 			...unchangedQueueSettings
 		});
 		overviewBusy = false;
@@ -152,7 +156,7 @@
 	);
 	async function saveQueue() {
 		queueBusy = true;
-		await run({ kind: 'UpdateSettings', name: null, defaultGuestRole: null, defaultAccountRole: null, autoplay: null, alwaysOn: null, startWaitSeconds: null, fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes });
+		await run({ kind: 'UpdateSettings', name: null, defaultGuestRole: null, defaultAccountRole: null, autoplay: null, alwaysOn: null, startWaitSeconds: null, karaoke: null, fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes });
 		queueBusy = false;
 	}
 	/** Choices for a limit, with the current value even when it isn't one of them (set elsewhere). */
@@ -255,6 +259,14 @@
 							<p class="text-sm text-d-muted">When the queue runs out, keep playing songs like the last one, as YouTube Music does.</p>
 						</div>
 						<Switch checked={autoplay} label="Autoplay" onchange={(on) => (autoplay = on)} />
+					</div>
+					<div class="my-6 h-px bg-d-line"></div>
+					<div class="flex items-center gap-4">
+						<div class="min-w-0 flex-1">
+							<h3 class="text-base font-semibold text-d-head">Karaoke mode</h3>
+							<p class="text-sm text-d-muted">The party screen and everyone's full player show the song's lyrics large, line by line, instead of the album art.</p>
+						</div>
+						<Switch checked={karaoke} label="Karaoke mode" onchange={(on) => (karaoke = on)} />
 					</div>
 					<div class="my-6 h-px bg-d-line"></div>
 					<h3 class="mb-1 text-base font-semibold text-d-head">Starting a song</h3>

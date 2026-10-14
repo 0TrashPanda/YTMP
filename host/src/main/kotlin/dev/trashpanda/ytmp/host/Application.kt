@@ -7,6 +7,9 @@ import dev.trashpanda.ytmp.core.ScreenRefused
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.core.personalized
+import dev.trashpanda.ytmp.protocol.AlbumRef
+import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import dev.trashpanda.ytmp.protocol.YoutubeHistorySetting
@@ -198,6 +201,8 @@ fun Application.ytmpModule(
     personalFor: ((ApplicationCall) -> PersonalCatalog?)? = null,
     /** Search suggestions while typing. */
     suggestions: SearchSuggestions? = null,
+    /** Lyrics for the songs (LRCLIB, then the source's own). */
+    lyrics: LyricsLookup? = null,
 ) {
     val screens = ScreenPairings()
     install(ContentNegotiation) { json(ProtocolJson) }
@@ -364,6 +369,22 @@ fun Application.ytmpModule(
                 if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
                 val source = similar ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No radio source")
                 call.respond(SearchResponse(call.asYou({ radio(songId) }) { source.radio(songId) }.filter { it.id != songId }))
+            }
+            get("/lyrics") {
+                // The song as the page knows it: LRCLIB looks lyrics up by title, artist, album and length.
+                val query = call.request.queryParameters
+                val id = query["id"]?.trim().orEmpty()
+                val title = query["title"]?.trim().orEmpty()
+                if (id.isEmpty() || title.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id or title")
+                val song = Song(
+                    id = id,
+                    title = title,
+                    artists = listOfNotNull(query["artist"]?.trim()?.takeIf { it.isNotEmpty() }?.let { ArtistRef(null, it) }),
+                    album = query["album"]?.trim()?.takeIf { it.isNotEmpty() }?.let { AlbumRef(null, it) },
+                    durationMs = query["durationMs"]?.toLongOrNull() ?: 0,
+                    thumbnails = emptyList(),
+                )
+                call.respond(lyrics?.lyrics(song) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No lyrics for this song"))
             }
             get("/artists/{id}") {
                 val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No artist pages here")

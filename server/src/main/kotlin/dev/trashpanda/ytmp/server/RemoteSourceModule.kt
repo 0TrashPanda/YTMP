@@ -6,6 +6,7 @@ import dev.trashpanda.ytmp.core.ResolvedStream
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.host.AudioProxy
 import dev.trashpanda.ytmp.host.SourceException
+import dev.trashpanda.ytmp.protocol.Lyrics
 import dev.trashpanda.ytmp.protocol.Song
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -45,6 +46,7 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.contentLength
 import io.ktor.http.contentType
@@ -118,6 +120,13 @@ class RemoteSourceModule(
         client.get("$baseUrl/podcasts/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
 
     override suspend fun home(): HomePage = client.get("$baseUrl/home") { auth() }.orThrow().body()
+
+    /** YouTube Music's lyrics for the song, or null when it has none. */
+    suspend fun lyrics(songId: String): Lyrics? {
+        val response = client.get("$baseUrl/songs/${songId.encodeURLPathPart()}/lyrics") { auth() }
+        if (response.status == HttpStatusCode.NotFound) return null
+        return response.orThrow().body()
+    }
 
     override suspend fun resolveStream(songId: String): String = resolve(songId).url
 

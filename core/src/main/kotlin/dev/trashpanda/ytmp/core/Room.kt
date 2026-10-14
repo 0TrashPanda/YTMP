@@ -1085,6 +1085,7 @@ class Room(
                     maxSongMinutes = command.maxSongMinutes ?: settings.maxSongMinutes,
                     noRepeatMinutes = command.noRepeatMinutes ?: settings.noRepeatMinutes,
                     startWaitSeconds = command.startWaitSeconds ?: settings.startWaitSeconds,
+                    karaoke = command.karaoke ?: settings.karaoke,
                 )
                 if (updated != settings) {
                     val autoplayChanged = updated.autoplay != settings.autoplay

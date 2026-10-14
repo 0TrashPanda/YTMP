@@ -11,6 +11,7 @@
 	import { targetPosition } from '../sync';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
+	import Lyrics from './Lyrics.svelte';
 
 	let {
 		room,
@@ -30,6 +31,8 @@
 	const song = $derived(current?.song ?? null);
 	const upNext = $derived([...(s?.queue ?? []), ...(s?.autoplay ?? [])].slice(0, 4));
 	const votes = $derived(s?.skipVotes ?? null);
+	// Karaoke mode (a room setting): the lyrics large, instead of the big album art and what's next.
+	const karaoke = $derived(!!s?.settings.karaoke && !!song && !song.podcast);
 
 	// The address to join at: the host's address for other devices, or this page's own.
 	const loopback = ['127.0.0.1', 'localhost'].includes(location.hostname);
@@ -137,7 +140,28 @@
 	{/if}
 
 	<!-- Middle: the song (or how to start). -->
-	{#if song && current}
+	{#if karaoke && song && current}
+		<div class="flex min-h-0 flex-1 flex-col gap-[2vh] px-[6vw] py-[2vh]">
+			<div class="flex shrink-0 items-center gap-[2vw] portrait:gap-[4vw]">
+				<Art {song} size={300} class="aspect-square h-[11vh] shrink-0 rounded-[1vmin] shadow-xl" />
+				<div class="min-w-0 flex-1">
+					<p class="truncate text-[min(4vh,3vw)] leading-tight font-bold portrait:text-[min(3vh,5.5vw)]">{song.title}</p>
+					<p class="truncate text-[min(2.8vh,2.1vw)] text-white/70 portrait:text-[min(2.2vh,4vw)]">{artistNames(song)} · Added by {addedBy(current)}</p>
+					{#if duration > 0}
+						<div class="mt-[1vh] h-[max(3px,0.5vh)] overflow-hidden rounded-full bg-white/20">
+							<div class="h-full rounded-full bg-white" style:width="{(position / duration) * 100}%"></div>
+						</div>
+					{/if}
+				</div>
+			</div>
+			<div class="min-h-0 flex-1">
+				<Lyrics {room} {song} positionMs={position} large seekable={false} />
+			</div>
+			{#if votes && votes.voters.length > 0}
+				<p class="shrink-0 text-center text-[max(13px,2vh)] text-white/80">{votes.voters.length} of {votes.needed} voted to skip</p>
+			{/if}
+		</div>
+	{:else if song && current}
 		<div class="flex min-h-0 flex-1 items-center gap-[5vmin] overflow-hidden px-[6vw] py-[3vh] portrait:flex-col portrait:justify-center">
 			<!-- Portrait: the art takes what's left above the song, so nothing overlaps. -->
 			<Art {song} size={1200} class="aspect-square h-[min(52vh,40vw)] rounded-[1.5vmin] shadow-2xl portrait:h-auto portrait:max-h-[40vh] portrait:min-h-0 portrait:flex-1" />
@@ -170,7 +194,7 @@
 	<!-- Bottom: up next, and how to join. -->
 	<div class="flex shrink-0 items-end gap-[3vw] px-[4vw] pb-[4vh] portrait:flex-col portrait:items-stretch portrait:gap-[2vh]">
 		<div class="min-w-0 flex-1">
-			{#if upNext.length}
+			{#if upNext.length && !karaoke}
 				<p class="mb-[1.5vh] text-[max(13px,1.9vh)] font-medium tracking-[0.2em] text-white/55 uppercase">Up next</p>
 				<div class="grid grid-cols-4 gap-[1.5vw] portrait:grid-cols-2 portrait:gap-[2vw] portrait:[&>*:nth-child(n+3)]:hidden">
 					{#each upNext as item (item.itemId)}

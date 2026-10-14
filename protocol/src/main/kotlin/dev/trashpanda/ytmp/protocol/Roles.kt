@@ -93,6 +93,8 @@ data class RoomSettings(
      * start it together ([PlaybackStatus.starting]); 0: it doesn't wait.
      */
     val startWaitSeconds: Int = 2,
+    /** Karaoke mode: the party screen and the full player show the song's lyrics large. */
+    val karaoke: Boolean = false,
 )
 
 /** The roles a room starts with. Saved to an account, so every room you create gets yours. */

@@ -82,7 +82,7 @@ set individual permissions.
 | **Listening** | Play audio locally on own device |
 | **Outputs** | Change host outputs |
 | **People** | Kick · Ban / unban · Assign roles · Edit roles |
-| **Room** | Change settings (name, default roles, autoplay, how long a new song waits for everyone's players, fair order, vote to skip, queue limits, access control; the limits don't apply to them) · Clone room · Send migration message in this room |
+| **Room** | Change settings (name, default roles, autoplay, karaoke mode, how long a new song waits for everyone's players, fair order, vote to skip, queue limits, access control; the limits don't apply to them) · Clone room · Send migration message in this room |
 
 ### Roles
 

@@ -11,6 +11,7 @@ import type {
 	CreatePlaylistResponse,
 	CreateRoomResponse,
 	LikeStatus,
+	Lyrics,
 	MyPlaylists,
 	PlaylistSummary,
 	SaveSongsRequest,
@@ -44,7 +45,15 @@ import type {
 import { identity } from './account';
 import { saved } from './storage';
 
-export class ApiRequestError extends Error {}
+export class ApiRequestError extends Error {
+	/** The HTTP status, e.g. 404. */
+	constructor(
+		message: string,
+		readonly status = 0
+	) {
+		super(message);
+	}
+}
 
 /**
  * Every request carries your account (the host token for this page), if you logged in: on a
@@ -60,7 +69,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	const response = await fetch(remote ? remote.server + path : path, { ...init, headers });
 	if (!response.ok) {
 		const body = (await response.json().catch(() => null)) as ApiError | null;
-		throw new ApiRequestError(body?.error.message ?? `Request failed (${response.status})`);
+		throw new ApiRequestError(body?.error.message ?? `Request failed (${response.status})`, response.status);
 	}
 	return (response.status === 204 ? null : response.json()) as Promise<T>;
 }
@@ -255,6 +264,23 @@ export function getPlaylist(id: string, personal = false): Promise<PlaylistPage>
 	return personal
 		? cached(`me:playlist:${id}`, () => request(`/api/me/playlists/${encodeURIComponent(id)}`))
 		: cached(`playlist:${id}`, () => request(`/api/playlists/${encodeURIComponent(id)}`));
+}
+
+/** The song's lyrics (LRCLIB, or its source's own), or null when nobody has them. */
+export function getLyrics(song: Song): Promise<Lyrics | null> {
+	const query = new URLSearchParams({
+		id: song.id,
+		title: song.title,
+		artist: song.artists[0]?.name ?? '',
+		album: song.album?.name ?? '',
+		durationMs: String(song.durationMs)
+	});
+	return cached(`lyrics:${song.id}`, () =>
+		request<Lyrics>(`/api/lyrics?${query}`).catch((e: unknown) => {
+			if (e instanceof ApiRequestError && e.status === 404) return null;
+			throw e;
+		})
+	);
 }
 
 export function getPodcast(id: string): Promise<PodcastPage> {
