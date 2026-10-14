@@ -3,12 +3,14 @@ package dev.trashpanda.ytmp.cast
 import dev.trashpanda.ytmp.cast.CastChannel.Companion.NS_RECEIVER
 import dev.trashpanda.ytmp.cast.CastChannel.Companion.RECEIVER
 import kotlinx.coroutines.delay
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.slf4j.LoggerFactory
 
 /**
  * Shows a web page on a Cast device (a TV, a display) with DashCast: an existing receiver
@@ -25,11 +27,15 @@ class CastWebPage(private val channel: CastChannel) {
      * DashCast no longer hears us after that, so a running DashCast is stopped and started afresh.
      */
     suspend fun show(url: String) {
-        dashCast(status())?.let { running ->
+        val started = System.currentTimeMillis()
+        val before = status()
+        dashCast(before)?.let { running ->
+            log.info("DashCast: stopping the one that runs, to start afresh")
             channel.request(NS_RECEIVER, RECEIVER, payload("STOP", "sessionId" to JsonPrimitive(running.sessionId)))
         }
-        channel.request(NS_RECEIVER, RECEIVER, payload("LAUNCH", "appId" to JsonPrimitive(APP_ID)))
-        var app = dashCast(status()) ?: error("The Cast device didn't start DashCast")
+        val launched = channel.request(NS_RECEIVER, RECEIVER, payload("LAUNCH", "appId" to JsonPrimitive(APP_ID)))
+        if (launched.type != "RECEIVER_STATUS") log.info("DashCast: the device answered the launch with {}", launched)
+        var app = dashCast(status()) ?: error("The Cast device didn't start DashCast (running: ${appIds(status())})")
         // A just-started app only hears messages once it has set up its namespace.
         var tries = 0
         while (NAMESPACE !in app.namespaces) {
@@ -37,6 +43,7 @@ class CastWebPage(private val channel: CastChannel) {
             delay(READY_WAIT_MS)
             app = dashCast(status()) ?: error("DashCast stopped on the Cast device")
         }
+        log.info("DashCast: ready after {} ms, opening {} as the whole page", System.currentTimeMillis() - started, url.substringBefore('#'))
         val transport = app.transportId
         transportId = transport
         channel.connect(transport)
@@ -47,7 +54,14 @@ class CastWebPage(private val channel: CastChannel) {
     }
 
     /** DashCast still runs on the device (nobody cast something else, the TV wasn't switched off). */
-    suspend fun isShowing(): Boolean = dashCast(status()) != null
+    suspend fun isShowing(): Boolean {
+        val status = status()
+        return (dashCast(status) != null).also { if (!it) log.info("DashCast: no longer runs (running: {})", appIds(status)) }
+    }
+
+    private fun appIds(status: JsonObject): List<String> =
+        (status["status"] as? JsonObject)?.get("applications")?.let { it as? JsonArray }
+            ?.mapNotNull { ((it as? JsonObject)?.get("displayName") ?: (it as? JsonObject)?.get("appId"))?.jsonPrimitive?.content }.orEmpty()
 
     /** Closes DashCast on the device. */
     suspend fun stop() {
@@ -74,6 +88,8 @@ class CastWebPage(private val channel: CastChannel) {
         JsonObject(mapOf("type" to JsonPrimitive(type)) + fields)
 
     companion object {
+        private val log = LoggerFactory.getLogger(CastWebPage::class.java)
+
         /** DashCast's app id and namespace (as in pychromecast's dashcast controller). */
         const val APP_ID = "84912283"
         const val NAMESPACE = "urn:x-cast:com.madmod.dashcast"

@@ -74,6 +74,44 @@
 		if (player?.error && room) reportProblem(`party screen on a Chromecast: ${player.error}`, room.roomCode);
 	});
 
+	// On a Chromecast nobody can look at the page's console, so it tells the host what happens:
+	// joining the room, the first sound, and when the room plays but the TV stays silent.
+	let reportedStatus: string | null = null;
+	$effect(() => {
+		if (!cast || !room) return;
+		const status = room.status === 'rejected' ? `turned away (${room.rejectReason})` : room.status === 'connected' ? 'in the room' : null;
+		if (!status || status === reportedStatus) return;
+		reportedStatus = status;
+		const me = room.me;
+		reportProblem(`party screen on a Chromecast: ${status}${me ? ` as ${me.name}, may play: ${room.can('listen_locally')}` : ''}`, room.roomCode);
+	});
+	let silentSince: number | null = null;
+	let soundReported: string | null = null;
+	let silenceReported: string | null = null;
+	const watchdog = cast
+		? setInterval(() => {
+				const s = room?.state;
+				const item = s?.nowPlaying?.item.itemId ?? null;
+				if (!room || !player || !item || !s?.playback.playing || !s.nowPlaying?.streamUrl) {
+					silentSince = null;
+					return;
+				}
+				if (player.sounding) {
+					silentSince = null;
+					if (soundReported !== item) {
+						soundReported = item;
+						reportProblem(`party screen on a Chromecast: sound plays (${player.describe?.()})`, room.roomCode);
+					}
+					return;
+				}
+				silentSince ??= Date.now();
+				if (Date.now() - silentSince > 15_000 && silenceReported !== item) {
+					silenceReported = item;
+					reportProblem(`party screen on a Chromecast: the room plays but the TV is silent for 15 s: ${player.describe?.()}`, room.roomCode);
+				}
+			}, 2000)
+		: undefined;
+
 	// Turned away (removed from the room, the room is gone): a new code. (On a Chromecast the
 	// host closes the page itself.)
 	$effect(() => {
@@ -133,6 +171,7 @@
 
 	onDestroy(() => {
 		stopped = true;
+		clearInterval(watchdog);
 		player?.destroy();
 		room?.close();
 	});

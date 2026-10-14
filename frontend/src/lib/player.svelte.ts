@@ -25,6 +25,10 @@ export interface RoomPlayer {
 	/** Call whenever the room state changes. */
 	sync(): void;
 	destroy(): void;
+	/** Sound comes out now (the browser player; the app's player says null). */
+	readonly sounding?: boolean | null;
+	/** What the player is doing, for a problem report. */
+	describe?(): string;
 }
 
 /** Buffering this long (ms) is reported to the host. */
@@ -259,6 +263,19 @@ class WebPlayer implements RoomPlayer {
 		reportProblem(
 			`browser buffered ${(ms / 1000).toFixed(1)} s at ${Math.round(this.audio.currentTime)} s in ${song.id} (${SOURCE_NAMES[this.source]})`,
 			this.room.roomCode
+		);
+	}
+
+	get sounding(): boolean {
+		return !this.audio.paused && this.audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && this.audio.volume > 0 && !this.audio.muted;
+	}
+
+	describe(): string {
+		const a = this.audio;
+		const error = a.error ? `, error ${a.error.code} (${MEDIA_ERRORS[a.error.code] ?? '?'}${a.error.message ? `: ${a.error.message}` : ''})` : '';
+		return (
+			`${a.paused ? 'paused' : 'playing'} at ${a.currentTime.toFixed(1)} s, ready ${a.readyState}/4, network ${a.networkState}, ` +
+			`volume ${a.volume}${a.muted ? ' muted' : ''}, from ${SOURCE_NAMES[this.source]}${error}${this.error ? `, says "${this.error}"` : ''}`
 		);
 	}
 

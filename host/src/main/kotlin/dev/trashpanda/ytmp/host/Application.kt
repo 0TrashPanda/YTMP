@@ -207,8 +207,12 @@ fun Application.ytmpModule(
     }
     install(CallLogging) {
         level = Level.INFO
-        // Client reports are logged themselves.
-        filter { it.request.path().startsWith("/api") && it.request.path() != "/api/log" }
+        // Client reports are logged themselves. Of the web app: the party screen page (a TV
+        // loading it), and anything that failed.
+        filter { call ->
+            val path = call.request.path()
+            (path.startsWith("/api") && path != "/api/log") || path == "/tv" || ((call.response.status()?.value ?: 0) >= 400 && path != "/favicon.ico")
+        }
         // Plain text: the log also goes to files.
         disableDefaultColors()
     }
