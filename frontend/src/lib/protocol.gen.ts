@@ -289,6 +289,7 @@ export interface CommandUpdateSettings {
   maxSongsPerPerson: number | null;
   maxSongMinutes: number | null;
   noRepeatMinutes: number | null;
+  startWaitSeconds: number | null;
 }
 
 export interface CommandVoteSkip {
@@ -560,6 +561,7 @@ export interface RoomSettings {
   maxSongsPerPerson: number;
   maxSongMinutes: number;
   noRepeatMinutes: number;
+  startWaitSeconds: number;
 }
 
 export interface EventSettingsChanged {

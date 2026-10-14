@@ -7,6 +7,7 @@ import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.ItemList
+import dev.trashpanda.ytmp.protocol.MAX_START_WAIT_SECONDS
 import dev.trashpanda.ytmp.protocol.Migrant
 import dev.trashpanda.ytmp.protocol.MigrationMode
 import dev.trashpanda.ytmp.protocol.MigrationOffer
@@ -238,7 +239,7 @@ class Room(
     private var wantPlaying = false
     /**
      * A new song waits for the players to load it ([Command.PlayerReady], [outputReady]), so
-     * nobody misses its start; then everyone starts it together. At most [MAX_START_WAIT_MS].
+     * nobody misses its start; then everyone starts it together. At most [RoomSettings.startWaitSeconds].
      */
     private var starting = false
     private var waitingSince = 0L
@@ -1066,6 +1067,7 @@ class Room(
                 if (command.voteSkipPercent != null && command.voteSkipPercent !in 1..100) return invalid("The share of votes is 1–100%")
                 val limits = listOfNotNull(command.maxSongsPerPerson, command.maxSongMinutes, command.noRepeatMinutes)
                 if (limits.any { it !in 0..Permissions.MAX_LIMIT }) return invalid("Limits are 0 (off) to ${Permissions.MAX_LIMIT}")
+                if (command.startWaitSeconds != null && command.startWaitSeconds !in 0..MAX_START_WAIT_SECONDS) return invalid("Waiting for the players is 0 (off) to $MAX_START_WAIT_SECONDS seconds")
                 if (newName != null && newName != name) {
                     name = newName
                     emit(Event.RoomUpdated(info))
@@ -1082,6 +1084,7 @@ class Room(
                     maxSongsPerPerson = command.maxSongsPerPerson ?: settings.maxSongsPerPerson,
                     maxSongMinutes = command.maxSongMinutes ?: settings.maxSongMinutes,
                     noRepeatMinutes = command.noRepeatMinutes ?: settings.noRepeatMinutes,
+                    startWaitSeconds = command.startWaitSeconds ?: settings.startWaitSeconds,
                 )
                 if (updated != settings) {
                     val autoplayChanged = updated.autoplay != settings.autoplay
@@ -1548,7 +1551,7 @@ class Room(
     private fun waitForPlayers() {
         stopWaiting()
         readyFor.clear()
-        if (!wantPlaying || notReady().isEmpty()) return
+        if (!wantPlaying || settings.startWaitSeconds <= 0 || notReady().isEmpty()) return
         starting = true
         waitingSince = clock()
         startJob = scope.launch {
@@ -1557,7 +1560,7 @@ class Room(
                 mutex.withLock {
                     val late = notReady()
                     // Someone left or stopped listening (late is empty then), or it waited long enough.
-                    if (starting && (late.isEmpty() || clock() - waitingSince >= MAX_START_WAIT_MS)) startTogether(late)
+                    if (starting && (late.isEmpty() || clock() - waitingSince >= settings.startWaitSeconds * 1000L)) startTogether(late)
                 }
             }
         }
@@ -1942,9 +1945,8 @@ class Room(
         /** A clone's queue (and autoplay queue) keeps at most this many songs. */
         const val MAX_CLONE_QUEUE = 1000
         const val MAX_MIGRANTS = 200
-        /** The longest a new song waits for the players to load it ([starting]). */
-        const val MAX_START_WAIT_MS = 8_000L
-        private const val START_CHECK_MS = 250L
+        /** How often a waiting song checks whether it waited long enough, or nobody's left to wait for. */
+        private const val START_CHECK_MS = 100L
         /** Party screens one room can have. */
         const val MAX_SCREENS = 5
         /** Speakers one person plays the room on near their phone ([Command.SetSpeakers]). */

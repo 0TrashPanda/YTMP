@@ -123,13 +123,13 @@ skipped, most on a TV. Now a new song waits for the players, like Sonos or Spoti
   and Sonos speakers. A player that can't play the song says so too, so nobody waits for it.
 - When everyone is ready, the song starts for all of them at that moment (`Room.startTogether`);
   they start within the time a message takes, and the usual sync takes it from there. The
-  room waits at most `Room.MAX_START_WAIT_MS` (8 s) for a slow player, which then joins late,
-  as before.
+  room waits at most `RoomSettings.startWaitSeconds` (2 s by default, 0–10; 0 doesn't wait)
+  for a slow player, which then joins late, as before.
 - **Who's waited for:** online participants listening with `SetListening(startsTogether =
   true)`, phones with `SetSpeakers(startsTogether = true)`, and the host's active outputs
   (not a TV showing the party screen: its page is a participant). Older apps don't send the
   flag (the page asks the app for bridge version 9), so they're not waited for. Someone who
-  stops listening while the room waits isn't waited for either (checked every 250 ms).
+  stops listening while the room waits isn't waited for either (checked every 100 ms).
 - Pausing or seeking while it waits ends the wait. The song ends by its length counted from
   when it started, not from when its stream was ready. Pages show a starting song as playing
   (and loading).

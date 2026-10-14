@@ -60,6 +60,9 @@ data class Role(
     val permissions: List<Permission>,
 )
 
+/** The longest a room's new songs can wait for the players ([RoomSettings.startWaitSeconds]). */
+const val MAX_START_WAIT_SECONDS = 10
+
 @Serializable
 @SerialName("RoomSettings")
 data class RoomSettings(
@@ -85,6 +88,11 @@ data class RoomSettings(
     val maxSongMinutes: Int = 0,
     /** Songs played in the last this many minutes can't be added again; 0: no limit. */
     val noRepeatMinutes: Int = 0,
+    /**
+     * A new song waits at most this many seconds for everyone's players to load it, so they
+     * start it together ([PlaybackStatus.starting]); 0: it doesn't wait.
+     */
+    val startWaitSeconds: Int = 2,
 )
 
 /** The roles a room starts with. Saved to an account, so every room you create gets yours. */

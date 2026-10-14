@@ -93,6 +93,7 @@
 	let accountRole = $state('');
 	let autoplay = $state(true);
 	let alwaysOn = $state(false);
+	let startWaitSeconds = $state(2);
 	let overviewBusy = $state(false);
 	function resetOverview() {
 		name = rs.room.name;
@@ -100,6 +101,7 @@
 		accountRole = rs.settings.defaultAccountRole;
 		autoplay = rs.settings.autoplay;
 		alwaysOn = rs.settings.alwaysOn;
+		startWaitSeconds = rs.settings.startWaitSeconds;
 	}
 	resetOverview();
 	const overviewDirty = $derived(
@@ -107,7 +109,8 @@
 			guestRole !== rs.settings.defaultGuestRole ||
 			accountRole !== rs.settings.defaultAccountRole ||
 			autoplay !== rs.settings.autoplay ||
-			alwaysOn !== rs.settings.alwaysOn
+			alwaysOn !== rs.settings.alwaysOn ||
+			startWaitSeconds !== rs.settings.startWaitSeconds
 	);
 	async function saveOverview() {
 		overviewBusy = true;
@@ -118,6 +121,7 @@
 			defaultAccountRole: accountRole,
 			autoplay,
 			alwaysOn,
+			startWaitSeconds,
 			...unchangedQueueSettings
 		});
 		overviewBusy = false;
@@ -148,7 +152,7 @@
 	);
 	async function saveQueue() {
 		queueBusy = true;
-		await run({ kind: 'UpdateSettings', name: null, defaultGuestRole: null, defaultAccountRole: null, autoplay: null, alwaysOn: null, fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes });
+		await run({ kind: 'UpdateSettings', name: null, defaultGuestRole: null, defaultAccountRole: null, autoplay: null, alwaysOn: null, startWaitSeconds: null, fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes });
 		queueBusy = false;
 	}
 	/** Choices for a limit, with the current value even when it isn't one of them (set elsewhere). */
@@ -252,6 +256,16 @@
 						</div>
 						<Switch checked={autoplay} label="Autoplay" onchange={(on) => (autoplay = on)} />
 					</div>
+					<div class="my-6 h-px bg-d-line"></div>
+					<h3 class="mb-1 text-base font-semibold text-d-head">Starting a song</h3>
+					<p class="mb-3 text-sm text-d-muted">
+						A new song waits until every phone, browser, TV and speaker playing the room has loaded it, so they all start it together. A slow one joins late after this.
+					</p>
+					<select class={input} bind:value={startWaitSeconds} aria-label="Starting a song">
+						{#each choices([1, 2, 3, 5, 10], startWaitSeconds) as seconds (seconds)}
+							<option value={seconds}>{seconds === 0 ? "Don't wait (some miss the start)" : `Wait at most ${seconds} s`}</option>
+						{/each}
+					</select>
 					<div class="my-6 h-px bg-d-line"></div>
 					<h3 class="mb-1 text-base font-semibold text-d-head">Password</h3>
 					<p class="mb-3 text-sm text-d-muted">

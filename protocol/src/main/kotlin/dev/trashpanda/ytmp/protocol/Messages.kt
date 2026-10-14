@@ -321,6 +321,8 @@ sealed interface Command {
         val maxSongsPerPerson: Int? = null,
         val maxSongMinutes: Int? = null,
         val noRepeatMinutes: Int? = null,
+        /** 0 to [MAX_START_WAIT_SECONDS]. */
+        val startWaitSeconds: Int? = null,
     ) : Command
 }
 

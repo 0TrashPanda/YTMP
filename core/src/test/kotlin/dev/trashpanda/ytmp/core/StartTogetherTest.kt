@@ -4,6 +4,7 @@ import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ErrorInfo
+import dev.trashpanda.ytmp.protocol.MAX_START_WAIT_SECONDS
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.PlaybackStatus
 import dev.trashpanda.ytmp.protocol.RoomState
@@ -18,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -92,7 +94,7 @@ class StartTogetherTest {
         var playback = room.playback(owner)
         assertTrue(playback.starting)
         assertFalse(playback.playing)
-        advanceTimeBy(2_000)
+        advanceTimeBy(1_000)
         // Ready for another song: doesn't count.
         assertNull(room.run(owner, Command.PlayerReady("other")))
         assertNull(room.run(owner, Command.PlayerReady(item)))
@@ -115,13 +117,36 @@ class StartTogetherTest {
         room.run(owner, Command.SetListening(true, startsTogether = true))
         room.run(owner, Command.PlayNow(song(1)))
         runCurrent()
-        advanceTimeBy(Room.MAX_START_WAIT_MS - 500)
+        // 2 s by default.
+        advanceTimeBy(1_900)
         assertTrue(room.playback(owner).starting)
-        advanceTimeBy(1_000)
+        advanceTimeBy(200)
         val playback = room.playback(owner)
         assertTrue(playback.playing)
         // It started at the deadline, from the start.
-        assertTrue(playback.positionMs in 0..500)
+        assertTrue(playback.positionMs in 0..200)
+    }
+
+    @Test
+    fun `how long a new song waits is a room setting, and 0 doesn't wait`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        room.run(owner, Command.SetListening(true, startsTogether = true))
+        assertEquals(2, room.state(owner).settings.startWaitSeconds)
+        assertNotNull(room.run(owner, Command.UpdateSettings(startWaitSeconds = MAX_START_WAIT_SECONDS + 1)))
+
+        assertNull(room.run(owner, Command.UpdateSettings(startWaitSeconds = 5)))
+        room.run(owner, Command.PlayNow(song(1)))
+        runCurrent()
+        advanceTimeBy(4_500)
+        assertTrue(room.playback(owner).starting)
+        advanceTimeBy(1_000)
+        assertTrue(room.playback(owner).playing)
+
+        assertNull(room.run(owner, Command.UpdateSettings(startWaitSeconds = 0)))
+        room.run(owner, Command.PlayNow(song(2)))
+        runCurrent()
+        assertTrue(room.playback(owner).playing)
     }
 
     @Test
@@ -185,7 +210,7 @@ class StartTogetherTest {
         room.run(owner, Command.PlayNow(song(1)))
         runCurrent()
         val item = room.currentItem(owner)
-        advanceTimeBy(5_000)
+        advanceTimeBy(1_500)
         room.run(owner, Command.PlayerReady(item))
         // Ends 180 s after it started, not after it was resolved.
         advanceTimeBy(179_000)

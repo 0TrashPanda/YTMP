@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.core
 
+import dev.trashpanda.ytmp.protocol.MAX_START_WAIT_SECONDS
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.Permission.*
 import dev.trashpanda.ytmp.protocol.Role
@@ -50,6 +51,7 @@ object Permissions {
                 maxSongsPerPerson = s.maxSongsPerPerson.coerceIn(0, MAX_LIMIT),
                 maxSongMinutes = s.maxSongMinutes.coerceIn(0, MAX_LIMIT),
                 noRepeatMinutes = s.noRepeatMinutes.coerceIn(0, MAX_LIMIT),
+                startWaitSeconds = s.startWaitSeconds.coerceIn(0, MAX_START_WAIT_SECONDS),
             ),
         )
     }
