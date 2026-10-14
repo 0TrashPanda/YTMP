@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.core
 
 import kotlinx.coroutines.CoroutineScope
+import dev.trashpanda.ytmp.protocol.ROOM_CODE
 import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.RoomClone
 import dev.trashpanda.ytmp.protocol.RoomInfo
@@ -26,6 +27,9 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /** How room codes look. See docs/features/joining.md. */
+/** Another room has the code someone chose. */
+class RoomCodeTaken(val code: String) : Exception("The code $code is taken")
+
 enum class RoomCodeStyle(val alphabet: String) {
     LETTERS("ACDEFGHJKMNPQRTUVWXY"),
     DIGITS("0123456789"),
@@ -131,9 +135,15 @@ class RoomManager(
         clone: RoomClone? = null,
         /** Joining needs this password (hashed: [RoomPasswords.hash]). */
         passwordHash: String? = null,
+        /** A code of the owner's own choosing ([ROOM_CODE]); null: a random one. Throws [RoomCodeTaken] when it's in use. */
+        chosenCode: String? = null,
     ): Room {
+        val chosen = chosenCode?.let(::normalize)
+        require(chosen == null || ROOM_CODE.matches(chosen)) { "Room codes are 3 to 12 letters and digits" }
+        // A room that moved away keeps sending people after it by its code.
+        if (chosen != null && chosen in moved) throw RoomCodeTaken(chosen)
         while (true) {
-            val code = newCode()
+            val code = chosen ?: newCode()
             lateinit var room: Room
             room = Room(
                 code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radioFor { room.ownerAccount },
@@ -145,6 +155,7 @@ class RoomManager(
                 roomChanged(code)
                 return room
             }
+            if (chosen != null) throw RoomCodeTaken(chosen)
         }
     }
 

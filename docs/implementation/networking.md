@@ -36,7 +36,11 @@ case the browser wants a tap) or continue in the browser; it doesn't join the ro
 - Unambiguous letter alphabet: `ACDEFGHJKMNPQRTUVWXY` (20 letters, without `B I L O S Z`).
 - Unambiguous digits: `3 4 6 7 9`, or all digits when the style is digits-only (no letters
   to confuse them with).
-- Normalise input: uppercase, and map look-alikes (`0→O`, `1→I`, …) before lookup.
+- Normalise input: uppercase before lookup. (Mapping look-alikes, `0→O`, `1→I`, …, isn't
+  built: chosen codes may contain them.)
+- **Chosen codes** ✅ (`CreateRoomRequest.code`, `RoomManager.create(chosenCode)`): `ROOM_CODE`,
+  3–12 of `A–Z 0–9`, stored uppercase. Taken (a room here has it, or a room that moved away
+  still forwards people by it): `409`, shown at the field; not valid: `400`.
 - Server config:
 
   ```toml

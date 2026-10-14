@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { identity, logInOnce, type Identity } from '../lib/account';
-	import { closeRoom, createRoom, getHost, getRoom, getRoomsElsewhere, linkAuthServer, listRooms, moveRoomHere } from '../lib/api';
+	import { ApiRequestError, closeRoom, createRoom, getHost, getRoom, getRoomsElsewhere, linkAuthServer, listRooms, moveRoomHere } from '../lib/api';
 	import Icon from '../lib/components/Icon.svelte';
 	import AvatarMenu from '../lib/components/AvatarMenu.svelte';
 	import SettingsScreen, { type SettingsSection } from '../lib/components/settings/SettingsScreen.svelte';
@@ -14,6 +14,15 @@
 	let name = $state(saved.displayName);
 	let code = $state('');
 	let roomName = $state('');
+	/** A room code of your own choosing (empty: a random one). */
+	let roomCode = $state('');
+	const codeOk = $derived(!roomCode.trim() || /^[A-Za-z0-9]{3,12}$/.test(roomCode.trim()));
+	/** The host said the chosen code is taken (shown at the code, not at the bottom). */
+	let codeTaken = $state<string | null>(null);
+	$effect(() => {
+		void roomCode;
+		codeTaken = null;
+	});
 	let error = $state<string | null>(null);
 	let busy = $state(false);
 
@@ -87,7 +96,14 @@
 
 	async function hostRoom(visibility: RoomVisibility) {
 		await attempt(async () => {
-			const created = await createRoom(roomName.trim() || defaultRoomName, visibility, me?.token ?? null);
+			let created;
+			try {
+				created = await createRoom(roomName.trim() || defaultRoomName, visibility, me?.token ?? null, null, roomCode.trim().toUpperCase() || null);
+			} catch (e) {
+				if (!(e instanceof ApiRequestError && e.status === 409)) throw e;
+				codeTaken = e.message;
+				return;
+			}
 			saved.displayName = name.trim();
 			saved.setOwnerToken(created.code, created.ownerToken);
 			await goto(`/room/${created.code}`);
@@ -273,6 +289,29 @@
 	</div>
 {/if}
 
+<!-- Your own room code instead of a random one (the host says when it's taken). -->
+{#snippet codeInput()}
+	<label class="flex flex-col gap-1">
+		<input
+			class="rounded-lg bg-raised px-4 py-3 font-mono tracking-[0.2em] uppercase outline-none placeholder:font-sans placeholder:tracking-normal placeholder:normal-case {codeOk && !codeTaken
+				? 'ring-white/40 focus:ring-2'
+				: 'ring-2 ring-accent'}"
+			bind:value={roomCode}
+			maxlength="12"
+			placeholder="Room code (optional)"
+			aria-label="Room code"
+			autocapitalize="characters"
+			autocomplete="off"
+			spellcheck="false"
+		/>
+		{#if !codeOk}
+			<span class="text-xs text-accent">3 to 12 letters and digits</span>
+		{:else if codeTaken}
+			<span class="text-xs text-accent">{codeTaken}</span>
+		{/if}
+	</label>
+{/snippet}
+
 {#snippet roomList(title: string)}
 	{#if myRooms.length > 0}
 		<section class="flex flex-col gap-1">
@@ -355,10 +394,11 @@
 					maxlength="64"
 					placeholder={defaultRoomName}
 				/>
+				{@render codeInput()}
 				<div class="grid grid-cols-2 gap-3">
 					<button
 						class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
-						disabled={busy || !validName}
+						disabled={busy || !validName || !codeOk}
 						onclick={() => hostRoom('private')}
 					>
 						<Icon name="headphones" />
@@ -367,7 +407,7 @@
 					</button>
 					<button
 						class="flex flex-col items-center gap-1 rounded-xl bg-accent p-3 disabled:opacity-40"
-						disabled={busy || !validName}
+						disabled={busy || !validName || !codeOk}
 						onclick={() => hostRoom('public')}
 					>
 						<Icon name="people" />
@@ -420,7 +460,7 @@
 				<input
 					class="rounded-lg bg-raised px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] uppercase outline-none ring-white/40 focus:ring-2"
 					bind:value={code}
-					maxlength="8"
+					maxlength="12"
 					placeholder="CODE"
 					autocapitalize="characters"
 					autocomplete="off"
@@ -440,11 +480,12 @@
 						maxlength="64"
 						placeholder={defaultRoomName}
 					/>
+					{@render codeInput()}
 					{#if host.supportsPrivateRooms}
 						<div class="grid grid-cols-2 gap-3">
 							<button
 								class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
-								disabled={busy || !validName}
+								disabled={busy || !validName || !codeOk}
 								onclick={() => hostRoom('private')}
 							>
 								<Icon name="headphones" />
@@ -453,7 +494,7 @@
 							</button>
 							<button
 								class="flex flex-col items-center gap-1 rounded-xl bg-accent p-3 disabled:opacity-40"
-								disabled={busy || !validName}
+								disabled={busy || !validName || !codeOk}
 								onclick={() => hostRoom('public')}
 							>
 								<Icon name="people" />
@@ -464,7 +505,7 @@
 					{:else}
 						<button
 							class="rounded-full bg-accent py-3 font-medium disabled:opacity-40"
-							disabled={busy || !validName}
+							disabled={busy || !validName || !codeOk}
 							onclick={() => hostRoom('public')}
 						>
 							Host

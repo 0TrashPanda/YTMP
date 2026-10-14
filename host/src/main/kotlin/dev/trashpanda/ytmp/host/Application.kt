@@ -3,12 +3,14 @@ package dev.trashpanda.ytmp.host
 import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.core.Outbox
 import dev.trashpanda.ytmp.core.RadioSource
+import dev.trashpanda.ytmp.core.RoomCodeTaken
 import dev.trashpanda.ytmp.core.ScreenRefused
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.AlbumRef
 import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.ROOM_CODE
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
@@ -731,7 +733,13 @@ fun RoomManager.createFor(
     if (request.visibility == RoomVisibility.PRIVATE && !supportsPrivateRooms) {
         throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Solo rooms aren't supported here")
     }
-    val room = create(name, request.visibility, ownerAccount = ownerAccount, template = template, clone = request.clone, passwordHash = passwordHash)
+    val code = request.code?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+    if (code != null && !ROOM_CODE.matches(code)) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Room codes are 3 to 12 letters and digits")
+    val room = try {
+        create(name, request.visibility, ownerAccount = ownerAccount, template = template, clone = request.clone, passwordHash = passwordHash, chosenCode = code)
+    } catch (e: RoomCodeTaken) {
+        throw ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID, "The code ${e.code} is taken. Pick another one")
+    }
     LoggerFactory.getLogger("dev.trashpanda.ytmp.host.Application").info(
         "Created room {} ({}, {}{}{})", room.code, room.name, room.visibility, ownerAccount?.let { ", owner $it" } ?: "",
         request.clone?.let { ", a clone with ${it.queue.size} songs queued" } ?: "",

@@ -726,6 +726,7 @@ export interface CreateRoomRequest {
   name: string;
   visibility: RoomVisibility;
   clone: RoomClone | null;
+  code: string | null;
 }
 
 export interface CreateRoomResponse {

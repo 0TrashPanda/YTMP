@@ -13,7 +13,12 @@ data class CreateRoomRequest(
     val visibility: RoomVisibility = RoomVisibility.PUBLIC,
     /** Start as a copy of another room (cloning). */
     val clone: RoomClone? = null,
+    /** A code of your own choosing ([ROOM_CODE] letters and digits); null: a random one. */
+    val code: String? = null,
 )
+
+/** What a chosen room code may be: 3 to 12 letters and digits (case doesn't matter). */
+val ROOM_CODE = Regex("[A-Z0-9]{3,12}")
 
 @Serializable
 @SerialName("CreateRoomResponse")

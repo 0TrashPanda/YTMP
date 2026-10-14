@@ -24,6 +24,14 @@ With the reduced alphabet (≈20 letters) that is ~160 000 codes, far more than 
 
 A code is never reused while its room exists.
 
+### Your own code ✅
+
+When you host a room you can **choose its code** instead (*Room code (optional)*, under the
+room's name): 3 to 12 letters and digits, like `PARTY` or `TREESEE42`. Any letters work
+here, look-alikes too, since you pick it yourself. If another room on that phone or server
+has it, you're told it's taken. It's set when the room is made; it can't be changed later
+(links, QR codes and everyone's saved login for the room go by the code).
+
 ## Joining a phone-hosted room on the local network
 
 There are three ways to find a phone host, with automatic discovery as the main one:

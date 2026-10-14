@@ -222,6 +222,25 @@ class ApplicationTest {
     }
 
     @Test
+    fun `a room can have a code of your own choosing, once`() = testApplication {
+        setup()
+        val client = jsonClient()
+        suspend fun create(code: String?) = client.post("/api/rooms") { contentType(ContentType.Application.Json); setBody(CreateRoomRequest("Party", code = code)) }
+
+        val created = create(" party1 ").body<CreateRoomResponse>()
+        assertEquals("PARTY1", created.code)
+        assertTrue(created.url!!.endsWith("/room/PARTY1"))
+        assertEquals(HttpStatusCode.OK, client.get("/api/rooms/party1").status)
+        // Taken (any case), too short, not just letters and digits.
+        assertEquals(HttpStatusCode.Conflict, create("Party1").status)
+        assertEquals(HttpStatusCode.BadRequest, create("AB").status)
+        assertEquals(HttpStatusCode.BadRequest, create("MY ROOM").status)
+        assertEquals(HttpStatusCode.BadRequest, create("ABCDEFGHIJKLM").status)
+        // Empty: a random one, as before.
+        assertEquals(4, create("").body<CreateRoomResponse>().code.length)
+    }
+
+    @Test
     fun `create a room, join it and add a song`() = testApplication {
         setup()
         val client = jsonClient()

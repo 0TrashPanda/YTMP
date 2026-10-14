@@ -118,11 +118,13 @@ export function createRoom(
 	name: string,
 	visibility: RoomVisibility = 'public',
 	accountToken: string | null = null,
-	clone: RoomClone | null = null
+	clone: RoomClone | null = null,
+	/** A code of your own choosing; null: a random one. */
+	code: string | null = null
 ): Promise<CreateRoomResponse> {
 	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 	if (accountToken) headers['Authorization'] = `Bearer ${accountToken}`;
-	return request('/api/rooms', { method: 'POST', headers, body: JSON.stringify({ name, visibility, clone }) });
+	return request('/api/rooms', { method: 'POST', headers, body: JSON.stringify({ name, visibility, clone, code }) });
 }
 
 /** On the phone's own page: clone a room onto your server (the phone forwards it, with your login). */
