@@ -65,6 +65,19 @@ song whose own link fails too. Songs that aren't YouTube's (`ytm:` IDs) keep the
 - A lookup that fails (module unreachable, wrong key, unavailable) is reported to the host
   log and the song goes through the proxy.
 
+**Fetching in pieces** ✅: YouTube sends a request for the whole rest of a file (no end to its
+`Range`) only about as fast as the song plays, so a player's buffer runs dry: short pauses
+(seen on 2026-10-15 with only 1–2 s buffered ahead). Both proxies (`OnDeviceAudioProxy`, the
+module's `/songs/{id}/audio`) and the app's own player (`ChunkedDataSource` for
+`*.googlevideo.com`) ask for 1 MB pieces with an explicit end, like yt-dlp does.
+
+**When YouTube refuses a song** ✅: at times YouTube serves a link's first MB and then answers
+403, for every connection (the phone's own link and the server's alike), for minutes. The
+proxies then resolve the song again once and go on from that byte. When a song doesn't play
+from anywhere, the app tries it again after 10 s and 30 s (fresh links each time) and the
+player says so ("Trying again…", then that it can't play the song); the room doesn't wait
+for that device.
+
 Local files, media server songs and cached songs are always served by the host.
 
 ## Sync accuracy

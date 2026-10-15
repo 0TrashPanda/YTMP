@@ -1,3 +1,4 @@
+import httpx
 from fastapi.testclient import TestClient
 
 from ytmp_ytm import core
@@ -73,3 +74,37 @@ def test_without_a_key_pages_cant_use_it():
     client = TestClient(create_app(core.YtmCore(), key=None))
     answer = client.get("/info", headers={"Origin": "https://example.com"})
     assert "access-control-allow-origin" not in answer.headers
+
+
+def test_audio_goes_on_with_a_fresh_link_when_youtube_stops_the_old_one(monkeypatch):
+    # YouTube sometimes serves a link's first MB and then answers 403: the proxy resolves the
+    # song again and goes on from where it was, instead of ending the stream there.
+    monkeypatch.setattr(core, "CHUNK_SIZE", 100)
+    data = bytes(i % 256 for i in range(250))
+
+    def youtube(request: httpx.Request) -> httpx.Response:
+        start, end = (int(x) for x in request.headers["range"].removeprefix("bytes=").split("-"))
+        if request.url.host == "old" and start >= 100:
+            return httpx.Response(403)
+        end = min(end, len(data) - 1)
+
+        async def body():
+            yield data[start:end + 1]
+
+        return httpx.Response(206, content=body(), headers={"content-range": f"bytes {start}-{end}/{len(data)}"})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(youtube)))
+    resolved: list[bool] = []
+
+    def stream(self, song_id: str, fresh: bool = False) -> core.StreamInfo:
+        resolved.append(fresh)
+        return core.StreamInfo(f"https://{'new' if fresh else 'old'}/a", core.time.time() + 3600, "audio/mp4", None)
+
+    monkeypatch.setattr(core.YtmCore, "stream", stream)
+    client = TestClient(create_app(core.YtmCore(), key="k"))
+
+    response = client.get("/songs/ytm:abc/audio", headers={"Authorization": "Bearer k", "Range": "bytes=0-"})
+    assert response.status_code == 206
+    assert response.content == data
+    assert resolved == [False, True]

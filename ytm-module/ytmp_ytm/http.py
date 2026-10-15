@@ -185,8 +185,10 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         log.debug("audio %s: bytes %d-%s of %s", song_id, start, end if total else "", total)
 
         async def body():
+            nonlocal info
             response = first
             position = start
+            refreshed = False
             chunk_started = time.monotonic()
             try:
                 while True:
@@ -201,6 +203,13 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
                         return
                     chunk_started = time.monotonic()
                     response = await fetch(info, position, min(end, position + core.CHUNK_SIZE - 1))
+                    if response.status_code == 403 and not refreshed:
+                        # YouTube sometimes stops a link after its first MB: a fresh one may go on.
+                        log.warning("audio %s: YouTube answered 403 at byte %d of %s, resolving again", song_id, position, total)
+                        refreshed = True
+                        await response.aclose()
+                        info = await run_in_threadpool(ytm.stream, song_id, True)
+                        response = await fetch(info, position, min(end, position + core.CHUNK_SIZE - 1))
                     if response.status_code >= 400:
                         log.warning("audio %s: YouTube answered %d at byte %d of %s, the stream stops here",
                                     song_id, response.status_code, position, total)

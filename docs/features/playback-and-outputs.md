@@ -33,6 +33,8 @@ permissions say otherwise (permission: *Play audio locally*).
     you set one up (*Settings → Playback*: its address and key);
   - otherwise, or when that fails, the host streams the song to you (if the server allows
     that on your network, see [server admin](server-admin.md)).
+  - When YouTube won't send a song for a while, the app tries it again a few times and the
+    player says so, instead of staying quiet.
 
 ## Host outputs
 

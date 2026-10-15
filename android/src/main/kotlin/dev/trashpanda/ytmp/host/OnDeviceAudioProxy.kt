@@ -54,6 +54,7 @@ class OnDeviceAudioProxy(
             var connection = first
             var position = start
             var pieceStarted = System.nanoTime()
+            var refreshed = false
             try {
                 while (true) {
                     position += connection.inputStream.use { it.copyTo(this) }
@@ -63,6 +64,14 @@ class OnDeviceAudioProxy(
                     if (total == null || position > end) break
                     pieceStarted = System.nanoTime()
                     connection = open(source, position, minOf(end, position + CHUNK_SIZE - 1))
+                    if (connection.responseCode == HttpURLConnection.HTTP_FORBIDDEN && !refreshed) {
+                        // YouTube sometimes stops a link after its first MB: a fresh one may go on.
+                        Log.w(TAG, "audio $songId: YouTube answered 403 at byte $position of $total, resolving again")
+                        refreshed = true
+                        connection.disconnect()
+                        source = stream(songId, true)
+                        connection = open(source, position, minOf(end, position + CHUNK_SIZE - 1))
+                    }
                     if (connection.responseCode >= 400) {
                         Log.w(TAG, "audio $songId: YouTube answered ${connection.responseCode} at byte $position of $total, the stream stops here")
                         break

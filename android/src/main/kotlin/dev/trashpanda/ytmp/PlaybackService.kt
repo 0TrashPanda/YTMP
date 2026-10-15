@@ -16,10 +16,12 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import kotlinx.coroutines.CoroutineScope
@@ -88,6 +90,9 @@ class PlaybackService : MediaSessionService() {
     private val ownLinks = mutableMapOf<String, String>()
     private val lookingUp = mutableSetOf<String>()
 
+    /** How often the current song was tried again after it didn't play from anywhere, by item. */
+    private val retries = mutableMapOf<String, Int>()
+
     private val follower = RoomFollower()
 
     /** What the player follows right now: the page's target, with the room parts from [follower]. */
@@ -148,6 +153,8 @@ class PlaybackService : MediaSessionService() {
             )
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
+            // YouTube's links in pieces: asked for in one go, YouTube sends them too slowly.
+            .setMediaSourceFactory(DefaultMediaSourceFactory(ChunkedDataSource.Factory(DefaultDataSource.Factory(this))))
             .build()
         exo.addListener(listener)
         wakeLock = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ytmp:playback").apply { setReferenceCounted(false) }
@@ -521,12 +528,38 @@ class PlaybackService : MediaSessionService() {
                 report(target, "app: ${from.label} failed for ${item.songId} (${error.errorCodeName}), now ${next.label}")
                 loadedItemId = null
                 apply(target)
+            } else if (item != null && (retries[item.itemId] ?: 0) < RETRY_DELAYS_MS.size) {
+                // YouTube sometimes refuses a song for a while, from every connection (403 after
+                // its first MB): rather than staying quiet for the whole song, try again later.
+                val attempt = retries[item.itemId] ?: 0
+                retries.keys.retainAll(setOf(item.itemId))
+                retries[item.itemId] = attempt + 1
+                val wait = RETRY_DELAYS_MS[attempt]
+                Log.i(TAG, "${item.songId} doesn't play from anywhere, trying again in ${wait / 1000} s")
+                report(target, "app: can't play ${item.songId} through the host either (${error.errorCodeName}), trying again in ${wait / 1000} s")
+                PlaybackHub.status("retrying")
+                reportReady()
+                scope.launch {
+                    delay(wait)
+                    val now = current ?: return@launch
+                    if (now.item?.itemId != item.itemId || !now.enabled) return@launch
+                    // From the start again, with fresh links: this phone's, and the host's
+                    // (its proxy forgets a link YouTube refused).
+                    ownLinks.remove(item.songId)
+                    if (hostItemId == item.itemId) hostItemId = null
+                    loadedItemId = null
+                    apply(now)
+                }
             } else {
                 report(target, "app: can't play ${target.item?.songId} through the host either (${error.errorCodeName}: ${error.message})")
                 PlaybackHub.status("error")
                 // It won't load: the room doesn't wait for it.
                 reportReady()
             }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) PlaybackHub.status("playing")
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -658,6 +691,9 @@ class PlaybackService : MediaSessionService() {
         private const val PAUSE_WAIT_MS = 3000L
         /** Buffering this long (ms) is logged, and reported to the host. */
         private const val LONG_BUFFERING_MS = 3000L
+
+        /** A song that didn't play from anywhere is tried again after these waits (ms). */
+        private val RETRY_DELAYS_MS = listOf(10_000L, 30_000L)
 
         /** The room's answer to a seek from here lands about where it was asked to. */
         private const val ROOM_SEEK_MATCH_MS = 1000L

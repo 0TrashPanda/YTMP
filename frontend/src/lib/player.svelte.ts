@@ -391,6 +391,8 @@ class NativePlayer implements RoomPlayer {
 	syncOffsetMs = $state(saved.syncOffsetMs);
 	buffering = $state(false);
 	error = $state<string | null>(null);
+	/** The song [error] is about: the next one starts without it. */
+	private errorItemId: string | null = null;
 
 	constructor(
 		private readonly room: RoomConnection,
@@ -404,7 +406,10 @@ class NativePlayer implements RoomPlayer {
 				// Another app took the audio, or headphones were unplugged (see saved.headphonesAction):
 				// not a choice to stop listening here.
 				if (status === 'stopped') this.disable(false);
-				if (status === 'error') this.error = "Can't play this song on this device.";
+				if (status === 'retrying' || status === 'error') this.errorItemId = this.room.state?.nowPlaying?.item.itemId ?? null;
+				if (status === 'retrying') this.error = "YouTube won't send this song right now. Trying again…";
+				if (status === 'error') this.error = "Can't play this song on this device: YouTube won't send it right now.";
+				if (status === 'playing') this.error = null;
 			}
 		};
 	}
@@ -443,6 +448,7 @@ class NativePlayer implements RoomPlayer {
 		const state = this.room.state;
 		const now = state?.nowPlaying ?? null;
 		const song = now?.item.song;
+		if (this.error && now?.item.itemId !== this.errorItemId) this.error = null;
 		this.bridge.playback(
 			JSON.stringify({
 				enabled: this.enabled,

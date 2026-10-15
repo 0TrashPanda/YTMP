@@ -324,6 +324,9 @@
 					<p class="mt-0.5 truncate text-xs text-muted">
 						Added by {current.item.addedByName}{loading ? ' • loading…' : player.buffering ? ' • buffering…' : ''}
 					</p>
+					{#if player.error}
+						<p class="mt-0.5 text-xs text-accent">{player.error}</p>
+					{/if}
 				</div>
 				{#if youtube.account}
 					{@const shown = song}
