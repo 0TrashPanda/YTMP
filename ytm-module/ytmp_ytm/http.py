@@ -10,6 +10,7 @@ import threading
 import time
 from collections import OrderedDict
 from contextlib import asynccontextmanager
+from urllib.parse import unquote_plus
 
 import httpx
 import uvicorn
@@ -58,6 +59,20 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Vary"] = "Origin"
             return response
+
+    # One line per search, page and stream link, so it's clear the module is being used.
+    # Health checks and the audio pieces of a song (already logged as "stream ...") are left out.
+    @app.middleware("http")
+    async def request_log(request: Request, call_next):
+        started = time.monotonic()
+        response = await call_next(request)
+        path = request.url.path
+        if request.method != "OPTIONS" and path != "/health" and not path.endswith("/audio"):
+            query = f"?{unquote_plus(request.url.query)}" if request.url.query else ""
+            client = request.client.host if request.client else "?"
+            log.info("%s %s%s -> %d in %d ms (from %s)", request.method, path, query,
+                     response.status_code, (time.monotonic() - started) * 1000, client)
+        return response
 
     def check_key(authorization: str | None = Header(default=None)) -> None:
         if key and not (authorization and secrets.compare_digest(authorization, f"Bearer {key}")):
