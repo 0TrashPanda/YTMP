@@ -106,3 +106,8 @@ into YTMP:
 The settings were reorganised (a quick menu behind the avatar, one Settings screen, see
 [UI](ui.md)), but they still need a visual update: how the Settings screen and the room
 settings look, and making them feel like one app (the room settings still look like Discord's).
+
+## Play after skipping while paused
+
+A setting for what **Next** does while the room is paused. Now the next song loads and stays
+paused. With the setting on, it starts playing, like YouTube Music does.
