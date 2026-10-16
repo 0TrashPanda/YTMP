@@ -23,6 +23,7 @@
 	import { removeFromPlaylist, yourRadio } from '../api';
 	import { likes } from '../likes.svelte';
 	import type { RoomConnection } from '../room.svelte';
+	import { isYoutubeSong } from '../ownModule';
 	import { youtube } from '../youtube.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 
@@ -118,7 +119,9 @@
 			list.push({ icon: 'similar', label: 'Find similar', run: () => (onFindSimilar(current), onClose()) });
 			list.push(null);
 		}
-		if (youtube.account) {
+		// Likes and playlists are YouTube Music's: not for local music.
+		const fromYoutube = isYoutubeSong(song.id);
+		if (youtube.account && fromYoutube) {
 			const current = song;
 			const wasCurrent = place === 'current';
 			list.push({ icon: liked ? 'liked' : 'like', label: liked ? 'Remove like' : 'Like', run: () => (likes.set(current.id, !liked, onToast), onClose()) });
@@ -167,7 +170,7 @@
 				});
 			}
 		}
-		if (onSave) {
+		if (onSave && fromYoutube) {
 			const current = song;
 			list.push({ icon: 'save', label: 'Save to playlist', run: () => (onSave(current), onClose()) });
 		}

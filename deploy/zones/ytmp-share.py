@@ -31,6 +31,9 @@ def mpd_picture(uri):
     with socket.create_connection((host, int(port)), timeout=10) as s:
         f = s.makefile("rb")
         f.readline()  # OK MPD …
+        # Big pieces: by default MPD sends 8 KB per request, slow for a 500 KB cover.
+        s.sendall(b"binarylimit 1048576\n")
+        f.readline()  # OK, or ACK on an MPD before 0.22.4 (then it stays 8 KB)
         for command in ("readpicture", "albumart"):
             data, offset, kind = bytearray(), 0, None
             while True:

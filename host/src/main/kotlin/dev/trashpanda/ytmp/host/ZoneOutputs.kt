@@ -119,7 +119,7 @@ class ZoneOutputs(
                     currentCoroutineContext().ensureActive()
                     loaded.update { it + (id to zones) }
                     shareMusic(id, config.music?.let { musicLibrary(it, url, player) })
-                    log.info("Zones from {}: {}{}", url, zones.joinToString { it.name }, if (config.music != null) ", and its music" else "")
+                    log.info("From {}: {}", url, (zones.map { it.name } + listOfNotNull(config.music?.let { "the player's music" })).joinToString())
                 }
             } catch (e: CancellationException) {
                 throw e

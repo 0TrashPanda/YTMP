@@ -74,6 +74,7 @@ class MpdLibrary(
                 track = tags["Track"]?.substringBefore('/')?.trim()?.toIntOrNull(),
                 year = tags["Date"]?.take(4)?.takeIf { it.length == 4 && it.all(Char::isDigit) },
                 durationMs = (tags["duration"]?.toDoubleOrNull() ?: tags["Time"]?.toDoubleOrNull() ?: 0.0).let { Math.round(it * 1000) },
+                folder = file.substringBeforeLast('/', ""),
             )
         }
     }

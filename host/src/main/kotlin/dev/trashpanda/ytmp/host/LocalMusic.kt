@@ -36,7 +36,10 @@ import java.net.URLEncoder
 import java.util.Collections
 import java.util.IdentityHashMap
 
-/** One song in a [LocalLibrary]. [key]: the library's own name for it (MPD: its path). */
+/**
+ * One song in a [LocalLibrary]. [key]: the library's own name for it (MPD: its path). [folder]:
+ * where it is; an album is the songs with the same album name in the same folder.
+ */
 data class LocalTrack(
     val key: String,
     val title: String,
@@ -47,6 +50,7 @@ data class LocalTrack(
     val track: Int?,
     val year: String?,
     val durationMs: Long,
+    val folder: String = "",
 )
 
 /** Music the host reaches itself: an MPD's music folder ([MpdLibrary]), the music on the hosting phone. */
@@ -198,7 +202,7 @@ class LocalMusic {
         val tracks = library.tracks()
         built[tracks]?.let { return it }
         val lib = library.id
-        val ordered = tracks.sortedWith(compareBy<LocalTrack>({ it.albumArtist.lowercase() }, { it.album.lowercase() }, { it.disc ?: 0 }, { it.track ?: 0 }, { it.title.lowercase() }))
+        val ordered = withoutCopies(tracks).sortedWith(compareBy<LocalTrack>({ it.albumArtist.lowercase() }, { it.album.lowercase() }, { it.disc ?: 0 }, { it.track ?: 0 }, { it.title.lowercase() }))
         val trackOf = HashMap<String, LocalTrack>()
         val songOf = HashMap<LocalTrack, Song>()
         for (t in ordered) {
@@ -207,19 +211,21 @@ class LocalMusic {
                 id = id,
                 title = t.title,
                 artists = listOf(ArtistRef(artistId(lib, t.artist), t.artist)),
-                album = t.album.takeIf { it.isNotEmpty() }?.let { AlbumRef(albumId(lib, t.albumArtist, it), it) },
+                album = t.album.takeIf { it.isNotEmpty() }?.let { AlbumRef(albumId(lib, t.folder, it), it) },
                 durationMs = t.durationMs,
-                thumbnails = library.artUrl(t.key, ART_SIZE)?.let { listOf(Thumbnail(it, ART_SIZE, ART_SIZE)) }.orEmpty(),
+                thumbnails = art(library, t.key),
             )
             trackOf[id] = t
             songOf[t] = song
         }
-        val albums = ordered.filter { it.album.isNotEmpty() }.groupBy { it.albumArtist.lowercase() to it.album.lowercase() }.values.map { group ->
-            val first = group.first()
-            val id = albumId(lib, first.albumArtist, first.album)
-            val thumbnails = library.artUrl(first.key, ART_SIZE)?.let { listOf(Thumbnail(it, ART_SIZE, ART_SIZE)) }.orEmpty()
-            val year = group.firstNotNullOfOrNull { it.year }
-            Album(id, first.album, first.albumArtist, artistId(lib, first.albumArtist), year, group.map { songOf.getValue(it) }, AlbumSummary(id, first.album, "Album", year, thumbnails))
+        val albums = ordered.filter { it.album.isNotEmpty() }.groupBy { it.folder to it.album.lowercase() }.values.map { group ->
+            val sorted = group.sortedWith(compareBy<LocalTrack>({ it.disc ?: 0 }, { it.track ?: 0 }, { it.key }))
+            val first = sorted.first()
+            val id = albumId(lib, first.folder, first.album)
+            // The album artist; songs by several artists without one: a compilation.
+            val artist = sorted.map { it.albumArtist }.distinctBy { it.lowercase() }.singleOrNull() ?: VARIOUS_ARTISTS
+            val year = sorted.firstNotNullOfOrNull { it.year }
+            Album(id, first.album, artist, artistId(lib, artist), year, sorted.map { songOf.getValue(it) }, AlbumSummary(id, first.album, "Album", year, art(library, first.key)))
         }
         val names = (ordered.map { it.albumArtist } + ordered.map { it.artist }).filter { it.isNotBlank() }.distinctBy { it.lowercase() }
         val artists = names.sortedBy { it.lowercase() }.map { name ->
@@ -236,6 +242,19 @@ class LocalMusic {
         return b
     }
 
+    /**
+     * One of each song: a music folder often has copies (the same album in two places). A copy
+     * has the same artist, album, disc, track and title and about the same length; the one with
+     * the shortest path stays.
+     */
+    private fun withoutCopies(tracks: List<LocalTrack>): List<LocalTrack> =
+        tracks.sortedWith(compareBy({ it.key.length }, { it.key }))
+            .distinctBy { listOf(it.albumArtist.lowercase(), it.album.lowercase(), it.disc, it.track, it.title.lowercase(), (it.durationMs + 1_000) / 2_000) }
+
+    /** The cover in a few sizes (rows, cards, the player), so pages load small ones where they can. */
+    private fun art(library: LocalLibrary, key: String): List<Thumbnail> =
+        ART_SIZES.mapNotNull { size -> library.artUrl(key, size)?.let { Thumbnail(it, size, size) } }
+
     private fun parse(id: String): Triple<LocalLibrary, String, String>? {
         if (!id.startsWith(PREFIX)) return null
         val parts = id.removePrefix(PREFIX).split(':', limit = 3)
@@ -250,7 +269,8 @@ class LocalMusic {
         private const val SONG = "s"
         private const val ALBUM = "a"
         private const val ARTIST = "r"
-        private const val ART_SIZE = 544
+        private val ART_SIZES = listOf(120, 400, 544)
+        private const val VARIOUS_ARTISTS = "Various Artists"
         private const val RADIO_SIZE = 50
         private const val RADIO_SAME_ARTIST = 10
 
@@ -258,7 +278,7 @@ class LocalMusic {
 
         fun songId(library: String, key: String) = "$PREFIX$library:$SONG:$key"
 
-        fun albumId(library: String, artist: String, album: String) = "$PREFIX$library:$ALBUM:${encode(artist.lowercase())}/${encode(album.lowercase())}"
+        fun albumId(library: String, folder: String, album: String) = "$PREFIX$library:$ALBUM:${encode(folder)}/${encode(album.lowercase())}"
 
         fun artistId(library: String, name: String) = "$PREFIX$library:$ARTIST:${encode(name.lowercase())}"
 

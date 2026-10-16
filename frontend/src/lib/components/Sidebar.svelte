@@ -1,10 +1,11 @@
 <script lang="ts">
-	// Desktop: YTM's left side. The logo, Home and Library, and (wide screens) your playlists.
+	// Desktop: YTM's left side. The logo, Home, Library and Local, and (wide screens) your playlists.
 	// Narrower screens get YTM's mini version: icons with small labels. Phones use the bottom bar.
 	// A search field above your playlists finds one by name.
 	import { getLibrary } from '../api';
 	import { fuzzyFind } from '../format';
 	import type { SearchItemPlaylist } from '../protocol.gen';
+	import { local } from '../local.svelte';
 	import { youtube } from '../youtube.svelte';
 	import Icon from './Icon.svelte';
 
@@ -15,9 +16,9 @@
 		onPlaylist
 	}: {
 		/** What's shown, or null while another page (search, an artist…) is open. */
-		section: 'home' | 'library' | null;
+		section: 'home' | 'library' | 'local' | null;
 		onLogo: () => void;
-		onSection: (section: 'home' | 'library') => void;
+		onSection: (section: 'home' | 'library' | 'local') => void;
 		/** One of your own playlists. */
 		onPlaylist: (playlist: { id: string; title: string }) => void;
 	} = $props();
@@ -41,8 +42,8 @@
 	let query = $state('');
 	const shown = $derived(fuzzyFind(playlists, query, (p) => `${p.title} ${p.author ?? ''}`));
 
-	const sections = $derived(youtube.available ? (['home', 'library'] as const) : (['home'] as const));
-	const labels = { home: 'Home', library: 'Library' };
+	const sections = $derived((['home', 'library', 'local'] as const).filter((s) => s === 'home' || (s === 'library' ? youtube.available : !!local.libraries?.length)));
+	const labels = { home: 'Home', library: 'Library', local: 'Local' };
 </script>
 
 <aside class="hidden w-20 shrink-0 flex-col border-r border-line bg-bg sm:flex lg:w-60">

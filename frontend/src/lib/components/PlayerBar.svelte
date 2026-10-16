@@ -5,6 +5,7 @@
 	import { artistNames, formatTime } from '../format';
 	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
+	import { isYoutubeSong } from '../ownModule';
 	import { youtube } from '../youtube.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef } from '../protocol.gen';
 	import type { RoomPlayer } from '../player.svelte';
@@ -196,7 +197,7 @@
 						{/if}
 					</div>
 				</div>
-				{#if current && youtube.account && images.dislikeButton !== 'hidden'}
+				{#if current && youtube.account && isYoutubeSong(current.item.song.id) && images.dislikeButton !== 'hidden'}
 					{@const id = current.item.song.id}
 					<button
 						class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-40 {rating === 'dislike' ? 'text-white' : ''} {images.dislikeButton === 'dim' ? 'opacity-35 hover:opacity-100' : ''}"
@@ -208,7 +209,7 @@
 						<Icon name={rating === 'dislike' ? 'disliked' : 'dislike'} size={20} />
 					</button>
 				{/if}
-				{#if current && youtube.account}
+				{#if current && youtube.account && isYoutubeSong(current.item.song.id)}
 					{@const id = current.item.song.id}
 					<button
 						class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-40 {liked ? 'text-white' : ''}"

@@ -11,6 +11,8 @@ import type {
 	CreatePlaylistResponse,
 	CreateRoomResponse,
 	LikeStatus,
+	LocalLibraries,
+	LocalLibraryPage,
 	Lyrics,
 	MyPlaylists,
 	PlaylistSummary,
@@ -331,6 +333,16 @@ export async function signOutOfYoutube(): Promise<void> {
 }
 
 /** Your playlists (Liked music first) and podcasts in YouTube Music. */
+/** The local music this host reaches (a Raspberry Pi's music folder, the music on the hosting phone). */
+export function getLocalLibraries(): Promise<LocalLibraries> {
+	return cached('local', () => request('/api/local'));
+}
+
+/** One local library, whole: its albums, artists and songs. */
+export function getLocalLibrary(id: string): Promise<LocalLibraryPage> {
+	return cached(`local:${id}`, () => request(`/api/local/${encodeURIComponent(id)}`));
+}
+
 export function getLibrary(): Promise<HomePage> {
 	return cached('me:library', () => request('/api/me/library'));
 }

@@ -156,6 +156,13 @@ export const saved = {
 	set tabOrder(value: TabOrder) {
 		write('ytmp.tabOrder', value);
 	},
+	/** The Local tab shows the music on the network (a Raspberry Pi's). */
+	get localNetwork(): boolean {
+		return read('ytmp.localNetwork') !== '0';
+	},
+	set localNetwork(on: boolean) {
+		write('ytmp.localNetwork', on ? '1' : '0');
+	},
 	/** Sharp pictures, or small ones to save data (see images.svelte.ts). */
 	get imageQuality(): ImageQuality {
 		return pick('ytmp.imageQuality', ['high', 'low'], 'high');

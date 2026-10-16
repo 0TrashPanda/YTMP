@@ -7,6 +7,8 @@
 	import NowPlaying from '../../../lib/components/NowPlaying.svelte';
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
+	import LocalView from '../../../lib/components/LocalView.svelte';
+	import { local, loadLocal } from '../../../lib/local.svelte';
 	import Sidebar from '../../../lib/components/Sidebar.svelte';
 	import AvatarMenu from '../../../lib/components/AvatarMenu.svelte';
 	import SettingsScreen, { type SettingsSection } from '../../../lib/components/settings/SettingsScreen.svelte';
@@ -114,8 +116,19 @@
 		}
 	}
 
-	// Home and Library (the bottom bar, in the app with YouTube Music sign-in), under the pages above.
-	let section = $state<'home' | 'library'>('home');
+	// Home, Library (in the app with YouTube Music sign-in) and Local (when there's local
+	// music): the bottom bar, under the pages above.
+	let section = $state<'home' | 'library' | 'local'>('home');
+	const sections = $derived(
+		([
+			['home', 'Home'],
+			['library', 'Library'],
+			['local', 'Local']
+		] as const).filter(([value]) => value === 'home' || (value === 'library' ? youtube.available : !!local.libraries?.length))
+	);
+	$effect(() => {
+		void loadLocal();
+	});
 	let accountOpen = $state(false);
 	/** Settings, at this section (null: the list). */
 	let settingsAt = $state<SettingsSection | null | undefined>(undefined);
@@ -129,7 +142,7 @@
 	/** Saving this song to one of your YouTube Music playlists. */
 	let saving = $state<Song | null>(null);
 
-	function pickSection(next: 'home' | 'library') {
+	function pickSection(next: 'home' | 'library' | 'local') {
 		closePlayer();
 		section = next;
 		browsing = false;
@@ -636,6 +649,8 @@
 							{:else if view.kind === 'podcast'}
 								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
 							{/if}
+						{:else if section === 'local'}
+							<LocalView {room} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} onAlbum={(a) => openAlbum(a)} onPlaylist={openPlaylist} onPodcast={openPodcast} />
 						{:else if section === 'library'}
 							<LibraryView
 								onToast={toast}
@@ -693,10 +708,10 @@
 				onPodcast={openPodcast}
 			/>
 		{/if}
-		{#if youtube.available}
+		{#if sections.length > 1}
 			<!-- Like YTM's bottom bar, on phones (desktop: the Sidebar). -->
 			<nav class="flex shrink-0 bg-surface sm:hidden">
-				{#each [['home', 'Home'], ['library', 'Library']] as const as [value, label] (value)}
+				{#each sections as [value, label] (value)}
 					{@const active = section === value && !browsing}
 					<button class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs {active ? 'text-white' : 'text-muted'}" aria-current={active ? 'page' : undefined} onclick={() => pickSection(value)}>
 						<Icon name={value} size={24} />

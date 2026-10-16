@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { hideIfBroken } from '../pictures';
 	// An artist page: top songs, albums and singles.
 	import { thumbUrl } from '../images.svelte';
 	import { getArtist, yourRadio } from '../api';
@@ -61,7 +62,7 @@
 	<header class="flex items-center gap-5 px-2">
 		<div class="h-28 w-28 shrink-0 overflow-hidden rounded-full bg-raised sm:h-40 sm:w-40">
 			{#if artist?.thumbnails.at(-1)}
-				<img src={thumbUrl(artist.thumbnails, 400)} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+				<img src={thumbUrl(artist.thumbnails, 400)} alt="" use:hideIfBroken referrerpolicy="no-referrer" class="h-full w-full object-cover" />
 			{/if}
 		</div>
 		<div class="min-w-0">

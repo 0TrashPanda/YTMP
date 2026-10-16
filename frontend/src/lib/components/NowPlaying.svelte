@@ -8,6 +8,7 @@
 	import { prefetch } from '../api';
 	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
+	import { isYoutubeSong } from '../ownModule';
 	import { youtube } from '../youtube.svelte';
 	import type { PageHandlers } from '../cards';
 	import type { RoomPlayer } from '../player.svelte';
@@ -328,7 +329,7 @@
 						<p class="mt-0.5 text-xs text-accent">{player.error}</p>
 					{/if}
 				</div>
-				{#if youtube.account}
+				{#if youtube.account && song && isYoutubeSong(song.id)}
 					{@const shown = song}
 					<button
 						class="shrink-0 rounded-full p-2.5 hover:bg-white/10 disabled:opacity-40"

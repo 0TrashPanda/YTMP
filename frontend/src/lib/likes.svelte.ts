@@ -2,6 +2,7 @@
 // player, the player bar and the song menu so they always agree. Needs your YouTube Music sign-in.
 import { SvelteMap } from 'svelte/reactivity';
 import { getRating, setRating } from './api';
+import { isYoutubeSong } from './ownModule';
 import type { LikeStatus } from './protocol.gen';
 import { youtube } from './youtube.svelte';
 
@@ -33,7 +34,8 @@ class Likes {
 			this.#known.clear();
 			this.#asked.clear();
 		}
-		if (!youtube.account || this.#asked.has(songId)) return;
+		// Only YouTube Music songs have a like there (not local music).
+		if (!youtube.account || !isYoutubeSong(songId) || this.#asked.has(songId)) return;
 		this.#asked.add(songId);
 		getRating(songId)
 			.then((s) => this.#known.set(songId, toRating(s)))

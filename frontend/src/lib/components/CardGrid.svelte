@@ -14,6 +14,8 @@
 </script>
 
 <script lang="ts">
+	import { hideIfBroken } from '../pictures';
+	import Icon from './Icon.svelte';
 	/** [row]: one row that scrolls sideways (the home page), instead of a grid. */
 	import PageDots from './PageDots.svelte';
 
@@ -31,9 +33,11 @@
 >
 	{#each unique as card (card.key)}
 		<button class="group flex min-w-0 snap-start flex-col gap-2 text-left" onclick={card.open} onpointerenter={card.prefetch} ontouchstart={card.prefetch}>
-			<div class="aspect-square w-full overflow-hidden bg-raised {card.round ? 'rounded-full' : 'rounded-md'}">
+			<div class="relative grid aspect-square w-full place-items-center overflow-hidden bg-raised text-muted {card.round ? 'rounded-full' : 'rounded-md'}">
+				<!-- Under the picture: shows when there's none, or it doesn't load. -->
+				<Icon name={card.round ? 'person' : 'note'} size={40} class="absolute" />
 				{#if card.art}
-					<img src={card.art} alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover transition-transform group-hover:scale-105" />
+					<img src={card.art} alt="" use:hideIfBroken loading="lazy" referrerpolicy="no-referrer" class="relative h-full w-full object-cover transition-transform group-hover:scale-105" />
 				{/if}
 			</div>
 			<div class="min-w-0 {card.round ? 'text-center' : ''}">
