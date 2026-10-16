@@ -104,7 +104,10 @@ class ZoneOutputs(
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: VirtualMachineError) {
+                throw e
+            } catch (e: Throwable) {
+                // Anything wrong with a file from the network only costs its zones, never the app.
                 if (e.message != problem) log.warn("Zones from {}: {}", url, e.message)
                 problem = e.message
                 // A broken file has no zones; one that's out of reach keeps them a little while.

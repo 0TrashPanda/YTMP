@@ -111,7 +111,8 @@ class ZoneControl(val key: String, private val amp: ZoneAmp) {
     }
 
     companion object {
-        private val PLACEHOLDER = Regex("""\{([A-Za-z0-9_.-]+)}""")
+        // Both braces escaped: Android's regex engine (ICU) rejects a lone "}".
+        private val PLACEHOLDER = Regex("""\{([A-Za-z0-9_.-]+)\}""")
         private val BUILT_IN = setOf("base", "zone")
 
         internal fun placeholders(template: String) = PLACEHOLDER.findAll(template).map { it.groupValues[1] }.toSet()
