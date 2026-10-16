@@ -205,6 +205,8 @@ fun Application.ytmpModule(
     suggestions: SearchSuggestions? = null,
     /** Lyrics for the songs (LRCLIB, then the source's own). */
     lyrics: LyricsLookup? = null,
+    /** Amplifier zones, for another host that takes their player over. */
+    zones: ZoneOutputs? = null,
 ) {
     val screens = ScreenPairings()
     install(ContentNegotiation) { json(ProtocolJson) }
@@ -300,6 +302,13 @@ fun Application.ytmpModule(
     routing {
         route("/api") {
             if (options.accountsOnly) install(accountsOnly)
+            // Another YTMP host that takes over a zones player asks what this host's zones had before.
+            get("/zones/handover") {
+                val host = call.request.queryParameters["host"]
+                val port = call.request.queryParameters["port"]?.toIntOrNull()
+                if (zones == null || host == null || port == null) return@get call.respond(HttpStatusCode.NotFound)
+                call.respond(zones.handover(ZoneOutputs.Player(host, port)))
+            }
             get("/host") {
                 // The hosting device's own page, logged in: whose device this is.
                 if (options.isLocal(call)) call.account()

@@ -75,7 +75,10 @@ with nothing to set up. Switching a room on switches it to the player on the amp
 rooms play the same music together. Each has its own volume slider, which is that room's
 volume on the amp. Switched off, the room goes back to what it had (the TV, muted or not).
 Picking something else for a room on the amp itself switches it off in YTMP. One player plays
-one room's music: when another room switches on one of its zones, it gets the player.
+one room's music: when another room switches on one of its zones, it gets the player, also
+a room on another phone. Either way, when the last one is done the amp's rooms go back to
+what they had before the first. A room can be left out of *Play on* (say the amp's
+headphones).
 
 Changing host outputs is a permission (see [room management](room-management.md#permissions)).
 

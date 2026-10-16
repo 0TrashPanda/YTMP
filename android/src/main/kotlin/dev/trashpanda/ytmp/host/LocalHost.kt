@@ -184,6 +184,7 @@ class LocalHost(private val context: Context) {
                 personal = youtube,
                 suggestions = cached,
                 lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
+                zones = zones,
             )
         }.start(wait = false)
         Log.i(TAG, "Hosting on port $PORT")

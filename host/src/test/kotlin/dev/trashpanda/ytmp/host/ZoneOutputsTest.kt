@@ -24,7 +24,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import com.sun.net.httpserver.HttpServer
 import java.io.File
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -35,9 +38,9 @@ class ZoneOutputsTest {
     private val song = Song("ytm:abc", "One More Time", listOf(ArtistRef(null, "Daft Punk")), null, 320_000, emptyList())
 
     /** A host with the MPD and the amp's zones, and a way to make rooms. */
-    private class Setup(val scope: CoroutineScope, val mpd: FakeMpd, val amp: FakeAmp) {
-        val mpds = MpdOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
-        val zones = ZoneOutputs(scope, { address -> "http://${address.hostAddress}:8765" }, mpds)
+    private class Setup(val scope: CoroutineScope, val mpd: FakeMpd, val amp: FakeAmp, audioBase: String = "http://127.0.0.1:8765") {
+        val mpds = MpdOutputs(scope) { audioBase }
+        val zones = ZoneOutputs(scope, { audioBase }, mpds)
         val rooms = RoomManager(
             { "https://stream/$it" },
             scope,
@@ -162,6 +165,48 @@ class ZoneOutputsTest {
         assertEquals(2, amp.zones[5]?.vchan)
         delay(2_500)
         assertEquals("http://127.0.0.1:8765/api/audio/ytm%3Adef", mpd.file)
+    }
+
+    @Test
+    fun `a host that takes the player over puts the house back as it was before the first`() = withSetup {
+        // Another host (say a second phone) on the same Pi and amp, which answers the handover over HTTP.
+        val server = HttpServer.create(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0), 0)
+        val other = Setup(scope, mpd, amp, audioBase = "http://127.0.0.1:${server.address.port}")
+        server.createContext("/api/zones/handover") { exchange ->
+            val query = exchange.requestURI.query.split('&').associate { it.substringBefore('=') to it.substringAfter('=') }
+            val body = zoneJson.encodeToString(ZoneHandover.serializer(), other.zones.handover(ZoneOutputs.Player(query["host"]!!, query["port"]!!.toInt()))).toByteArray()
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.start()
+        try {
+            eventually { zones.devices.value.size == 2 && other.zones.devices.value.size == 2 }
+            // The other host plays on both zones first.
+            val first = other.rooms.create("First")
+            val runFirst = other.join(first)
+            runFirst(Command.AddSongs(listOf(song), QueuePosition.END))
+            runFirst(Command.SetOutput(zithoek, active = true))
+            runFirst(Command.SetOutput(keuken, active = true))
+            eventually { mpd.state == "play" && amp.zones[1]?.vchan == 2 && amp.zones[5]?.vchan == 2 }
+
+            // This host takes Keuken.
+            val second = rooms.create("Second")
+            val runSecond = join(second)
+            runSecond(Command.AddSongs(listOf(song.copy(id = "ytm:def", title = "Other")), QueuePosition.END))
+            runSecond(Command.SetOutput(keuken, active = true))
+            eventually { mpd.file == "http://127.0.0.1:8765/api/audio/ytm%3Adef" }
+            // Zithoek, which it doesn't want, goes back to what it had before the other host (Digibox, unmuted).
+            eventually { amp.zones[1] == FakeAmp.ZoneState(1, 0, 39) }
+            eventually { first.view().activeOutputs.isEmpty() }
+            assertEquals(2, amp.zones[5]?.vchan)
+
+            // Done: Keuken too goes back to what it had before the other host (Digibox, muted).
+            runSecond(Command.SetOutput(keuken, active = false))
+            eventually { amp.zones[5]?.let { it.vchan == 1 && it.muted == 1 } == true }
+            eventually { mpd.state == "stop" }
+        } finally {
+            server.stop(0)
+        }
     }
 
     @Test

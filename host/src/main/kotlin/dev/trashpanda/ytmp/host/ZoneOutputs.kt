@@ -23,12 +23,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URI
+import java.net.URLEncoder
 
 /**
  * Amplifier zones: rooms of a multi-room amp that one player (an MPD) feeds, each offered as a
@@ -211,9 +213,12 @@ class ZoneOutputs(
             log.info("Zones of {}: another room plays there now", player.host)
             return takenOver(restore = true)
         }
-        val session = players.getOrPut(player) {
+        var session = players[player]
+        if (session == null) {
+            inheritFrom(player, runs.map { it.zone.id }.toSet())
             synchronized(lock) { playerOwners[player] = me }
-            MpdSession(runs.joinToString(" and ") { it.zone.name }, player.host, player.port, audioBaseUrl)
+            session = MpdSession(runs.joinToString(" and ") { it.zone.name }, player.host, player.port, audioBaseUrl)
+            players[player] = session
         }
         // The zones first, so the song's start is heard.
         for (run in runs) {
@@ -313,6 +318,61 @@ class ZoneOutputs(
         }
     }
 
+    /**
+     * What this host's rooms have of [player]'s zones, for another YTMP host that takes the player
+     * over: each zone's state from before it was switched on (empty when nothing was saved).
+     */
+    fun handover(player: Player): ZoneHandover {
+        val ids = loaded.value.values.flatten().filter { it.player == player }.map { it.id }.toSet()
+        return synchronized(lock) { ZoneHandover(zoneOwners.keys.filter { it in ids }.associateWith { savedStates[it].orEmpty() }) }
+    }
+
+    /**
+     * Before a room takes [player] over from another YTMP host (its music plays there now): asks
+     * that host which zones it has on and what they had before. The zones this room switches on
+     * too go back to that when it's done; the others go back right away. If the other host
+     * can't be asked, its zones are left as they are.
+     */
+    private suspend fun inheritFrom(player: Player, wanted: Set<String>) {
+        val handover = try {
+            askHandover(player) ?: return
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.info("Zones of {}: couldn't ask the host that played there: {}", player.host, e.message)
+            return
+        }
+        val known = loaded.value.values.flatten().associateBy { it.id }
+        for ((id, saved) in handover.zones) {
+            val zone = known[id]?.takeIf { it.player == player } ?: continue
+            if (synchronized(lock) { zoneOwners[id] != null }) continue
+            if (id in wanted) {
+                synchronized(lock) { savedStates.putIfAbsent(id, saved) }
+            } else {
+                log.info("Zone {}: switching it off (the host that played there had it on)", zone.name)
+                try {
+                    for (url in zone.control.offUrls(saved)) httpGet(url)
+                } catch (e: IOException) {
+                    log.warn("Zone {} couldn't be switched off: {}", zone.name, e.message)
+                }
+            }
+        }
+    }
+
+    /** The other host's handover, or null when the player plays nothing of another YTMP host's. */
+    private suspend fun askHandover(player: Player): ZoneHandover? {
+        val mpd = MpdPlayer(player.host, player.port)
+        val file = mpd.status().file ?: return null
+        val at = file.indexOf("/api/audio/").takeIf { it > 0 } ?: return null
+        val base = file.substring(0, at)
+        if (base == audioBaseUrl(mpd.localAddress).trimEnd('/')) return null
+        val uri = runCatching { URI(base) }.getOrNull() ?: return null
+        if ((uri.scheme != "http" && uri.scheme != "https") || uri.host == null || !isLocal(uri.host)) return null
+        val query = "host=" + URLEncoder.encode(player.host, Charsets.UTF_8) + "&port=" + player.port
+        val text = httpGet("$base/api/zones/handover?$query", connectTimeout = 1_500, readTimeout = 2_000)
+        return zoneJson.decodeFromString<ZoneHandover>(text)
+    }
+
     private fun release(me: Any, player: Player): Boolean = synchronized(lock) {
         if (playerOwners[player] !== me) return false
         playerOwners.remove(player)
@@ -360,11 +420,11 @@ class ZoneOutputs(
             if (player.port == MpdPlayer.DEFAULT_PORT) "zone:${player.host}:$zone" else "zone:${player.host}:${player.port}:$zone"
 
         /** The answer to a GET, as text. */
-        internal suspend fun httpGet(url: String): String = withContext(Dispatchers.IO) {
+        internal suspend fun httpGet(url: String, connectTimeout: Int = 3_000, readTimeout: Int = 5_000): String = withContext(Dispatchers.IO) {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
             try {
-                connection.connectTimeout = 3_000
-                connection.readTimeout = 5_000
+                connection.connectTimeout = connectTimeout
+                connection.readTimeout = readTimeout
                 connection.instanceFollowRedirects = false
                 val code = connection.responseCode
                 if (code !in 200..299) throw IOException("HTTP $code from ${URI(url).host}")
@@ -375,3 +435,7 @@ class ZoneOutputs(
         }
     }
 }
+
+/** A host's zones of one player, by id, each with the state it had before (`GET /api/zones/handover`). */
+@Serializable
+data class ZoneHandover(val zones: Map<String, Map<String, String>>)

@@ -160,6 +160,7 @@ fun main(args: Array<String>) {
             catalog = cached,
             suggestions = cached,
             lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
+            zones = zones,
             // Your account's YouTube Music, when you're logged in with an account of this server.
             // Also from the pages of rooms on other hosts, with a token just for that (see AccountApi.youtubeToken).
             personalFor = { call ->

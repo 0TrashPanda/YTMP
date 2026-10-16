@@ -81,7 +81,15 @@ to the internet. The worst it can do is offer zones that don't work.
 - **Two rooms on one host**: the room that switched on a zone of a player last gets the
   player. The other room's zones of it are switched off there (and back on the amp, unless
   the new room has them too), with the usual notice.
-- **Another app or host** takes the MPD (it plays something that isn't this host's audio): the
+- **Another YTMP host** (say a second phone) takes the player: first it asks the host whose
+  music plays there (the address in MPD's current song) which zones it has on and what they
+  had before (`GET /api/zones/handover?host=…&port=…`). The zones it switches on too keep that
+  state, so they go back to it when it's done; the others go back right away. So however many
+  hosts take over in turn, the house ends up as it was before the first. The host that lost
+  the player switches its zones off in its room and leaves the amp to the new one. It's asked
+  while it's still playing (so a phone host is still awake and hosting); if it can't be asked
+  (gone, or an older version), its zones are left as they are.
+- **Another app** takes the MPD (it plays something that isn't a YTMP host's audio): the
   zones are switched off in the room and left as they are on the amp.
 
 ## Finding the file
