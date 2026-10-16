@@ -68,8 +68,11 @@
   are only held while a room plays: a **wake lock** (songs move on with the screen off, also
   when only speakers or friends listen) and a **Wi-Fi lock** (high-performance; the next song
   must load). An idle public room holds neither: a friend's request wakes the phone.
-- Chromecast and Sonos discovery (`CastFinder`, `SonosFinder`) run while the app is on screen,
-  or while a public room plays; devices found earlier stay in the list.
+- Chromecast, Sonos and MPD discovery (`CastFinder`, `SonosFinder`, `MpdFinder`, all on
+  `NsdFinder`) run while the app is on screen, or while a public room plays. A device leaves
+  the list when mDNS says it's gone (after 30 s, in case it's back right away), when a new
+  search doesn't find it within 20 s, and when the phone is on another Wi-Fi network
+  (`WifiWatch`: another address range or router, or off Wi-Fi for over a minute).
 - **Cloning onto the phone** (bridge `cloneRoom`, version 6): from another host's page in the
   app, the page hands over a copy of the room; the app makes it on its own host and the page
   opens it there (`http://127.0.0.1:8765/room/CODE#owner=…`). From the phone's own page onto
@@ -81,7 +84,7 @@
   [chromecast](chromecast.md#from-the-app-in-a-room-on-another-host-).
 - **Speakers near the phone** (bridge `nearby`, `playNearby`, `stopNearby`,
   `setNearbyVolume`, version 8): in a room on another host, the phone plays the room on its
-  Sonos speakers and Chromecasts itself (`LocalHost.nearby`), see
+  Sonos speakers, Chromecasts and MPDs itself (`LocalHost.nearby`), see
   [chromecast](chromecast.md#speakers-near-the-phone-in-a-room-on-another-host-).
 - **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
   account holders of that server can join its rooms (see [auth](auth.md)). The WebView keeps

@@ -6,6 +6,7 @@ import dev.trashpanda.ytmp.core.RoomTimeouts
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.LyricsLookup
+import dev.trashpanda.ytmp.host.MpdOutputs
 import dev.trashpanda.ytmp.host.SonosOutputs
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -80,8 +81,11 @@ fun main(args: Array<String>) {
             config.cast.audioBaseUrl.trimEnd('/').ifEmpty { "http://${localAddress.hostAddress}:${config.server.port}" }
         }
         config.sonos.devices.forEach(sonos::addHost)
-        if (config.sonos.discovery) sonos.discover()
-        val outputs = combine(casts.devices, sonos.devices) { a, b -> a + b }.stateIn(this, SharingStarted.Eagerly, emptyList())
+        if (config.sonos.discovery) sonos.discover(keep = config.sonos.devices.toSet())
+        val mpd = MpdOutputs(this, audioBase)
+        mpd.addConfigured(config.mpd.devices)
+        if (config.mpd.discovery) mpd.discover(keep = config.mpd.devices.map { MpdEntry.parse(it).id }.toSet())
+        val outputs = combine(casts.devices, sonos.devices, mpd.devices) { a, b, c -> a + b + c }.stateIn(this, SharingStarted.Eagerly, emptyList())
 
         val db = Database.open(config.database)
         val accounts = Accounts(db)
@@ -124,6 +128,7 @@ fun main(args: Array<String>) {
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
         casts.attach(rooms)
         sonos.attach(rooms)
+        mpd.attach(rooms)
 
         ytmpModule(
             rooms,

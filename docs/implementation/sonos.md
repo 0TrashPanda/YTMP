@@ -15,8 +15,9 @@ Sonos speakers are room outputs next to Chromecasts (see [playback](../features/
   reports whole seconds) is seeked. Volume changed in the Sonos app or on the speaker shows
   up in the room.
 - Discovery: the **phone** uses Android's NSD (`_sonos._tcp`); the **server** sends an SSDP
-  M-SEARCH for ZonePlayers, which needs UDP multicast replies to get through (a firewall or
-  Docker without host networking blocks them). Speakers can also be listed by IP address:
+  M-SEARCH for ZonePlayers every 5 minutes, which needs UDP multicast replies to get through
+  (a firewall or Docker without host networking blocks them); a speaker it found that misses 3
+  searches in a row goes from the list. Speakers can also be listed by IP address (those stay):
 
 ```toml
 [sonos]

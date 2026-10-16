@@ -281,9 +281,14 @@ class MainActivity : ComponentActivity() {
         CastScreenState(devices.map { CastScreenDevice(it.id, it.name) }, shown)
 
     /** The speakers and TVs this phone found, the party screens it shows, and what plays on them (bridge `nearby`). */
-    private fun nearbyState() = combine(app.host.casts.devices, app.host.sonos.devices, app.host.castScreens.shown, app.host.nearby.playing, ::NearbyState)
+    private fun nearbyState() = combine(
+        combine(app.host.casts.devices, app.host.sonos.devices, app.host.mpd.devices) { a, b, c -> a + b + c },
+        app.host.castScreens.shown,
+        app.host.nearby.playing,
+        NearbyState::of,
+    )
 
-    private fun nearbyDevices(): List<OutputDevice> = app.host.casts.devices.value + app.host.sonos.devices.value
+    private fun nearbyDevices(): List<OutputDevice> = app.host.casts.devices.value + app.host.sonos.devices.value + app.host.mpd.devices.value
 
     /** [url] is on the site of the page shown now (one of the app's pages): only that page may use it. */
     private fun fromThisPage(url: String): Boolean {
@@ -545,14 +550,14 @@ class MainActivity : ComponentActivity() {
         }
 
         /**
-         * The Sonos speakers and Chromecasts on this phone's network, the party screens shown
+         * The Chromecasts, Sonos speakers and MPDs on this phone's network, the party screens shown
          * there, and the room playing on them (bridge version 8), as JSON [NearbyState].
          * Changes come as `onNearby`, problems as `onNearbyNotice(text)`.
          */
         @JavascriptInterface
         fun nearby(): String = json.encodeToString(
             NearbyState.serializer(),
-            NearbyState(app.host.casts.devices.value, app.host.sonos.devices.value, app.host.castScreens.shown.value, app.host.nearby.playing.value),
+            NearbyState.of(nearbyDevices(), app.host.castScreens.shown.value, app.host.nearby.playing.value),
         )
 
         /**
@@ -613,8 +618,10 @@ private data class CastScreenDevice(val id: String, val name: String)
 /** For the page (bridge `nearby`): the speakers and TVs this phone found, and what it does with them. */
 @Serializable
 private data class NearbyState(val devices: List<NearbyDevice>, val shown: List<ShownScreen>, val playing: NearbyPlaying?) {
-    constructor(casts: List<OutputDevice>, sonos: List<OutputDevice>, shown: List<ShownScreen>, playing: NearbyPlaying?) :
-        this((casts + sonos).map { NearbyDevice(it.id, it.name, it.kind) }, shown, playing)
+    companion object {
+        fun of(devices: List<OutputDevice>, shown: List<ShownScreen>, playing: NearbyPlaying?) =
+            NearbyState(devices.map { NearbyDevice(it.id, it.name, it.kind) }, shown, playing)
+    }
 }
 
 @Serializable

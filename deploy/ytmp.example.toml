@@ -32,6 +32,14 @@ discovery = true
 # Sonos speakers to always offer, by IP address. They're named after their Sonos room.
 devices = []
 
+[mpd]
+# Find MPD players (e.g. a Raspberry Pi on a speaker) with mDNS. Inside Docker this needs
+# network_mode: host.
+discovery = true
+# MPD players to always offer, as "host", "host:port" or "Name=host[:port]",
+# e.g. ["Woonkamer=192.168.0.50"].
+devices = []
+
 [accounts]
 # This server's public address. Logins on pages served from there work; without it only
 # this machine's own IP addresses do. YTMP_URL overrides it.

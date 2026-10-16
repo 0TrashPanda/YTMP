@@ -205,7 +205,7 @@
 		{#each outputs as output (output.id)}
 			<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">
 				<label class="flex items-center gap-3">
-					<Icon name={output.kind === 'sonos' ? 'speaker' : 'cast'} size={20} class={output.active ? 'text-accent' : 'text-muted'} />
+					<Icon name={output.kind === 'chromecast' ? 'cast' : 'speaker'} size={20} class={output.active ? 'text-accent' : 'text-muted'} />
 					<span class="min-w-0 flex-1 truncate">{output.name}</span>
 					<input
 						type="checkbox"
@@ -254,7 +254,7 @@
 			<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">
 				{#if canPlayNear}
 					<label class="flex items-center gap-3">
-						<Icon name={device.kind === 'sonos' ? 'speaker' : 'cast'} size={20} class={plays?.here || showsHere ? 'text-accent' : 'text-muted'} />
+						<Icon name={device.kind === 'chromecast' ? 'cast' : 'speaker'} size={20} class={plays?.here || showsHere ? 'text-accent' : 'text-muted'} />
 						<span class="min-w-0 flex-1 truncate">{device.name}</span>
 						<input
 							type="checkbox"

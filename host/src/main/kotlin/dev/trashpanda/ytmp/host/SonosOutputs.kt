@@ -42,17 +42,21 @@ class SonosOutputs(
     private val scope: CoroutineScope,
     /** Base URL of this host as seen from a speaker that reached us at [InetAddress]. */
     private val audioBaseUrl: (localAddress: InetAddress) -> String,
-) {
+) : OutputDriver {
     private val known = MutableStateFlow<Map<String, SonosAddress>>(emptyMap())
     private val drivers = HashMap<String, Job>()
 
     /** The speakers as room outputs. */
-    val devices: StateFlow<List<OutputDevice>> = known
+    override val devices: StateFlow<List<OutputDevice>> = known
         .map { all -> all.values.sortedBy { it.name }.map { OutputDevice(it.id, it.name, OutputKind.SONOS) } }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     fun add(device: SonosAddress) {
         known.update { it + (device.id to device) }
+    }
+
+    fun remove(id: String) {
+        known.update { it - id }
     }
 
     /** Adds a speaker by address, named after its room ("Woonkamer"). */
@@ -64,12 +68,32 @@ class SonosOutputs(
         }
     }
 
-    /** Looks for Sonos speakers with SSDP now and every few minutes. Needs UDP multicast replies to get through. */
-    fun discover() {
+    /**
+     * Looks for Sonos speakers with SSDP now and every few minutes. Needs UDP multicast replies to
+     * get through. A speaker it found that doesn't answer [MISSED_SEARCHES] searches in a row is
+     * gone (switched off, moved); the ones in [keep] (the configured ones) stay.
+     */
+    fun discover(keep: Set<String> = emptySet()) {
         scope.launch(Dispatchers.IO) {
+            val missed = HashMap<String, Int>()
             while (true) {
-                runCatching { ssdpSearch() }.onFailure { log.debug("Sonos discovery failed: {}", it.message) }.getOrNull()
-                    ?.forEach { host -> if (known.value.values.none { it.host == host }) addHost(host) }
+                val found = runCatching { ssdpSearch() }.onFailure { log.debug("Sonos discovery failed: {}", it.message) }.getOrNull()
+                if (found != null) {
+                    for (host in found) {
+                        missed[host] = 0
+                        if (known.value.values.none { it.host == host }) addHost(host)
+                    }
+                    for (host in missed.keys - found - keep) {
+                        val count = missed.getValue(host) + 1
+                        missed[host] = count
+                        if (count < MISSED_SEARCHES) continue
+                        missed.remove(host)
+                        known.value.values.filter { it.host == host }.forEach {
+                            log.info("Sonos {} is gone", it.name)
+                            remove(it.id)
+                        }
+                    }
+                }
                 delay(DISCOVERY_INTERVAL_MS)
             }
         }
@@ -88,11 +112,7 @@ class SonosOutputs(
         }
     }
 
-    /**
-     * Plays a room on these devices (the ones in its [RoomView.activeOutputs]) until the job is
-     * cancelled: a room on another host that this phone plays on speakers near it.
-     */
-    fun play(room: OutputRoom): Job = scope.launch { drive(room) }
+    override fun play(room: OutputRoom): Job = scope.launch { drive(room) }
 
     private suspend fun drive(room: OutputRoom) {
         val changed = Channel<Unit>(Channel.CONFLATED)
@@ -270,5 +290,7 @@ class SonosOutputs(
         private const val VOLUME_CHECK_MS = 6_000L
         private const val RETRY_AFTER_MS = 10_000L
         private const val DISCOVERY_INTERVAL_MS = 5 * 60_000L
+        /** SSDP answers can get lost: only this many missed searches in a row mean a speaker is gone. */
+        private const val MISSED_SEARCHES = 3
     }
 }

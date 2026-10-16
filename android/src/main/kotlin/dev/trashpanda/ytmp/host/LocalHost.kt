@@ -69,9 +69,19 @@ class LocalHost(private val context: Context) {
     /** Sonos speakers on the network; they fetch the audio from this phone too. */
     val sonos = SonosOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
     val sonosFinder = SonosFinder(context, sonos)
+    /** MPDs on the network (e.g. a Raspberry Pi with a speaker); they fetch the audio from this phone too. */
+    val mpd = MpdOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
+    val mpdFinder = MpdFinder(context, mpd)
+    /** On another Wi-Fi network, the devices found on the old one go from the list. */
+    private val wifi = WifiWatch(context) {
+        Log.i(TAG, "On another network: looking for speakers and TVs again")
+        castFinder.forgetAll()
+        sonosFinder.forgetAll()
+        mpdFinder.forgetAll()
+    }
     /** Speakers here that play a room on another host (a server), which can't reach them. */
-    val nearby = NearbySpeakers(scope, casts, sonos)
-    private val outputs = combine(casts.devices, sonos.devices) { a, b -> a + b }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+    val nearby = NearbySpeakers(scope, listOf(casts, sonos, mpd))
+    private val outputs = combine(casts.devices, sonos.devices, mpd.devices) { a, b, c -> a + b + c }.stateIn(scope, SharingStarted.Eagerly, emptyList())
     val authLink = AuthLink(context, PORT)
     /** The phone owner's YouTube Music account. */
     val youtube = PhoneYoutubeAccount(context) { ytm }
@@ -140,6 +150,8 @@ class LocalHost(private val context: Context) {
         sync.start()
         casts.attach(rooms)
         sonos.attach(rooms)
+        mpd.attach(rooms)
+        wifi.start()
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
             ytmpModule(
                 rooms,

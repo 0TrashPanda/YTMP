@@ -155,6 +155,8 @@ data class RoomInfo(
 enum class OutputKind {
     @SerialName("chromecast") CHROMECAST,
     @SerialName("sonos") SONOS,
+    /** MPD (Music Player Daemon), e.g. on a Raspberry Pi with a speaker. */
+    @SerialName("mpd") MPD,
 }
 
 /** A speaker or TV the host can play the room on. */

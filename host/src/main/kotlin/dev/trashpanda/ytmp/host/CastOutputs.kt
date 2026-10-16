@@ -51,12 +51,12 @@ class CastOutputs(
     private val pageBaseUrl: ((localAddress: InetAddress) -> String)? = null,
     /** Base URL of this host as seen from a device that reached us at [InetAddress] (our side of the connection). */
     private val audioBaseUrl: (localAddress: InetAddress) -> String,
-) {
+) : OutputDriver {
     private val known = MutableStateFlow<Map<String, CastDeviceAddress>>(emptyMap())
     private val drivers = HashMap<String, Job>()
 
     /** The devices as room outputs. Pass to [RoomManager]. */
-    val devices: StateFlow<List<OutputDevice>> = known
+    override val devices: StateFlow<List<OutputDevice>> = known
         .map { all -> all.values.sortedBy { it.name }.map { OutputDevice(it.id, it.name, OutputKind.CHROMECAST) } }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -84,11 +84,7 @@ class CastOutputs(
         }
     }
 
-    /**
-     * Plays a room on these devices (the ones in its [RoomView.activeOutputs]) until the job is
-     * cancelled: a room on another host that this phone plays on speakers near it.
-     */
-    fun play(room: OutputRoom): Job = scope.launch { drive(room) }
+    override fun play(room: OutputRoom): Job = scope.launch { drive(room) }
 
     private suspend fun drive(room: OutputRoom) {
         val changed = Channel<Unit>(Channel.CONFLATED)

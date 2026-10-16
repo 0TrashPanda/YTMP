@@ -24,6 +24,9 @@ class ConfigTest {
                 [cast]
                 discovery = false
                 devices = ["Bose=10.0.0.109", "10.0.0.101"]
+
+                [mpd]
+                devices = ["Woonkamer=192.168.0.50", "192.168.0.51:6601"]
                 """.trimIndent(),
             )
             deleteOnExit()
@@ -37,6 +40,12 @@ class ConfigTest {
         assertEquals(6, config.rooms.codeLength)
         assertEquals(false, config.cast.discovery)
         assertEquals(listOf("Bose=10.0.0.109", "10.0.0.101"), config.cast.devices)
+        assertEquals(true, config.mpd.discovery)
+        assertEquals(
+            listOf(MpdEntry("Woonkamer", "192.168.0.50", 6600), MpdEntry(null, "192.168.0.51", 6601)),
+            config.mpd.devices.map(MpdEntry::parse),
+        )
+        assertEquals("mpd:192.168.0.51:6601", MpdEntry.parse("192.168.0.51:6601").id)
     }
 
     @Test

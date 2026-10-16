@@ -24,7 +24,7 @@ Spotify Jam does, but:
 | **Account** | An optional YTMP account. Used for room transfer, access control, playlists, listening history, and linking YouTube or media servers. |
 | **Solo room** | A private room that only you are in (on a phone, or on a server through the browser). Nobody else can join until it is made public. |
 | **Source** | Where music comes from: YouTube Music, YouTube, local files, and later Spotify, SoundCloud, … |
-| **Output** | Where the host sends audio: device speakers, Sonos, Chromecast, … Clients can also play the audio themselves. |
+| **Output** | Where the host sends audio: device speakers, Sonos, Chromecast, MPD, … Clients can also play the audio themselves. |
 | **Autoplay queue** | A backup queue per room that plays when the queue is empty. |
 
 ## Feature map

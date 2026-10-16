@@ -16,6 +16,7 @@ data class Config(
     val rooms: RoomsConfig = RoomsConfig(),
     val cast: CastConfig = CastConfig(),
     val sonos: SonosConfig = SonosConfig(),
+    val mpd: MpdConfig = MpdConfig(),
     val database: DatabaseConfig = DatabaseConfig(),
     val accounts: AccountsConfig = AccountsConfig(),
     val audio: AudioConfig = AudioConfig(),
@@ -120,6 +121,14 @@ data class SonosConfig(
     /** Find Sonos speakers with SSDP. Needs UDP multicast replies to reach the server (firewall, Docker host networking). */
     val discovery: Boolean = true,
     /** Sonos speakers to always offer, by IP address, e.g. "192.168.68.100". They're named after their room. */
+    val devices: List<String> = emptyList(),
+)
+
+@Serializable
+data class MpdConfig(
+    /** Find MPD players with mDNS (MPD's zeroconf, `_mpd._tcp`). Inside Docker this needs `network_mode: host`. */
+    val discovery: Boolean = true,
+    /** MPD players to always offer, as "host", "host:port" or "Name=host[:port]", e.g. "Woonkamer=192.168.0.50". */
     val devices: List<String> = emptyList(),
 )
 

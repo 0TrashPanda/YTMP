@@ -45,15 +45,20 @@ The host can also send audio to **output modules**. Outputs are **modular**.
 | Local device | The host's own speakers. On a phone host the phone plays as a client (*this device*); a server's own speakers: planned |
 | Sonos ✅ | Streams to Sonos speakers over HTTP (see [implementation](../implementation/sonos.md)) |
 | Chromecast ✅ | Casts to Chromecast / Google Cast devices: TVs, Nest speakers, speaker groups (see [implementation](../implementation/chromecast.md)). A TV or display can show the [party screen](ui.md#party-screen) while it plays |
+| MPD ✅ | Plays on MPD (Music Player Daemon), e.g. a Raspberry Pi on a speaker or an amplifier, wired or over Bluetooth (see [implementation](../implementation/mpd.md)) |
 | Snapcast | Future idea: precise multi-room sync through a Snapcast server (see [future ideas](future-ideas.md#snapcast-output)) |
 | Discord bot | Future idea: plays into a Discord voice channel (see [future ideas](future-ideas.md#discord-bot-output)) |
 | … | Future output modules |
 
-Outputs like Sonos and Chromecast must be on the **same network as the host**. A phone
+Outputs like Sonos, Chromecast and MPD must be on the **same network as the host**. A phone
 host or a home server can use them, a server in a datacenter can't.
 
+*Play on* lists the speakers and TVs that are there now: one that's switched off, or that's
+on the network your phone just left (another Wi-Fi), goes from the list. If the room was
+playing there, it's switched off with a notice.
+
 **Speakers near your phone** ✅: in a room on another host (a server), the app's *Play on*
-also lists the Sonos speakers and Chromecasts on your phone's network that the host doesn't
+also lists the Sonos speakers, Chromecasts and MPDs on your phone's network that the host doesn't
 offer itself, under *Near this phone*. Switched on, the phone plays the room there: it
 follows the room, looks the songs up itself and serves them to the speaker, so it works
 wherever the server is. They have their own volume slider, and a Chromecast TV can show the

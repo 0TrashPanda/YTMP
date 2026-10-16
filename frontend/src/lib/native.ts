@@ -89,7 +89,7 @@ export interface NativeCallbacks {
 
 /** Speakers and TVs on the phone's own network (android/.../MainActivity.kt), for a room on another host. */
 export interface NearbyState {
-	devices: { id: string; name: string; kind: 'chromecast' | 'sonos' }[];
+	devices: { id: string; name: string; kind: 'chromecast' | 'sonos' | 'mpd' }[];
 	shown: { deviceId: string; name: string; url: string }[];
 	/** The room playing on speakers here, with them; null when none plays. */
 	playing: { roomCode: string; speakers: { id: string; name: string; volume: number | null }[] } | null;

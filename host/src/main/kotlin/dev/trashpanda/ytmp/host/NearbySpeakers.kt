@@ -24,21 +24,34 @@ import kotlin.math.roundToLong
 
 /**
  * A room on another host (a server) played on speakers near this phone, which that host can't
- * reach: Sonos speakers and Chromecasts on the phone's own network. The app follows the room
- * over its own connection ([RoomSource]) and drives the speakers with the same drivers as the
- * phone's own rooms ([CastOutputs.play], [SonosOutputs.play]). The speakers get the audio from
+ * reach: Chromecasts, Sonos speakers and MPDs on the phone's own network. The app follows the
+ * room over its own connection ([RoomSource]) and drives the speakers with the same drivers as
+ * the phone's own rooms ([OutputDriver.play]). The speakers get the audio from
  * this phone (its `/api/audio/…`): the host's stream links only work on the host's own
  * internet connection. The room hears about it ([Command.SetSpeakers]), so it keeps playing
  * while only these speakers play. One room at a time.
  */
 class NearbySpeakers(
     private val scope: CoroutineScope,
-    private val casts: CastOutputs,
-    private val sonos: SonosOutputs,
+    private val drivers: List<OutputDriver>,
 ) {
     private var room: Followed? = null
     private val _playing = MutableStateFlow<NearbyPlaying?>(null)
     private val _notices = MutableSharedFlow<String>(extraBufferCapacity = 16)
+
+    init {
+        // A speaker that's gone from the network (or the phone moved to another one) stops playing the room.
+        scope.launch {
+            combine(drivers.map { it.devices }) { all -> all.flatMap { list -> list.map { it.id } }.toSet() }.collect { found ->
+                val gone = synchronized(this@NearbySpeakers) { room?.speakerIds().orEmpty() - found }
+                for (id in gone) {
+                    val name = _playing.value?.speakers?.firstOrNull { it.id == id }?.name ?: continue
+                    _notices.tryEmit("$name is no longer on this network, so the room stopped playing there")
+                    turnOff(id)
+                }
+            }
+        }
+    }
 
     /** What plays where now, or null. */
     val playing: StateFlow<NearbyPlaying?> = _playing
@@ -99,8 +112,7 @@ class NearbySpeakers(
                 combine(source.room.map { it != null }.distinctUntilChanged(), speakers.map { all -> all.values.map { it.first } }.distinctUntilChanged()) { connected, names -> connected to names }
                     .collect { (connected, names) -> if (connected) source.command(Command.SetSpeakers(names, startsTogether = true)) }
             }
-            jobs += casts.play(this)
-            jobs += sonos.play(this)
+            for (driver in drivers) jobs += driver.play(this)
         }
 
         fun add(deviceId: String, name: String) {
@@ -116,6 +128,8 @@ class NearbySpeakers(
         }
 
         fun isEmpty() = speakers.value.isEmpty()
+
+        fun speakerIds() = speakers.value.keys
 
         fun setVolume(deviceId: String, volume: Double) {
             speakers.update { all -> all[deviceId]?.let { all + (deviceId to (it.first to volume)) } ?: all }

@@ -72,9 +72,9 @@ class YtmpApp : Application() {
                 }
             }
         }
-        // Look for Chromecasts and Sonos only while they can be picked, to save battery: while the
-        // app is on screen, or while a public room plays (friends may pick one). Devices found
-        // earlier stay in the list.
+        // Look for Chromecasts, Sonos and MPDs only while they can be picked, to save battery: while
+        // the app is on screen, or while a public room plays (friends may pick one). Devices found
+        // earlier stay in the list until a new search misses them or the phone changes networks.
         scope.launch {
             combine(visible, host.rooms.playing) { shown, playing -> shown || playing.any { it.visibility == RoomVisibility.PUBLIC } }
                 .distinctUntilChanged()
@@ -82,9 +82,11 @@ class YtmpApp : Application() {
                     if (it) {
                         host.castFinder.start()
                         host.sonosFinder.start()
+                        host.mpdFinder.start()
                     } else {
                         host.castFinder.stop()
                         host.sonosFinder.stop()
+                        host.mpdFinder.stop()
                     }
                 }
         }

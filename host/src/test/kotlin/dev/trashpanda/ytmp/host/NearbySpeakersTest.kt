@@ -17,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.CopyOnWriteArrayList
@@ -44,7 +45,7 @@ class NearbySpeakersTest {
         FakeCastDevice().use { device ->
             val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
             casts.add(CastDeviceAddress("cast:fake", "Woonkamer", "127.0.0.1", device.port))
-            val nearby = NearbySpeakers(scope, casts, SonosOutputs(scope) { "http://unused" })
+            val nearby = NearbySpeakers(scope, listOf(casts, SonosOutputs(scope) { "http://unused" }))
 
             // The server's room (no speakers of its own), as the app follows it.
             val server = RoomManager({ "https://googlevideo.example/$it" }, scope)
@@ -95,12 +96,51 @@ class NearbySpeakersTest {
     }
 
     @Test
+    fun `an MPD near the phone plays the room, and stops when it's gone from the network`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        FakeMpd().use { mpd ->
+            val outputs = MpdOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
+            outputs.add(MpdAddress("mpd:fake", "Pi", "127.0.0.1", mpd.port))
+            val nearby = NearbySpeakers(scope, listOf(outputs))
+            val notices = CopyOnWriteArrayList<String>()
+            scope.launch { nearby.notices.collect { notices += it } }
+
+            val server = RoomManager({ "https://googlevideo.example/$it" }, scope)
+            val room = server.create("Party")
+            var state: RoomState? = null
+            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { m ->
+                if (m is ServerMessage.Welcome) state = m.state
+                if (m is ServerMessage.Snapshot) state = m.state
+            })!!
+            room.handle(me, ClientMessage.CommandMessage("a", Command.AddSongs(listOf(song), QueuePosition.END)))
+            room.handle(me, ClientMessage.CommandMessage("p", Command.SetListening(true)))
+            val source = FakeSource()
+            eventually {
+                room.handle(me, ClientMessage.RequestSnapshot)
+                source.room.value = state!! to 0.0
+                state?.nowPlaying?.streamUrl != null && state!!.playback.playing
+            }
+
+            nearby.turnOn(room.code, "mpd:fake", "Pi") { source }
+            eventually { mpd.state == "play" }
+            assertEquals("http://127.0.0.1:8765/api/audio/ytm%3Aabc", mpd.file)
+
+            // The phone lost it (it's off, or the phone is on another network now).
+            outputs.remove("mpd:fake")
+            eventually { nearby.playing.value == null }
+            assertTrue(notices.any { "Pi is no longer on this network" in it })
+            eventually { source.closed }
+        }
+        scope.cancel()
+    }
+
+    @Test
     fun `a new song waits until the speakers near the phone have it, and they start it at its start`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         FakeCastDevice().use { device ->
             val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
             casts.add(CastDeviceAddress("cast:fake", "Woonkamer", "127.0.0.1", device.port))
-            val nearby = NearbySpeakers(scope, casts, SonosOutputs(scope) { "http://unused" })
+            val nearby = NearbySpeakers(scope, listOf(casts, SonosOutputs(scope) { "http://unused" }))
 
             val server = RoomManager({ "https://googlevideo.example/$it" }, scope)
             val room = server.create("Party")
