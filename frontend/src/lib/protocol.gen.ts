@@ -256,6 +256,7 @@ export interface CommandShuffleQueue {
 
 export interface CommandSkip {
   kind: "Skip";
+  play: boolean;
 }
 
 export interface CommandStartRadio {

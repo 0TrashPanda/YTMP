@@ -23,6 +23,6 @@ class WireFormatTest {
     fun `objects round trip`() {
         val text = """{"type":"command","id":"c2","command":{"kind":"Skip"}}"""
         val message = ProtocolJson.decodeFromString(ClientMessage.serializer(), text)
-        assertEquals(ClientMessage.CommandMessage("c2", Command.Skip), message)
+        assertEquals(ClientMessage.CommandMessage("c2", Command.Skip()), message)
     }
 }

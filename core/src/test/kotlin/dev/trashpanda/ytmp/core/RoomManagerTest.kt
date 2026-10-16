@@ -138,7 +138,7 @@ class RoomManagerTest {
         val anna = room.connect("Anna", ownerToken = room.ownerToken)
         room.run(anna, Command.AddSongs(listOf(song(1), song(2), song(3)), QueuePosition.END))
         runCurrent()
-        room.run(anna, Command.Skip)
+        room.run(anna, Command.Skip())
         advanceTimeBy(20_000)
         runCurrent()
         assertTrue(store.rooms.containsKey(room.code))

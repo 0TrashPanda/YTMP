@@ -673,7 +673,7 @@ class PlaybackService : MediaSessionService() {
 
         override fun seekToNext() {
             Log.d(TAG, "media session: next")
-            PlaybackHub.command("""{"kind":"Skip"}""")
+            PlaybackHub.command("""{"kind":"Skip","play":${PlaybackHub.target.value?.nextPlays == true}}""")
         }
 
         override fun seekToNextMediaItem() = seekToNext()

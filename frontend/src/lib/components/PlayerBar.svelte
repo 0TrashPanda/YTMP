@@ -88,7 +88,7 @@
 		if (rating === null) return;
 		const disliking = rating !== 'dislike';
 		const solo = room.state?.room.visibility === 'private';
-		if ((await likes.rate(id, disliking ? 'dislike' : 'none', onToast)) && disliking && solo && room.can('skip')) await room.run({ kind: 'Skip' });
+		if ((await likes.rate(id, disliking ? 'dislike' : 'none', onToast)) && disliking && solo && room.can('skip')) await room.run({ kind: 'Skip', play: false });
 	}
 	$effect(() => {
 		if (songId && wide.current) likes.load(songId);

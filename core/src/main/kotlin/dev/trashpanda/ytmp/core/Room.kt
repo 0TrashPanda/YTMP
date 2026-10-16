@@ -876,12 +876,14 @@ class Room(
                 need(member, Permission.PLAY_PAUSE)?.let { return it }
                 pausePlayback()
             }
-            Command.Skip -> {
+            is Command.Skip -> {
                 if (!mayVoteOrSkip(member)) return need(member, Permission.SKIP)
                 if (current == null) return invalid("Nothing is playing")
                 // Someone who may only vote: their skip is a vote.
                 if (!can(member, Permission.SKIP) && settings.voteSkip) return vote(member, true)
                 retireCurrent(QueueItemResult.SKIPPED)
+                // Next while paused plays (if they asked, and may press play).
+                if (command.play && can(member, Permission.PLAY_PAUSE)) wantPlaying = true
                 playNextFromQueue()
             }
             Command.Previous -> {

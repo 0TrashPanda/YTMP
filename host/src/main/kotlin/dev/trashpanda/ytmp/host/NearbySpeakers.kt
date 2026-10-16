@@ -201,7 +201,7 @@ class NearbySpeakers(
         override suspend fun outputSkipped(fromItemId: String, forward: Boolean) {
             // Only if that's still the current song, so a skip isn't done twice.
             if (last?.first?.nowPlaying?.item?.itemId != fromItemId) return
-            source.command(if (forward) Command.Skip else Command.Previous)
+            source.command(if (forward) Command.Skip() else Command.Previous)
         }
     }
 

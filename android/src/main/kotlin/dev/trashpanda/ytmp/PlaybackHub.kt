@@ -33,6 +33,8 @@ data class PlaybackTarget(
     val headphones: String = "stop",
     /** The room this is from, so the app can follow it itself (see [RoomFollower]). */
     val room: RoomLink? = null,
+    /** Next (notification, lock screen) while paused plays the next song (Settings → Playback). */
+    val nextPlays: Boolean = false,
 )
 
 /** Enough to attach to the room as the page's participant (`attach` in the protocol). */

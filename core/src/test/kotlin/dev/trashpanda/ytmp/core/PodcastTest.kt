@@ -69,7 +69,7 @@ class PodcastTest {
         room.run(anna, Command.AddSongs(listOf(episode, song), QueuePosition.END))
         runCurrent()
         advanceTimeBy(600_000)
-        room.run(anna, Command.Skip)
+        room.run(anna, Command.Skip())
         runCurrent()
         assertEquals(song.id, room.save().current?.song?.id)
 
@@ -118,7 +118,7 @@ class PodcastTest {
         room.run(anna, Command.AddSongs(listOf(long, song), QueuePosition.END))
         runCurrent()
         advanceTimeBy(120_000)
-        room.run(anna, Command.Skip)
+        room.run(anna, Command.Skip())
         runCurrent()
         room.run(anna, Command.PlayNow(long))
         runCurrent()

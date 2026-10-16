@@ -20,6 +20,10 @@ permissions say otherwise (permission: *Play audio locally*).
   your first tap or key press, since browsers only allow audio after one). Switching
   *this device* off in a solo room is remembered for that room. Another app taking the
   audio stops it for now but doesn't count as switching off.
+- **Next while paused** ✅ (*Settings → Playback*, per device): **Plays the next song**
+  (default, like YouTube Music) or **Stays paused** (the next song loads, the room stays
+  paused). Also for the notification's, lock screen's and keyboard's Next. It needs *Play /
+  pause*; without it Next only skips. (`Skip` with `play`; an older host just skips.)
 - **Headphones disconnected** (unplugged, Bluetooth gone) is a setting in the app (profile
   menu): **Pause** (default; pauses the room like YTM when you're the only one listening,
   otherwise stops playing here), **Stop here**, or **Keep playing** on the speaker.

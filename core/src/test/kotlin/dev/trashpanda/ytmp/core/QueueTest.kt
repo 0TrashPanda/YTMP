@@ -195,7 +195,7 @@ class QueueTest {
         assertTrue(state.playback.positionMs < 1_000)
         assertTrue(state.history.isEmpty())
 
-        room.run(owner, Command.Skip)
+        room.run(owner, Command.Skip())
         state = room.state(owner)
         assertEquals("ytm:2", state.nowPlaying?.item?.song?.id)
     }
@@ -242,7 +242,7 @@ class QueueTest {
         val guest = room.connect("Guest")
         room.run(owner, Command.AddSongs(listOf(song(1), song(2)), QueuePosition.END))
 
-        assertNull(room.run(guest, Command.Skip))
+        assertNull(room.run(guest, Command.Skip()))
 
         assertEquals("ytm:2", room.state(owner).nowPlaying?.item?.song?.id)
         assertNull(room.state(owner).skipVotes)
@@ -257,7 +257,7 @@ class QueueTest {
         room.run(owner, Command.AddSongs(listOf(song(1), song(2)), QueuePosition.END))
         assertEquals(2, room.state(owner).skipVotes?.needed) // half of 3 people, rounded up
 
-        assertNull(room.run(a, Command.Skip)) // a vote, not a skip
+        assertNull(room.run(a, Command.Skip())) // a vote, not a skip
         var state = room.state(owner)
         assertEquals("ytm:1", state.nowPlaying?.item?.song?.id)
         assertEquals(listOf(a.id), state.skipVotes?.voters)
@@ -300,7 +300,7 @@ class QueueTest {
         room.run(owner, Command.UpdateSettings(voteSkip = true))
         room.run(owner, Command.AddSongs(listOf(song(1), song(2)), QueuePosition.END))
 
-        room.run(owner, Command.Skip)
+        room.run(owner, Command.Skip())
 
         assertEquals("ytm:2", room.state(owner).nowPlaying?.item?.song?.id)
     }

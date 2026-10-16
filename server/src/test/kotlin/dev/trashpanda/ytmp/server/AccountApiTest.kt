@@ -286,7 +286,7 @@ class AccountApiTest {
             kotlinx.coroutines.delay(300)
             send(Frame.Text(ProtocolJson.encodeToString(ClientMessage.serializer(), ClientMessage.CommandMessage("1", Command.AddSongs(listOf(song), QueuePosition.END)))))
             kotlinx.coroutines.delay(300)
-            send(Frame.Text(ProtocolJson.encodeToString(ClientMessage.serializer(), ClientMessage.CommandMessage("2", Command.Skip))))
+            send(Frame.Text(ProtocolJson.encodeToString(ClientMessage.serializer(), ClientMessage.CommandMessage("2", Command.Skip()))))
             kotlinx.coroutines.delay(500)
             others.forEach { it.cancel() }
         }

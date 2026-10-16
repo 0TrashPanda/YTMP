@@ -102,7 +102,7 @@ class MpdOutputsTest {
             eventually { "mpd:fake" !in room.view().activeOutputs }
             assertTrue(synchronized(notices) { notices.any { "Pi is playing something else" in it } })
             // The room doesn't stop it, and doesn't take it back at the next song.
-            run(Command.Skip)
+            run(Command.Skip())
             delay(3_000)
             assertEquals("Avril Lavigne/Let Go/03 Skater Boy.mp3", mpd.file)
             assertTrue(mpd.commands.drop(commandsBefore).none { it == "stop" || it == "clear" })

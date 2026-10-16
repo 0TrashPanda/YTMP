@@ -36,7 +36,7 @@ class FinishedPlayTest {
         advanceTimeBy(60_001) // song 1 plays to the end
         runCurrent()
         advanceTimeBy(20_000)
-        run(Command.Skip) // song 2 skipped after 20 s
+        run(Command.Skip()) // song 2 skipped after 20 s
         runCurrent()
 
         assertEquals(listOf("ytm:1" to false, "ytm:2" to true), plays.map { it.item.song.id to it.skipped })

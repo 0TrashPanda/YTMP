@@ -94,7 +94,7 @@ class RolesTest {
         // Listeners skip with *Vote to skip* (right away while the room doesn't vote).
         assertNull(room.run(owner, Command.SetParticipantPermissions(guest.id, allow = listOf(Permission.SEEK), deny = listOf(Permission.VOTE_SKIP))))
         assertNull(room.run(guest, Command.Seek(1000)))
-        assertDenied(room.run(guest, Command.Skip))
+        assertDenied(room.run(guest, Command.Skip()))
     }
 
     @Test

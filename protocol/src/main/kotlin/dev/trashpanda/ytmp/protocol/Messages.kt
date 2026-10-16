@@ -155,9 +155,10 @@ sealed interface Command {
     @SerialName("Pause")
     data object Pause : Command
 
+    /** Next. [play]: start playing it, also when the room was paused (like YouTube Music's Next). */
     @Serializable
     @SerialName("Skip")
-    data object Skip : Command
+    data class Skip(val play: Boolean = false) : Command
 
     @Serializable
     @SerialName("Previous")

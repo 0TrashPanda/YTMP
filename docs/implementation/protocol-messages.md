@@ -95,7 +95,7 @@ Each command lists the permission it needs (see [room management](../features/ro
 | Command | Fields | Permission |
 |---------|--------|------------|
 | `Play` / `Pause` ✅ | – | Play/pause |
-| `Skip` / `Previous` ✅ | – | Skip |
+| `Skip` / `Previous` ✅ | `Skip`: `play` (default false): also start playing when paused (needs Play / pause) | Skip |
 | `Seek` ✅ | `positionMs` | Seek |
 | `SetRepeat` ✅ | `mode: "off" \| "queue" \| "one"` | Repeat |
 | `VoteSkip` ✅ | `on` (false takes the vote back). `Skip` from someone who may only vote is a vote too | Vote to skip |

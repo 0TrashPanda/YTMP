@@ -187,9 +187,9 @@ class RoomTest {
         val client = room.connect()
         room.run(client, Command.AddSongs(listOf(song(1), song(2), song(3)), QueuePosition.END))
         runCurrent()
-        room.run(client, Command.Skip)
+        room.run(client, Command.Skip())
         runCurrent()
-        room.run(client, Command.Skip)
+        room.run(client, Command.Skip())
         runCurrent()
         // Now: history [1, 2], playing 3.
 
@@ -199,6 +199,27 @@ class RoomTest {
         assertEquals("ytm:song1", client.state.nowPlaying?.item?.song?.id)
         assertEquals(listOf("ytm:song2", "ytm:song3"), client.state.queue.map { it.song.id })
         assertTrue(client.state.history.isEmpty())
+    }
+
+    @Test
+    fun `next while paused stays paused, unless it asks to play`() = runTest {
+        val room = newRoom()
+        val client = room.connect()
+        room.run(client, Command.AddSongs(listOf(song(1), song(2), song(3)), QueuePosition.END))
+        runCurrent()
+        room.run(client, Command.Pause)
+        runCurrent()
+
+        room.run(client, Command.Skip())
+        runCurrent()
+        assertEquals("ytm:song2", client.state.nowPlaying?.item?.song?.id)
+        assertFalse(client.state.playback.playing)
+
+        // Like YouTube Music's Next: the next song plays.
+        room.run(client, Command.Skip(play = true))
+        runCurrent()
+        assertEquals("ytm:song3", client.state.nowPlaying?.item?.song?.id)
+        assertTrue(client.state.playback.playing)
     }
 
     @Test

@@ -97,6 +97,7 @@
 	let soloBack = $state(saved.backLimit(true));
 	let partyBack = $state(saved.backLimit(false));
 	let headphones = $state(saved.headphonesAction);
+	let nextPlays = $state(saved.nextPlays);
 	const qualityOptions: [ImageQuality, string][] = [
 		['high', 'High'],
 		['low', 'Low']
@@ -156,9 +157,24 @@
 				<AccountSection {host} {info} {account} {invite} onAccount={(a) => (account = a)} {onToast} />
 			{:else if section === 'youtube'}
 				<YoutubeSection {onToast} />
-			{:else if section === 'playback' && !inApp}
-				<OwnModuleSection {onToast} />
 			{:else if section === 'playback'}
+				<Choice
+					label="Next while paused"
+					hint="Like YouTube Music, the next song plays. Or it loads and the room stays paused."
+					options={[
+						['play', 'Plays the next song'],
+						['pause', 'Stays paused']
+					] as ['play' | 'pause', string][]}
+					value={nextPlays ? 'play' : 'pause'}
+					onchange={(v) => {
+						nextPlays = v === 'play';
+						saved.nextPlays = nextPlays;
+						window.dispatchEvent(new Event('ytmp:settings'));
+					}}
+				/>
+				{#if !inApp}
+					<OwnModuleSection {onToast} />
+				{:else}
 				<Choice
 					label="Headphones disconnected"
 					hint="Pause only pauses the room when you're the only one listening; otherwise it stops playing here."
@@ -191,6 +207,7 @@
 					}}
 				/>
 				<p class="text-xs text-muted">The sync adjustment for Bluetooth is under <em>Play on</em> in a room.</p>
+				{/if}
 			{:else if section === 'gestures'}
 				<GesturesSection />
 			{:else if section === 'local'}

@@ -156,6 +156,13 @@ export const saved = {
 	set tabOrder(value: TabOrder) {
 		write('ytmp.tabOrder', value);
 	},
+	/** Next while paused plays the next song (like YouTube Music), or keeps the room paused. */
+	get nextPlays(): boolean {
+		return read('ytmp.nextPlays') !== '0';
+	},
+	set nextPlays(on: boolean) {
+		write('ytmp.nextPlays', on ? '1' : '0');
+	},
 	/** The Local tab shows the music on the network (a Raspberry Pi's). */
 	get localNetwork(): boolean {
 		return read('ytmp.localNetwork') !== '0';

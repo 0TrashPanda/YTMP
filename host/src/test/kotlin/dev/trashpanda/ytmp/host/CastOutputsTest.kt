@@ -152,7 +152,7 @@ class CastOutputsTest {
 
             device.takenOverBy("CC32E753") // Spotify
             eventually { "cast:fake" !in room.view().activeOutputs }
-            run(Command.Skip)
+            run(Command.Skip())
             kotlinx.coroutines.delay(3_000)
             // Not launched again over Spotify.
             assertEquals(launches, device.types(CastChannel.NS_RECEIVER).count { it == "LAUNCH" })
@@ -199,7 +199,7 @@ class CastOutputsTest {
             eventually { room.view().current?.song?.id == "ytm:s1" }
 
             // A skip in the room (not on the device) still loads the song on the device.
-            run(Command.Skip)
+            run(Command.Skip())
             eventually { device.currentTag == room.view().current?.itemId && room.view().current?.song?.id == "ytm:s2" }
         }
         scope.cancel()

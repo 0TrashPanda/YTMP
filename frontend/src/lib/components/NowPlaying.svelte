@@ -122,7 +122,7 @@
 		if (!song || rating === null) return;
 		const disliking = rating !== 'dislike';
 		const solo = room.state?.room.visibility === 'private';
-		if ((await likes.rate(song.id, disliking ? 'dislike' : 'none', onToast)) && disliking && solo && room.can('skip')) await room.run({ kind: 'Skip' });
+		if ((await likes.rate(song.id, disliking ? 'dislike' : 'none', onToast)) && disliking && solo && room.can('skip')) await room.run({ kind: 'Skip', play: false });
 	}
 	/** Phones: Up next / Related slid up over the player. */
 	let sheet = $state(false);

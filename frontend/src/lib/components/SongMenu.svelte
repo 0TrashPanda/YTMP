@@ -134,7 +134,7 @@
 					// Like YouTube Music: a disliked song that's playing is skipped, in a solo room (a party's music is everyone's).
 					const solo = room.state?.room.visibility === 'private';
 					if ((await likes.rate(current.id, disliking ? 'dislike' : 'none', onToast)) && disliking && wasCurrent && solo && room.can('skip')) {
-						await room.run({ kind: 'Skip' });
+						await room.run({ kind: 'Skip', play: false });
 					}
 				}
 			});

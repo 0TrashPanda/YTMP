@@ -146,9 +146,9 @@ export class RoomConnection {
 		return !!this.participantId && !!this.state?.skipVotes?.voters.includes(this.participantId);
 	}
 
-	/** Next: skips, or votes (and a second press takes the vote back). */
+	/** Next: skips (playing the next song also when paused, if this device's setting says so), or votes (a second press takes the vote back). */
 	next(): Promise<ErrorInfo | null> {
-		return this.run(this.skipMode === 'vote' ? { kind: 'VoteSkip', on: !this.votedToSkip } : { kind: 'Skip' });
+		return this.run(this.skipMode === 'vote' ? { kind: 'VoteSkip', on: !this.votedToSkip } : { kind: 'Skip', play: saved.nextPlays });
 	}
 
 	/** What "play next" did, for a toast: with fair order a listener's song goes in their next turn. */

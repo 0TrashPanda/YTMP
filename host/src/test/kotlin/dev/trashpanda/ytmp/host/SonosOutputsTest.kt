@@ -93,7 +93,7 @@ class SonosOutputsTest {
             eventually { "sonos:fake" !in room.view().activeOutputs }
             assertTrue(synchronized(notices) { notices.any { "Woonkamer is playing something else" in it } })
             // The room doesn't stop it, and doesn't take it back at the next song.
-            run(Command.Skip)
+            run(Command.Skip())
             delay(3_000)
             assertEquals("x-sonos-spotify:spotify%3atrack%3a123", speaker.uri)
             assertTrue("Stop" !in speaker.actions.drop(actionsBefore))

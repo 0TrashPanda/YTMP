@@ -251,7 +251,7 @@ class WebPlayer implements RoomPlayer {
 		const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
 			['play', () => this.room.run({ kind: 'Play' })],
 			['pause', () => this.room.run({ kind: 'Pause' })],
-			['nexttrack', () => this.room.run({ kind: 'Skip' })],
+			['nexttrack', () => this.room.next()],
 			['previoustrack', () => this.room.run({ kind: 'Previous' })],
 			['seekto', (details) => details.seekTime != null && this.room.run({ kind: 'Seek', positionMs: Math.round(details.seekTime * 1000) })]
 		];
@@ -464,6 +464,8 @@ class NativePlayer implements RoomPlayer {
 							}
 						: null,
 				streamUrl: now?.streamUrl ?? null,
+				// The notification's and lock screen's Next plays the next song while paused (Settings → Playback).
+				nextPlays: saved.nextPlays,
 				proxyUrl: song ? new URL(proxiedAudioUrl(song.id), location.href).href : null,
 				playing: state?.playback.playing ?? false,
 				starting: state?.playback.starting ?? false,
