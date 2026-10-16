@@ -45,6 +45,8 @@ class ZoneOutputs(
     private val audioBaseUrl: (localAddress: InetAddress) -> String,
     /** Its MPDs that feed zones aren't offered by themselves too. */
     private val mpd: MpdOutputs? = null,
+    /** Where a file's `music` goes (the Local tab). */
+    private val local: LocalMusic? = null,
 ) : OutputDriver {
     /** One zone: [control] makes its requests. */
     class Zone(val id: String, val name: String, val player: Player, val control: ZoneControl)
@@ -56,6 +58,8 @@ class ZoneOutputs(
     /** Zone files by source (an mDNS service, or a URL from the config). */
     private val loaded = MutableStateFlow<Map<String, List<Zone>>>(emptyMap())
     private val sources = HashMap<String, Pair<String, Job>>()
+    /** The local music each source shares, by source. */
+    private val libraries = HashMap<String, String>()
     private val drivers = HashMap<String, Job>()
 
     // Shared by all rooms on this host, under [lock]: who has each player and zone, and what
@@ -85,6 +89,18 @@ class ZoneOutputs(
     fun removeSource(id: String) {
         synchronized(sources) { sources.remove(id)?.second?.cancel() }
         loaded.update { it - id }
+        shareMusic(id, null)
+    }
+
+    /** Offers (or with null, takes back) the music [id]'s file shares, as a library in [local]. */
+    private fun shareMusic(id: String, library: LocalLibrary?) {
+        val music = local ?: return
+        synchronized(libraries) {
+            val before = libraries[id]
+            if (before != null && before != library?.id) music.remove(before)
+            if (library == null) libraries.remove(id) else libraries[id] = library.id
+        }
+        library?.let(music::add)
     }
 
     private suspend fun follow(id: String, url: String) {
@@ -99,10 +115,11 @@ class ZoneOutputs(
                 if (last != config to playerHost) {
                     last = config to playerHost
                     val player = Player(playerHost, config.player.port)
-                    val zones = config.zones.filterNot { it.hidden }.map { Zone(idFor(player, it.zone.content), it.name, player, ZoneControl(it.zone.content, config.amp)) }
+                    val zones = config.amp?.let { amp -> config.zones.filterNot { it.hidden }.map { Zone(idFor(player, it.zone.content), it.name, player, ZoneControl(it.zone.content, amp)) } }.orEmpty()
                     currentCoroutineContext().ensureActive()
                     loaded.update { it + (id to zones) }
-                    log.info("Zones from {}: {}", url, zones.joinToString { it.name })
+                    shareMusic(id, config.music?.let { musicLibrary(it, url, player) })
+                    log.info("Zones from {}: {}{}", url, zones.joinToString { it.name }, if (config.music != null) ", and its music" else "")
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -117,10 +134,29 @@ class ZoneOutputs(
                     last = null
                     currentCoroutineContext().ensureActive()
                     loaded.update { it - id }
+                    shareMusic(id, null)
                 }
             }
             delay(REFRESH_MS)
         }
+    }
+
+    /** The player's music, with its files and covers where the file says (relative to the file's own address). */
+    private fun musicLibrary(music: ZoneMusic, fileUrl: String, player: Player): MpdLibrary {
+        fun resolve(path: String): String {
+            val url = URI(fileUrl).resolve(path).toString().let { if (it.endsWith('/')) it else "$it/" }
+            val host = URI(url).host
+            if (host == null || !isLocal(host)) throw ZoneConfigException("the music at $url isn't on the local network")
+            return url
+        }
+        return MpdLibrary(
+            id = LocalMusic.libraryId("mpd", player.host, player.port),
+            name = music.name?.trim()?.ifEmpty { null } ?: "Music on ${player.host}",
+            host = player.host,
+            port = player.port,
+            filesBase = resolve(music.files),
+            artBase = music.art?.let(::resolve),
+        )
     }
 
     private suspend fun fetch(url: String): Pair<ZoneConfig, String> = withContext(Dispatchers.IO) {

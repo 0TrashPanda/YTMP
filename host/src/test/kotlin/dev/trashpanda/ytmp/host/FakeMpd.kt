@@ -29,6 +29,9 @@ class FakeMpd(
     @Volatile private var at = 0L
     @Volatile private var since = 0L
     @Volatile var error: String? = null
+    /** Its music database, as `listallinfo` answers it (tags by song); [databaseVersion] is its `db_update`. */
+    @Volatile var library: List<Map<String, String>> = emptyList()
+    @Volatile var databaseVersion = 1
 
     private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
 
@@ -72,6 +75,8 @@ class FakeMpd(
             "pause" -> { if (state != "stop") state = if (argument == "1") "pause" else "play"; "" }
             "stop" -> { state = "stop"; "" }
             "seekcur" -> if (state == "stop") return "ACK [55@0] {seekcur} Not playing\n" else { positionMs = (argument.toDouble() * 1000).toLong(); "" }
+            "stats" -> "artists: 0\nsongs: ${library.size}\ndb_update: $databaseVersion\n"
+            "listallinfo" -> "directory: Music\n" + library.joinToString("") { song -> song.entries.joinToString("") { (k, v) -> "$k: $v\n" } }
             "setvol" -> if (volume == null) return "ACK [52@0] {setvol} problems setting volume\n" else { volume = argument.toInt(); "" }
             else -> return "ACK [5@0] {$command} unknown command \"$command\"\n"
         }

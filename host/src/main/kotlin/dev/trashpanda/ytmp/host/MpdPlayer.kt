@@ -83,6 +83,28 @@ class MpdPlayer(val host: String, private val port: Int = DEFAULT_PORT) {
         )
     }
 
+    /** MPD's `stats`: songs, artists, db_update (when its database last changed), … */
+    suspend fun stats(): Map<String, String> = session { command("stats").toMap() }
+
+    /**
+     * Every song in MPD's database with its tags (`listallinfo`). A database too big for MPD's
+     * output buffer is read folder by folder (`lsinfo`).
+     */
+    suspend fun songs(): List<Map<String, String>> = session {
+        try {
+            songRecords(command("listallinfo"))
+        } catch (e: MpdException) {
+            val all = ArrayList<Map<String, String>>()
+            val folders = ArrayDeque(listOf(""))
+            while (folders.isNotEmpty()) {
+                val answer = command("lsinfo ${quote(folders.removeFirst())}")
+                answer.filter { it.first == "directory" }.forEach { folders += it.second }
+                all += songRecords(answer)
+            }
+            all
+        }
+    }
+
     /** 0.0–1.0; fails when MPD has no mixer. */
     suspend fun setVolume(level: Double) = session { command("setvol ${Math.round(level.coerceIn(0.0, 1.0) * 100)}") }
 
@@ -127,6 +149,23 @@ class MpdPlayer(val host: String, private val port: Int = DEFAULT_PORT) {
         internal fun quote(text: String) = "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
         internal fun seconds(ms: Long) = String.format(Locale.ROOT, "%.3f", maxOf(0, ms) / 1000.0)
+
+        /** The songs (`file` records) of a listing that also has folders and playlists. */
+        internal fun songRecords(answer: List<Pair<String, String>>): List<Map<String, String>> {
+            val all = ArrayList<MutableMap<String, String>>()
+            var inSong = false
+            for ((key, value) in answer) {
+                when (key) {
+                    "file" -> {
+                        all += LinkedHashMap<String, String>().apply { put(key, value) }
+                        inSong = true
+                    }
+                    "directory", "playlist" -> inSong = false
+                    else -> if (inSong) all.last().putIfAbsent(key, value)
+                }
+            }
+            return all
+        }
 
         /** Splits an answer into records, each starting at the key [first]. */
         internal fun records(answer: List<Pair<String, String>>, first: String): List<Map<String, String>> {

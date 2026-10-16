@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.LyricsLookup
 import dev.trashpanda.ytmp.host.MpdOutputs
 import dev.trashpanda.ytmp.host.SonosOutputs
+import dev.trashpanda.ytmp.host.LocalMusic
 import dev.trashpanda.ytmp.host.ZoneOutputs
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -86,7 +87,9 @@ fun main(args: Array<String>) {
         val mpd = MpdOutputs(this, audioBase)
         mpd.addConfigured(config.mpd.devices)
         if (config.mpd.discovery) mpd.discover(keep = config.mpd.devices.map { MpdEntry.parse(it).id }.toSet())
-        val zones = ZoneOutputs(this, audioBase, mpd)
+        // Music a Raspberry Pi shares (with its zones file): the Local tab.
+        val local = LocalMusic()
+        val zones = ZoneOutputs(this, audioBase, mpd, local)
         for (url in config.zones.files) zones.addSource(url, url)
         if (config.zones.discovery) zones.discover()
         val outputs = combine(casts.devices, sonos.devices, mpd.devices, zones.devices) { a, b, c, d -> a + b + c + d }.stateIn(this, SharingStarted.Eagerly, emptyList())
@@ -115,7 +118,7 @@ fun main(args: Array<String>) {
         fun localAccount(accountId: String): String? =
             accountId.takeIf { it.endsWith("@$issuer") }?.substringBeforeLast('@')?.let(accounts::find)?.id
         val rooms = RoomManager(
-            ytm, this, config.rooms.style(), config.rooms.codeLength, outputs = outputs, store = JdbcRoomStore(db),
+            local.streams(ytm), this, config.rooms.style(), config.rooms.codeLength, outputs = outputs, store = JdbcRoomStore(db),
             // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
             // Party rooms whose admins are all gone for 5 minutes tell the others they can clone them.
             timeouts = RoomTimeouts(guestSoloRoom = 30.days, adminless = 5.minutes),
@@ -123,9 +126,9 @@ fun main(args: Array<String>) {
                 plays.report(play)
                 youtube.report(play, ::localAccount)
             },
-            radio = cached,
+            radio = local.radio(cached),
             // A room with an owner account of this server: radio through that account's YouTube Music.
-            ownerRadio = { owner, seed -> owner?.let(::localAccount)?.let(youtube::of)?.personalized()?.radio(seed) },
+            ownerRadio = { owner, seed -> if (LocalMusic.isLocal(seed)) null else owner?.let(::localAccount)?.let(youtube::of)?.personalized()?.radio(seed) },
         )
         rooms.startCleanup()
         val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, defaultPassword = service::roomPassword)
@@ -138,7 +141,7 @@ fun main(args: Array<String>) {
         ytmpModule(
             rooms,
             search = cached,
-            audio = ytm,
+            audio = local.audio(ytm),
             webApp = File(config.server.frontend),
             HostOptions(
                 kind = HostKind.SERVER,
@@ -156,11 +159,12 @@ fun main(args: Array<String>) {
                 hub.routes(this)
                 youtube.routes(this) { call -> service.sessionAccount(call)?.id }
             },
-            similar = cached,
-            catalog = cached,
+            similar = local.radio(cached),
+            catalog = local.catalog(cached),
             suggestions = cached,
             lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
             zones = zones,
+            local = local,
             // Your account's YouTube Music, when you're logged in with an account of this server.
             // Also from the pages of rooms on other hosts, with a token just for that (see AccountApi.youtubeToken).
             personalFor = { call ->

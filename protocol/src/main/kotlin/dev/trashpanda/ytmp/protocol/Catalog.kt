@@ -276,3 +276,36 @@ data class CreatePlaylistRequest(val title: String, val songIds: List<String>)
 @Serializable
 @SerialName("CreatePlaylistResponse")
 data class CreatePlaylistResponse(val id: String)
+
+// Local music (`GET /api/local`, `GET /api/local/{id}`): music the host reaches itself, like
+// the music folder of a Raspberry Pi with MPD, or the music on the hosting phone.
+
+@Serializable
+@SerialName("LocalLibraryKind")
+enum class LocalLibraryKind {
+    /** An MPD's music (say a Raspberry Pi next to the stereo). */
+    @SerialName("mpd") MPD,
+
+    /** The music stored on the hosting phone. */
+    @SerialName("phone") PHONE,
+}
+
+@Serializable
+@SerialName("LocalLibrarySummary")
+data class LocalLibrarySummary(val id: String, val name: String, val kind: LocalLibraryKind, val songCount: Int)
+
+@Serializable
+@SerialName("LocalLibraries")
+data class LocalLibraries(val libraries: List<LocalLibrarySummary>)
+
+/** One library, whole: the Local tab filters it as you type. [albums] and [artists] are search items (album, artist). */
+@Serializable
+@SerialName("LocalLibraryPage")
+data class LocalLibraryPage(
+    val id: String,
+    val name: String,
+    val kind: LocalLibraryKind,
+    val albums: List<SearchItem>,
+    val artists: List<SearchItem>,
+    val songs: List<Song>,
+)

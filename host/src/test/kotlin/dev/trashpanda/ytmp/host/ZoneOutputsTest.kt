@@ -233,8 +233,8 @@ class ZoneOutputsTest {
     @Test
     fun `the building blocks`() {
         val config = zoneJson.decodeFromString<ZoneConfig>(FakeAmp().use { it.zonesFor(6600, mapOf(5 to "Keuken")) })
-        val control = ZoneControl("5", config.amp)
-        val base = config.amp.base.replace("{zone}", "5")
+        val control = ZoneControl("5", config.amp!!)
+        val base = config.amp!!.base.replace("{zone}", "5")
         assertEquals("$base&settings=?", control.stateUrl())
         assertEquals(listOf("$base&vchan=2", "$base&muted=0"), control.onUrls())
         assertEquals(listOf("$base&muted=1", "$base&vchan=1", "$base&muted=1"), control.offUrls(mapOf("vchan" to "1", "muted" to "1")))
@@ -251,11 +251,11 @@ class ZoneOutputsTest {
 
         assertEquals("127.0.0.1", validateZones(config, "127.0.0.1"))
         fun invalid(edit: (ZoneConfig) -> ZoneConfig) = assertFailsWith<ZoneConfigException> { validateZones(edit(config), "127.0.0.1") }
-        invalid { it.copy(amp = it.amp.copy(base = "http://8.8.8.8/audio_set?output={zone}")) }
+        invalid { it.copy(amp = it.amp!!.copy(base = "http://8.8.8.8/audio_set?output={zone}")) }
         invalid { it.copy(player = it.player.copy(host = "8.8.8.8")) }
-        invalid { it.copy(amp = it.amp.copy(on = listOf("{base}&vchan={input}"))) }
-        invalid { it.copy(amp = it.amp.copy(off = listOf("{base}&vchan={channel}"))) }
-        invalid { it.copy(amp = it.amp.copy(state = null)) }
+        invalid { it.copy(amp = it.amp!!.copy(on = listOf("{base}&vchan={input}"))) }
+        invalid { it.copy(amp = it.amp!!.copy(off = listOf("{base}&vchan={channel}"))) }
+        invalid { it.copy(amp = it.amp!!.copy(state = null)) }
         invalid { it.copy(zones = emptyList()) }
         assertTrue(isLocal("192.168.0.156") && isLocal("10.0.0.1") && isLocal("fd00::1") && !isLocal("1.1.1.1"))
 

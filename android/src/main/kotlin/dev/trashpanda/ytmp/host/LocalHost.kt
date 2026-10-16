@@ -73,7 +73,9 @@ class LocalHost(private val context: Context) {
     val mpd = MpdOutputs(scope) { localAddress -> "http://${localAddress.hostAddress}:$PORT" }
     val mpdFinder = MpdFinder(context, mpd)
     /** Amplifier zones the house describes in a file on its network (fed by one of those MPDs). */
-    val zones = ZoneOutputs(scope, { localAddress -> "http://${localAddress.hostAddress}:$PORT" }, mpd)
+    /** Local music (the Local tab): what a Raspberry Pi shares, and the music on this phone. */
+    val local = LocalMusic()
+    val zones = ZoneOutputs(scope, { localAddress -> "http://${localAddress.hostAddress}:$PORT" }, mpd, local)
     val zoneFinder = ZoneFinder(context, zones)
     /** On another Wi-Fi network, the devices found on the old one go from the list. */
     private val wifi = WifiWatch(context) {
@@ -105,18 +107,18 @@ class LocalHost(private val context: Context) {
     )
     private val plays = PlayReporter(authLink.auth, scope)
     val rooms: RoomManager = RoomManager(
-        streams = object : StreamResolver {
+        streams = local.streams(object : StreamResolver {
             override suspend fun resolveStream(songId: String) = ytm.resolveStream(songId)
             override suspend fun resolve(songId: String) = ytm.resolve(songId)
-        },
+        }),
         scope = scope, outputs = outputs, store = PhoneRoomStore(context),
         onPlayFinished = { play ->
             plays.report(play)
             addToYoutubeHistory(play)
         },
-        radio = cached,
+        radio = local.radio(cached),
         // Every room here is the phone owner's, so radio goes through their YouTube Music.
-        ownerRadio = { _, seed -> youtube.personalized()?.radio(seed) },
+        ownerRadio = { _, seed -> if (LocalMusic.isLocal(seed)) null else youtube.personalized()?.radio(seed) },
         onRoomSaved = { sync.saved(it) },
         onRoomClosed = { sync.closed(it) },
         onRoomDisowned = { account, syncId -> sync.closed(account, syncId) },
@@ -137,7 +139,8 @@ class LocalHost(private val context: Context) {
                 YoutubeHistory.SOLO -> play.visibility == RoomVisibility.PRIVATE
                 YoutubeHistory.ALL -> true
             }
-            if (!wanted || youtube.account() == null) return@launch
+            // Only YouTube Music songs go into YouTube Music's history (not local music).
+            if (!wanted || youtube.account() == null || !play.item.song.id.startsWith("ytm:")) return@launch
             try {
                 youtube.addToHistory(play.item.song.id)
                 Log.d(TAG, "Added ${play.item.song.id} to the YouTube Music history")
@@ -161,7 +164,7 @@ class LocalHost(private val context: Context) {
             ytmpModule(
                 rooms,
                 search = cached,
-                audio = OnDeviceAudioProxy { songId, fresh -> ytm.stream(songId, fresh) },
+                audio = local.audio(OnDeviceAudioProxy { songId, fresh -> ytm.stream(songId, fresh) }),
                 webApp = webApp,
                 options = HostOptions(
                     kind = HostKind.PHONE,
@@ -179,12 +182,13 @@ class LocalHost(private val context: Context) {
                     sync.routes(this)
                     sync.cloneRoute(this)
                 },
-                similar = cached,
-                catalog = cached,
+                similar = local.radio(cached),
+                catalog = local.catalog(cached),
                 personal = youtube,
                 suggestions = cached,
                 lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
                 zones = zones,
+                local = local,
             )
         }.start(wait = false)
         Log.i(TAG, "Hosting on port $PORT")

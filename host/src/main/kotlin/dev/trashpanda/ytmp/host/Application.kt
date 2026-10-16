@@ -38,6 +38,7 @@ import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
 import dev.trashpanda.ytmp.protocol.HostInfo
+import dev.trashpanda.ytmp.protocol.LocalLibraries
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.RejectReason
@@ -207,6 +208,8 @@ fun Application.ytmpModule(
     lyrics: LyricsLookup? = null,
     /** Amplifier zones, for another host that takes their player over. */
     zones: ZoneOutputs? = null,
+    /** Local music (the Local tab): a Raspberry Pi's music folder, the music on the hosting phone. */
+    local: LocalMusic? = null,
 ) {
     val screens = ScreenPairings()
     install(ContentNegotiation) { json(ProtocolJson) }
@@ -302,6 +305,14 @@ fun Application.ytmpModule(
     routing {
         route("/api") {
             if (options.accountsOnly) install(accountsOnly)
+            // The Local tab: the libraries here, then one whole (filtered in the page as you type).
+            get("/local") {
+                call.respond(local?.summaries() ?: LocalLibraries(emptyList()))
+            }
+            get("/local/{id}") {
+                val page = local?.page(call.parameters["id"]!!) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "That music isn't on the network now")
+                call.respond(page)
+            }
             // Another YTMP host that takes over a zones player asks what this host's zones had before.
             get("/zones/handover") {
                 val host = call.request.queryParameters["host"]

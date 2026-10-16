@@ -1043,6 +1043,28 @@ export interface HomePage {
   sections: HomeSection[];
 }
 
+export type LocalLibraryKind = "mpd" | "phone";
+
+export interface LocalLibrarySummary {
+  id: string;
+  name: string;
+  kind: LocalLibraryKind;
+  songCount: number;
+}
+
+export interface LocalLibraries {
+  libraries: LocalLibrarySummary[];
+}
+
+export interface LocalLibraryPage {
+  id: string;
+  name: string;
+  kind: LocalLibraryKind;
+  albums: SearchItem[];
+  artists: SearchItem[];
+  songs: Song[];
+}
+
 export interface YoutubeAccount {
   name: string;
   handle: string | null;

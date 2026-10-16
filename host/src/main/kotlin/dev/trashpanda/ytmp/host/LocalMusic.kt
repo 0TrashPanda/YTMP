@@ -1,0 +1,304 @@
+package dev.trashpanda.ytmp.host
+
+import dev.trashpanda.ytmp.core.CatalogSource
+import dev.trashpanda.ytmp.core.RadioSource
+import dev.trashpanda.ytmp.core.ResolvedStream
+import dev.trashpanda.ytmp.core.StreamResolver
+import dev.trashpanda.ytmp.protocol.AlbumPage
+import dev.trashpanda.ytmp.protocol.AlbumRef
+import dev.trashpanda.ytmp.protocol.AlbumSummary
+import dev.trashpanda.ytmp.protocol.ArtistPage
+import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.LocalLibraries
+import dev.trashpanda.ytmp.protocol.LocalLibraryKind
+import dev.trashpanda.ytmp.protocol.LocalLibraryPage
+import dev.trashpanda.ytmp.protocol.LocalLibrarySummary
+import dev.trashpanda.ytmp.protocol.SearchItem
+import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.protocol.Thumbnail
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.response.header
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
+import java.net.HttpURLConnection
+import java.net.URI
+import java.net.URLDecoder
+import java.net.URLEncoder
+import java.util.Collections
+import java.util.IdentityHashMap
+
+/** One song in a [LocalLibrary]. [key]: the library's own name for it (MPD: its path). */
+data class LocalTrack(
+    val key: String,
+    val title: String,
+    val artist: String,
+    val albumArtist: String,
+    val album: String,
+    val disc: Int?,
+    val track: Int?,
+    val year: String?,
+    val durationMs: Long,
+)
+
+/** Music the host reaches itself: an MPD's music folder ([MpdLibrary]), the music on the hosting phone. */
+interface LocalLibrary {
+    /** Short and without ":", part of every song's id. */
+    val id: String
+    val name: String
+    val kind: LocalLibraryKind
+
+    /** All its songs (the library may remember them a while). */
+    suspend fun tracks(): List<LocalTrack>
+
+    /** A link the devices on the network can play the song from. */
+    fun fileUrl(key: String): String
+
+    /** The song's cover, [size] px, or null. */
+    fun artUrl(key: String, size: Int): String?
+
+    /** Sends the song through the host (`/api/audio/…`), with [range]. */
+    suspend fun respond(call: ApplicationCall, key: String, range: String?)
+}
+
+/**
+ * The host's local music: its libraries as songs, albums and artists, for the Local tab
+ * (`/api/local`), album and artist pages, autoplay, and playing them (stream links and
+ * `/api/audio`). Songs are `local:<library>:s:<key>`; the YouTube Music source handles the
+ * rest, through the wrappers ([streams], [radio], [catalog], [audio]). See
+ * docs/implementation/local-music.md.
+ */
+class LocalMusic {
+    private val libraries = MutableStateFlow<Map<String, LocalLibrary>>(emptyMap())
+    val all: StateFlow<Map<String, LocalLibrary>> = libraries
+
+    /** Built from the tracks list, by that list (a library hands out the same list until it changes). */
+    private val built = Collections.synchronizedMap(IdentityHashMap<List<LocalTrack>, Built>())
+
+    fun add(library: LocalLibrary) {
+        if (libraries.value[library.id] == library) return
+        libraries.update { it + (library.id to library) }
+        log.info("Local music: {} ({})", library.name, library.id)
+    }
+
+    fun remove(id: String) = libraries.update { it - id }
+
+    suspend fun summaries(): LocalLibraries = LocalLibraries(
+        libraries.value.values.mapNotNull { library ->
+            runCatching { LocalLibrarySummary(library.id, library.name, library.kind, library.tracks().size) }
+                .onFailure { log.warn("Local music {}: {}", library.name, it.message) }
+                .getOrNull()
+        }.sortedBy { it.kind },
+    )
+
+    suspend fun page(id: String): LocalLibraryPage? {
+        val library = libraries.value[id] ?: return null
+        val b = build(library)
+        return LocalLibraryPage(
+            library.id,
+            library.name,
+            library.kind,
+            albums = b.albums.sortedBy { it.title.lowercase() }.map { SearchItem.AlbumResult(it.summary, listOf(ArtistRef(it.artistId, it.artist))) },
+            artists = b.artists.map { SearchItem.ArtistResult(it.id, it.name, it.thumbnails) },
+            songs = b.songs.sortedBy { it.title.lowercase() },
+        )
+    }
+
+    /** Null when [id] isn't local music. */
+    suspend fun album(id: String): AlbumPage? {
+        val (library, kind, _) = parse(id) ?: return null
+        if (kind != ALBUM) return null
+        val b = build(library)
+        val album = b.albumsById[id] ?: throw SourceException("That album isn't in ${library.name} any more")
+        return AlbumPage(album.id, album.title, "Album", album.year, listOf(ArtistRef(album.artistId, album.artist)), album.summary.thumbnails, album.songs)
+    }
+
+    /** Null when [id] isn't local music. */
+    suspend fun artist(id: String): ArtistPage? {
+        val (library, kind, _) = parse(id) ?: return null
+        if (kind != ARTIST) return null
+        val artist = build(library).artistsById[id] ?: throw SourceException("That artist isn't in ${library.name} any more")
+        return ArtistPage(artist.id, artist.name, artist.thumbnails, null, artist.songs, artist.albums.map { it.summary }, emptyList())
+    }
+
+    /**
+     * More of the library after [seedId], for autoplay, Start radio and Find similar: some of
+     * the same artist, the rest from all over, mixed. Null when [seedId] isn't local music.
+     */
+    suspend fun radio(seedId: String): List<Song>? {
+        val (library, kind, _) = parse(seedId) ?: return null
+        if (kind != SONG) return emptyList()
+        val b = build(library)
+        val seed = b.trackOf[seedId]
+        val others = b.songs.filter { it.id != seedId }
+        val same = seed?.let { s -> others.filter { b.trackOf[it.id]?.artist.equals(s.artist, ignoreCase = true) }.shuffled().take(RADIO_SAME_ARTIST) }.orEmpty()
+        val rest = (others - same.toSet()).shuffled().take(RADIO_SIZE - same.size)
+        return (same + rest).shuffled()
+    }
+
+    /** The stream link of a local song, or null when [songId] isn't local music. */
+    suspend fun stream(songId: String): ResolvedStream? {
+        val (library, kind, key) = parse(songId) ?: return null
+        if (kind != SONG) throw SourceException("Not a song")
+        return ResolvedStream(library.fileUrl(key), durationMs = null)
+    }
+
+    /** Sends a local song through the host; false when [songId] isn't local music. */
+    suspend fun respond(call: ApplicationCall, songId: String, range: String?): Boolean {
+        val (library, kind, key) = parse(songId) ?: return false
+        if (kind != SONG) throw SourceException("Not a song")
+        library.respond(call, key, range)
+        return true
+    }
+
+    // --- in front of the YouTube Music source ---
+
+    fun streams(inner: StreamResolver): StreamResolver = object : StreamResolver {
+        override suspend fun resolveStream(songId: String) = stream(songId)?.url ?: inner.resolveStream(songId)
+
+        override suspend fun resolve(songId: String) = stream(songId) ?: inner.resolve(songId)
+    }
+
+    fun radio(inner: RadioSource): RadioSource = RadioSource { seed -> radio(seed) ?: inner.radio(seed) }
+
+    fun catalog(inner: CatalogSource): CatalogSource = object : CatalogSource by inner {
+        override suspend fun album(id: String): AlbumPage = this@LocalMusic.album(id) ?: inner.album(id)
+
+        override suspend fun artist(id: String): ArtistPage = this@LocalMusic.artist(id) ?: inner.artist(id)
+    }
+
+    fun audio(inner: AudioProxy?): AudioProxy = AudioProxy { call, songId, range ->
+        if (!respond(call, songId, range)) inner?.respond(call, songId, range) ?: call.respond(HttpStatusCode.NotFound)
+    }
+
+    // --- songs, albums and artists from the tracks ---
+
+    private class Album(val id: String, val title: String, val artist: String, val artistId: String, val year: String?, val songs: List<Song>, val summary: AlbumSummary)
+
+    private class Artist(val id: String, val name: String, val thumbnails: List<Thumbnail>, val albums: List<Album>, val songs: List<Song>)
+
+    private class Built(
+        val songs: List<Song>,
+        val trackOf: Map<String, LocalTrack>,
+        val albums: List<Album>,
+        val albumsById: Map<String, Album>,
+        val artists: List<Artist>,
+        val artistsById: Map<String, Artist>,
+    )
+
+    private suspend fun build(library: LocalLibrary): Built {
+        val tracks = library.tracks()
+        built[tracks]?.let { return it }
+        val lib = library.id
+        val ordered = tracks.sortedWith(compareBy<LocalTrack>({ it.albumArtist.lowercase() }, { it.album.lowercase() }, { it.disc ?: 0 }, { it.track ?: 0 }, { it.title.lowercase() }))
+        val trackOf = HashMap<String, LocalTrack>()
+        val songOf = HashMap<LocalTrack, Song>()
+        for (t in ordered) {
+            val id = songId(lib, t.key)
+            val song = Song(
+                id = id,
+                title = t.title,
+                artists = listOf(ArtistRef(artistId(lib, t.artist), t.artist)),
+                album = t.album.takeIf { it.isNotEmpty() }?.let { AlbumRef(albumId(lib, t.albumArtist, it), it) },
+                durationMs = t.durationMs,
+                thumbnails = library.artUrl(t.key, ART_SIZE)?.let { listOf(Thumbnail(it, ART_SIZE, ART_SIZE)) }.orEmpty(),
+            )
+            trackOf[id] = t
+            songOf[t] = song
+        }
+        val albums = ordered.filter { it.album.isNotEmpty() }.groupBy { it.albumArtist.lowercase() to it.album.lowercase() }.values.map { group ->
+            val first = group.first()
+            val id = albumId(lib, first.albumArtist, first.album)
+            val thumbnails = library.artUrl(first.key, ART_SIZE)?.let { listOf(Thumbnail(it, ART_SIZE, ART_SIZE)) }.orEmpty()
+            val year = group.firstNotNullOfOrNull { it.year }
+            Album(id, first.album, first.albumArtist, artistId(lib, first.albumArtist), year, group.map { songOf.getValue(it) }, AlbumSummary(id, first.album, "Album", year, thumbnails))
+        }
+        val names = (ordered.map { it.albumArtist } + ordered.map { it.artist }).filter { it.isNotBlank() }.distinctBy { it.lowercase() }
+        val artists = names.sortedBy { it.lowercase() }.map { name ->
+            val own = albums.filter { it.artist.equals(name, ignoreCase = true) }
+            val songs = ordered.filter { it.artist.equals(name, ignoreCase = true) || it.albumArtist.equals(name, ignoreCase = true) }.map { songOf.getValue(it) }
+            Artist(artistId(lib, name), name, own.firstOrNull()?.summary?.thumbnails ?: songs.firstOrNull()?.thumbnails.orEmpty(), own, songs)
+        }.filter { it.songs.isNotEmpty() }
+        val b = Built(ordered.map { songOf.getValue(it) }, trackOf, albums, albums.associateBy { it.id }, artists, artists.associateBy { it.id })
+        synchronized(built) {
+            // Only the latest list of each library is worth keeping.
+            if (built.size > 8) built.clear()
+            built[tracks] = b
+        }
+        return b
+    }
+
+    private fun parse(id: String): Triple<LocalLibrary, String, String>? {
+        if (!id.startsWith(PREFIX)) return null
+        val parts = id.removePrefix(PREFIX).split(':', limit = 3)
+        if (parts.size < 3) throw SourceException("Not local music: $id")
+        val library = libraries.value[parts[0]] ?: throw SourceException("That music isn't on the network now")
+        return Triple(library, parts[1], parts[2])
+    }
+
+    companion object {
+        private val log = LoggerFactory.getLogger(LocalMusic::class.java)
+        const val PREFIX = "local:"
+        private const val SONG = "s"
+        private const val ALBUM = "a"
+        private const val ARTIST = "r"
+        private const val ART_SIZE = 544
+        private const val RADIO_SIZE = 50
+        private const val RADIO_SAME_ARTIST = 10
+
+        fun isLocal(id: String) = id.startsWith(PREFIX)
+
+        fun songId(library: String, key: String) = "$PREFIX$library:$SONG:$key"
+
+        fun albumId(library: String, artist: String, album: String) = "$PREFIX$library:$ALBUM:${encode(artist.lowercase())}/${encode(album.lowercase())}"
+
+        fun artistId(library: String, name: String) = "$PREFIX$library:$ARTIST:${encode(name.lowercase())}"
+
+        /** A library id from anything (a host and port): letters, digits and "-". */
+        fun libraryId(vararg parts: Any) = parts.joinToString("-") { it.toString() }.replace(Regex("[^A-Za-z0-9]+"), "-").trim('-')
+
+        internal fun encode(text: String) = URLEncoder.encode(text, Charsets.UTF_8)
+
+        internal fun decode(text: String) = URLDecoder.decode(text, Charsets.UTF_8)
+    }
+}
+
+/** Passes a file from [url] (a web server on the network, with ranges) on to [call]. */
+internal suspend fun proxyHttp(call: ApplicationCall, url: String, range: String?) {
+    val connection = withContext(Dispatchers.IO) {
+        (URI(url).toURL().openConnection() as HttpURLConnection).apply {
+            connectTimeout = 5_000
+            readTimeout = 30_000
+            if (range != null) setRequestProperty("Range", range)
+            connect()
+        }
+    }
+    val code = withContext(Dispatchers.IO) { connection.responseCode }
+    if (code !in 200..299) {
+        connection.disconnect()
+        throw SourceException("The music server answered $code")
+    }
+    call.response.header(HttpHeaders.AcceptRanges, "bytes")
+    connection.getHeaderField("Content-Range")?.let { call.response.header(HttpHeaders.ContentRange, it) }
+    call.respondOutputStream(
+        contentType = connection.contentType?.let { runCatching { ContentType.parse(it) }.getOrNull() },
+        status = HttpStatusCode.fromValue(code),
+        contentLength = connection.contentLengthLong.takeIf { it >= 0 },
+    ) {
+        try {
+            connection.inputStream.use { it.copyTo(this) }
+        } catch (e: java.io.IOException) {
+            // Usually the listener stopped or skipped.
+        } finally {
+            connection.disconnect()
+        }
+    }
+}

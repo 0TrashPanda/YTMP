@@ -21,9 +21,19 @@ import java.net.URLEncoder
 data class ZoneConfig(
     val version: Int = 1,
     val player: ZonePlayer = ZonePlayer(),
-    val amp: ZoneAmp,
-    val zones: List<ZoneEntry>,
+    /** The amp and its zones; a file can also only share the player's [music]. */
+    val amp: ZoneAmp? = null,
+    val zones: List<ZoneEntry> = emptyList(),
+    val music: ZoneMusic? = null,
 )
+
+/**
+ * The player's music for the Local tab: MPD's songs, with the files and covers from a web server
+ * (deploy/zones/ytmp-share.py). [files] and [art] are relative to the file's own address (or
+ * whole addresses); [name] is how the Local tab calls it.
+ */
+@Serializable
+data class ZoneMusic(val name: String? = null, val files: String = "/music/", val art: String? = "/art/")
 
 /** The player all zones listen to. [host]: the machine that serves the config when left out. */
 @Serializable
@@ -137,8 +147,12 @@ class ZoneControl(val key: String, private val amp: ZoneAmp) {
 fun validateZones(config: ZoneConfig, sourceHost: String): String {
     if (config.version != 1) throw ZoneConfigException("version ${config.version} isn't supported")
     if (config.player.type != "mpd") throw ZoneConfigException("player type \"${config.player.type}\" isn't supported")
+    if (config.amp == null && config.music == null) throw ZoneConfigException("no \"amp\" or \"music\"")
+    if (config.amp == null && config.zones.isNotEmpty()) throw ZoneConfigException("zones need an \"amp\"")
+    val player = config.player.host ?: sourceHost
+    if (!isLocal(player)) throw ZoneConfigException("the player $player isn't on the local network")
+    val amp = config.amp ?: return InetAddress.getByName(player).hostAddress
     if (config.zones.isEmpty()) throw ZoneConfigException("no zones")
-    val amp = config.amp
     if (amp.on.isEmpty()) throw ZoneConfigException("no \"on\" requests")
     if (amp.state == null && (amp.ours.isNotEmpty() || amp.save.isNotEmpty() || amp.volume != null)) throw ZoneConfigException("\"ours\", \"save\" and \"volume\" need \"state\"")
     amp.volume?.let { if (it.field == null) throw ZoneConfigException("\"volume\" needs the \"field\" it's read from") }
@@ -158,8 +172,6 @@ fun validateZones(config: ZoneConfig, sourceHost: String): String {
         val host = uri.host ?: throw ZoneConfigException("no host in $url")
         if (!isLocal(host)) throw ZoneConfigException("$host isn't on the local network")
     }
-    val player = config.player.host ?: sourceHost
-    if (!isLocal(player)) throw ZoneConfigException("the player $player isn't on the local network")
     return InetAddress.getByName(player).hostAddress
 }
 

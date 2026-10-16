@@ -62,6 +62,8 @@ class YoutubeLinks(
      */
     fun report(play: FinishedPlay, localId: (String) -> String?) {
         if (play.heardMs < HISTORY_MIN_MS && play.skipped) return
+        // Only YouTube Music songs go into YouTube Music's history (not local music).
+        if (!play.item.song.id.startsWith("ytm:")) return
         for (listener in play.listeners) {
             val id = listener.accountId?.let(localId) ?: continue
             scope.launch {
