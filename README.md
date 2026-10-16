@@ -15,7 +15,8 @@ Music, without Premium, and not tied to a single music service.
 - **Host anywhere.** On a Linux server (everyone joins from a browser), or on an Android
   phone with no server at all.
 - **Listen anywhere.** Every phone or browser can play along in sync, or the room plays on
-  Chromecast, Sonos and MPD speakers (say a Raspberry Pi on your stereo).
+  Chromecast, Sonos and MPD speakers (say a Raspberry Pi on your stereo), or the rooms of a
+  multi-room amplifier.
 - **Feels like YouTube Music.** Home with suggestions, search with chips, artist, album,
   playlist and podcast pages, a mini player and a full player with Up next.
 - **Music and podcasts.** Episodes resume where you left off, with skip buttons.
@@ -62,7 +63,9 @@ Music, without Premium, and not tied to a single music service.
 - A mini player that opens a full player (tap or swipe up): album art, controls, like,
   save to playlist, and Up next / Related tabs.
 - Play on this device, on Chromecasts (including speakers with Chromecast built in), on
-  Sonos speakers and on MPD (a Raspberry Pi on a speaker or amplifier), with their volume. In a room on a server, the app also plays on the
+  Sonos speakers and on MPD (a Raspberry Pi on a speaker or amplifier), with their volume.
+  The rooms of a multi-room amplifier show up as speakers of their own, from a file the house
+  keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
   speakers near your phone (the phone looks the songs up and serves them).
 - Android: lock screen and notification controls, keeps playing with the screen off.
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app

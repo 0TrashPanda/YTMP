@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "player": {"type": "mpd"},
+  "amp": {
+    "base": "http://192.168.0.156/audio_set?output={zone}",
+    "state": "{base}&settings=?",
+    "stateAfter": "settings=",
+    "ours": {"channel": 3, "muted": 0},
+    "save": ["vchan", "muted"],
+    "on": ["{base}&vchan=2", "{base}&muted=0"],
+    "off": ["{base}&muted=1", "{base}&vchan={vchan}", "{base}&muted={muted}"],
+    "volume": {"set": "{base}&volume={volume}", "field": "volume", "max": 50}
+  },
+  "zones": [
+    {"zone": 1, "name": "Zithoek achter"},
+    {"zone": 3, "name": "Zithoek voor"},
+    {"zone": 5, "name": "Keuken"},
+    {"zone": 7, "name": "Koptelefoon"}
+  ]
+}

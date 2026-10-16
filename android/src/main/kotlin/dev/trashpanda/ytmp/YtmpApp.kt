@@ -83,10 +83,12 @@ class YtmpApp : Application() {
                         host.castFinder.start()
                         host.sonosFinder.start()
                         host.mpdFinder.start()
+                        host.zoneFinder.start()
                     } else {
                         host.castFinder.stop()
                         host.sonosFinder.stop()
                         host.mpdFinder.stop()
+                        host.zoneFinder.stop()
                     }
                 }
         }

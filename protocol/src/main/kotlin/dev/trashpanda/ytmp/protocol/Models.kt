@@ -157,6 +157,8 @@ enum class OutputKind {
     @SerialName("sonos") SONOS,
     /** MPD (Music Player Daemon), e.g. on a Raspberry Pi with a speaker. */
     @SerialName("mpd") MPD,
+    /** A room of a multi-room amplifier, fed by a player (an MPD) that other zones may share. */
+    @SerialName("zone") ZONE,
 }
 
 /** A speaker or TV the host can play the room on. */

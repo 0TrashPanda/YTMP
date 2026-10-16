@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.LyricsLookup
 import dev.trashpanda.ytmp.host.MpdOutputs
 import dev.trashpanda.ytmp.host.SonosOutputs
+import dev.trashpanda.ytmp.host.ZoneOutputs
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -85,7 +86,10 @@ fun main(args: Array<String>) {
         val mpd = MpdOutputs(this, audioBase)
         mpd.addConfigured(config.mpd.devices)
         if (config.mpd.discovery) mpd.discover(keep = config.mpd.devices.map { MpdEntry.parse(it).id }.toSet())
-        val outputs = combine(casts.devices, sonos.devices, mpd.devices) { a, b, c -> a + b + c }.stateIn(this, SharingStarted.Eagerly, emptyList())
+        val zones = ZoneOutputs(this, audioBase, mpd)
+        for (url in config.zones.files) zones.addSource(url, url)
+        if (config.zones.discovery) zones.discover()
+        val outputs = combine(casts.devices, sonos.devices, mpd.devices, zones.devices) { a, b, c, d -> a + b + c + d }.stateIn(this, SharingStarted.Eagerly, emptyList())
 
         val db = Database.open(config.database)
         val accounts = Accounts(db)
@@ -129,6 +133,7 @@ fun main(args: Array<String>) {
         casts.attach(rooms)
         sonos.attach(rooms)
         mpd.attach(rooms)
+        zones.attach(rooms)
 
         ytmpModule(
             rooms,

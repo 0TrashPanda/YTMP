@@ -17,6 +17,7 @@ data class Config(
     val cast: CastConfig = CastConfig(),
     val sonos: SonosConfig = SonosConfig(),
     val mpd: MpdConfig = MpdConfig(),
+    val zones: ZonesConfig = ZonesConfig(),
     val database: DatabaseConfig = DatabaseConfig(),
     val accounts: AccountsConfig = AccountsConfig(),
     val audio: AudioConfig = AudioConfig(),
@@ -130,6 +131,15 @@ data class MpdConfig(
     val discovery: Boolean = true,
     /** MPD players to always offer, as "host", "host:port" or "Name=host[:port]", e.g. "Woonkamer=192.168.0.50". */
     val devices: List<String> = emptyList(),
+)
+
+/** Amplifier zones (docs/implementation/zones.md). */
+@Serializable
+data class ZonesConfig(
+    /** Find zones files with mDNS (`_ytmp-zones._tcp`). Inside Docker this needs `network_mode: host`. */
+    val discovery: Boolean = true,
+    /** Zones files to always follow, by URL, e.g. "http://192.168.0.50:8766/ytmp-zones.json". */
+    val files: List<String> = emptyList(),
 )
 
 /** See docs/implementation/storage.md. */

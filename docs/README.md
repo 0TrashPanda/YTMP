@@ -50,5 +50,6 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [implementation/chromecast.md](implementation/chromecast.md) | Chromecast output module |
 | [implementation/sonos.md](implementation/sonos.md) | Sonos output module |
 | [implementation/mpd.md](implementation/mpd.md) | MPD output module (e.g. a Raspberry Pi on a speaker) |
+| [implementation/zones.md](implementation/zones.md) | Amplifier zones: the zones file and its building blocks, setting up the Pi |
 | [implementation/room-sync.md](implementation/room-sync.md) | Room sync: hub on the server, copies, epochs, moving |
 | [implementation/networking.md](implementation/networking.md) | LAN discovery, QR, room code generation, transport security, default timeouts |

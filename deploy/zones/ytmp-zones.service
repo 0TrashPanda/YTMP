@@ -1,0 +1,14 @@
+# Serves /etc/ytmp-zones/ytmp-zones.json on port 8766 for YTMP to find (see docs/implementation/zones.md).
+# Install: sudo cp ytmp-zones.service /etc/systemd/system/ && sudo systemctl enable --now ytmp-zones
+[Unit]
+Description=YTMP zones file
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 -m http.server 8766 --directory /etc/ytmp-zones
+DynamicUser=yes
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

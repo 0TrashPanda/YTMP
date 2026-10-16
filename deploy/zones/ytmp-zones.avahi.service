@@ -1,0 +1,11 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- Announces the zones file so YTMP finds it. Install: sudo cp ytmp-zones.avahi.service /etc/avahi/services/ytmp-zones.service -->
+<service-group>
+  <name replace-wildcards="yes">YTMP zones on %h</name>
+  <service>
+    <type>_ytmp-zones._tcp</type>
+    <port>8766</port>
+    <txt-record>path=/ytmp-zones.json</txt-record>
+  </service>
+</service-group>

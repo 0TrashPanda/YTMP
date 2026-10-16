@@ -40,6 +40,13 @@ discovery = true
 # e.g. ["Woonkamer=192.168.0.50"].
 devices = []
 
+[zones]
+# The rooms of a multi-room amplifier, from a zones file on the network (docs/implementation/zones.md).
+# Find zones files with mDNS. Inside Docker this needs network_mode: host.
+discovery = true
+# Zones files to always follow, e.g. ["http://192.168.0.50:8766/ytmp-zones.json"].
+files = []
+
 [accounts]
 # This server's public address. Logins on pages served from there work; without it only
 # this machine's own IP addresses do. YTMP_URL overrides it.

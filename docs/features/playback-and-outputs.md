@@ -46,11 +46,12 @@ The host can also send audio to **output modules**. Outputs are **modular**.
 | Sonos ✅ | Streams to Sonos speakers over HTTP (see [implementation](../implementation/sonos.md)) |
 | Chromecast ✅ | Casts to Chromecast / Google Cast devices: TVs, Nest speakers, speaker groups (see [implementation](../implementation/chromecast.md)). A TV or display can show the [party screen](ui.md#party-screen) while it plays |
 | MPD ✅ | Plays on MPD (Music Player Daemon), e.g. a Raspberry Pi on a speaker or an amplifier, wired or over Bluetooth (see [implementation](../implementation/mpd.md)) |
+| Amplifier zones ✅ | The rooms of a multi-room amplifier, each a speaker of its own, with a player (an MPD) on one of its inputs (see [below](#amplifier-zones) and [implementation](../implementation/zones.md)) |
 | Snapcast | Future idea: precise multi-room sync through a Snapcast server (see [future ideas](future-ideas.md#snapcast-output)) |
 | Discord bot | Future idea: plays into a Discord voice channel (see [future ideas](future-ideas.md#discord-bot-output)) |
 | … | Future output modules |
 
-Outputs like Sonos, Chromecast and MPD must be on the **same network as the host**. A phone
+Outputs like Sonos, Chromecast, MPD and amplifier zones must be on the **same network as the host**. A phone
 host or a home server can use them, a server in a datacenter can't.
 
 *Play on* lists the speakers and TVs that are there now: one that's switched off, or that's
@@ -58,7 +59,7 @@ on the network your phone just left (another Wi-Fi), goes from the list. If the 
 playing there, it's switched off with a notice.
 
 **Speakers near your phone** ✅: in a room on another host (a server), the app's *Play on*
-also lists the Sonos speakers, Chromecasts and MPDs on your phone's network that the host doesn't
+also lists the Sonos speakers, Chromecasts, MPDs and amplifier zones on your phone's network that the host doesn't
 offer itself, under *Near this phone*. Switched on, the phone plays the room there: it
 follows the room, looks the songs up itself and serves them to the speaker, so it works
 wherever the server is. They have their own volume slider, and a Chromecast TV can show the
@@ -66,6 +67,15 @@ wherever the server is. They have their own volume slider, and a Chromecast TV c
 keeps playing while they play, and everyone sees *plays on Woonkamer* next to your name.
 The phone must stay on that Wi-Fi with the app running (it shows a notification, like
 hosting); when it goes away, so do its speakers.
+
+**Amplifier zones** ✅: a house with a multi-room amplifier and a player on one of its inputs
+(say a Raspberry Pi) describes them once, in a file on its own network. Every phone or home
+server on that Wi-Fi then lists each room of the amp in *Play on* (*Keuken*, *Zithoek voor*),
+with nothing to set up. Switching a room on switches it to the player on the amp; several
+rooms play the same music together. Each has its own volume slider, which is that room's
+volume on the amp. Switched off, the room goes back to what it had (the TV, muted or not).
+Picking something else for a room on the amp itself switches it off in YTMP. One player plays
+one room's music: when another room switches on one of its zones, it gets the player.
 
 Changing host outputs is a permission (see [room management](room-management.md#permissions)).
 

@@ -454,7 +454,7 @@ export interface EventNowPlayingChanged {
   item: QueueItem | null;
 }
 
-export type OutputKind = "chromecast" | "sonos" | "mpd";
+export type OutputKind = "chromecast" | "sonos" | "mpd" | "zone";
 
 export interface OutputInfo {
   id: string;

@@ -43,11 +43,14 @@ discovery = true
 devices = ["Woonkamer=192.168.0.50"]   # "host", "host:port" or "Name=host[:port]"
 ```
 
+An MPD that feeds the zones of a multi-room amplifier is offered as those zones instead, with
+the same session (`MpdSession`), see [amplifier zones](zones.md).
+
 ## Another app takes it
 
-Each check reads MPD's current song. Once a song has settled, a file that isn't the host's
-`/api/audio/…` (someone plays MPD's own library, or another app queued something) means it's
-taken: the driver lets go without `stop` and calls `Room.outputTakenOver`, which switches the
+Each check reads MPD's current song. Once a song has settled, a file that isn't this host's
+own `/api/audio/…` (someone plays MPD's own library, another app queued something, or another
+YTMP host plays there) means it's taken: the driver lets go without `stop` and calls `Room.outputTakenOver`, which switches the
 output off in the room with a notice.
 
 ## Not yet

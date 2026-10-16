@@ -27,6 +27,9 @@ class ConfigTest {
 
                 [mpd]
                 devices = ["Woonkamer=192.168.0.50", "192.168.0.51:6601"]
+
+                [zones]
+                files = ["http://192.168.0.50:8766/ytmp-zones.json"]
                 """.trimIndent(),
             )
             deleteOnExit()
@@ -46,6 +49,7 @@ class ConfigTest {
             config.mpd.devices.map(MpdEntry::parse),
         )
         assertEquals("mpd:192.168.0.51:6601", MpdEntry.parse("192.168.0.51:6601").id)
+        assertEquals(ZonesConfig(discovery = true, files = listOf("http://192.168.0.50:8766/ytmp-zones.json")), config.zones)
     }
 
     @Test
