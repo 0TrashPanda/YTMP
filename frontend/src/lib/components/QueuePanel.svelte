@@ -1,7 +1,7 @@
 <script lang="ts">
 	// "Up next": played songs, the current one, the queue and the autoplay queue as one list.
 	// Every song can be dragged anywhere in it (a played song moved below the current one
-	// plays again; the current one moved away lets the next one play). Tap, swipe right, swipe
+	// plays again; the current one keeps playing, and the songs it's dragged past change sides). Tap, swipe right, swipe
 	// left and hold do what Settings → Taps and swipes says (play, play next, remove like YTM,
 	// the song menu by default); right-click or ⋮ on hover with a mouse: the song menu.
 	import { tick } from 'svelte';

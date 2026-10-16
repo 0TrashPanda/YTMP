@@ -224,8 +224,10 @@ Open it with the **⋮** button or by **right-clicking** the song.
   song dragged into the queue becomes yours.
 - **Tapping** a song in *Up next* jumps to it; tapping an **autoplay** song makes it play
   next instead.
-- The **current song** works like the others: dragging it elsewhere (or removing it) lets
-  the next song play.
+- The **current song** keeps playing when it's dragged elsewhere, like YTM's one list: the
+  songs it's dragged past change sides. Down past upcoming songs, they count as played
+  (skipped); up past played songs, they play again after it. Removing it lets the next song
+  play.
 - The song in the desktop player bar is centered. **Leave Room** is at the bottom of the room
   settings sidebar (people icon), like Discord's *Leave Server*.
 - Browsing is cached (in the page and on the host): going back to an artist or album is

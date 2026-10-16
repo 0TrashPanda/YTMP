@@ -1301,7 +1301,7 @@ class Room(
 
     private fun moveItem(member: Member, command: Command.MoveItem): ErrorInfo? {
         val playing = current
-        if (playing != null && playing.itemId == command.itemId) return moveCurrent(member, playing, command)
+        if (playing != null && playing.itemId == command.itemId) return moveCurrent(member, command)
         val (from, original) = find(command.itemId) ?: return notFound()
         // Taking an autoplay song into the queue (next or last) is like adding it; anything else is reordering.
         val toEnd = command.toIndex >= queue.size
@@ -1344,21 +1344,43 @@ class Room(
         return null
     }
 
-    /** The current song dragged somewhere else: it goes there, and the next song starts. */
-    private fun moveCurrent(member: Member, playing: QueueItem, command: Command.MoveItem): ErrorInfo? {
+    /**
+     * The current song dragged somewhere else, like YTM's one list: it keeps playing at its new
+     * place, and the songs it was dragged past change sides. Down past queued songs: they count
+     * as played (skipped); into autoplay: the whole queue too, and the autoplay songs before it
+     * go (they never played). Up past played songs: they play again, after it.
+     */
+    private fun moveCurrent(member: Member, command: Command.MoveItem): ErrorInfo? {
         need(member, Permission.REORDER)?.let { return it }
-        val historyOffset = maxOf(0, history.size - SNAPSHOT_HISTORY)
-        current = null
-        val target = listOf(command.list)
-        val item = if (command.list == ItemList.HISTORY) playing.copy(result = QueueItemResult.SKIPPED) else playing.copy(result = null)
-        val to = (command.toIndex + if (command.list == ItemList.HISTORY) historyOffset else 0).coerceIn(0, target.size)
-        target.add(to, item)
         when (command.list) {
-            ItemList.QUEUE -> emit(Event.QueueReplaced(queue.toList()))
-            ItemList.HISTORY -> emit(Event.HistoryReplaced(history.takeLast(SNAPSHOT_HISTORY)))
-            ItemList.AUTOPLAY -> emitAutoplay()
+            ItemList.QUEUE, ItemList.AUTOPLAY -> {
+                val passed = if (command.list == ItemList.QUEUE) command.toIndex.coerceIn(0, queue.size) else queue.size
+                repeat(passed) {
+                    val skipped = queue.removeAt(0)
+                    emit(Event.QueueItemRemoved(skipped.itemId))
+                    appendHistory(skipped, QueueItemResult.SKIPPED)
+                }
+                if (command.list == ItemList.AUTOPLAY) {
+                    val dropped = command.toIndex.coerceIn(0, autoplay.size)
+                    if (dropped > 0) {
+                        autoplay.subList(0, dropped).clear()
+                        emitAutoplay()
+                    }
+                }
+            }
+            ItemList.HISTORY -> {
+                // History indexes count from the first song clients see (the snapshot only has the last ones).
+                val from = (command.toIndex + maxOf(0, history.size - SNAPSHOT_HISTORY)).coerceIn(0, history.size)
+                val reopened = history.subList(from, history.size).toList()
+                if (reopened.isEmpty()) return null
+                history.subList(from, history.size).clear()
+                reopened.forEach { emit(Event.HistoryItemRemoved(it.itemId)) }
+                val items = reopened.map { it.copy(result = null) }
+                queue.addAll(0, items)
+                emit(Event.QueueItemsAdded(items, 0))
+            }
         }
-        playNextFromQueue()
+        refillAutoplay()
         return null
     }
 

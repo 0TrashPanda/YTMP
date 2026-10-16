@@ -4,6 +4,7 @@ import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ItemList
+import dev.trashpanda.ytmp.protocol.QueueItemResult
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.QueueItemOrigin
 import dev.trashpanda.ytmp.protocol.QueuePosition
@@ -186,10 +187,10 @@ class RadioTest {
     }
 
     @Test
-    fun `the current song can be removed or dragged away like any other`() = runTest {
+    fun `the current song can be removed, and dragged elsewhere it keeps playing`() = runTest {
         val room = room()
         room.run(Command.UpdateSettings(autoplay = false))
-        room.run(Command.AddSongs(listOf(song("a"), song("b"), song("c")), QueuePosition.END))
+        room.run(Command.AddSongs(listOf(song("a"), song("b"), song("c"), song("d"), song("e")), QueuePosition.END))
         runCurrent()
         // Remove the current song: b plays, and a isn't in the history.
         room.run(Command.RemoveQueueItem(room.state().nowPlaying!!.item.itemId))
@@ -198,12 +199,25 @@ class RadioTest {
         assertEquals("b", state.nowPlaying?.item?.song?.id)
         assertTrue(state.history.isEmpty())
 
-        // Drag the current song (b) below c: c plays, b is next.
-        room.run(Command.MoveItem(state.nowPlaying!!.item.itemId, ItemList.QUEUE, 1))
+        // Drag the current song (b) below d: b keeps playing, c and d count as played (skipped).
+        val b = state.nowPlaying!!.item.itemId
+        room.run(Command.MoveItem(b, ItemList.QUEUE, 2))
         runCurrent()
         state = room.state()
-        assertEquals("c", state.nowPlaying?.item?.song?.id)
-        assertEquals(listOf("b"), state.queue.map { it.song.id })
+        assertEquals(b, state.nowPlaying?.item?.itemId)
+        assertTrue(state.playback.playing)
+        assertEquals(listOf("c", "d"), state.history.map { it.song.id })
+        assertTrue(state.history.all { it.result == QueueItemResult.SKIPPED })
+        assertEquals(listOf("e"), state.queue.map { it.song.id })
+
+        // Back up above c: c and d play again, after b, which still plays.
+        room.run(Command.MoveItem(b, ItemList.HISTORY, 0))
+        runCurrent()
+        state = room.state()
+        assertEquals(b, state.nowPlaying?.item?.itemId)
+        assertTrue(state.history.isEmpty())
+        assertEquals(listOf("c", "d", "e"), state.queue.map { it.song.id })
+        assertTrue(state.queue.all { it.result == null })
     }
 
     @Test
