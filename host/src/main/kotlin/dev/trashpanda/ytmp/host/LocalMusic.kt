@@ -71,6 +71,9 @@ interface LocalLibrary {
 
     /** Sends the song through the host (`/api/audio/…`), with [range]. */
     suspend fun respond(call: ApplicationCall, key: String, range: String?)
+
+    /** Sends the song's cover, [size] px (`/api/local/art/…`), for a library whose [artUrl] points there; false when it has none. */
+    suspend fun respondArt(call: ApplicationCall, key: String, size: Int): Boolean = false
 }
 
 /**
@@ -161,6 +164,12 @@ class LocalMusic {
         if (kind != SONG) throw SourceException("Not a song")
         library.respond(call, key, range)
         return true
+    }
+
+    /** Sends a local song's cover; false when it has none here. */
+    suspend fun respondArt(call: ApplicationCall, songId: String, size: Int): Boolean {
+        val (library, kind, key) = parse(songId) ?: return false
+        return kind == SONG && library.respondArt(call, key, size.coerceIn(32, 1024))
     }
 
     // --- in front of the YouTube Music source ---
@@ -285,9 +294,9 @@ class LocalMusic {
         /** A library id from anything (a host and port): letters, digits and "-". */
         fun libraryId(vararg parts: Any) = parts.joinToString("-") { it.toString() }.replace(Regex("[^A-Za-z0-9]+"), "-").trim('-')
 
-        internal fun encode(text: String) = URLEncoder.encode(text, Charsets.UTF_8)
+        internal fun encode(text: String) = URLEncoder.encode(text, "UTF-8")
 
-        internal fun decode(text: String) = URLDecoder.decode(text, Charsets.UTF_8)
+        internal fun decode(text: String) = URLDecoder.decode(text, "UTF-8")
     }
 }
 

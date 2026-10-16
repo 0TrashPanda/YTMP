@@ -20,6 +20,8 @@ Music, without Premium, and not tied to a single music service.
 - **Feels like YouTube Music.** Home with suggestions, search with chips, artist, album,
   playlist and podcast pages, a mini player and a full player with Up next.
 - **Music and podcasts.** Episodes resume where you left off, with skip buttons.
+- **Your own music too.** A *Local* tab with the music on a Raspberry Pi at home or on your
+  phone, playing on every speaker.
 - **Radio & recommendations.** Start a radio, keep the party going with autoplay, or
   browse similar songs.
 - **Permissions & roles.** Decide who can add, skip, remove or manage, per person or per
@@ -71,6 +73,8 @@ Music, without Premium, and not tied to a single music service.
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app
   looks songs up itself, and a browser can use a YouTube Music module on your own computer
   (*Settings → Playback*), instead of streaming through the server.
+- A *Local* tab with your own music: a Raspberry Pi's music folder (shared with MPD) and the
+  music on your phone, with albums, artists, songs, search and Shuffle all.
 
 **People and accounts**
 - Roles and permissions with a Discord-style editor (one role per person plus per-person
@@ -100,7 +104,7 @@ Music, without Premium, and not tied to a single music service.
 
 - Dealing with YouTube's "confirm you're not a bot" block
 - New podcast episodes on Home, playback speed, played marks
-- More sources: YouTube, local files, Plex / Jellyfin
+- More sources: YouTube, other music folders, Plex / Jellyfin
 - Learning which songs go together (song graph) for better radio, and recaps
 - YTMP playlists, explore page, sleep timer
 

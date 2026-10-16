@@ -94,7 +94,7 @@ class Lrclib(private val baseUrl: String = "https://lrclib.net") : LyricsSource 
 
     /** The parsed JSON, or null when LRCLIB doesn't have it (404). */
     private fun get(path: String, query: List<Pair<String, String>>): JsonElement? {
-        val url = baseUrl + path + "?" + query.joinToString("&") { (k, v) -> k + "=" + URLEncoder.encode(v, Charsets.UTF_8) }
+        val url = baseUrl + path + "?" + query.joinToString("&") { (k, v) -> k + "=" + URLEncoder.encode(v, "UTF-8") }
         val connection = URI(url).toURL().openConnection() as HttpURLConnection
         try {
             connection.connectTimeout = TIMEOUT_MS

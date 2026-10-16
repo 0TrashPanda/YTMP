@@ -334,7 +334,11 @@ export async function signOutOfYoutube(): Promise<void> {
 
 /** Your playlists (Liked music first) and podcasts in YouTube Music. */
 /** The local music this host reaches (a Raspberry Pi's music folder, the music on the hosting phone). */
-export function getLocalLibraries(): Promise<LocalLibraries> {
+export function getLocalLibraries(fresh = false): Promise<LocalLibraries> {
+	if (fresh) {
+		cache.delete('local');
+		cache.delete('local:phone');
+	}
 	return cached('local', () => request('/api/local'));
 }
 

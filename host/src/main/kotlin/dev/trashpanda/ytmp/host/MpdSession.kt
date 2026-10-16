@@ -58,7 +58,7 @@ internal class MpdSession(
             loadedItemId = item.itemId
             failed = false
             settledAt = now + SETTLE_MS
-            val url = audioPrefix + URLEncoder.encode(item.song.id, Charsets.UTF_8)
+            val url = audioPrefix + URLEncoder.encode(item.song.id, "UTF-8")
             try {
                 log.info("MPD {}: loading {}", name, item.song.title)
                 player.load(url)

@@ -1,6 +1,10 @@
 package dev.trashpanda.ytmp.host
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.edit
+import android.os.Build
 import android.net.ConnectivityManager
 import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
@@ -75,6 +79,18 @@ class LocalHost(private val context: Context) {
     /** Amplifier zones the house describes in a file on its network (fed by one of those MPDs). */
     /** Local music (the Local tab): what a Raspberry Pi shares, and the music on this phone. */
     val local = LocalMusic()
+    private val phoneLibrary = PhoneLibrary(context) { lanUrl() ?: "http://127.0.0.1:$PORT" }
+    private val localSettings = context.getSharedPreferences("ytmp.local", Context.MODE_PRIVATE)
+
+    /** The music on this phone shows in the Local tab (Settings → Local music), and Android lets us read it. */
+    val phoneMusicOn: Boolean get() = localSettings.getBoolean(PHONE_MUSIC, false) && canReadMusic()
+
+    fun canReadMusic() = context.checkSelfPermission(MUSIC_PERMISSION) == PackageManager.PERMISSION_GRANTED
+
+    fun setPhoneMusic(on: Boolean) {
+        localSettings.edit { putBoolean(PHONE_MUSIC, on) }
+        if (phoneMusicOn) local.add(phoneLibrary) else local.remove(PhoneLibrary.ID)
+    }
     val zones = ZoneOutputs(scope, { localAddress -> "http://${localAddress.hostAddress}:$PORT" }, mpd, local)
     val zoneFinder = ZoneFinder(context, zones)
     /** On another Wi-Fi network, the devices found on the old one go from the list. */
@@ -159,6 +175,7 @@ class LocalHost(private val context: Context) {
         sonos.attach(rooms)
         mpd.attach(rooms)
         zones.attach(rooms)
+        if (phoneMusicOn) local.add(phoneLibrary)
         wifi.start()
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
             ytmpModule(
@@ -264,6 +281,9 @@ class LocalHost(private val context: Context) {
 
     companion object {
         const val PORT = 8765
+        private const val PHONE_MUSIC = "phoneMusic"
+        /** Reading the music on the phone: its own permission since Android 13. */
+        val MUSIC_PERMISSION = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
         /** Mobile data: friends can't reach the phone there. */
         private val MOBILE_DATA = listOf("rmnet", "ccmni", "v4-rmnet", "pdp", "seth")
         /** The phone's own hotspot (differs per maker). */

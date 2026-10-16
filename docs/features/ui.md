@@ -85,7 +85,9 @@ Like YTM:
   bars above and below.
 - **The logo** ✅ always goes to Home (closing the full player); on Home already, it loads new
   suggestions, like pulling down.
-- **Desktop layout** ✅, like YTM: a **left side** with the logo, Home, Library and (wide
+- **Bottom bar** ✅ on phones: Home, Library (with YouTube Music sign-in) and Local (when
+  there's [local music](sources.md#local-music-)).
+- **Desktop layout** ✅, like YTM: a **left side** with the logo, Home, Library, Local and (wide
   screens) your playlists, with a search field above them; narrower screens get YTM's mini version (icons with small
   labels). No bottom bar on desktop, and the search box starts where the page does.
 - **Space plays and pauses** ✅ the room, like YTM (not while typing). A button you click

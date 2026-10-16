@@ -196,7 +196,7 @@ class SonosOutputs(
                 loadedItemId = item.itemId
                 failed = false
                 settledAt = now + SETTLE_MS
-                val url = audioBaseUrl(player.localAddress) + "/api/audio/" + URLEncoder.encode(item.song.id, Charsets.UTF_8)
+                val url = audioBaseUrl(player.localAddress) + "/api/audio/" + URLEncoder.encode(item.song.id, "UTF-8")
                 try {
                     log.info("Sonos {}: loading {}", device.name, item.song.title)
                     player.setUri(

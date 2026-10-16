@@ -309,6 +309,11 @@ fun Application.ytmpModule(
             get("/local") {
                 call.respond(local?.summaries() ?: LocalLibraries(emptyList()))
             }
+            // Covers of local music that the host serves itself (the music on a phone).
+            get("/local/art/{songId}") {
+                val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 544
+                if (local?.respondArt(call, call.parameters["songId"]!!, size) != true) call.respond(HttpStatusCode.NotFound)
+            }
             get("/local/{id}") {
                 val page = local?.page(call.parameters["id"]!!) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "That music isn't on the network now")
                 call.respond(page)

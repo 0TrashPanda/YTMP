@@ -126,7 +126,7 @@ data class ShownScreen(val deviceId: String, val name: String, val url: String) 
     fun unlink(): Pair<String, ScreenUnlinkRequest>? {
         val (code, token) = CAST_PAGE.matchEntire(url)?.destructured ?: return null
         return url.substringBefore("/tv#") + "/api/screens/unlink" to
-            ScreenUnlinkRequest(URLDecoder.decode(code, Charsets.UTF_8), URLDecoder.decode(token, Charsets.UTF_8))
+            ScreenUnlinkRequest(URLDecoder.decode(code, "UTF-8"), URLDecoder.decode(token, "UTF-8"))
     }
 
     companion object {

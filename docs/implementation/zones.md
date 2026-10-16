@@ -110,17 +110,25 @@ discovery = true
 files = ["http://192.168.0.50:8766/ytmp-zones.json"]
 ```
 
+## The player's music
+
+`"music": {"name": "Music on the Pi"}` shares the player's music folder too, for the Local tab
+(see [local music](local-music.md)). A file can also have only `player` and `music` (no amp).
+
 ## Setting up the Pi
 
-The files are in [`deploy/zones/`](../../deploy/zones/): the zones file, a systemd unit that
-serves it (Python's own web server, port 8766) and the mDNS announcement for Avahi.
+The files are in [`deploy/zones/`](../../deploy/zones/): the zones file, `ytmp-share.py` (serves
+the zones file, MPD's music folder and covers on port 8766; only Python), its systemd unit and
+the mDNS announcement for Avahi.
 
 ```sh
 sudo mkdir -p /etc/ytmp-zones
-sudo cp ytmp-zones.json /etc/ytmp-zones/              # edit it for your amp and zones
-sudo cp ytmp-zones.service /etc/systemd/system/
-sudo systemctl enable --now ytmp-zones
+sudo cp ytmp-zones.json /etc/ytmp-zones/              # edit it for your amp, zones and music
+sudo cp ytmp-share.py /usr/local/bin/
+sudo cp ytmp-zones.service /etc/systemd/system/       # --music: MPD's music_directory
+sudo systemctl daemon-reload && sudo systemctl enable --now ytmp-zones
 sudo cp ytmp-zones.avahi.service /etc/avahi/services/ytmp-zones.service
+sudo apt install python3-pil                          # optional: small covers
 ```
 
 MPD on the Pi plays into the amp's input (an ALSA output, e.g. a USB sound card). It needs no

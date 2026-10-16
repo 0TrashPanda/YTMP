@@ -1,12 +1,15 @@
-# Serves /etc/ytmp-zones/ytmp-zones.json on port 8766 for YTMP to find (see docs/implementation/zones.md).
-# Install: sudo cp ytmp-zones.service /etc/systemd/system/ && sudo systemctl enable --now ytmp-zones
+# Shares the zones file, MPD's music folder and covers with YTMP on port 8766
+# (ytmp-share.py; see docs/implementation/zones.md and local-music.md).
+# Install: sudo cp ytmp-share.py /usr/local/bin/ && sudo cp ytmp-zones.service /etc/systemd/system/
+#          && sudo systemctl daemon-reload && sudo systemctl enable --now ytmp-zones
+# Edit --music to MPD's music_directory (grep music_directory /etc/mpd.conf).
 [Unit]
-Description=YTMP zones file
-After=network-online.target
+Description=YTMP zones file and music
+After=network-online.target mpd.service
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/bin/python3 -m http.server 8766 --directory /etc/ytmp-zones
+ExecStart=/usr/bin/python3 /usr/local/bin/ytmp-share.py --dir /etc/ytmp-zones --music /home/jonah/Music --port 8766
 DynamicUser=yes
 Restart=on-failure
 

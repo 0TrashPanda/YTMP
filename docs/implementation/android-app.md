@@ -86,6 +86,9 @@
   `setNearbyVolume`, version 8): in a room on another host, the phone plays the room on its
   Sonos speakers, Chromecasts, MPDs and amplifier zones itself (`LocalHost.nearby`), see
   [chromecast](chromecast.md#speakers-near-the-phone-in-a-room-on-another-host-).
+- **Local music** (bridge `phoneMusic`, `setPhoneMusic`, version 10): the music on the phone
+  in the Local tab (`PhoneLibrary`, Android's media store; asks for `READ_MEDIA_AUDIO` once),
+  see [local music](local-music.md).
 - **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
   account holders of that server can join its rooms (see [auth](auth.md)). The WebView keeps
   that server's pages in the app, for logging in.

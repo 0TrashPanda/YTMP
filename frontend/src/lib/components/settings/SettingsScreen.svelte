@@ -190,7 +190,7 @@
 				/>
 				<p class="text-xs text-muted">The sync adjustment for Bluetooth is under <em>Play on</em> in a room.</p>
 			{:else if section === 'local'}
-				<LocalSection />
+				<LocalSection {onToast} />
 			{:else if section === 'look'}
 				<Choice
 					label="Image quality"

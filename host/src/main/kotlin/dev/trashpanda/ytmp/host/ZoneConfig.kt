@@ -127,7 +127,7 @@ class ZoneControl(val key: String, private val amp: ZoneAmp) {
 
         internal fun placeholders(template: String) = PLACEHOLDER.findAll(template).map { it.groupValues[1] }.toSet()
 
-        private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
+        private fun encode(value: String) = URLEncoder.encode(value, "UTF-8").replace("+", "%20")
 
         /** A field of the state, `a.b` for one inside another. */
         private fun JsonObject.field(path: String): JsonPrimitive? {

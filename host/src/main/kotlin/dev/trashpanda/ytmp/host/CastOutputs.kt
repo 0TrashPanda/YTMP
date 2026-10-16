@@ -242,7 +242,7 @@ class CastOutputs(
         )
 
         private fun proxyUrl(item: QueueItem) =
-            audioBaseUrl(channel!!.localAddress) + "/api/audio/" + URLEncoder.encode(item.song.id, Charsets.UTF_8)
+            audioBaseUrl(channel!!.localAddress) + "/api/audio/" + URLEncoder.encode(item.song.id, "UTF-8")
 
         /** Keeps the device's previous and next songs in step with the room, without interrupting the current one. */
         private suspend fun updateNeighbors(player: CastMediaPlayer, view: RoomView, currentId: Int?) {
@@ -306,7 +306,7 @@ class CastOutputs(
                 appliedVolume = wantedVolume
             }
             val page = CastWebPage(channel)
-            val url = (pageBaseUrl ?: audioBaseUrl)(channel.localAddress) + "/tv#cast=" + URLEncoder.encode(roomCode, Charsets.UTF_8) + "." + URLEncoder.encode(guestToken, Charsets.UTF_8)
+            val url = (pageBaseUrl ?: audioBaseUrl)(channel.localAddress) + "/tv#cast=" + URLEncoder.encode(roomCode, "UTF-8") + "." + URLEncoder.encode(guestToken, "UTF-8")
             val now = System.currentTimeMillis()
             if (shownUrl != url) {
                 log.info("Cast device {}: showing the party screen of {}", device.name, roomCode)

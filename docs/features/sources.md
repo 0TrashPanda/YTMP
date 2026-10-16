@@ -68,11 +68,33 @@ phone**, if the room allows it (permission: *Send songs from own device*).
 |--------|--------|
 | YouTube Music | ✅ Built (server service and on the phone) |
 | YouTube | Planned |
-| Local files | Planned. Includes songs downloaded through YTMP. |
+| Local music | ✅ A Raspberry Pi's music folder (with MPD) and the music on the hosting phone, in the [Local tab](#local-music-). Other folders and songs downloaded through YTMP: planned. |
 | Media servers (Plex, Jellyfin, Subsonic/Navidrome, file servers, …) | Planned, linked to an account |
 | Spotify | Future (see [Spotify module](future-ideas.md#spotify-module)) |
 | SoundCloud | Future |
 | … | Future |
+
+## Local music ✅
+
+Music in the house, next to YouTube Music, in its own **Local** tab in the bottom bar (on a
+computer: the left side). It shows when there's local music:
+
+- **Music on the network**: a Raspberry Pi with MPD (say next to the stereo) shares its music
+  folder with YTMP (see [implementation](../implementation/local-music.md)). Every phone and
+  home server on that Wi-Fi finds it by itself.
+- **Music on this phone**: the songs stored on the phone, in rooms on the phone. Android asks
+  once whether YTMP may read them.
+
+The tab is like YouTube Music's library: **Albums** (the default, with covers), **Artists** and
+**Songs**, a search box that only searches this music, and **Shuffle all** (plays everything
+mixed, the queue stays as it is). Albums and artists open their pages, with Play, Play next
+and Add to queue. When an album ends, more of the same music follows (some of the same
+artist), never YouTube. Copies of a song in the music folder show once. These songs play
+everywhere: this phone, browsers, Chromecasts, Sonos, MPD and the amplifier's rooms.
+
+Settings → **Local music** switches *Music on the network* and *Music on this phone* on or off
+(on this device). Likes and YouTube Music playlists aren't for local songs, so those buttons
+don't show for them.
 
 ## Media servers
 

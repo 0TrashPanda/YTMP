@@ -1,0 +1,162 @@
+package dev.trashpanda.ytmp.host
+
+import android.content.ContentUris
+import android.content.Context
+import android.graphics.Bitmap
+import android.provider.MediaStore
+import android.util.Size
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.response.header
+import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondOutputStream
+import dev.trashpanda.ytmp.protocol.LocalLibraryKind
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.io.FileInputStream
+import java.net.URLEncoder
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * The music stored on this phone (Android's media store) as a [LocalLibrary], for rooms hosted
+ * here. The phone serves the files and covers itself (`/api/audio/…`, `/api/local/art/…`), at
+ * [baseUrl] (its address on the network, so speakers and friends reach it too).
+ */
+class PhoneLibrary(private val context: Context, private val baseUrl: () -> String) : LocalLibrary {
+    override val id = ID
+    override val name = "On this phone"
+    override val kind = LocalLibraryKind.PHONE
+
+    private val mutex = Mutex()
+    private var tracks: List<LocalTrack>? = null
+    private var generation = -1L
+    private val types = ConcurrentHashMap<String, String>()
+
+    /** The phone's music; read again when the media store changed. */
+    override suspend fun tracks(): List<LocalTrack> = mutex.withLock {
+        val now = withContext(Dispatchers.IO) { generation() }
+        tracks?.let { if (now == generation) return it }
+        val read = withContext(Dispatchers.IO) { query() }
+        tracks = read
+        generation = now
+        read
+    }
+
+    override fun fileUrl(key: String) = "${baseUrl()}/api/audio/${encode(LocalMusic.songId(id, key))}"
+
+    override fun artUrl(key: String, size: Int) = "${baseUrl()}/api/local/art/${encode(LocalMusic.songId(id, key))}?size=$size"
+
+    override suspend fun respond(call: ApplicationCall, key: String, range: String?) {
+        val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, key.toLongOrNull() ?: throw SourceException("Not a song on this phone"))
+        val file = withContext(Dispatchers.IO) { context.contentResolver.openFileDescriptor(uri, "r") } ?: throw SourceException("That song isn't on this phone any more")
+        val total = file.statSize
+        val (start, requestedEnd) = ByteRange.parse(range)
+        val end = minOf(requestedEnd, total - 1)
+        if (start > end) {
+            file.close()
+            call.response.header(HttpHeaders.ContentRange, "bytes */$total")
+            call.respondBytes(ByteArray(0), status = HttpStatusCode.RequestedRangeNotSatisfiable)
+            return
+        }
+        call.response.header(HttpHeaders.AcceptRanges, "bytes")
+        if (range != null) call.response.header(HttpHeaders.ContentRange, "bytes $start-$end/$total")
+        // Closed after sending, also when sending never starts (closing twice is fine).
+        try {
+            sendFile(call, file, key, range != null, start, end)
+        } finally {
+            runCatching { file.close() }
+        }
+    }
+
+    private suspend fun sendFile(call: ApplicationCall, file: android.os.ParcelFileDescriptor, key: String, partial: Boolean, start: Long, end: Long) {
+        call.respondOutputStream(
+            contentType = types[key]?.let { runCatching { ContentType.parse(it) }.getOrNull() },
+            status = if (partial) HttpStatusCode.PartialContent else HttpStatusCode.OK,
+            contentLength = end - start + 1,
+        ) {
+            file.use {
+                FileInputStream(it.fileDescriptor).use { input ->
+                    input.channel.position(start)
+                    var left = end - start + 1
+                    val buffer = ByteArray(64 * 1024)
+                    try {
+                        while (left > 0) {
+                            val read = input.read(buffer, 0, minOf(buffer.size.toLong(), left).toInt())
+                            if (read < 0) break
+                            write(buffer, 0, read)
+                            left -= read
+                        }
+                    } catch (e: java.io.IOException) {
+                        // The listener stopped or skipped.
+                    }
+                }
+            }
+        }
+    }
+
+    override suspend fun respondArt(call: ApplicationCall, key: String, size: Int): Boolean {
+        val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, key.toLongOrNull() ?: return false)
+        val bytes = withContext(Dispatchers.IO) {
+            runCatching {
+                val picture = context.contentResolver.loadThumbnail(uri, Size(size, size), null)
+                ByteArrayOutputStream().also { picture.compress(Bitmap.CompressFormat.JPEG, 85, it) }.toByteArray()
+            }.getOrNull()
+        } ?: return false
+        call.response.header(HttpHeaders.CacheControl, "max-age=86400")
+        call.respondBytes(bytes, ContentType.Image.JPEG)
+        return true
+    }
+
+    /** Changes when the phone's music does (the sum over its storage volumes). */
+    private fun generation(): Long = MediaStore.getExternalVolumeNames(context).sumOf { MediaStore.getGeneration(context, it) }
+
+    private fun query(): List<LocalTrack> {
+        val columns = arrayOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.TITLE,
+            MediaStore.Audio.Media.ARTIST,
+            MediaStore.Audio.Media.ALBUM_ARTIST,
+            MediaStore.Audio.Media.ALBUM,
+            MediaStore.Audio.Media.TRACK,
+            MediaStore.Audio.Media.YEAR,
+            MediaStore.Audio.Media.DURATION,
+            MediaStore.Audio.Media.RELATIVE_PATH,
+            MediaStore.Audio.Media.MIME_TYPE,
+        )
+        val found = ArrayList<LocalTrack>()
+        context.contentResolver.query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, columns, "${MediaStore.Audio.Media.IS_MUSIC} != 0", null, null)?.use { c ->
+            while (c.moveToNext()) {
+                val key = c.getLong(0).toString()
+                fun text(i: Int) = c.getString(i)?.trim()?.takeIf { it.isNotEmpty() && it != MediaStore.UNKNOWN_STRING }
+                val artist = text(2) ?: text(3) ?: "Unknown artist"
+                val number = if (c.isNull(5)) null else c.getInt(5)
+                c.getString(9)?.let { types[key] = it }
+                found += LocalTrack(
+                    key = key,
+                    title = text(1) ?: "Unknown song",
+                    artist = artist,
+                    albumArtist = text(3) ?: artist,
+                    album = text(4).orEmpty(),
+                    // Android keeps the disc in the thousands: 2003 is disc 2, track 3.
+                    disc = number?.div(1000)?.takeIf { it > 0 },
+                    track = number?.rem(1000)?.takeIf { it > 0 },
+                    year = if (c.isNull(6)) null else c.getInt(6).takeIf { it > 0 }?.toString(),
+                    durationMs = c.getLong(7),
+                    folder = c.getString(8).orEmpty(),
+                )
+            }
+        }
+        return found
+    }
+
+    private fun encode(text: String) = URLEncoder.encode(text, "UTF-8").replace("+", "%20")
+
+    companion object {
+        const val ID = "phone"
+    }
+}

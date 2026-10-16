@@ -426,7 +426,7 @@ class ZoneOutputs(
         if (base == audioBaseUrl(mpd.localAddress).trimEnd('/')) return null
         val uri = runCatching { URI(base) }.getOrNull() ?: return null
         if ((uri.scheme != "http" && uri.scheme != "https") || uri.host == null || !isLocal(uri.host)) return null
-        val query = "host=" + URLEncoder.encode(player.host, Charsets.UTF_8) + "&port=" + player.port
+        val query = "host=" + URLEncoder.encode(player.host, "UTF-8") + "&port=" + player.port
         val text = httpGet("$base/api/zones/handover?$query", connectTimeout = 1_500, readTimeout = 2_000)
         return zoneJson.decodeFromString<ZoneHandover>(text)
     }

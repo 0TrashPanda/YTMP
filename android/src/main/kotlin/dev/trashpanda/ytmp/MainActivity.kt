@@ -68,6 +68,15 @@ class MainActivity : ComponentActivity() {
     private val json = Json { ignoreUnknownKeys = true }
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
+    /** Reading the music on the phone, for the Local tab: the answer goes to the page as onPhoneMusic. */
+    private val musicPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        app.host.setPhoneMusic(granted)
+        phoneMusicAnswer(granted, if (granted) null else "YTMP may not read the music on this phone. You can allow Music and audio in the app's settings (Android settings → Apps → YTMP).")
+    }
+
+    private fun phoneMusicAnswer(on: Boolean, error: String?) =
+        js("window.__ytmpNative && window.__ytmpNative.onPhoneMusic && window.__ytmpNative.onPhoneMusic($on, ${error?.let(JSONObject::quote) ?: "null"})")
+
     /** Back from [YoutubeLoginActivity]: sign the host in, then tell the page (null = signed in, else why not). */
     private val youtubeLogin = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val cookie = result.data?.getStringExtra(YoutubeLoginActivity.EXTRA_COOKIE)
@@ -358,6 +367,20 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun bridgeVersion(): Int = BRIDGE_VERSION
 
+        /** The music on this phone shows in the Local tab (bridge version 10). */
+        @JavascriptInterface
+        fun phoneMusic(): Boolean = app.host.phoneMusicOn
+
+        /** Switches it on (asking Android once) or off; the answer comes as onPhoneMusic (bridge version 10). */
+        @JavascriptInterface
+        fun setPhoneMusic(on: Boolean) = runOnUiThread {
+            when {
+                !on -> app.host.setPhoneMusic(false).also { phoneMusicAnswer(false, null) }
+                app.host.canReadMusic() -> app.host.setPhoneMusic(true).also { phoneMusicAnswer(true, null) }
+                else -> musicPermission.launch(LocalHost.MUSIC_PERMISSION)
+            }
+        }
+
         @JavascriptInterface
         fun serverUrl(): String = server.orEmpty()
 
@@ -603,7 +626,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 9
+        const val BRIDGE_VERSION = 10
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

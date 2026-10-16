@@ -58,6 +58,10 @@ export interface NativeBridge {
 	stopNearby?(deviceId: string): void;
 	/** 0–1. */
 	setNearbyVolume?(deviceId: string, volume: number): void;
+	/** The music on this phone shows in the Local tab (bridge version 10). */
+	phoneMusic?(): boolean;
+	/** Switches that on (Android asks once) or off; the answer comes as onPhoneMusic (bridge version 10). */
+	setPhoneMusic?(on: boolean): void;
 }
 
 /** Callbacks the app calls on the page. */
@@ -85,6 +89,8 @@ export interface NativeCallbacks {
 	onNearby?(state: NearbyState): void;
 	/** A speaker near the phone had a problem (couldn't play a song, another app took it). */
 	onNearbyNotice?(text: string): void;
+	/** Back from setPhoneMusic: whether it's on now, and why not when Android said no. */
+	onPhoneMusic?(on: boolean, error: string | null): void;
 }
 
 /** Speakers and TVs on the phone's own network (android/.../MainActivity.kt), for a room on another host. */

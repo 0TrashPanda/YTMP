@@ -11,6 +11,7 @@
     "off": ["{base}&muted=1", "{base}&vchan={vchan}", "{base}&muted={muted}"],
     "volume": {"set": "{base}&volume={volume}", "field": "volume", "max": 50}
   },
+  "music": {"name": "Music on the Pi"},
   "zones": [
     {"zone": 1, "name": "Zithoek achter"},
     {"zone": 3, "name": "Zithoek voor"},
