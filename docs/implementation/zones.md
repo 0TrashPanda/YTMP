@@ -40,7 +40,8 @@ JSON, e.g. for an AudioSystem 8.8 with the Pi on its input "computer"
 - **`player`**: the MPD that feeds the zones: `host` (default: the machine that serves the
   file) and `port` (6600). That MPD isn't offered by itself any more, only as its zones.
 - **`zones`**: each zone's `name` in *Play on*, and `zone`, the amp's own number or name for
-  it, which the requests use as `{zone}`.
+  it, which the requests use as `{zone}`. `"hidden": true` leaves a zone out of *Play on* (say
+  the amp's headphones output), like leaving it out of the list.
 - **Requests** are web addresses (GET), with placeholders: `{base}` (the shared start,
   `base`, which may use `{zone}`), `{zone}`, `{volume}` and saved fields.
   - `on`: switch a zone to the player, in order.

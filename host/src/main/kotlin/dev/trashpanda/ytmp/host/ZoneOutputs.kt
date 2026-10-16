@@ -97,7 +97,7 @@ class ZoneOutputs(
                 if (last != config to playerHost) {
                     last = config to playerHost
                     val player = Player(playerHost, config.player.port)
-                    val zones = config.zones.map { Zone(idFor(player, it.zone.content), it.name, player, ZoneControl(it.zone.content, config.amp)) }
+                    val zones = config.zones.filterNot { it.hidden }.map { Zone(idFor(player, it.zone.content), it.name, player, ZoneControl(it.zone.content, config.amp)) }
                     currentCoroutineContext().ensureActive()
                     loaded.update { it + (id to zones) }
                     log.info("Zones from {}: {}", url, zones.joinToString { it.name })

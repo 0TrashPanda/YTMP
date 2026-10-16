@@ -15,6 +15,6 @@
     {"zone": 1, "name": "Zithoek achter"},
     {"zone": 3, "name": "Zithoek voor"},
     {"zone": 5, "name": "Keuken"},
-    {"zone": 7, "name": "Koptelefoon"}
+    {"zone": 7, "name": "Koptelefoon", "hidden": true}
   ]
 }

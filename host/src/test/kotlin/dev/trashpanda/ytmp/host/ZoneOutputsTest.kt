@@ -68,7 +68,8 @@ class ZoneOutputsTest {
             FakeAmp().use { amp ->
                 amp.zones[1] = FakeAmp.ZoneState(vchan = 1, muted = 0, volume = 39)
                 amp.zones[5] = FakeAmp.ZoneState(vchan = 1, muted = 1, volume = 34)
-                amp.zonesFile = amp.zonesFor(mpd.port, mapOf(1 to "Zithoek", 5 to "Keuken"))
+                amp.zones[7] = FakeAmp.ZoneState(vchan = 1, muted = 0, volume = 30)
+                amp.zonesFile = amp.zonesFor(mpd.port, mapOf(1 to "Zithoek", 5 to "Keuken", 7 to "Koptelefoon"), hidden = setOf(7))
                 Setup(scope, mpd, amp).block()
             }
         }
@@ -78,6 +79,7 @@ class ZoneOutputsTest {
     @Test
     fun `zones play the room on one player, with their own volume, and get back what they had`() = withSetup {
         eventually { zones.devices.value.size == 2 }
+        // Koptelefoon is hidden in the file.
         assertEquals(listOf("Zithoek", "Keuken"), zones.devices.value.map { it.name })
         assertEquals(setOf(OutputKind.ZONE), zones.devices.value.map { it.kind }.toSet())
         // The Pi's MPD is offered as its zones, not by itself.

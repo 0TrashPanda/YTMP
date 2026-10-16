@@ -54,7 +54,7 @@ class FakeAmp : AutoCloseable {
     }
 
     /** A zones file for this amp and [mpdPort], with an AudioSystem 8.8 setup like docs/implementation/zones.md's. */
-    fun zonesFor(mpdPort: Int, names: Map<Int, String>): String = """
+    fun zonesFor(mpdPort: Int, names: Map<Int, String>, hidden: Set<Int> = emptySet()): String = """
         {
           "player": {"type": "mpd", "port": $mpdPort},
           "amp": {
@@ -67,7 +67,7 @@ class FakeAmp : AutoCloseable {
             "off": ["{base}&muted=1", "{base}&vchan={vchan}", "{base}&muted={muted}"],
             "volume": {"set": "{base}&volume={volume}", "field": "volume", "max": 50}
           },
-          "zones": [${names.entries.joinToString { (zone, name) -> "{\"zone\": $zone, \"name\": \"$name\"}" }}]
+          "zones": [${names.entries.joinToString { (zone, name) -> "{\"zone\": $zone, \"name\": \"$name\", \"hidden\": ${zone in hidden}}" }}]
         }
     """.trimIndent()
 

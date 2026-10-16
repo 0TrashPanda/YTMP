@@ -52,9 +52,9 @@ data class ZoneAmp(
 @Serializable
 data class ZoneVolume(val set: String, val field: String? = null, val min: Double = 0.0, val max: Double = 100.0)
 
-/** [zone]: the amp's number or name for it, as `{zone}`. */
+/** [zone]: the amp's number or name for it, as `{zone}`. [hidden]: not offered (say the amp's headphones). */
 @Serializable
-data class ZoneEntry(val zone: JsonPrimitive, val name: String)
+data class ZoneEntry(val zone: JsonPrimitive, val name: String, val hidden: Boolean = false)
 
 class ZoneConfigException(message: String) : Exception(message)
 
