@@ -119,5 +119,6 @@ outputs too.
 - Requests other than GET (POST, a body, a password).
 - Amps that don't speak HTTP (a serial port, telnet).
 
-Tested against a simulated amp and MPD (`host/src/test/.../FakeAmp.kt`, `FakeMpd.kt`); not
-yet on a real one.
+Tested against a simulated amp and MPD (`host/src/test/.../FakeAmp.kt`, `FakeMpd.kt`), and on
+a real AudioSystem 8.8 with MPD 0.23 on a Raspberry Pi 5 (a USB sound card into the amp's input)
+with the file in `deploy/zones/`: switching on and off, volume, and putting back the input.

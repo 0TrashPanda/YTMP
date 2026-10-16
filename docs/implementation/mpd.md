@@ -60,4 +60,5 @@ output off in the room with a notice.
   skip buttons): the queue holds only the current song.
 - A pause pressed in another MPD app is undone by the room (the room is in charge).
 
-Tested against a simulated MPD (`host/src/test/.../FakeMpd.kt`); not yet on a real one.
+Tested against a simulated MPD (`host/src/test/.../FakeMpd.kt`), and on a real MPD 0.23 on a
+Raspberry Pi 5 (through [amplifier zones](zones.md)).
