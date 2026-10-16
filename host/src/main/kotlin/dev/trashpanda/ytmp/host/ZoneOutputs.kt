@@ -167,10 +167,16 @@ class ZoneOutputs(
         room.addChangeListener { changed.trySend(Unit) }
         val zones = HashMap<String, ZoneRun>()
         val players = HashMap<Player, MpdSession>()
+        /** Since when the room plays nothing (paused, or nothing left); 0 while it plays. */
+        var quietSince = 0L
         try {
             while (true) {
                 withTimeoutOrNull(SYNC_INTERVAL_MS) { changed.receive() }
                 val view = room.view()
+                val now = System.currentTimeMillis()
+                if (view.playing) quietSince = 0 else if (quietSince == 0L) quietSince = now
+                // Paused for a while: the zones get back what they had (the TV), until it plays again.
+                val parked = quietSince > 0 && now - quietSince >= PARK_AFTER_MS
                 val known = loaded.value.values.flatten().associateBy { it.id }
                 // Switched off in the room, or gone from the network: put back what the zone had.
                 for (id in zones.keys - view.activeOutputs.keys) letGo(me, zones.remove(id)!!, restore = true)
@@ -180,7 +186,7 @@ class ZoneOutputs(
                     val session = players.remove(player)!!
                     if (release(me, player)) runCatching { session.stop() }
                 }
-                for ((player, runs) in zones.values.groupBy { it.zone.player }) syncPlayer(room, me, view, player, runs, zones, players)
+                for ((player, runs) in zones.values.groupBy { it.zone.player }) syncPlayer(room, me, view, parked, player, runs, zones, players)
             }
         } finally {
             withContext(NonCancellable) {
@@ -194,6 +200,7 @@ class ZoneOutputs(
         room: OutputRoom,
         me: Any,
         view: RoomView,
+        parked: Boolean,
         player: Player,
         runs: List<ZoneRun>,
         zones: HashMap<String, ZoneRun>,
@@ -222,7 +229,7 @@ class ZoneOutputs(
         }
         // The zones first, so the song's start is heard.
         for (run in runs) {
-            if (!syncZone(room, me, run, view.activeOutputs[run.zone.id])) {
+            if (!syncZone(room, me, run, view.activeOutputs[run.zone.id], parked)) {
                 zones.remove(run.zone.id)
                 room.outputTakenOver(run.zone.id)
             }
@@ -250,12 +257,27 @@ class ZoneOutputs(
     }
 
     /** Switches [run]'s zone on, or checks it's still ours; false when someone else has it now. */
-    private suspend fun syncZone(room: OutputRoom, me: Any, run: ZoneRun, wantedVolume: Double?): Boolean {
+    private suspend fun syncZone(room: OutputRoom, me: Any, run: ZoneRun, wantedVolume: Double?, parked: Boolean): Boolean {
         val now = System.currentTimeMillis()
         if (now - run.failedAt < MpdSession.RETRY_AFTER_MS) return true
         val zone = run.zone
         val control = zone.control
         try {
+            if (parked) {
+                // The zone stays on in the room; on the amp it has what it had until the room plays.
+                if (run.switched) {
+                    log.info("Zone {}: the room is paused, giving it back", zone.name)
+                    letGo(me, run, restore = true)
+                    run.switched = false
+                }
+                // Its volume slider shows the zone's volume all the same.
+                if (!run.checkedVolume) readState(control)?.let { state -> control.volumeOf(state)?.let { volume ->
+                    run.checkedVolume = true
+                    run.appliedVolume = control.ampVolume(volume)
+                    room.reportOutputVolume(zone.id, volume)
+                } }
+                return true
+            }
             if (run.switched && synchronized(lock) { zoneOwners[zone.id] } !== me) {
                 log.info("Zone {}: another room switched it on", zone.name)
                 return false
@@ -404,6 +426,8 @@ class ZoneOutputs(
         private const val SYNC_INTERVAL_MS = 2_000L
         /** After switching a zone on, the amp's state may still show what it had. */
         private const val SETTLE_MS = 4_000L
+        /** Paused this long, the room's zones get back what they had on the amp. */
+        private const val PARK_AFTER_MS = 10_000L
         private const val REFRESH_MS = 60_000L
         /** Fetches in a row that fail before the zones go (the file's machine is off or gone). */
         private const val MISSES = 3

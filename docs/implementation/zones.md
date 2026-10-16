@@ -76,6 +76,10 @@ to the internet. The worst it can do is offer zones that don't work.
 - The player plays the room through the same MPD session as an MPD speaker (`MpdSession`, see
   [MPD](mpd.md)), once per player whatever the number of zones, at full volume: the zones have
   the volume. A new song waits until the player has it, for every zone.
+- **Paused** (or nothing left to play) for 10 s: the room's zones get back what they had on the
+  amp (`off`, with the saved fields), but stay on in the room. When it plays again they're
+  switched to the player again (saving their state anew). Their volume slider keeps showing
+  the zone's volume meanwhile.
 - A zone switched off: `off`, with the saved fields. The player stops when the room has none
   of its zones on any more.
 - **Two rooms on one host**: the room that switched on a zone of a player last gets the

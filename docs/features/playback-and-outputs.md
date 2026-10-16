@@ -73,7 +73,9 @@ hosting); when it goes away, so do its speakers.
 server on that Wi-Fi then lists each room of the amp in *Play on* (*Keuken*, *Zithoek voor*),
 with nothing to set up. Switching a room on switches it to the player on the amp; several
 rooms play the same music together. Each has its own volume slider, which is that room's
-volume on the amp. Switched off, the room goes back to what it had (the TV, muted or not).
+volume on the amp. Switched off, the room goes back to what it had (the TV, muted or not), and
+so it does when the music has been paused for 10 seconds: then it stays on in *Play on* and
+switches to the player again when the music plays.
 Picking something else for a room on the amp itself switches it off in YTMP. One player plays
 one room's music: when another room switches on one of its zones, it gets the player, also
 a room on another phone. Either way, when the last one is done the amp's rooms go back to

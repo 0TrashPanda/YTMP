@@ -124,6 +124,27 @@ class ZoneOutputsTest {
     }
 
     @Test
+    fun `paused for a while, the zones get back what they had until the room plays again`() = withSetup {
+        eventually { zones.devices.value.size == 2 }
+        val room = rooms.create("Party")
+        val run = join(room)
+        run(Command.AddSongs(listOf(song), QueuePosition.END))
+        run(Command.SetOutput(keuken, active = true))
+        eventually { mpd.state == "play" && amp.zones[5]?.let { it.vchan == 2 && it.muted == 0 } == true }
+
+        run(Command.Pause)
+        delay(5_000)
+        assertEquals(2, amp.zones[5]?.vchan)
+        // After 10 s: back to Digibox, muted, but still on in the room.
+        eventually { amp.zones[5]?.let { it.vchan == 1 && it.muted == 1 } == true }
+        assertTrue(keuken in room.view().activeOutputs)
+        assertEquals("pause", mpd.state)
+
+        run(Command.Play)
+        eventually { mpd.state == "play" && amp.zones[5]?.let { it.vchan == 2 && it.muted == 0 } == true }
+    }
+
+    @Test
     fun `a zone switched to something else on the amp leaves the room as it is`() = withSetup {
         eventually { zones.devices.value.size == 2 }
         val room = rooms.create("Party")
