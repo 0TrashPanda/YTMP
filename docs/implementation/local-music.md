@@ -62,6 +62,11 @@ the zones file, MPD's music folder (with ranges) and the covers, which it gets f
 shrinks when `python3-pil` is installed (else they're sent as they are, often 500 KB).
 Setting it up: see [zones](zones.md#setting-up-the-pi).
 
+**Copies in the music folder:** YTMP shows each song once, but the folder keeps them.
+[`tools/music-dedupe.py`](../../tools/music-dedupe.py) on the Pi finds them the same way (from
+MPD's tags) and moves the extra copies out (to `~/Music-duplicates`, keeping their paths), then
+has MPD update. Without `--move` it only shows what it would move.
+
 ## The music on the phone
 
 `PhoneLibrary` (`android/`): Android's media store (`IS_MUSIC`), read again when its generation
