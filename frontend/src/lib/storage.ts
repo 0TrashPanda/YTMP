@@ -1,7 +1,7 @@
 // Small things remembered in this browser. Storage can be unavailable (private mode),
 // so every access is wrapped and falls back to "nothing saved".
 
-function read(key: string): string | null {
+export function read(key: string): string | null {
 	try {
 		return localStorage.getItem(key);
 	} catch {
@@ -9,7 +9,7 @@ function read(key: string): string | null {
 	}
 }
 
-function write(key: string, value: string): void {
+export function write(key: string, value: string): void {
 	try {
 		localStorage.setItem(key, value);
 	} catch {

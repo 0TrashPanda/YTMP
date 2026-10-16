@@ -1,10 +1,13 @@
 <script lang="ts">
 	// "Up next": played songs, the current one, the queue and the autoplay queue as one list.
 	// Every song can be dragged anywhere in it (a played song moved below the current one
-	// plays again; the current one moved away lets the next one play), swiped left to remove
-	// (like YTM), and has the song menu (hold, right-click, or ⋮ on hover with a mouse).
+	// plays again; the current one moved away lets the next one play). Tap, swipe right, swipe
+	// left and hold do what Settings → Taps and swipes says (play, play next, remove like YTM,
+	// the song menu by default); right-click or ⋮ on hover with a mouse: the song menu.
 	import { tick } from 'svelte';
+	import { yourRadio } from '../api';
 	import { artistNames, formatTime } from '../format';
+	import { ACTION_ICONS, ACTION_NAMES, gestures, RowSwipe, type Gesture, type QueueAction } from '../gestures.svelte';
 	import type { ItemList, QueueItem } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -223,53 +226,100 @@
 		return 0;
 	}
 
-	// --- swipe left to remove (touch) -----------------------------------------------------
+	// --- tap, swipe and hold ----------------------------------------------------------------
 
-	/** [horizontal]: null until the finger moved far enough to tell a swipe from scrolling. */
-	let swipe = $state<{ key: string; x: number; y: number; dx: number; width: number; horizontal: boolean | null } | null>(null);
+	const swipe = new RowSwipe();
 	/** Swiped away, waiting for the host to remove it. */
 	let removing = $state<string | null>(null);
-	const SWIPE_DECIDE_PX = 10;
+	/** Touch or mouse, for the last press: holding a finger does the Hold action, a right-click always opens the menu. */
+	let pointer = 'mouse';
 
 	function canRemove(item: QueueItem) {
 		return room.can(item.addedBy === room.participantId ? 'remove_own' : 'remove_others');
 	}
 
-	function swipeStart(e: TouchEvent, key: string) {
-		// The drag handle moves the song instead.
-		if ((e.target as HTMLElement).closest('.touch-none') || drag) return;
-		const t = e.touches[0];
-		swipe = { key, x: t.clientX, y: t.clientY, dx: 0, width: (e.currentTarget as HTMLElement).offsetWidth, horizontal: null };
-	}
-
-	function swipeMove(e: TouchEvent, item: QueueItem) {
-		if (!swipe) return;
-		const t = e.touches[0];
-		const dx = t.clientX - swipe.x;
-		const dy = t.clientY - swipe.y;
-		if (swipe.horizontal === null) {
-			if (Math.abs(dx) < SWIPE_DECIDE_PX && Math.abs(dy) < SWIPE_DECIDE_PX) return;
-			swipe.horizontal = Math.abs(dx) > Math.abs(dy) && dx < 0 && canRemove(item);
+	function allowed(action: QueueAction, slot: Slot): boolean {
+		if (slot.kind === 'header') return false;
+		const moves = slot.kind === 'item' ? room.can(slot.place === 'autoplay' ? 'add_songs' : 'reorder') : room.can('add_songs');
+		switch (action) {
+			case 'playNow':
+				return canOpen(slot);
+			case 'playNext':
+			case 'addToQueue':
+				return moves;
+			case 'remove':
+				return slot.kind === 'item' && canRemove(slot.item);
+			case 'radio':
+				return room.can('start_radio') && !slot.item.song.podcast;
+			case 'menu':
+				return true;
+			default:
+				return false;
 		}
-		if (swipe.horizontal) swipe.dx = Math.min(0, dx);
 	}
 
-	function swipeEnd(item: QueueItem) {
-		const s = swipe;
-		swipe = null;
-		if (!s?.horizontal || s.dx > -s.width * 0.35) return;
-		removing = s.key;
-		room.run({ kind: 'RemoveQueueItem', itemId: item.itemId }).then((error) => {
-			// Not removed (e.g. no permission any more): put it back.
-			if (error && removing === s.key) removing = null;
-		});
+	/** Does what [gesture] is set to in Up next for [slot]. */
+	async function act(gesture: Gesture, slot: Slot, event: MouseEvent | null, row: HTMLElement | null) {
+		if (slot.kind === 'header') return;
+		const action = gestures.queue[gesture];
+		if (action === 'menu') return showMenu(slot, event, row);
+		if (!allowed(action, slot)) return;
+		const item = slot.item;
+		const queueLength = roomState?.queue.length ?? 0;
+		switch (action) {
+			case 'playNow':
+				return open(slot);
+			case 'playNext':
+				return slot.kind === 'current'
+					? room.run({ kind: 'AddSongs', songs: [item.song], position: 'next' })
+					: room.run({ kind: 'MoveItem', itemId: item.itemId, list: 'queue', toIndex: 0 });
+			case 'addToQueue':
+				return slot.kind === 'current'
+					? room.run({ kind: 'AddSongs', songs: [item.song], position: 'end' })
+					: room.run({ kind: 'MoveItem', itemId: item.itemId, list: 'queue', toIndex: slot.place === 'queue' ? queueLength - 1 : queueLength });
+			case 'remove': {
+				const key = slot.key;
+				removing = key;
+				const error = await room.run({ kind: 'RemoveQueueItem', itemId: item.itemId });
+				// Not removed (e.g. no permission any more): put it back.
+				if (error && removing === key) removing = null;
+				return;
+			}
+			case 'radio':
+				return room.run({ kind: 'StartRadio', song: item.song, songs: await yourRadio(item.song.id) });
+		}
 	}
 
-	/** How far a song is swiped to the left. */
+	function swiped(slot: Slot, row: HTMLElement) {
+		const done = swipe.end();
+		if (done) act(done.direction, slot, null, row);
+	}
+
+	/** Hold (touch) does the Hold action; a right-click opens the menu. */
+	function held(event: MouseEvent, slot: Slot) {
+		if (pointer === 'touch' && gestures.queue.hold !== 'menu') {
+			event.preventDefault();
+			swipe.cancel();
+			act('hold', slot, null, event.currentTarget as HTMLElement);
+		} else {
+			menu(event, slot, true);
+		}
+	}
+
+	function showMenu(slot: Slot, event: MouseEvent | null, row: HTMLElement | null) {
+		if (slot.kind === 'header') return;
+		const rect = (row ?? (event?.currentTarget as HTMLElement)).getBoundingClientRect();
+		onMenu({ song: slot.item.song, item: slot.item, place: slot.kind === 'current' ? 'current' : slot.place, x: rect.right - 256, y: rect.bottom });
+	}
+
+	/** How far a song is swiped, or swiped away. */
 	function swipeOffset(key: string): string {
 		if (removing === key) return '-100%';
-		return swipe?.key === key && swipe.horizontal ? `${swipe.dx}px` : '0px';
+		return `${swipe.offset(key)}px`;
 	}
+
+	/** The action a swipe of [offset] px would do. */
+	const swipeAction = (offset: number): QueueAction => gestures.queue[offset > 0 ? 'right' : 'left'];
 
 	// --- actions ---------------------------------------------------------------------------
 
@@ -340,7 +390,8 @@
 				</div>
 			{:else}
 				{@const place = slot.kind === 'current' ? 'current' : slot.place}
-				{@const swiping = swipe?.key === slot.key && swipe.horizontal}
+				{@const offset = swipe.offset(slot.key)}
+				{@const swiping = offset !== 0}
 				<div
 					data-slot
 					data-id={id}
@@ -348,10 +399,19 @@
 					class="group relative h-16 overflow-hidden rounded-md {dragging || glide?.lift === id ? 'z-10 shadow-xl' : ''} {instant ? '' : 'transition-transform'}"
 					style:transform="translateY({offsetOf(id, index)}px)"
 				>
-					<!-- Shown under the song while it is swiped away. -->
-					{#if swiping || removing === slot.key}
+					<!-- Under the song while it's swiped: what letting go does. -->
+					{#if removing === slot.key}
 						<div class="absolute inset-0 flex items-center justify-end bg-accent px-5 text-white">
 							<Icon name="remove" size={22} />
+						</div>
+					{:else if swiping}
+						{@const action = swipeAction(offset)}
+						<div
+							class="absolute inset-0 flex items-center gap-2 px-5 text-sm font-medium text-white transition-colors
+								{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(slot.key) ? (action === 'remove' ? 'bg-accent' : 'bg-d-green') : 'bg-line'}"
+						>
+							<Icon name={ACTION_ICONS[action]} size={22} />
+							{ACTION_NAMES[action]}
 						</div>
 					{/if}
 					<div
@@ -361,19 +421,20 @@
 							{dragging ? 'bg-line' : ''}
 							{swiping ? '' : 'transition-transform duration-200'}"
 						style:transform="translateX({swipeOffset(slot.key)})"
-						oncontextmenu={(e) => menu(e, slot, true)}
-						ontouchstart={(e) => swipeStart(e, slot.key)}
-						ontouchmove={(e) => swipeMove(e, slot.item)}
-						ontouchend={() => swipeEnd(slot.item)}
-						ontouchcancel={() => (swipe = null)}
+						onpointerdown={(e) => (pointer = e.pointerType)}
+						oncontextmenu={(e) => held(e, slot)}
+						ontouchstart={(e) => !drag && swipe.start(e, slot.key)}
+						ontouchmove={(e) => swipe.move(e, (way) => { const a = gestures.queue[way]; return a !== 'none' && allowed(a, slot); })}
+						ontouchend={(e) => swiped(slot, e.currentTarget as HTMLElement)}
+						ontouchcancel={() => swipe.cancel()}
 						role="listitem"
 					>
 						<!-- Not `disabled`: browsers don't send right-clicks to disabled buttons. -->
 						<button
 							class="flex min-w-0 flex-1 items-center gap-3 text-left {canOpen(slot) ? '' : 'cursor-default'}"
 							aria-disabled={!canOpen(slot)}
-							onclick={() => open(slot)}
-							title={slot.kind === 'item' && canOpen(slot) ? (slot.place === 'autoplay' ? 'Play next' : 'Jump to this song') : undefined}
+							onclick={(e) => act('tap', slot, e, e.currentTarget.parentElement)}
+							title={ACTION_NAMES[gestures.queue.tap]}
 						>
 							<Art song={slot.item.song} size={40} class="h-10 w-10" />
 							<div class="min-w-0 flex-1">
@@ -382,9 +443,9 @@
 							</div>
 							<span class="text-xs text-muted tabular-nums">{slot.item.song.durationMs ? formatTime(slot.item.song.durationMs) : ''}</span>
 						</button>
-						<!-- With a mouse, on hover (touch screens hold the song for the menu). -->
+						<!-- With a mouse, on hover; touch screens hold the song for the menu, or (when Hold does something else) have it here. -->
 						<button
-							class="rounded-full p-1.5 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus:opacity-100 pointer-coarse:hidden"
+							class="rounded-full p-1.5 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus:opacity-100 {gestures.queue.hold === 'menu' ? 'pointer-coarse:hidden' : 'pointer-coarse:opacity-100'}"
 							aria-label="More for {slot.item.song.title}"
 							onclick={(e) => menu(e, slot, false)}
 						>

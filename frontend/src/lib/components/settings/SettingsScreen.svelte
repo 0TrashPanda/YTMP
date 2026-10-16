@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	export type SettingsSection = 'account' | 'youtube' | 'playback' | 'local' | 'look' | 'app' | 'server';
+	export type SettingsSection = 'account' | 'youtube' | 'playback' | 'gestures' | 'local' | 'look' | 'app' | 'server';
 </script>
 
 <script lang="ts">
@@ -16,6 +16,7 @@
 	import Icon, { type IconName } from '../Icon.svelte';
 	import AccountSection from './AccountSection.svelte';
 	import Choice from './Choice.svelte';
+	import GesturesSection from './GesturesSection.svelte';
 	import LocalSection from './LocalSection.svelte';
 	import OwnModuleSection from './OwnModuleSection.svelte';
 	import ServerSection from './ServerSection.svelte';
@@ -60,6 +61,7 @@
 				['account', 'Account', 'person', true],
 				['youtube', 'YouTube Music', 'library', true],
 				['playback', 'Playback', 'headphones', true],
+				['gestures', 'Taps and swipes', 'tune', true],
 				['local', 'Local music', 'local', true],
 				['look', 'Look', 'palette', true],
 				['app', 'App', 'phone', !!nativeBridge?.appVersion],
@@ -189,6 +191,8 @@
 					}}
 				/>
 				<p class="text-xs text-muted">The sync adjustment for Bluetooth is under <em>Play on</em> in a room.</p>
+			{:else if section === 'gestures'}
+				<GesturesSection />
 			{:else if section === 'local'}
 				<LocalSection {onToast} />
 			{:else if section === 'look'}

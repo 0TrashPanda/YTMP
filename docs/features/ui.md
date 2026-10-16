@@ -8,7 +8,8 @@ Because it is one web frontend, it is the same in the browser and in the Android
 The most common use of YTMP:
 
 1. **Search** for a song or artist (mostly through the YTM module).
-2. **Play** it (tap = play next, swipe = play now), add it to the queue, or
+2. **Play** it (tap = play next, swipe left = play now, swipe right = add to queue; all
+   [settable](#gestures)), or
 3. **Start a radio** from it ([radio / mix](history-and-recommendations.md#radio--mix)), or
    open **find similar** to pick similar songs by hand
    ([find similar](history-and-recommendations.md#find-similar)).
@@ -152,14 +153,24 @@ YTMP plays YouTube Music's podcasts like YTM does:
 
 ## Gestures
 
-| Gesture | Action | Needs |
-|---------|--------|-------|
-| **Tap** a song (search, pages, playlists, …) | **Play next** (add to the start of the queue) | *Add songs* |
-| **Tap** a song **in the queue** | **Jump to it**, like YTM: it plays now, and the songs before it go to the queue history as skipped | *Play now* |
-| **Tap** a song **in the queue history** | **Jump back to it**, like YTM: it plays again, and the queue continues after it | *Play now* |
-| **Swipe** a song | **Play now** | *Play now* |
-| **Drag** a song in the queue | Move it | *Reorder* |
-| Long-press / ⋮ | Open the [song menu](#song-menu) | |
+✅ **Tap, swipe right, swipe left and hold** a song do what *Settings → Taps and swipes* says,
+separately for songs in lists (search, albums, artists, playlists, Local) and in *Up next*.
+Each can be *Play now*, *Play next*, *Add to queue*, *Start radio*, *Song menu* or *Nothing*;
+in *Up next* also *Remove*. The defaults:
+
+| Gesture | Songs in lists | Songs in *Up next* |
+|---------|----------------|--------------------|
+| **Tap** | **Play next** (the start of the queue) | **Play now**: jump to it, like YTM (the songs before it go to the history as skipped; a played song plays again; an autoplay song plays next, so the queue stays) |
+| **Swipe right** | **Add to queue** (the end) | **Play next** (moved to the start of the queue) |
+| **Swipe left** | **Play now** | **Remove**, like YTM |
+| **Hold** | Open the [song menu](#song-menu) | Open the song menu |
+| **Drag** (the handle) | Move it in your own playlists | Move it |
+
+A swiped song shows what letting go does underneath, in green once it's far enough (red to
+remove); a short swipe does nothing. An action someone may not do (no permission) doesn't
+swipe. A **right-click** or **⋮** always opens the song menu, also when *Hold* does something
+else (in *Up next* the ⋮ then shows on touch screens too). Swipes are for touch screens. Saved
+on the device.
 
 With **fair ordering** on, *play next* puts the song in your next fair slot (the message
 says "Added … in your next turn"), unless you have the *Reorder* permission.
@@ -204,7 +215,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
 
 - In *Up next*, **hold** a song (or right-click it) for its menu; with a mouse a ⋮ also shows
   on hover. **Swipe a song left** to remove it, like YTM (the menu has *Remove* too,
-  also for the current song: the next one plays).
+  also for the current song: the next one plays). Both [settable](#gestures).
 - There is no *Move* action: songs are moved by **dragging** them in *Up next*. The song
   stays under the pointer while the list scrolls (the mouse wheel, or holding it near the
   top or bottom edge, which scrolls the list). Played
