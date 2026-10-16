@@ -121,6 +121,9 @@ Fixes and small features to do later:
   the other songs; now only its menu has *Remove*.
 - **Lyrics**: opening them scrolls down from the top every time; they should open at the
   current line.
-- **Liked music** loads only its first page: show all your likes (more as you scroll).
+- **Liked music** loads all your likes at once: load them in pages (more as you scroll).
 - **Local songs** stop at 300: a *Load more* button for the next 300.
 - **How many items a page loads** (Liked music, Local songs, …) as a setting.
+- **Bug: pull to refresh while swiping a row sideways.** On Home, swiping *Listen again* (or
+  another row) sideways can also pull the page down to refresh: a sideways swipe should never
+  refresh.
