@@ -1898,6 +1898,12 @@ class Room(
                     emitPlayback()
                 }.onFailure { e ->
                     if (e is CancellationException) throw e
+                    if (e is SourceBlocked) {
+                        failedInARow = 0
+                        emit(Event.Notice("Paused: ${e.message}"))
+                        pausePlayback()
+                        return@withLock null
+                    }
                     if (++failedInARow >= MAX_FAILED_IN_A_ROW) {
                         // Probably no internet: don't skip through the whole queue, wait on this song.
                         failedInARow = 0

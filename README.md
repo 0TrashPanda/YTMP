@@ -99,10 +99,13 @@ Music, without Premium, and not tied to a single music service.
   logs* in the settings.
 - Server and app keep logs that clean up after themselves (what happened when a song
   stopped or buffered).
+- Less trouble with YouTube's "confirm you're not a bot" block: song lookups can carry a
+  token that says they come from a real YouTube player (on the server and in the app). When
+  YouTube blocks anyway, the room pauses on the song and YTMP waits a few minutes before
+  asking again.
 
 ## What's next
 
-- Dealing with YouTube's "confirm you're not a bot" block
 - New podcast episodes on Home, playback speed, played marks
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Learning which songs go together (song graph) for better radio, and recaps

@@ -91,7 +91,9 @@ So the operations below are the contract for both. HTTP is only the transport on
   ```
 
   Codes used now: `unauthorized` (wrong module key), `not_found`, `unavailable`,
-  `not_signed_in`, `invalid`, `upstream_error`. Planned: `rate_limited`, `unsupported`.
+  `not_signed_in`, `invalid`, `upstream_error`, `blocked` (HTTP 503: YouTube's bot check, no
+  lookups for a few minutes, see [ytm-module](ytm-module.md#youtubes-bot-check-and-po-tokens-)).
+  Planned: `unsupported`.
 
 ## Data types
 

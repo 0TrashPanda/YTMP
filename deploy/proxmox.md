@@ -242,7 +242,8 @@ images, and removes the old ones. Rooms, accounts and history stay.
   same command. Remove the line to follow the newest again.
 - **What it did**: `docker compose logs watchtower`.
 - **The setup files themselves** (`docker-compose.yml`, `Caddyfile`, rarely changed):
-  `cd /opt/ytmp && git pull`, then the command above.
+  `cd /opt/ytmp && git pull`, then the command above. Watchtower doesn't add new services,
+  like the `pot` container (PO tokens): this is how they arrive.
 
 ### Switching an older install to this
 
@@ -272,8 +273,12 @@ Proxmox (**Backup** → **Backup now**, or a scheduled backup job).
 - **nginx: also visitors from outside can stream through the server:** nginx appends to
   `X-Forwarded-For` (`$proxy_add_x_forwarded_for`) instead of setting it; use
   `proxy_set_header X-Forwarded-For $remote_addr;`.
-- **Songs fail with "Sign in to confirm you're not a bot":** YouTube has rate-limited your
-  home IP, usually after very many songs in a short time. It passes after a few hours.
+- **Songs fail with "YouTube is blocking requests from this network for now (bot check)":**
+  YouTube distrusts your home connection for a while (it counts everything on it, also your
+  own YouTube use). The room pauses on the song; YTMP waits 2 minutes before asking again,
+  then longer while it lasts. Check that the `pot` container runs (`docker compose ps`): it
+  makes the tokens that keep this rare. How often it happened:
+  `docker compose logs ytm | grep "bot check"`.
 - **Docker containers won't start in the LXC:** check **nesting** and **keyctl**. If it
   still fails, a small Debian VM with the same steps (2 and on) avoids LXC's limits.
 - **Logs:** `docker compose logs -f` (add the two `-f` files with Caddy).

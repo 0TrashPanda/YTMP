@@ -1,3 +1,5 @@
+import pytest
+
 from ytmp_ytm import core
 
 
@@ -38,27 +40,126 @@ def test_clean_error():
     assert core._clean_error("ERROR: [youtube] abc: Video unavailable") == "Video unavailable"
 
 
-def test_fresh_stream_skips_the_cache(monkeypatch):
+def _bare_core() -> core.YtmCore:
     ytm = core.YtmCore.__new__(core.YtmCore)
     ytm._lock = core.threading.Lock()
-    ytm._streams = {"abc": core.StreamInfo("https://old", core.time.time() + 3600, "audio/mp4", None)}
+    ytm._streams = {}
     ytm._ydl_opts = {}
+    ytm._pot_url = None
+    ytm._bot_check = core._BotCheck()
+    return ytm
 
-    class FakeYdl:
-        def __init__(self, _opts): pass
-        def __enter__(self): return self
-        def __exit__(self, *_): return False
-        def extract_info(self, _url, download): return {"url": "https://new?expire=9999999999", "ext": "m4a"}
 
+class FakeYdl:
+    """yt-dlp that answers with [result] (a link, or an exception to raise), and keeps its options."""
+    result: object = "https://new?expire=9999999999"
+    available_at: float | None = None
+    opts: list[dict] = []
+
+    def __init__(self, opts): FakeYdl.opts.append(opts)
+    def __enter__(self): return self
+    def __exit__(self, *_): return False
+
+    def extract_info(self, _url, download):
+        if isinstance(FakeYdl.result, Exception):
+            raise FakeYdl.result
+        return {"url": FakeYdl.result, "ext": "m4a", "available_at": FakeYdl.available_at}
+
+
+def test_fresh_stream_skips_the_cache(monkeypatch):
+    ytm = _bare_core()
+    ytm._streams = {"abc": core.StreamInfo("https://old", core.time.time() + 3600, "audio/mp4", None)}
     monkeypatch.setattr(core.yt_dlp, "YoutubeDL", FakeYdl)
+    monkeypatch.setattr(FakeYdl, "result", "https://new?expire=9999999999")
     assert ytm.stream("ytm:abc").url == "https://old"
     assert ytm.stream("ytm:abc", fresh=True).url == "https://new?expire=9999999999"
     assert ytm.stream("ytm:abc").url == "https://new?expire=9999999999"
 
 
-def test_bot_check_gets_a_clear_message():
-    message = "ERROR: [youtube] abc: Sign in to confirm you\u2019re not a bot. Use --cookies-from-browser or --cookies"
-    assert "bot check" in core._clean_error(message)
+def test_bot_check_pauses_lookups_for_longer_each_time(monkeypatch):
+    ytm = _bare_core()
+    now = [1000.0]
+    monkeypatch.setattr(core.time, "time", lambda: now[0])
+    monkeypatch.setattr(core.yt_dlp, "YoutubeDL", FakeYdl)
+    monkeypatch.setattr(FakeYdl, "opts", [])
+    bot_check = core.yt_dlp.utils.DownloadError(
+        "ERROR: [youtube] abc: Sign in to confirm you\u2019re not a bot. Use --cookies-from-browser or --cookies")
+    monkeypatch.setattr(FakeYdl, "result", bot_check)
+
+    with pytest.raises(core.Blocked, match=r"bot check\)\. Try again in 2 min"):
+        ytm.stream("ytm:abc")
+    # While paused, YouTube isn't asked at all.
+    now[0] += 60
+    with pytest.raises(core.Blocked, match="Try again in 1 min"):
+        ytm.stream("ytm:def")
+    assert len(FakeYdl.opts) == 1
+
+    # Still blocked after the pause: twice as long.
+    now[0] += 61
+    with pytest.raises(core.Blocked, match="Try again in 4 min"):
+        ytm.stream("ytm:def")
+    assert len(FakeYdl.opts) == 2
+
+    # Working again: the next bot check starts over at the shortest pause.
+    now[0] += 4 * 60 + 1
+    monkeypatch.setattr(FakeYdl, "result", "https://ok?expire=9999999999")
+    assert ytm.stream("ytm:def").url == "https://ok?expire=9999999999"
+    monkeypatch.setattr(FakeYdl, "result", bot_check)
+    with pytest.raises(core.Blocked, match="Try again in 2 min"):
+        ytm.stream("ytm:ghi")
+
+
+def test_other_failures_dont_pause(monkeypatch):
+    ytm = _bare_core()
+    monkeypatch.setattr(core.yt_dlp, "YoutubeDL", FakeYdl)
+    monkeypatch.setattr(FakeYdl, "result", core.yt_dlp.utils.DownloadError("ERROR: [youtube] abc: Video unavailable"))
+    with pytest.raises(core.Unavailable) as e:
+        ytm.stream("ytm:abc")
+    assert not isinstance(e.value, core.Blocked)
+    monkeypatch.setattr(FakeYdl, "result", "https://ok?expire=9999999999")
+    assert ytm.stream("ytm:def").url == "https://ok?expire=9999999999"
+
+
+def test_a_link_with_an_ad_comes_once_the_ad_is_over(monkeypatch):
+    ytm = _bare_core()
+    now = [1000.0]
+    monkeypatch.setattr(core.time, "time", lambda: now[0])
+    slept = []
+    monkeypatch.setattr(core.time, "sleep", lambda s: slept.append(s))
+    monkeypatch.setattr(core.yt_dlp, "YoutubeDL", FakeYdl)
+    monkeypatch.setattr(FakeYdl, "result", "https://ad?expire=9999999999")
+
+    monkeypatch.setattr(FakeYdl, "available_at", 1005.0)
+    assert ytm.stream("ytm:abc").url == "https://ad?expire=9999999999"
+    assert slept == [5.0]
+
+    monkeypatch.setattr(FakeYdl, "available_at", 1000.0 + 5 * 60)
+    with pytest.raises(core.Unavailable, match="ad of 300 s"):
+        ytm.stream("ytm:def")
+
+
+def test_po_tokens_ask_as_the_mobile_web_player(monkeypatch):
+    monkeypatch.setattr(core.yt_dlp, "YoutubeDL", FakeYdl)
+    monkeypatch.setattr(FakeYdl, "result", "https://ok?expire=9999999999")
+
+    monkeypatch.setattr(FakeYdl, "opts", [])
+    _bare_core().stream("ytm:abc")
+    assert "extractor_args" not in FakeYdl.opts[0]
+
+    # A server with a bgutil server.
+    monkeypatch.setattr(FakeYdl, "opts", [])
+    server = core.YtmCore(pot_url="http://pot:4416")
+    server.stream("ytm:abc")
+    args = FakeYdl.opts[0]["extractor_args"]
+    # The usual player first (no ads), the mobile web player with tokens for when it's turned away.
+    assert args["youtube"]["player_client"] == ["visionos", "mweb"]
+    assert args["youtubepot-bgutilhttp"] == {"base_url": ["http://pot:4416"]}
+
+    # The phone, once the app handed over its WebView.
+    monkeypatch.setattr(FakeYdl, "opts", [])
+    monkeypatch.setattr(core.pot, "_botguard", object())
+    _bare_core().stream("ytm:abc")
+    assert FakeYdl.opts[0]["extractor_args"]["youtube"]["fetch_pot"] == ["always"]
 
 
 def test_parse_range():

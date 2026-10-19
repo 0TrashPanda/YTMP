@@ -24,6 +24,7 @@ import com.chaquo.python.android.AndroidPlatform
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.core.ResolvedStream
 import dev.trashpanda.ytmp.core.StreamResolver
+import dev.trashpanda.ytmp.host.SourceBlockedException
 import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.Song
@@ -66,6 +67,14 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
      */
     private val jsEngine by lazy {
         JsEngine.create(context)?.also { python.getModule("ytmp_ytm.jsc").callAttr("use_engine", it) }
+    }
+
+    /**
+     * PO tokens (see [BotGuard]), so YouTube's bot check comes later. Only with the engine
+     * above: the player that uses them (mobile web) needs it.
+     */
+    private val botGuard by lazy {
+        jsEngine?.let { BotGuard(context).also { python.getModule("ytmp_ytm.pot").callAttr("use_botguard", it) } }
     }
 
     init {
@@ -199,7 +208,7 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
     override suspend fun resolve(songId: String): ResolvedStream = stream(songId).let { ResolvedStream(it.url, it.durationMs) }
 
     suspend fun stream(songId: String, fresh: Boolean = false): Stream = python {
-        jsEngine
+        botGuard
         val info = core.callAttr("stream", songId, fresh)
         val headers = info["http_headers"]!!.asMap().entries.associate { (k, v) -> k.toString() to v.toString() }
         // Python's None arrives as null.
@@ -213,7 +222,11 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         } catch (e: PyException) {
             // e.g. "Unavailable: Video unavailable" -> "Video unavailable"
             val message = e.message?.substringAfter(": ") ?: "YouTube Music error"
-            throw if (e.message.orEmpty().startsWith("NotSignedIn")) NotSignedInException(message) else SourceException(message)
+            throw when {
+                e.message.orEmpty().startsWith("NotSignedIn") -> NotSignedInException(message)
+                e.message.orEmpty().startsWith("Blocked") -> SourceBlockedException(message)
+                else -> SourceException(message)
+            }
         }
     }
 }

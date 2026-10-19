@@ -2,8 +2,9 @@
 # downloads them (deploy/docker-compose.yml, updated by Watchtower every night).
 #
 # - Push a tag like v0.7.0: ytmp-server and ytmp-ytm, tagged 0.7.0 and latest.
-# - Every night: ytmp-ytm again, from the latest release, but only when a new yt-dlp or
-#   ytmusicapi is out (YouTube changes often; a new yt-dlp is the usual fix).
+# - Every night: ytmp-ytm again, from the latest release, but only when a new yt-dlp,
+#   ytmusicapi or PO token plugin (bgutil) is out (YouTube changes often; a new yt-dlp is
+#   the usual fix).
 # - Run it by hand (Actions → Docker → Run workflow): both, from the latest release.
 name: Docker
 
@@ -43,14 +44,16 @@ jobs:
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
           echo "Building from $tag"
 
-      - name: Newest yt-dlp and ytmusicapi
+      - name: Newest yt-dlp, ytmusicapi and PO token plugin
         id: deps
         run: |
           ytdlp=$(curl -fsS https://pypi.org/pypi/yt-dlp/json | jq -r .info.version)
           ytm=$(curl -fsS https://pypi.org/pypi/ytmusicapi/json | jq -r .info.version)
+          pot=$(curl -fsS https://pypi.org/pypi/bgutil-ytdlp-pot-provider/json | jq -r .info.version)
           echo "ytdlp=$ytdlp" >> "$GITHUB_OUTPUT"
           echo "ytmusicapi=$ytm" >> "$GITHUB_OUTPUT"
-          echo "tag=${{ steps.release.outputs.version }}-ytdlp-$ytdlp-ytm-$ytm" >> "$GITHUB_OUTPUT"
+          echo "pot=$pot" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ steps.release.outputs.version }}-ytdlp-$ytdlp-ytm-$ytm-pot-$pot" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v3
         with:
@@ -93,6 +96,7 @@ jobs:
           build-args: |
             YT_DLP_VERSION=${{ steps.deps.outputs.ytdlp }}
             YTMUSICAPI_VERSION=${{ steps.deps.outputs.ytmusicapi }}
+            POT_PROVIDER_VERSION=${{ steps.deps.outputs.pot }}
           tags: |
             ${{ env.REGISTRY }}/ytmp-ytm:${{ steps.release.outputs.version }}
             ${{ env.REGISTRY }}/ytmp-ytm:${{ steps.deps.outputs.tag }}

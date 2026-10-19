@@ -31,6 +31,7 @@ import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.ShareAddress
 import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
+import dev.trashpanda.ytmp.core.SourceBlocked
 import dev.trashpanda.ytmp.protocol.ApiError
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
@@ -108,6 +109,9 @@ class ApiException(val status: HttpStatusCode, val code: ErrorCode, message: Str
 
 /** Thrown by a source when it can't do what was asked (e.g. YouTube refused). */
 open class SourceException(message: String) : Exception(message)
+
+/** YouTube's bot check: no lookups from this network for a while (see [SourceBlocked]). */
+class SourceBlockedException(message: String) : SourceException(message), SourceBlocked
 
 @Serializable
 private data class ClientLogReport(val message: String, val room: String? = null)

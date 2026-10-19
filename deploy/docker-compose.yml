@@ -46,12 +46,22 @@ services:
       YTMP_YTM_LOCATION: BE
       # debug: also yt-dlp's steps for every song, not only for failed or slow ones.
       YTMP_YTM_LOG_LEVEL: info
+      # PO tokens make song lookups look like YouTube's own player, so its bot check comes later.
+      YTMP_YTM_POT_URL: http://pot:4416
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     restart: unless-stopped
     logging: *logging
 
-  # Updates the two services above (only those) every night, and removes the old images.
+  # Makes the PO tokens (bgutil, ~180 MB of memory). Only the module reaches it.
+  pot:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    restart: unless-stopped
+    logging: *logging
+
+  # Updates the services above (only those) every night, and removes the old images.
   watchtower:
     image: nickfedor/watchtower
     volumes:

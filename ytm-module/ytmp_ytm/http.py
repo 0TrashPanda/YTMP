@@ -83,6 +83,10 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         log.warning("%s: unavailable: %s", request.url.path, e)
         return _error(422, "unavailable", str(e))
 
+    @app.exception_handler(core.Blocked)
+    async def blocked(request: Request, e: core.Blocked):
+        return _error(503, "blocked", str(e))
+
     @app.exception_handler(core.NotFound)
     async def not_found(request: Request, e: core.NotFound):
         log.info("%s: not found: %s", request.url.path, e)
@@ -350,6 +354,7 @@ def main() -> None:
         language=os.environ.get("YTMP_YTM_LANGUAGE", "en"),
         location=os.environ.get("YTMP_YTM_LOCATION", "BE"),
         js_runtime=os.environ.get("YTMP_YTM_JS_RUNTIME") or None,
+        pot_url=os.environ.get("YTMP_YTM_POT_URL") or None,
     )
     app = create_app(ytm, os.environ.get("YTMP_MODULE_KEY") or None)
     uvicorn.run(

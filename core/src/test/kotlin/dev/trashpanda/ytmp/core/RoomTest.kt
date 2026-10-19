@@ -281,6 +281,31 @@ class RoomTest {
     }
 
     @Test
+    fun `when the source is blocked for a while, the room pauses on the song instead of skipping`() = runTest {
+        class Blocked : Exception("YouTube is blocking requests from this network for now (bot check)."), SourceBlocked
+        var blocked = true
+        val room = Room("ABCD", "Test", "t", RoomVisibility.PUBLIC, { id -> if (blocked) throw Blocked() else "https://stream/$id" }, backgroundScope) {
+            testScheduler.currentTime
+        }
+        val client = room.connect()
+        room.run(client, Command.AddSongs(listOf(song(1), song(2)), QueuePosition.END))
+        runCurrent()
+
+        assertEquals("ytm:song1", client.state.nowPlaying?.item?.song?.id)
+        assertEquals(listOf("ytm:song2"), client.state.queue.map { it.song.id })
+        assertFalse(client.state.playback.playing)
+        assertEquals("Paused: YouTube is blocking requests from this network for now (bot check).",
+            client.events.filterIsInstance<Event.Notice>().last().message)
+
+        // Play tries the same song again.
+        blocked = false
+        room.run(client, Command.Play)
+        runCurrent()
+        assertEquals("ytm:song1", client.state.nowPlaying?.item?.song?.id)
+        assertTrue(client.state.playback.playing)
+    }
+
+    @Test
     fun `only the hosting device can join a private room until it is made public`() = runTest {
         val room = Room("ABCD", "Solo", "owner-token", RoomVisibility.PRIVATE, { "x" }, backgroundScope) { testScheduler.currentTime }
         val owner = FakeClient()

@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<script>
+// Runs YouTube's BotGuard for PO tokens, in a hidden WebView (BotGuard.kt): it calls these,
+// and gets the answers through YtmpBotGuard.done / fail. The steps follow BgUtils
+// (https://github.com/LuanRT/BgUtils, MIT): BotGuardClient.snapshot and WebPoMinter.
+'use strict';
+(() => {
+	// BotGuard's output; its first item makes the minter.
+	let signals = [];
+	let minter = null;
+
+	const answer = (id, work) => Promise.resolve().then(work).then(
+		(value) => YtmpBotGuard.done(id, String(value)),
+		(e) => YtmpBotGuard.fail(id, String((e && e.message) || e)),
+	);
+	const within = (ms, what, promise) => Promise.race([promise, new Promise((_, reject) =>
+		setTimeout(() => reject(new Error(`${what} took too long`)), ms))]);
+	const fromBase64 = (text) => Uint8Array.from(
+		atob(text.replace(/[-_.]/g, (c) => ({ '-': '+', _: '/', '.': '=' })[c])), (c) => c.charCodeAt(0));
+	const toWebsafeBase64 = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_');
+
+	window.ytmpBg = {
+		snapshot(id, script, program, globalName, ytcfg) {
+			answer(id, async () => {
+				signals = [];
+				minter = null;
+				// BotGuard reads the page's event ID from YouTube's settings.
+				if (ytcfg) window.yt = { config_: JSON.parse(ytcfg) };
+				new Function(script)();
+				const vm = window[globalName];
+				if (!vm || !vm.a) throw new Error('BotGuard is missing from its script');
+				const snapshot = await within(10000, 'Starting BotGuard', new Promise((resolve) => {
+					vm.a(program, (asyncSnapshot) => resolve(asyncSnapshot), true, undefined, () => {},
+						[[], []], undefined, false, [() => {}, () => {}, () => {}, () => {}, () => {}]);
+				}));
+				return within(10000, 'BotGuard', new Promise((resolve) =>
+					snapshot(resolve, [undefined, undefined, signals, undefined])));
+			});
+		},
+		start(id, integrityToken) {
+			answer(id, async () => {
+				const mint = signals[0] && await signals[0](fromBase64(integrityToken));
+				if (typeof mint !== 'function') throw new Error('BotGuard gave no minter');
+				minter = mint;
+				return '';
+			});
+		},
+		mint(id, binding) {
+			answer(id, async () => {
+				if (!minter) throw new Error('No minter');
+				const token = await minter(new TextEncoder().encode(binding));
+				if (!(token instanceof Uint8Array)) throw new Error('BotGuard made no token');
+				return toWebsafeBase64(token);
+			});
+		},
+	};
+})();
+</script>
+</body>
+</html>

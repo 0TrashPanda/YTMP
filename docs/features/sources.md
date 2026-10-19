@@ -123,5 +123,10 @@ focus** (see [future ideas](future-ideas.md)).
   phone can host without a server.
 - With a [linked YouTube account](accounts.md#linked-youtube-account) ✅: access
   to the user's playlists and likes.
+- **YouTube's bot check** ✅ ("confirm you're not a bot", for a whole home network at once)
+  comes rarely: song lookups carry a token that says they come from a real YouTube player,
+  on a server and in the app. When it comes anyway, the room pauses on the song with
+  *"YouTube is blocking requests from this network for now (bot check). Try again in 2 min."*,
+  instead of skipping songs, and YTMP doesn't ask YouTube again before then.
 
 Implementation details: [implementation/ytm-module.md](../implementation/ytm-module.md).

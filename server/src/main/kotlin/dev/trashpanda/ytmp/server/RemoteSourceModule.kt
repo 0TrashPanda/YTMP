@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.core.ResolvedStream
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.host.AudioProxy
+import dev.trashpanda.ytmp.host.SourceBlockedException
 import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.Lyrics
 import dev.trashpanda.ytmp.protocol.Song
@@ -250,6 +251,7 @@ class RemoteSourceModule(
     private suspend fun HttpResponse.orThrow(): HttpResponse {
         if (status.isSuccess()) return this
         val error = runCatching { body<ErrorBody>().error }.getOrNull()
+        if (error?.code == "blocked") throw SourceBlockedException(error.message)
         throw ModuleException(error?.code ?: "upstream_error", error?.message ?: "Module answered $status: ${bodyAsText().take(200)}")
     }
 }

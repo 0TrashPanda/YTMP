@@ -30,6 +30,12 @@ fun interface StreamResolver {
 
 data class ResolvedStream(val url: String, val durationMs: Long?)
 
+/**
+ * A source refusing for a while, like YouTube's bot check: the song itself is fine, and the
+ * next one would fail the same way, so the room waits on it instead of skipping.
+ */
+interface SourceBlocked
+
 /** Searches the host's sources. */
 fun interface SongSearch {
     suspend fun search(query: String, type: SearchType): SearchPage

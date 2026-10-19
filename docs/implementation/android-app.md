@@ -58,6 +58,9 @@
   big scripts (the player is ~3 MB), yt-dlp works as before, without JavaScript. Set up on the
   first stream lookup (connecting waits for the main thread). Takes ~1.3 s, only for lookups
   that need it.
+- **PO tokens** (`BotGuard`): YouTube's BotGuard runs in a hidden WebView, so lookups can
+  carry a PO token and YouTube's bot check comes later. See
+  [ytm-module](ytm-module.md#youtubes-bot-check-and-po-tokens-).
   Chaquopy 17 supports AGP up to 9.2, so the project uses AGP 9.2.1.
 - **Who can do what:** only the phone itself (loopback) can create, list and close rooms, and
   join **solo** (private) rooms. Friends on the same Wi-Fi can join **public** rooms at

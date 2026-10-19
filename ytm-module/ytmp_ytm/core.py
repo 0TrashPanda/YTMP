@@ -20,6 +20,8 @@ import yt_dlp
 from ytmusicapi import LikeStatus, YTMusic
 from ytmusicapi.helpers import initialize_headers
 
+from . import pot
+
 MODULE_ID = "ytm"
 _PREFIXES = ("ytm:", "yt:")
 _LARGE_ART = 544
@@ -61,6 +63,17 @@ _YTM_AUTHOR = "YouTube Music"
 _EXPIRY_MARGIN_S = 10 * 60
 # A stream lookup taking longer than this gets yt-dlp's steps in the log, like a failed one.
 _SLOW_RESOLVE_S = 8.0
+# With PO tokens, yt-dlp also asks as YouTube's mobile web player (what yt-dlp's PO Token
+# Guide recommends), with a token for its player request too. That player's links come with
+# an ad and only work once it's over, so the usual player (no ads) goes first: the mobile web
+# player is there for when YouTube's bot check turns the usual one away.
+_PO_TOKEN_ARGS = {"player_client": ["visionos", "mweb"], "fetch_pot": ["always"], "skip": ["hls"]}
+# Waiting longer than this for an ad to end is not worth it: the song fails instead.
+_MAX_AD_WAIT_S = 60
+# After YouTube's bot check, no lookups for this long, longer each time it's still there:
+# asking again right away makes the network look even more like a bot.
+_BOT_CHECK_PAUSES_S = (2 * 60, 4 * 60, 8 * 60, 16 * 60, 30 * 60)
+_BOT_CHECK = "YouTube is blocking requests from this network for now (bot check)."
 
 log = logging.getLogger("ytmp_ytm")
 
@@ -89,6 +102,10 @@ class NotFound(Exception):
 
 class Unavailable(Exception):
     pass
+
+
+class Blocked(Unavailable):
+    """YouTube's bot check: no lookups from this network for a while. The song itself is fine."""
 
 
 class NotSignedIn(Exception):
@@ -125,7 +142,10 @@ def video_id(song_id: str) -> str:
 
 
 class YtmCore:
-    def __init__(self, language: str = "en", location: str = "BE", js_runtime: str | None = None):
+    def __init__(self, language: str = "en", location: str = "BE", js_runtime: str | None = None,
+                 pot_url: str | None = None):
+        """[pot_url]: a bgutil PO token server (http://host:4416), for PO tokens on a server.
+        On the phone, the app hands pot.py a WebView instead."""
         self._ytm = YTMusic(language=language, location=location)
         self._ydl_opts = {
             "format": "bestaudio[ext=m4a]/bestaudio",
@@ -133,6 +153,10 @@ class YtmCore:
         }
         if js_runtime:
             self._ydl_opts["js_runtimes"] = {js_runtime: {}}
+        self._pot_url = pot_url
+        if pot_url:
+            self._ydl_opts["extractor_args"] = {"youtubepot-bgutilhttp": {"base_url": [pot_url]}}
+        self._bot_check = _BotCheck()
         self._streams: dict[str, StreamInfo] = {}
         self._lock = threading.Lock()
         self._language = language
@@ -459,20 +483,35 @@ class YtmCore:
         if cached and cached.expires_at - _EXPIRY_MARGIN_S > time.time():
             return cached
 
+        self._bot_check.check()
         steps = _YdlLog(vid)
+        opts = dict(self._ydl_opts, logger=steps)
+        if self._pot_url or pot.available():
+            opts["extractor_args"] = dict(opts.get("extractor_args") or {}, youtube=_PO_TOKEN_ARGS)
         started = time.monotonic()
         try:
-            with yt_dlp.YoutubeDL(dict(self._ydl_opts, logger=steps)) as ydl:
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(f"https://music.youtube.com/watch?v={vid}", download=False)
         except yt_dlp.utils.DownloadError as e:
             log.warning("stream %s: yt-dlp failed after %.1f s: %s\n%s", vid, time.monotonic() - started, e, steps.text())
+            if "confirm you" in str(e) and "not a bot" in str(e):
+                pause = self._bot_check.seen()
+                log.warning("stream %s: YouTube's bot check: no lookups for %d min", vid, pause // 60)
+                raise Blocked(f"{_BOT_CHECK} Try again in {pause // 60} min.") from e
             raise Unavailable(_clean_error(str(e))) from e
         except Exception:
             log.exception("stream %s: yt-dlp crashed after %.1f s\n%s", vid, time.monotonic() - started, steps.text())
             raise
 
         url = info["url"]
-        expires = urllib.parse.parse_qs(urllib.parse.urlparse(url).query).get("expire", [None])[0]
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+        # A link that comes with an ad works once the ad would be over.
+        if (wait := (info.get("available_at") or 0) - time.time()) > 0:
+            if wait > _MAX_AD_WAIT_S:
+                raise Unavailable(f"YouTube wants an ad of {round(wait)} s first")
+            log.info("stream %s: waiting %.0f s for YouTube's link (it comes with an ad)", vid, wait)
+            time.sleep(wait)
+        expires = query.get("expire", [None])[0]
         stream = StreamInfo(
             url=url,
             expires_at=float(expires) if expires else time.time() + 3600,
@@ -481,11 +520,13 @@ class YtmCore:
             duration_ms=int(info["duration"] * 1000) if info.get("duration") else None,
             http_headers=dict(info.get("http_headers") or {}),
         )
+        self._bot_check.passed()
         took = time.monotonic() - started
         log.info(
-            "stream %s: %s in %.1f s, format %s (%s, %s kbps), host %s, expires in %d min%s",
+            "stream %s: %s in %.1f s, format %s (%s, %s kbps, %s), host %s, expires in %d min%s",
             vid, "re-resolved" if fresh else "resolved", took, info.get("format_id"), info.get("ext"),
-            round(info["abr"]) if info.get("abr") else "?", urllib.parse.urlparse(url).hostname,
+            round(info["abr"]) if info.get("abr") else "?", query.get("c", ["?"])[0].lower(),
+            urllib.parse.urlparse(url).hostname,
             (stream.expires_at - time.time()) // 60, f"\n{steps.text()}" if took > _SLOW_RESOLVE_S else "",
         )
         with self._lock:
@@ -825,8 +866,33 @@ def total_size(content_range: str | None) -> int | None:
     return int(match.group(1)) if match else None
 
 
+class _BotCheck:
+    """When YouTube's bot check was last seen; shared by a core's signed-in views."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._until = 0.0
+        self._times = 0
+
+    def check(self) -> None:
+        """Raises Blocked while lookups are paused."""
+        with self._lock:
+            left = self._until - time.time()
+        if left > 0:
+            raise Blocked(f"{_BOT_CHECK} Try again in {max(1, round(left / 60))} min.")
+
+    def seen(self) -> int:
+        """Pauses lookups, and returns for how many seconds."""
+        with self._lock:
+            pause = _BOT_CHECK_PAUSES_S[min(self._times, len(_BOT_CHECK_PAUSES_S) - 1)]
+            self._times += 1
+            self._until = time.time() + pause
+        return pause
+
+    def passed(self) -> None:
+        with self._lock:
+            self._times = 0
+
+
 def _clean_error(message: str) -> str:
-    if "confirm you" in message and "not a bot" in message:
-        # YouTube's bot check: it blocks this network for a while after many requests.
-        return "YouTube is blocking requests from this network for now (bot check). Try again later."
     return re.sub(r"^ERROR: (\[[^\]]+\] )?([\w-]+: )?", "", message).strip()
