@@ -37,7 +37,8 @@ from yt_dlp.utils.traversal import traverse_obj
 
 log = logging.getLogger("ytmp_ytm.pot")
 
-# The key and endpoint YouTube's own pages use for integrity tokens.
+# The key and endpoint YouTube's own pages use for integrity tokens. The API key is YouTube's
+# public one (also in BgUtils and bgutil), not a secret: GitHub's secret scanning flags it anyway.
 _REQUEST_KEY = "O43z0dpjhgX20SCx4KAo"
 _API_KEY = "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw"
 _GENERATE_IT = "https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT"
