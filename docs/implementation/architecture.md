@@ -80,8 +80,8 @@ neither compiles until it's handled. Tests check that clients get the host's roo
 its data written by `YTMP_WRITE_FIXTURES=1 ./gradlew :core:test --tests '*RoomTest*'`).
 
 **The host's HTTP side** (`host/`): `ytmpModule(rooms, sources, options)` in `Application.kt`.
-What a host offers is a `HostSources` (search, pages, lyrics, audio, local music, your YouTube
-Music, the song graph), how it behaves a `HostOptions`. Routes are in files by area:
+What a host offers is a `HostSources` (search, pages, lyrics, audio, downloads, local music,
+your YouTube Music, the song graph), how it behaves a `HostOptions`. Routes are in files by area:
 `RoomRoutes` (`/api/host`, rooms, `/ws`), `CatalogRoutes` (search, pages, Local, audio),
 `PersonalRoutes` (`/api/me`), `ScreenRoutes` (party screens); what they share (who a request is,
 its YouTube Music) is `HostContext`. The server adds its own routes (accounts, history, room

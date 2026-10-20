@@ -108,6 +108,11 @@ class LocalHost(private val context: Context) {
     /** The phone owner's YouTube Music account. */
     val youtube = PhoneYoutubeAccount(context) { ytm }
 
+    /** Songs' audio straight from YouTube, through the phone: for players, speakers and downloads. */
+    private val audio = OnDeviceAudioProxy { songId, fresh -> ytm.stream(songId, fresh) }
+    /** Download in the song menu: for friends' browsers (the host's /api/download) and this phone's Music folder. */
+    val downloads = PhoneDownloads(context, SongFiles(audio, context.cacheDir), scope)
+
     /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
     private val cached = CachedSource(
         search = { query, type -> ytm.search(query, type) },
@@ -193,7 +198,8 @@ class LocalHost(private val context: Context) {
                     similar = local.radio(cached),
                     catalog = local.catalog(cached),
                     lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
-                    audio = local.audio(OnDeviceAudioProxy { songId, fresh -> ytm.stream(songId, fresh) }),
+                    audio = local.audio(audio),
+                    downloads = downloads.files,
                     local = local,
                     zones = zones,
                     personal = youtube,

@@ -481,6 +481,15 @@ export function reportProblem(message: string, room?: string): void {
 	fetch('/api/log', { method: 'POST', headers, body: JSON.stringify({ message, room }), keepalive: true }).catch(() => {});
 }
 
+/** A song made into a file to keep by the host (docs/implementation/downloads.md): its bytes and Content-Disposition. */
+export async function downloadFile(song: Song): Promise<{ blob: Blob; disposition: string | null }> {
+	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+	if (identity.token) headers['Authorization'] = `Bearer ${identity.token}`;
+	const response = await fetch('/api/download', { method: 'POST', headers, body: JSON.stringify(song) });
+	if (!response.ok) await answer(response);
+	return { blob: await response.blob(), disposition: response.headers.get('Content-Disposition') };
+}
+
 /** Audio streamed through the host, for when the direct stream URL doesn't work. */
 export function proxiedAudioUrl(songId: string): string {
 	return `/api/audio/${encodeURIComponent(songId)}`;

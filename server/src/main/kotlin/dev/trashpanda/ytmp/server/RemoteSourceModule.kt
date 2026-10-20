@@ -4,7 +4,9 @@ import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.core.ResolvedStream
 import dev.trashpanda.ytmp.core.StreamResolver
+import dev.trashpanda.ytmp.host.AudioFiles
 import dev.trashpanda.ytmp.host.AudioProxy
+import dev.trashpanda.ytmp.host.SongFiles
 import dev.trashpanda.ytmp.host.SourceBlockedException
 import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.PodcastSavedRequest
@@ -59,6 +61,8 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.jvm.javaio.copyTo
+import java.io.File
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 
@@ -72,7 +76,7 @@ class RemoteSourceModule(
     private val client: HttpClient,
     private val baseUrl: String,
     private val key: String,
-) : SongSearch, StreamResolver, AudioProxy, RadioSource, CatalogSource, SearchSuggestions {
+) : SongSearch, StreamResolver, AudioProxy, AudioFiles, RadioSource, CatalogSource, SearchSuggestions {
 
     @Serializable
     private data class SearchResult(val items: List<Song>)
@@ -151,6 +155,16 @@ class RemoteSourceModule(
             }
         }
     }
+
+    /** The module's whole audio for a download, into [to]; throws when it stops before the end. */
+    override suspend fun download(songId: String, to: File): String =
+        client.prepareGet("$baseUrl/songs/${songId.encodeURLPathPart()}/audio") { auth() }.execute { response ->
+            response.orThrow()
+            val expected = response.contentLength()
+            val written = to.outputStream().use { response.bodyAsChannel().copyTo(it) }
+            if (expected != null && written < expected) throw SourceException("The download stopped at ${written * 100 / expected}%")
+            response.contentType()?.withoutParameters()?.toString() ?: SongFiles.MP4
+        }
 
     private class ProxiedAudio(response: HttpResponse, private val body: ByteReadChannel) : OutgoingContent.ReadChannelContent() {
         override val status = response.status

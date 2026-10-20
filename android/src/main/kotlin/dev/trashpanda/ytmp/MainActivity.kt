@@ -41,6 +41,7 @@ import dev.trashpanda.ytmp.core.OutputDevice
 import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -603,6 +604,20 @@ class MainActivity : ComponentActivity() {
             if (currentUrl?.let(::isAppPage) == true) app.host.nearby.setVolume(deviceId, volume)
         }
 
+        /**
+         * Download (bridge version 11): [songJson] is the Song, saved with its tags in the phone's
+         * Music/YTMP folder. The phone gets it from YouTube itself, whichever host the page is on.
+         * The answer comes as `onDownloaded(songId, error)`, error null when it's saved.
+         */
+        @JavascriptInterface
+        fun downloadSong(songJson: String) {
+            if (currentUrl?.let(::isAppPage) != true) return
+            val song = runCatching { ProtocolJson.decodeFromString(Song.serializer(), songJson) }.getOrNull() ?: return
+            app.host.downloads.save(song) { error ->
+                js("window.__ytmpNative && window.__ytmpNative.onDownloaded && window.__ytmpNative.onDownloaded(${JSONObject.quote(song.id)}, ${error?.let(JSONObject::quote) ?: "null"})")
+            }
+        }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -621,7 +636,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 10
+        const val BRIDGE_VERSION = 11
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

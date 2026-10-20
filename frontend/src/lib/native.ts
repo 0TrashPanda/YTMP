@@ -62,6 +62,11 @@ export interface NativeBridge {
 	phoneMusic?(): boolean;
 	/** Switches that on (Android asks once) or off; the answer comes as onPhoneMusic (bridge version 10). */
 	setPhoneMusic?(on: boolean): void;
+	/**
+	 * Saves a song (JSON Song) with its tags in the phone's Music/YTMP folder (bridge version 11);
+	 * the answer comes as onDownloaded.
+	 */
+	downloadSong?(songJson: string): void;
 }
 
 /** Callbacks the app calls on the page. */
@@ -91,6 +96,8 @@ export interface NativeCallbacks {
 	onNearbyNotice?(text: string): void;
 	/** Back from setPhoneMusic: whether it's on now, and why not when Android said no. */
 	onPhoneMusic?(on: boolean, error: string | null): void;
+	/** Back from downloadSong: null when the song is in the Music folder, else why not. */
+	onDownloaded?(songId: string, error: string | null): void;
 }
 
 /** Speakers and TVs on the phone's own network (android/.../MainActivity.kt), for a room on another host. */

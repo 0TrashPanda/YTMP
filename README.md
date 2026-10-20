@@ -73,6 +73,8 @@ Music, without Premium, and not tied to a single music service.
   keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
   speakers near your phone (the phone looks the songs up and serves them).
 - Android: lock screen and notification controls, keeps playing with the screen off.
+- Download a song or episode from its menu: a music file with its title, artist, album and
+  cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app
   looks songs up itself, and a browser can use a YouTube Music module on your own computer
   (*Settings → Playback*), instead of streaming through the server.

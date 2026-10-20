@@ -68,7 +68,7 @@ phone**, if the room allows it (permission: *Send songs from own device*).
 |--------|--------|
 | YouTube Music | ✅ Built (server service and on the phone) |
 | YouTube | Planned |
-| Local music | ✅ A Raspberry Pi's music folder (with MPD) and the music on the hosting phone, in the [Local tab](#local-music-). Other folders and songs downloaded through YTMP: planned. |
+| Local music | ✅ A Raspberry Pi's music folder (with MPD) and the music on the hosting phone, in the [Local tab](#local-music-). Songs downloaded in the app are in the phone's music (*Music/YTMP*). Other folders: planned. |
 | Media servers (Plex, Jellyfin, Subsonic/Navidrome, file servers, …) | Planned, linked to an account |
 | Spotify | Future (see [Spotify module](future-ideas.md#spotify-module)) |
 | SoundCloud | Future |

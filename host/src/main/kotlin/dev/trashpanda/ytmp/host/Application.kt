@@ -79,6 +79,8 @@ data class HostSources(
     val lyrics: LyricsLookup? = null,
     /** Songs' audio through the host, for players whose direct link doesn't work (and speakers). */
     val audio: AudioProxy? = null,
+    /** Songs made into tagged files to keep (Download in the song menu); local music isn't offered. */
+    val downloads: SongFiles? = null,
     /** Local music (the Local tab): a Raspberry Pi's music folder, the music on the hosting phone. */
     val local: LocalMusic? = null,
     /** Amplifier zones, for another host that takes their player over. */

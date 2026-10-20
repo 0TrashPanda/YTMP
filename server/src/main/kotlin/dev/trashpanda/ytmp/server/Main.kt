@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.core.RoomTimeouts
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.LyricsLookup
+import dev.trashpanda.ytmp.host.SongFiles
 import dev.trashpanda.ytmp.host.MpdOutputs
 import dev.trashpanda.ytmp.host.SonosOutputs
 import dev.trashpanda.ytmp.host.LocalMusic
@@ -166,6 +167,7 @@ fun main(args: Array<String>) {
                 catalog = local.catalog(cached),
                 lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
                 audio = local.audio(ytm),
+                downloads = SongFiles(ytm),
                 local = local,
                 zones = zones,
                 // Your account's YouTube Music, when you're logged in with an account of this server.

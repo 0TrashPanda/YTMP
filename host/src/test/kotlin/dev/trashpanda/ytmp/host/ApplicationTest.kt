@@ -409,6 +409,31 @@ class ApplicationTest {
     }
 
     @Test
+    fun `a download is the song as a file, named after it`() = testApplication {
+        val asked = mutableListOf<String>()
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            // Not an m4a: passed on as it came.
+            val files = SongFiles({ songId, to -> asked += songId; to.writeText("audio"); "audio/webm" })
+            ytmpModule(rooms, HostSources(search, downloads = files), HostOptions(kind = HostKind.SERVER, mayProxyAudio = { it.request.headers["X-Test-Lan"] == "1" }))
+        }
+        val client = jsonClient()
+        suspend fun download(song: Song, lan: Boolean = true) = client.post("/api/download") {
+            contentType(ContentType.Application.Json)
+            if (lan) header("X-Test-Lan", "1")
+            setBody(song)
+        }
+        val ok = download(song.copy(title = "Één"))
+        assertEquals(HttpStatusCode.OK, ok.status)
+        assertEquals("audio", ok.bodyAsText())
+        assertEquals("audio/webm", ok.headers[HttpHeaders.ContentType])
+        assertEquals("attachment; filename=\"Daft Punk - __n.webm\"; filename*=UTF-8''Daft%20Punk%20-%20%C3%89%C3%A9n.webm", ok.headers[HttpHeaders.ContentDisposition])
+        assertEquals(HttpStatusCode.Forbidden, download(song, lan = false).status)
+        assertEquals(HttpStatusCode.BadRequest, download(song.copy(id = "local:x:s:1")).status)
+        assertEquals(listOf(song.id), asked)
+    }
+
+    @Test
     fun `search goes to the sources`() = testApplication {
         setup()
         val all = jsonClient().get("/api/search?q=daft").body<SearchPage>()

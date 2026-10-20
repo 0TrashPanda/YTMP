@@ -11,18 +11,24 @@ import dev.trashpanda.ytmp.protocol.SuggestionsResponse
 import dev.trashpanda.ytmp.protocol.wireName
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.ContentType
+import io.ktor.server.http.content.LocalFileContent
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.header
+import io.ktor.server.request.receive
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import java.net.URLEncoder
 import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("ytmp")
 
 /**
  * Finding music: search, Find similar, lyrics, artist, album, playlist and podcast pages, Home,
- * the Local tab, and songs' audio through the host.
+ * the Local tab, songs' audio through the host, and downloads.
  */
 internal fun Route.catalogRoutes(host: HostContext) = with(host) {
     get("/search") {
@@ -102,6 +108,30 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
         log.debug("audio {}: through the host for {} ({})", songId, call.request.origin.remoteAddress, range ?: "whole file")
         proxy.respond(call, songId, range)
     }
+
+    // Download: the song (as the page knows it, for the tags) made into a file to keep.
+    post("/download") {
+        val files = sources.downloads ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Songs can't be downloaded here")
+        val song = call.receive<Song>()
+        if (LocalMusic.isLocal(song.id)) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Local music can't be downloaded")
+        if (!options.mayProxyAudio(call)) {
+            throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "This server only sends songs to devices on its own network")
+        }
+        val made = files.make(song)
+        try {
+            log.info("download {}: {} ({} KB) for {}", song.id, made.name, made.file.length() / 1024, call.request.origin.remoteAddress)
+            call.response.header(HttpHeaders.ContentDisposition, attachment(made.name))
+            call.respond(LocalFileContent(made.file, ContentType.parse(made.mimeType)))
+        } finally {
+            made.file.delete()
+        }
+    }
+}
+
+/** A Content-Disposition for [name], also when it isn't plain ASCII (RFC 6266). */
+private fun attachment(name: String): String {
+    val ascii = name.map { if (it.code in 0x20..0x7e && it != '"' && it != '\\') it else '_' }.joinToString("")
+    return "attachment; filename=\"$ascii\"; filename*=UTF-8''${URLEncoder.encode(name, "UTF-8").replace("+", "%20")}"
 }
 
 /** The host's artist, album, playlist, podcast and home pages, or a 404 saying there are no [what] pages here. */

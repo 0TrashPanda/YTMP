@@ -30,6 +30,7 @@
 	import { likes } from '../likes.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import { isYoutubeSong } from '../ownModule';
+	import { canDownload, downloadSong } from '../downloads';
 	import { youtube } from '../youtube.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 
@@ -183,6 +184,10 @@
 		if (onSave && fromYoutube) {
 			const current = song;
 			list.push({ icon: 'save', label: 'Save to playlist', run: () => (onSave(current), onClose()) });
+		}
+		if (canDownload(song)) {
+			const current = song;
+			list.push({ icon: 'download', label: 'Download', run: () => (onClose(), void downloadSong(current, onToast)) });
 		}
 		list.push(null);
 		if (song.podcast?.id) {
