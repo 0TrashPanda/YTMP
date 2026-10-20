@@ -233,12 +233,14 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - Browsing is cached (in the page and on the host): going back to an artist or album is
   instant, and album pages start loading when you hover them.
 - Search results end with a link to search the same words **on YouTube Music**.
-- Every page you open stacks up in order: Home, Library and Local (the bottom bar), and
-  search, find similar, artist, album, playlist, genre and folder pages. Going back shows the
-  page before, **scrolled as you left it**. Pages opened from other pages have a **Back**
-  button. The **YTMP logo** goes to Home (on Home: new suggestions).
+- Pages stack up in the order you open them: search, find similar, artist, album, playlist,
+  podcast, genre and folder pages. Going back shows the page before, **scrolled as you left
+  it**. Pages opened from other pages have a **Back** button.
+- The bottom bar starts over: **Home** is the root (the pages opened before are gone), and
+  **Library** and **Local** sit right on Home, so Back from them goes Home. The **YTMP logo**
+  goes Home too (on Home: new suggestions).
 - The phone's **Back** button (app) closes what's open, then steps back through those pages
-  in the order you opened them, down to Home. On Home it either stops (the app goes to the background, like YTM) or goes on to the
+  in order, down to Home. On Home it either stops (the app goes to the background, like YTM) or goes on to the
   room list: a setting, separately for solo rooms (default: stop) and party rooms (default:
   room list).
 - The **avatar** (top right, in rooms and on the room list) opens a short menu, like YTM's:

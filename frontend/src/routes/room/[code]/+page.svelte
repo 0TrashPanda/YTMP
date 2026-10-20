@@ -74,9 +74,10 @@
 	let searchType = $state<SearchType>('all');
 	let menu = $state<MenuTarget | null>(null);
 
-	// The pages you opened, in order, Home at the bottom: Home, Library and Local (the bottom
-	// bar), and search, find similar, artist, album, playlist, podcast, genre and folder pages.
-	// Back (the phone's, or the back arrow) goes to the one before, scrolled as you left it.
+	// The pages you opened, in order: Home at the bottom, then Library or Local (the bottom bar
+	// starts over from there), then search, find similar, artist, album, playlist, podcast, genre
+	// and folder pages. Back (the phone's, or the back arrow) goes to the one before, scrolled as
+	// you left it.
 	type Section = 'home' | 'library' | 'local';
 	type View =
 		| { kind: 'search'; query: string }
@@ -176,16 +177,22 @@
 	/** Saving this song to one of your YouTube Music playlists. */
 	let saving = $state<Song | null>(null);
 
-	/** A page of the bottom bar; the one shown already goes back to its top. */
+	/**
+	 * A page of the bottom bar: the pages start over from it, Home under Library and Local (so
+	 * Back from those goes Home). The one shown already goes back to its top.
+	 */
 	function pickSection(next: Section) {
+		closePlayer();
 		if (top.kind === next) {
-			closePlayer();
 			scroller?.scrollTo({ top: 0, behavior: 'smooth' });
 			return;
 		}
+		leavePage();
 		// Local opens where you were, or (Remember where you were off) at the start.
 		if (next === 'local' && !localPlace.remember) forgetLocalPlace();
-		show({ kind: next, scrollTop: next === 'local' ? localPlace.scrollTop : 0 });
+		const scrollTop = next === 'local' ? localPlace.scrollTop : 0;
+		pages = next === 'home' ? [{ kind: 'home' }] : [{ kind: 'home' }, { kind: next, scrollTop }];
+		scrollPageTo(scrollTop);
 	}
 
 	// The full player (album art, controls, Up next) over everything. A history entry, so
