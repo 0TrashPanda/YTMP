@@ -136,17 +136,26 @@ focus** (see [future ideas](future-ideas.md)).
 Songs you play are kept, so they start at once next time, need no YouTube lookup, and play
 without internet on the phone. It works by itself: there is nothing to pick.
 
-- **Every song that is played is saved** in the cache of the host that plays or serves it:
-  the server, or the phone. Podcast episodes too, by the same rules.
+- **Songs are saved when that costs nothing extra**: a song the phone plays itself, or that
+  the server or phone already streams (to speakers, or to players that stream through it),
+  is kept as it passes.
+- **Songs played elsewhere are fetched only once they're played again**: from the 2nd play
+  in 30 days. So one-off radio and autoplay songs don't cost an extra download each (and
+  extra YouTube traffic), but your favourites end up cached.
+- **Music only**: podcast episodes are never cached (they're big and mostly heard once).
+- A cached song **stays the same YouTube Music song** (likes, radio, lyrics and history work
+  as before); only its audio comes from the cache.
 - **A maximum size**, on by default: **5 GB on a server** (`ytmp.toml`), **1 GB on a phone**
   (*Settings → Playback*; about 250 songs). Both show how full the cache is and have
   **Clear cache**. On a server the admin sets it (see [server admin](server-admin.md)).
+- **Where it's kept is a setting**: a folder of your choice on a server (`ytmp.toml`), the
+  phone's own storage or its SD card on a phone.
 - **When the cache is almost full**, songs are removed to make room: first the songs that
   haven't been played for the longest time, and of those the ones played least. A song played
-  often stays longer than one played once, even if that one was a bit more recent. A big
-  episode makes room for itself the same way.
-- **Downloads are separate**: a song you [download](ui.md#song-menu) is yours and is never
-  removed; the cache only holds copies YTMP manages itself.
+  often stays longer than one played once, even if that one was a bit more recent.
+- **Downloads show in the cache** (on the phone): a song you [download](ui.md#song-menu) is
+  listed with the cached songs, marked *Downloaded*, and plays from the Music folder instead
+  of streaming. It doesn't count toward the cache's size and is never removed: it's yours.
 - Only songs from online sources (YouTube Music, later YouTube) are cached. Local music and
   media servers are already files.
 
@@ -158,7 +167,7 @@ Where the cache is used:
 | Speakers | Speakers the phone plays on (Chromecast, Sonos, MPD, zones) get cached songs from the phone | The server's speakers get cached songs from the server |
 | Others in the room | Friends' browsers and phones in a room on the phone get cached songs from the phone | **All listeners** in a server room get cached songs from the server instead of from YouTube (with `proxy = "lan"` only devices on the server's network; others stream from YouTube as now) |
 | No YouTube lookup | A cached song isn't looked up on YouTube | A cached song isn't looked up on YouTube (fewer lookups, less risk of the [bot check](../implementation/ytm-module.md)) |
-| Offline | Without internet, cached songs still play in a solo room on the phone; the Local tab shows **Cached on this phone** to pick them from | — |
+| Offline | Without internet, cached songs still play in a solo room on the phone; the Local tab shows **Cached on this phone** (cached and downloaded songs) to pick them from | — |
 - With a [linked YouTube account](accounts.md#linked-youtube-account) ✅: access
   to the user's playlists and likes.
 - **YouTube's bot check** ✅ ("confirm you're not a bot", for a whole home network at once)
