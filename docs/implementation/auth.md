@@ -176,7 +176,7 @@ Music for you, `youtube.load()` switches every `/api/me/...` request (and Home, 
 The account the phone's own page proves (a bearer token on a loopback request: `/api/host`,
 `/api/me/*`) is kept as the phone's owner (`AuthLink.ownerAccount`, `HostOptions.onLocalAccount`
 / `deviceOwner`). A request from another device with a host token of that account may use
-the phone's YouTube Music sign-in like the phone itself (`personal()` in `Application.kt`).
+the phone's YouTube Music sign-in like the phone itself (`personal()` in `HostContext.kt`).
 Linking another auth server forgets the owner.
 
 ### Accounts only

@@ -93,7 +93,7 @@ class ApplicationTest {
     private fun ApplicationTestBuilder.setup() {
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER))
+            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER))
         }
     }
 
@@ -114,9 +114,13 @@ class ApplicationTest {
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
             ytmpModule(
-                rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER),
-                similar = { seed -> if (seed == "local:x") throw SourceException("not on YouTube Music") else listOf(song(seed), song("r1"), song("r2"), song("r3")) },
-                songGraph = { call, seed -> if (call.request.headers[HttpHeaders.Authorization] == "Bearer anna") listOf(song("$seed-g1"), song("r2")) else emptyList() },
+                rooms,
+                HostSources(
+                    search,
+                    similar = { seed -> if (seed == "local:x") throw SourceException("not on YouTube Music") else listOf(song(seed), song("r1"), song("r2"), song("r3")) },
+                    songGraph = { call, seed -> if (call.request.headers[HttpHeaders.Authorization] == "Bearer anna") listOf(song("$seed-g1"), song("r2")) else emptyList() },
+                ),
+                HostOptions(kind = HostKind.SERVER),
             )
         }
         val client = createClient { install(ContentNegotiation) { json(ProtocolJson) } }
@@ -137,7 +141,7 @@ class ApplicationTest {
         }
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = true))
+            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = true))
         }
         val client = jsonClient()
         fun io.ktor.client.request.HttpRequestBuilder.asAnna() = header(HttpHeaders.Authorization, "Bearer anna")
@@ -170,7 +174,7 @@ class ApplicationTest {
         }
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = true))
+            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = true))
         }
         val client = jsonClient()
         val created = client.post("/api/rooms") {
@@ -382,7 +386,7 @@ class ApplicationTest {
         }
         application {
             val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, search, audio = null, webApp = dir, HostOptions(kind = HostKind.SERVER))
+            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER), webApp = dir)
         }
         val page = client.get("/room/ABCD")
         assertEquals(HttpStatusCode.OK, page.status)
@@ -396,7 +400,7 @@ class ApplicationTest {
         application {
             val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
             val audio = AudioProxy { call, _, _ -> call.respondText("audio") }
-            ytmpModule(rooms, search, audio, webApp = null, HostOptions(kind = HostKind.SERVER, mayProxyAudio = { it.request.headers["X-Test-Lan"] == "1" }))
+            ytmpModule(rooms, HostSources(search, audio = audio), HostOptions(kind = HostKind.SERVER, mayProxyAudio = { it.request.headers["X-Test-Lan"] == "1" }))
         }
         assertEquals(HttpStatusCode.Forbidden, client.get("/api/audio/ytm:abc").status)
         assertEquals("audio", client.get("/api/audio/ytm:abc") { header("X-Test-Lan", "1") }.bodyAsText())
@@ -418,10 +422,7 @@ class ApplicationTest {
     fun `suggestions while typing`() = testApplication {
         application {
             val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(
-                rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER),
-                suggestions = { q -> listOf("$q punk", "$q punk one more time") },
-            )
+            ytmpModule(rooms, HostSources(search, suggestions = { q -> listOf("$q punk", "$q punk one more time") }), HostOptions(kind = HostKind.SERVER))
         }
         assertEquals(listOf("daft punk", "daft punk one more time"), jsonClient().get("/api/search/suggestions?q=daft").body<SuggestionsResponse>().items)
         assertEquals(emptyList(), jsonClient().get("/api/search/suggestions?q=%20").body<SuggestionsResponse>().items)
@@ -450,8 +451,9 @@ class ApplicationTest {
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
             ytmpModule(
-                rooms, search, audio = null, webApp = null,
-                options = HostOptions(
+                rooms,
+                HostSources(search, catalog = catalog, personal = personal, suggestions = suggestions),
+                HostOptions(
                     kind = HostKind.PHONE,
                     shareUrl = { "http://192.168.1.23:8765" },
                     localOnlyRoomManagement = true,
@@ -461,9 +463,6 @@ class ApplicationTest {
                     deviceOwner = deviceOwner,
                     onLocalAccount = onLocalAccount,
                 ),
-                catalog = catalog,
-                personal = personal,
-                suggestions = suggestions,
             )
         }
     }
@@ -710,7 +709,7 @@ class ApplicationTest {
     fun `a solo room on a server is only there for its owner`() = testApplication {
         application {
             val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, supportsPrivateRooms = true, isLocal = { false }))
+            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER, supportsPrivateRooms = true, isLocal = { false }))
         }
         val client = jsonClient()
         val created = client.post("/api/rooms") {

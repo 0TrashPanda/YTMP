@@ -11,6 +11,7 @@ import dev.trashpanda.ytmp.host.SonosOutputs
 import dev.trashpanda.ytmp.host.LocalMusic
 import dev.trashpanda.ytmp.host.ZoneOutputs
 import dev.trashpanda.ytmp.host.OutputDrivers
+import dev.trashpanda.ytmp.host.HostSources
 import dev.trashpanda.ytmp.host.CachedSource
 import dev.trashpanda.ytmp.host.PlayReporter
 import dev.trashpanda.ytmp.host.TrustedAuthServers
@@ -149,9 +150,36 @@ fun main(args: Array<String>) {
 
         ytmpModule(
             rooms,
-            search = cached,
-            audio = local.audio(ytm),
-            webApp = File(config.server.frontend),
+            HostSources(
+                search = cached,
+                suggestions = cached,
+                similar = local.radio(cached),
+                catalog = local.catalog(cached),
+                lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
+                audio = local.audio(ytm),
+                local = local,
+                zones = zones,
+                // Your account's YouTube Music, when you're logged in with an account of this server.
+                // Also from the pages of rooms on other hosts, with a token just for that (see AccountApi.youtubeToken).
+                personalFor = { call ->
+                    val token = call.bearerToken()
+                    val id = token?.let(auth::verify)?.id ?: token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
+                    id?.let(::localAccount)?.let(youtube::of)
+                },
+                // Find similar and Related: the song graph of whoever asks (one of our accounts, or one
+                // of a server we trust, which decides itself), else of everyone here.
+                songGraph = { call, seed ->
+                    val token = call.bearerToken()
+                    val songs = when {
+                        token != null && auth.verify(token) != null -> auth.similar(token, seed)
+                        else -> {
+                            val id = token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
+                            withContext(Dispatchers.IO) { service.similar(id?.let(::localUsername), seed) }
+                        }
+                    }
+                    songs.filter { local.playable(it.id) }
+                },
+            ),
             HostOptions(
                 kind = HostKind.SERVER,
                 auth = auth,
@@ -163,36 +191,11 @@ fun main(args: Array<String>) {
                 accountsOnly = !config.accounts.guests,
                 crossOriginPersonal = true,
             ),
+            webApp = File(config.server.frontend),
             extraApi = {
                 service.routes(this)
                 hub.routes(this)
                 youtube.routes(this) { call -> service.sessionAccount(call)?.id }
-            },
-            similar = local.radio(cached),
-            catalog = local.catalog(cached),
-            suggestions = cached,
-            lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
-            zones = zones,
-            local = local,
-            // Your account's YouTube Music, when you're logged in with an account of this server.
-            // Also from the pages of rooms on other hosts, with a token just for that (see AccountApi.youtubeToken).
-            personalFor = { call ->
-                val token = call.bearerToken()
-                val id = token?.let(auth::verify)?.id ?: token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
-                id?.let(::localAccount)?.let(youtube::of)
-            },
-            // Find similar and Related: the song graph of whoever asks (one of our accounts, or one
-            // of a server we trust, which decides itself), else of everyone here.
-            songGraph = { call, seed ->
-                val token = call.bearerToken()
-                val songs = when {
-                    token != null && auth.verify(token) != null -> auth.similar(token, seed)
-                    else -> {
-                        val id = token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
-                        withContext(Dispatchers.IO) { service.similar(id?.let(::localUsername), seed) }
-                    }
-                }
-                songs.filter { local.playable(it.id) }
             },
         )
     }.start(wait = true)

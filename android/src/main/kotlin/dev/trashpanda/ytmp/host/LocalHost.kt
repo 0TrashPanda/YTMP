@@ -179,10 +179,22 @@ class LocalHost(private val context: Context) {
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
             ytmpModule(
                 rooms,
-                search = cached,
-                audio = local.audio(OnDeviceAudioProxy { songId, fresh -> ytm.stream(songId, fresh) }),
-                webApp = webApp,
-                options = HostOptions(
+                HostSources(
+                    search = cached,
+                    suggestions = cached,
+                    similar = local.radio(cached),
+                    catalog = local.catalog(cached),
+                    lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
+                    audio = local.audio(OnDeviceAudioProxy { songId, fresh -> ytm.stream(songId, fresh) }),
+                    local = local,
+                    zones = zones,
+                    personal = youtube,
+                    // Find similar and Related: the song graph of the asker's server, with their login.
+                    songGraph = { call, seed ->
+                        call.bearerToken()?.let { authLink.auth.similar(it, seed) }.orEmpty().filter { local.playable(it.id) }
+                    },
+                ),
+                HostOptions(
                     kind = HostKind.PHONE,
                     shareUrl = ::lanUrl,
                     shareAddresses = ::lanAddresses,
@@ -193,21 +205,11 @@ class LocalHost(private val context: Context) {
                     onLocalAccount = { authLink.usedBy(it.id) },
                     deviceOwner = { authLink.ownerAccount },
                 ),
+                webApp = webApp,
                 extraApi = {
                     authLink.routes(this)
                     sync.routes(this)
                     sync.cloneRoute(this)
-                },
-                similar = local.radio(cached),
-                catalog = local.catalog(cached),
-                personal = youtube,
-                suggestions = cached,
-                lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
-                zones = zones,
-                local = local,
-                // Find similar and Related: the song graph of the asker's server, with their login.
-                songGraph = { call, seed ->
-                    call.bearerToken()?.let { authLink.auth.similar(it, seed) }.orEmpty().filter { local.playable(it.id) }
                 },
             )
         }.start(wait = false)

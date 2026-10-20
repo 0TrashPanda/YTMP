@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp.server
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.host.AccountTokens
 import dev.trashpanda.ytmp.host.HostOptions
+import dev.trashpanda.ytmp.host.HostSources
 import dev.trashpanda.ytmp.host.TrustedAuthServers
 import dev.trashpanda.ytmp.host.ytmpModule
 import dev.trashpanda.ytmp.protocol.SearchPage
@@ -85,7 +86,7 @@ class AccountApiTest {
         application {
             val scope = CoroutineScope(SupervisorJob())
             val rooms = RoomManager({ id -> "https://stream/$id" }, scope, onPlayFinished = PlayReporter(auth, scope)::report)
-            ytmpModule(rooms, { _, _ -> SearchPage(emptyList()) }, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = { service.routes(this) })
+            ytmpModule(rooms, HostSources({ _, _ -> SearchPage(emptyList()) }), HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = { service.routes(this) })
         }
         return service
     }
@@ -111,7 +112,7 @@ class AccountApiTest {
         val youtube = YoutubeLinks(accounts, "module-key", RemoteSourceModule(HttpClient(), "http://unused", ""), CoroutineScope(SupervisorJob()))
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, { _, _ -> SearchPage(emptyList()) }, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = {
+            ytmpModule(rooms, HostSources({ _, _ -> SearchPage(emptyList()) }), HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = {
                 service.routes(this)
                 youtube.routes(this) { call -> service.sessionAccount(call)?.id }
             })

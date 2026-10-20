@@ -1,62 +1,24 @@
 package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.core.AccountIdentity
-import dev.trashpanda.ytmp.core.Outbox
-import dev.trashpanda.ytmp.core.RadioSource
-import dev.trashpanda.ytmp.core.RoomCodeTaken
-import dev.trashpanda.ytmp.core.ScreenRefused
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
-import dev.trashpanda.ytmp.core.personalized
-import dev.trashpanda.ytmp.core.mixedRadio
-import dev.trashpanda.ytmp.protocol.AlbumRef
-import dev.trashpanda.ytmp.protocol.ArtistRef
-import dev.trashpanda.ytmp.protocol.ROOM_CODE
-import dev.trashpanda.ytmp.protocol.Song
-import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
-import dev.trashpanda.ytmp.protocol.YoutubeHistory
-import dev.trashpanda.ytmp.protocol.YoutubeHistorySetting
-import dev.trashpanda.ytmp.protocol.YoutubePersonalizeSetting
-import dev.trashpanda.ytmp.protocol.YoutubeSignInRequest
-import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
-import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
-import dev.trashpanda.ytmp.protocol.LikeStatus
-import dev.trashpanda.ytmp.protocol.RenamePlaylistRequest
-import dev.trashpanda.ytmp.protocol.MovePlaylistItemRequest
-import dev.trashpanda.ytmp.protocol.RemovePlaylistItemsRequest
-import dev.trashpanda.ytmp.protocol.MyPlaylists
-import dev.trashpanda.ytmp.protocol.SaveSongsRequest
-import dev.trashpanda.ytmp.core.Room
+import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.RoomManager
-import dev.trashpanda.ytmp.protocol.RoleTemplate
-import dev.trashpanda.ytmp.protocol.ShareAddress
 import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.core.SourceBlocked
 import dev.trashpanda.ytmp.protocol.ApiError
-import dev.trashpanda.ytmp.protocol.ClientMessage
-import dev.trashpanda.ytmp.protocol.CreateRoomRequest
-import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
 import dev.trashpanda.ytmp.protocol.HostInfo
-import dev.trashpanda.ytmp.protocol.LocalLibraries
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ProtocolJson
-import dev.trashpanda.ytmp.protocol.RejectReason
-import dev.trashpanda.ytmp.protocol.RoomListResponse
-import dev.trashpanda.ytmp.protocol.RoomVisibility
-import dev.trashpanda.ytmp.protocol.SearchResponse
-import dev.trashpanda.ytmp.protocol.ScreenCastRequest
-import dev.trashpanda.ytmp.protocol.ScreenLinkRequest
-import dev.trashpanda.ytmp.protocol.ScreenLinked
-import dev.trashpanda.ytmp.protocol.ScreenUnlinkRequest
-import dev.trashpanda.ytmp.protocol.SearchType
-import dev.trashpanda.ytmp.protocol.SuggestionsResponse
-import dev.trashpanda.ytmp.protocol.wireName
-import dev.trashpanda.ytmp.protocol.ServerMessage
+import dev.trashpanda.ytmp.protocol.ShareAddress
+import dev.trashpanda.ytmp.protocol.Song
 import io.ktor.http.CacheControl
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -67,44 +29,29 @@ import io.ktor.server.http.content.staticFiles
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.origin
-import io.ktor.http.HttpMethod
-import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.header
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import io.ktor.server.request.receive
-import kotlinx.serialization.Serializable
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondFile
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
-import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.pingPeriod
 import io.ktor.server.websocket.timeout
-import io.ktor.server.websocket.webSocket
-import io.ktor.websocket.CloseReason
-import io.ktor.websocket.Frame
-import io.ktor.websocket.close
-import io.ktor.websocket.readText
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
 
 private val log = LoggerFactory.getLogger("ytmp")
-
-/** Messages a slow client may have queued before it is disconnected. */
-private const val OUTBOX_CAPACITY = 1024
 
 class ApiException(val status: HttpStatusCode, val code: ErrorCode, message: String) : Exception(message)
 
@@ -114,30 +61,41 @@ open class SourceException(message: String) : Exception(message)
 /** YouTube's bot check: no lookups from this network for a while (see [SourceBlocked]). */
 class SourceBlockedException(message: String) : SourceException(message), SourceBlocked
 
-@Serializable
-private data class ClientLogReport(val message: String, val room: String? = null)
-
-private const val CLIENT_LOG_MAX_LENGTH = 500
-
-/** At most [perMinute] client reports per address a minute, so a broken page can't fill the log. */
-private class ClientLogLimit(private val perMinute: Int) {
-    private val counts = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Int>>()
-
-    fun allow(address: String): Boolean {
-        val minute = System.currentTimeMillis() / 60_000
-        if (counts.size > 1000) counts.clear()
-        val (at, count) = counts.compute(address) { _, old -> if (old == null || old.first != minute) minute to 1 else minute to old.second + 1 }!!
-        return at == minute && count <= perMinute
-    }
-}
-
-private val clientLogLimit = ClientLogLimit(perMinute = 20)
-private val screenCodeLimit = ClientLogLimit(perMinute = 10)
-
 /** Streams a song's audio through the host, for clients whose direct stream URL doesn't work. */
 fun interface AudioProxy {
     suspend fun respond(call: ApplicationCall, songId: String, range: String?)
 }
+
+/** What a host offers besides its rooms: where songs, pages, lyrics and audio come from. */
+data class HostSources(
+    val search: SongSearch,
+    /** Search suggestions while typing. */
+    val suggestions: SearchSuggestions? = null,
+    /** Similar songs (YTM's radio), for Find similar. */
+    val similar: RadioSource? = null,
+    /** Artist, album, playlist and podcast pages, and Home. */
+    val catalog: CatalogSource? = null,
+    /** Lyrics for the songs (LRCLIB, then the source's own). */
+    val lyrics: LyricsLookup? = null,
+    /** Songs' audio through the host, for players whose direct link doesn't work (and speakers). */
+    val audio: AudioProxy? = null,
+    /** Local music (the Local tab): a Raspberry Pi's music folder, the music on the hosting phone. */
+    val local: LocalMusic? = null,
+    /** Amplifier zones, for another host that takes their player over. */
+    val zones: ZoneOutputs? = null,
+    /** The owner's YouTube Music account (phone hosts), for requests from the host's own app. */
+    val personal: PersonalCatalog? = null,
+    /**
+     * Whose YouTube Music a request may use, instead of [personal]: on a server, the account
+     * the request proves. Null: none (the general pages).
+     */
+    val personalFor: ((ApplicationCall) -> PersonalCatalog?)? = null,
+    /**
+     * Songs that go with a song in the song graph, for whoever asks (their account's listening,
+     * where their auth server allows it), mixed into Find similar and Related. Null: none.
+     */
+    val songGraph: (suspend (call: ApplicationCall, seedSongId: String) -> List<Song>)? = null,
+)
 
 /** How this host behaves. The Linux server and a phone differ. */
 data class HostOptions(
@@ -164,7 +122,7 @@ data class HostOptions(
     val onLocalAccount: (AccountIdentity) -> Unit = {},
     /**
      * The account of whoever owns the hosting device (a phone), or null. Logged in with it on
-     * another device, they may use the device's own YouTube Music sign-in ([ytmpModule]'s `personal`).
+     * another device, they may use the device's own YouTube Music sign-in ([HostSources.personal]).
      */
     val deviceOwner: () -> String? = { null },
     /**
@@ -188,40 +146,20 @@ fun isLoopback(call: ApplicationCall): Boolean {
     return address == "localhost" || address.startsWith("127.") || address == "::1" || address == "0:0:0:0:0:0:0:1"
 }
 
+/**
+ * A YTMP host's HTTP side, the same on a server and a phone: the API (`/api`, its parts in
+ * [roomRoutes], [catalogRoutes], [personalRoutes], [screenRoutes]), the room connection
+ * (`/ws`) and the web app ([webApp], a folder; null: only the API). [extraApi]: more `/api`
+ * routes (the account API on a server, linking an auth server on a phone).
+ */
 fun Application.ytmpModule(
     rooms: RoomManager,
-    search: SongSearch,
-    audio: AudioProxy?,
-    webApp: File?,
+    sources: HostSources,
     options: HostOptions,
-    /** More `/api` routes: the account API on a server, linking an auth server on a phone. */
+    webApp: File? = null,
     extraApi: Route.() -> Unit = {},
-    /** Similar songs (YTM's radio), for Find similar. */
-    similar: RadioSource? = null,
-    /** Artist, album and playlist pages. */
-    catalog: CatalogSource? = null,
-    /** The owner's YouTube Music account (phone hosts), for requests from the host's own app. */
-    personal: PersonalCatalog? = null,
-    /**
-     * Whose YouTube Music a request may use, instead of [personal]: on a server, the account
-     * the request proves. Null: none (the general pages).
-     */
-    personalFor: ((ApplicationCall) -> PersonalCatalog?)? = null,
-    /** Search suggestions while typing. */
-    suggestions: SearchSuggestions? = null,
-    /** Lyrics for the songs (LRCLIB, then the source's own). */
-    lyrics: LyricsLookup? = null,
-    /** Amplifier zones, for another host that takes their player over. */
-    zones: ZoneOutputs? = null,
-    /** Local music (the Local tab): a Raspberry Pi's music folder, the music on the hosting phone. */
-    local: LocalMusic? = null,
-    /**
-     * Songs that go with a song in the song graph, for whoever asks (their account's listening,
-     * where their auth server allows it), mixed into Find similar and Related. Null: none.
-     */
-    songGraph: (suspend (call: ApplicationCall, seedSongId: String) -> List<Song>)? = null,
 ) {
-    val screens = ScreenPairings()
+    val host = HostContext(rooms, sources, options)
     install(ContentNegotiation) { json(ProtocolJson) }
     install(WebSockets) {
         pingPeriod = 20.seconds
@@ -246,73 +184,14 @@ fun Application.ytmpModule(
         }
     }
 
-    fun ApplicationCall.mayManageRooms() = !options.localOnlyRoomManagement || options.isLocal(this)
-
-    /** The account this request proves (bearer host token), if any. */
-    fun ApplicationCall.account(): AccountIdentity? {
-        val token = bearerToken() ?: return null
-        return options.auth.verify(token)?.also {
-            options.onAccountToken(token, it)
-            if (options.isLocal(this)) options.onLocalAccount(it)
-        }
-    }
-
-    /** Logged in with the account of whoever owns this device (a phone), on another device. */
-    fun ApplicationCall.isDeviceOwner(): Boolean {
-        val owner = options.deviceOwner() ?: return false
-        return account()?.id == owner
-    }
-
-    /**
-     * Your YouTube Music: on a phone, its owner's, in their own app or logged in with their
-     * account on another device; on a server, your account's.
-     */
-    fun ApplicationCall.personal(): PersonalCatalog? {
-        personalFor?.invoke(this)?.let { return it }
-        if (options.isLocal(this)) {
-            // The device's own page: notes who's logged in there (its owner).
-            account()
-            return personal
-        }
-        return personal?.takeIf { isDeviceOwner() }
-    }
-
-    /** [radio] (of [songId]) with the song graph's songs for whoever asks mixed in ([mixedRadio]). */
-    suspend fun ApplicationCall.withGraph(songId: String, radio: suspend () -> List<Song>): List<Song> {
-        val graph = songGraph ?: return radio()
-        return mixedRadio(radio) { graph(this, songId) }
-    }
-
-    /**
-     * Your own searches (and Related) go through your YouTube Music account, when you're signed
-     * in and want that; everyone else's (and yours, if that fails) through the shared, anonymous one.
-     */
-    suspend fun <T : Any> ApplicationCall.asYou(mine: suspend PersonalCatalog.() -> T?, anonymous: suspend () -> T): T {
-        val you = personal()?.personalized()
-        if (you != null) {
-            try {
-                you.mine()?.let { return it }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                log.warn("Searching with the YouTube Music account didn't work, searching without: {}", e.message)
-            }
-        }
-        return anonymous()
-    }
-
-    /** The room's owner: its owner token (header), or its owner account. */
-    fun ApplicationCall.owns(room: Room) =
-        request.header(OWNER_TOKEN_HEADER) == room.ownerToken || (room.ownerAccount != null && account()?.id == room.ownerAccount)
-
     /** Accounts-only hosts: everything in /api but [OPEN_WITHOUT_ACCOUNT] needs an account. */
     val accountsOnly = createRouteScopedPlugin("AccountsOnly") {
         onCall { call ->
             val path = call.request.path()
             // Your YouTube Music from another host's page: a browser asks first (OPTIONS), then
             // comes with a token just for that (personalFor).
-            val personalCall = path.startsWith("/api/me/") && (call.request.httpMethod == HttpMethod.Options || personalFor?.invoke(call) != null)
-            if (OPEN_WITHOUT_ACCOUNT.none { path == it || path.startsWith(it) } && !personalCall && call.account() == null) {
+            val personalCall = path.startsWith("/api/me/") && (call.request.httpMethod == HttpMethod.Options || sources.personalFor?.invoke(call) != null)
+            if (OPEN_WITHOUT_ACCOUNT.none { path == it || path.startsWith(it) } && !personalCall && with(host) { call.account() } == null) {
                 throw ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Log in to use this server")
             }
         }
@@ -321,389 +200,22 @@ fun Application.ytmpModule(
     routing {
         route("/api") {
             if (options.accountsOnly) install(accountsOnly)
-            // The Local tab: the libraries here, then one whole (filtered in the page as you type).
-            get("/local") {
-                call.respond(local?.summaries() ?: LocalLibraries(emptyList()))
-            }
-            // Covers of local music that the host serves itself (the music on a phone).
-            get("/local/art/{songId}") {
-                val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 544
-                if (local?.respondArt(call, call.parameters["songId"]!!, size) != true) call.respond(HttpStatusCode.NotFound)
-            }
-            get("/local/{id}") {
-                val page = local?.page(call.parameters["id"]!!) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "That music isn't on the network now")
-                call.respond(page)
-            }
+            roomRoutes(host)
+            catalogRoutes(host)
+            personalRoutes(host)
+            screenRoutes(host)
+            clientLogRoute()
             // Another YTMP host that takes over a zones player asks what this host's zones had before.
             get("/zones/handover") {
-                val host = call.request.queryParameters["host"]
+                val zoneHost = call.request.queryParameters["host"]
                 val port = call.request.queryParameters["port"]?.toIntOrNull()
-                if (zones == null || host == null || port == null) return@get call.respond(HttpStatusCode.NotFound)
-                call.respond(zones.handover(ZoneOutputs.Player(host, port)))
-            }
-            get("/host") {
-                // The hosting device's own page, logged in: whose device this is.
-                if (options.isLocal(call)) call.account()
-                call.respond(
-                    HostInfo(
-                        kind = options.kind,
-                        shareUrl = options.shareUrl(),
-                        canCreateRooms = call.mayManageRooms(),
-                        supportsPrivateRooms = options.supportsPrivateRooms,
-                        authServers = options.auth.servers(),
-                        accountsOnly = options.accountsOnly,
-                        shareAddresses = options.shareAddresses(),
-                    ),
-                )
-            }
-            get("/rooms") {
-                // The hosting phone sees all its rooms; on a server, you see the rooms your account owns.
-                if (options.localOnlyRoomManagement) {
-                    if (!options.isLocal(call)) throw forbidden()
-                    return@get call.respond(RoomListResponse(rooms.list.value))
-                }
-                val me = call.account()?.id ?: return@get call.respond(RoomListResponse(emptyList()))
-                call.respond(RoomListResponse(rooms.all().filter { it.ownerAccount == me }.map { it.info }))
-            }
-            post("/rooms") {
-                if (!call.mayManageRooms()) throw forbidden()
-                val request = call.receive<CreateRoomRequest>()
-                val token = call.bearerToken()
-                val account = call.account()
-                // The creator's own roles, if they saved a template to their account (a clone keeps the
-                // room's), and their default room password.
-                val template = if (account != null && token != null) options.auth.roleTemplate(token) else null
-                val room = rooms.createFor(request, account?.id, template.takeIf { request.clone == null }, options.supportsPrivateRooms, passwordHash = template?.roomPassword)
-                val base = options.shareUrl() ?: call.request.origin.let { o ->
-                    val defaultPort = (o.scheme == "https" && o.serverPort == 443) || (o.scheme == "http" && o.serverPort == 80)
-                    "${o.scheme}://${o.serverHost}${if (defaultPort) "" else ":${o.serverPort}"}"
-                }
-                call.respond(CreateRoomResponse(room.code, room.ownerToken, url = "$base/room/${room.code}"))
-            }
-            get("/rooms/{code}") {
-                val room = rooms[call.parameters["code"]!!]
-                // A private room doesn't exist for anyone but the hosting device and its owner.
-                if (room == null || (room.visibility == RoomVisibility.PRIVATE && !options.isLocal(call) && !call.owns(room))) {
-                    throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
-                }
-                call.respond(room.info)
-            }
-            delete("/rooms/{code}") {
-                val room = rooms[call.parameters["code"]!!] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
-                val hostingPhone = options.localOnlyRoomManagement && options.isLocal(call)
-                if (!hostingPhone && !call.owns(room)) throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Only the room's owner can close it")
-                rooms.close(room.code)
-                call.respond(HttpStatusCode.NoContent)
-            }
-            get("/search") {
-                val query = call.request.queryParameters["q"]?.trim().orEmpty()
-                if (query.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing q")
-                val type = call.request.queryParameters["type"]?.let(::searchType) ?: SearchType.ALL
-                call.respond(call.asYou({ search(query, type) }) { search.search(query, type) })
-            }
-            get("/search/suggestions") {
-                // Typing goes on without them, so no source (or an empty box) is just no suggestions.
-                val query = call.request.queryParameters["q"].orEmpty()
-                if (query.isBlank()) return@get call.respond(SuggestionsResponse(emptyList()))
-                call.respond(SuggestionsResponse(call.asYou({ suggestions(query) }) { suggestions?.suggestions(query).orEmpty() }))
-            }
-            get("/similar") {
-                val songId = call.request.queryParameters["id"]?.trim().orEmpty()
-                if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
-                val source = similar ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No radio source")
-                call.respond(SearchResponse(call.withGraph(songId) { call.asYou({ radio(songId) }) { source.radio(songId) } }.filter { it.id != songId }))
-            }
-            get("/lyrics") {
-                // The song as the page knows it: LRCLIB looks lyrics up by title, artist, album and length.
-                val query = call.request.queryParameters
-                val id = query["id"]?.trim().orEmpty()
-                val title = query["title"]?.trim().orEmpty()
-                if (id.isEmpty() || title.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id or title")
-                val song = Song(
-                    id = id,
-                    title = title,
-                    artists = listOfNotNull(query["artist"]?.trim()?.takeIf { it.isNotEmpty() }?.let { ArtistRef(null, it) }),
-                    album = query["album"]?.trim()?.takeIf { it.isNotEmpty() }?.let { AlbumRef(null, it) },
-                    durationMs = query["durationMs"]?.toLongOrNull() ?: 0,
-                    thumbnails = emptyList(),
-                )
-                call.respond(lyrics?.lyrics(song) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No lyrics for this song"))
-            }
-            get("/artists/{id}") {
-                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No artist pages here")
-                call.respond(source.artist(call.parameters["id"]!!))
-            }
-            get("/albums/{id}") {
-                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No album pages here")
-                call.respond(source.album(call.parameters["id"]!!))
-            }
-            get("/playlists/{id}") {
-                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No playlist pages here")
-                call.respond(source.playlist(call.parameters["id"]!!))
-            }
-            get("/podcasts/{id}") {
-                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No podcast pages here")
-                call.respond(source.podcast(call.parameters["id"]!!))
-            }
-            get("/home") {
-                // The owner's own home page in their app; everyone else gets the general one.
-                // ?fresh=1: pulled down to refresh, so not from the cache.
-                val fresh = call.request.queryParameters["fresh"] == "1"
-                val mine = call.personal()
-                if (mine != null && mine.account() != null) {
-                    return@get call.respond(if (fresh) mine.freshHome() else mine.home())
-                }
-                val source = catalog ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No home page here")
-                call.respond(if (fresh) source.freshHome() else source.home())
-            }
-            route("/me") {
-                if (options.crossOriginPersonal) {
-                    install(CORS) {
-                        anyHost()
-                        allowHeader(HttpHeaders.Authorization)
-                        allowHeader(HttpHeaders.ContentType)
-                        allowMethod(HttpMethod.Put)
-                        allowMethod(HttpMethod.Delete)
-                    }
-                }
-                fun ApplicationCall.owner(): PersonalCatalog =
-                    personal() ?: throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Log in to use your YouTube Music here")
-                // Your Home, search and radio, for pages of other hosts (theirs are /api/home, /api/search, …).
-                get("/home") { call.respond(call.owner().home()) }
-                get("/search") {
-                    val query = call.request.queryParameters["q"]?.trim().orEmpty()
-                    if (query.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing q")
-                    val type = call.request.queryParameters["type"]?.let(::searchType) ?: SearchType.ALL
-                    call.respond(call.owner().search(query, type) ?: throw notHere())
-                }
-                get("/search/suggestions") {
-                    val query = call.request.queryParameters["q"].orEmpty()
-                    if (query.isBlank()) return@get call.respond(SuggestionsResponse(emptyList()))
-                    call.respond(SuggestionsResponse(call.owner().suggestions(query) ?: throw notHere()))
-                }
-                get("/similar") {
-                    val songId = call.request.queryParameters["id"]?.trim().orEmpty()
-                    if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
-                    val owner = call.owner()
-                    call.respond(SearchResponse(call.withGraph(songId) { owner.radio(songId) ?: throw notHere() }.filter { it.id != songId }))
-                }
-                get("/youtube") {
-                    val mine = call.personal()
-                    call.respond(
-                        YoutubeAccountStatus(
-                            available = mine != null,
-                            account = mine?.account(),
-                            history = mine?.historySetting() ?: YoutubeHistory.SOLO,
-                            personalize = mine?.personalize() ?: true,
-                        ),
-                    )
-                }
-                put("/youtube/personalize") {
-                    val owner = call.owner()
-                    owner.setPersonalize(call.receive<YoutubePersonalizeSetting>().on)
-                    call.respond(HttpStatusCode.NoContent)
-                }
-                put("/youtube/history") {
-                    val owner = call.owner()
-                    owner.setHistorySetting(call.receive<YoutubeHistorySetting>().history)
-                    call.respond(HttpStatusCode.NoContent)
-                }
-                put("/youtube") {
-                    val owner = call.owner()
-                    val account = try {
-                        owner.signIn(call.receive<YoutubeSignInRequest>().cookie)
-                    } catch (e: UnsupportedOperationException) {
-                        throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "Sign in in the app")
-                    }
-                    call.respond(account)
-                }
-                delete("/youtube") {
-                    call.owner().signOut()
-                    call.respond(HttpStatusCode.NoContent)
-                }
-                get("/library") { call.respond(call.owner().library()) }
-                get("/playlists") { call.respond(MyPlaylists(call.owner().ownPlaylists())) }
-                post("/playlists") {
-                    val owner = call.owner()
-                    val request = call.receive<CreatePlaylistRequest>()
-                    val title = request.title.trim()
-                    if (title.isEmpty() || title.length > 150) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Playlist name must be 1-150 characters")
-                    call.respond(CreatePlaylistResponse(owner.createPlaylist(title, request.songIds)))
-                }
-                get("/playlists/{id}") { call.respond(call.owner().playlist(call.parameters["id"]!!, call.request.queryParameters["more"])) }
-                post("/playlists/{id}/songs") {
-                    val owner = call.owner()
-                    owner.addToPlaylist(call.parameters["id"]!!, call.receive<SaveSongsRequest>().songIds)
-                    call.respond(HttpStatusCode.NoContent)
-                }
-                // Your own playlists: remove songs, move one, rename, delete.
-                post("/playlists/{id}/remove") {
-                    val owner = call.owner()
-                    owner.removeFromPlaylist(call.parameters["id"]!!, call.receive<RemovePlaylistItemsRequest>().items)
-                    call.respond(HttpStatusCode.NoContent)
-                }
-                post("/playlists/{id}/move") {
-                    val owner = call.owner()
-                    val request = call.receive<MovePlaylistItemRequest>()
-                    owner.movePlaylistItem(call.parameters["id"]!!, request.itemId, request.beforeItemId)
-                    call.respond(HttpStatusCode.NoContent)
-                }
-                put("/playlists/{id}") {
-                    val owner = call.owner()
-                    val title = call.receive<RenamePlaylistRequest>().title.trim()
-                    if (title.isEmpty() || title.length > 150) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Playlist name must be 1-150 characters")
-                    owner.renamePlaylist(call.parameters["id"]!!, title)
-                    call.respond(HttpStatusCode.NoContent)
-                }
-                delete("/playlists/{id}") {
-                    call.owner().deletePlaylist(call.parameters["id"]!!)
-                    call.respond(HttpStatusCode.NoContent)
-                }
-                get("/likes/{songId}") { call.respond(call.owner().rating(call.parameters["songId"]!!)) }
-                put("/likes/{songId}") {
-                    val owner = call.owner()
-                    val rating = call.receive<LikeStatus>()
-                    owner.setRating(call.parameters["songId"]!!, rating.copy(disliked = rating.disliked && !rating.liked))
-                    call.respond(HttpStatusCode.NoContent)
-                }
-            }
-            get("/audio/{songId}") {
-                val proxy = audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")
-                val songId = call.parameters["songId"]!!
-                val range = call.request.header(HttpHeaders.Range)
-                if (!options.mayProxyAudio(call)) {
-                    // Behind a reverse proxy the peer is the proxy; the visitor is in X-Forwarded-For.
-                    val forwarded = call.request.headers[HttpHeaders.XForwardedFor]?.let { " (forwarded for $it)" }.orEmpty()
-                    log.info("audio {}: not streamed to {}{} (outside the network)", songId, call.request.origin.remoteAddress, forwarded)
-                    throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "This server doesn't stream audio to devices outside its network")
-                }
-                log.debug("audio {}: through the host for {} ({})", songId, call.request.origin.remoteAddress, range ?: "whole file")
-                proxy.respond(call, songId, range)
-            }
-            // Players in browsers report problems (a link that stopped working, long buffering)
-            // here, so they end up in the host's log next to what the host saw.
-            post("/log") {
-                val from = call.request.origin.remoteAddress
-                val report = runCatching { call.receive<ClientLogReport>() }.getOrNull()
-                    ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Expected {\"message\": …}")
-                if (clientLogLimit.allow(from)) {
-                    val text = report.message.replace(Regex("\\s+"), " ").take(CLIENT_LOG_MAX_LENGTH)
-                    log.info("client {}{}: {}", from, report.room?.take(12)?.let { " in $it" }.orEmpty(), text)
-                }
-                call.respond(HttpStatusCode.NoContent)
-            }
-            // Party screens on a TV: it shows a code, someone in a room enters it (ScreenPairings).
-            post("/screens") {
-                if (!screenCodeLimit.allow(call.request.origin.remoteAddress)) {
-                    throw ApiException(HttpStatusCode.TooManyRequests, ErrorCode.INVALID, "Too many codes, try again in a minute")
-                }
-                call.respond(screens.start())
-            }
-            get("/screens/{secret}") {
-                val linked = try {
-                    screens.await(call.parameters["secret"]!!, SCREEN_WAIT_MS)
-                } catch (e: NoSuchElementException) {
-                    throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, e.message ?: "This code expired")
-                }
-                if (linked == null) call.respond(HttpStatusCode.NoContent) else call.respond(linked)
-            }
-            post("/screens/link") {
-                val request = call.receive<ScreenLinkRequest>()
-                val room = rooms[request.roomCode] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
-                var full = false
-                val linked = screens.link(request.code) {
-                    room.addScreen(request.guestToken)?.let { ScreenLinked(room.code, it) }.also { full = it == null }
-                }
-                if (!linked) {
-                    throw ApiException(
-                        HttpStatusCode.NotFound, ErrorCode.NOT_FOUND,
-                        if (full) "This room can't show on another screen" else "No TV shows that code. Check it, or get a new one on the TV.",
-                    )
-                }
-                call.respond(HttpStatusCode.NoContent)
-            }
-            // A TV on your own network shows the party screen, started by the app (CastScreens there).
-            post("/screens/cast") {
-                val request = call.receive<ScreenCastRequest>()
-                val room = rooms[request.roomCode] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
-                val token = room.addPlayingScreen(request.guestToken, request.name).getOrElse { e ->
-                    val error = (e as ScreenRefused).error
-                    val status = when (error.code) {
-                        ErrorCode.PERMISSION_DENIED -> HttpStatusCode.Forbidden
-                        ErrorCode.NOT_FOUND -> HttpStatusCode.NotFound
-                        else -> HttpStatusCode.Conflict
-                    }
-                    throw ApiException(status, error.code, error.message)
-                }
-                call.respond(ScreenLinked(room.code, token))
-            }
-            post("/screens/unlink") {
-                val request = call.receive<ScreenUnlinkRequest>()
-                val room = rooms[request.roomCode] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
-                if (!room.removeScreen(request.guestToken)) throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No such screen in this room")
-                call.respond(HttpStatusCode.NoContent)
+                val zones = sources.zones
+                if (zones == null || zoneHost == null || port == null) return@get call.respond(HttpStatusCode.NotFound)
+                call.respond(zones.handover(ZoneOutputs.Player(zoneHost, port)))
             }
             extraApi()
         }
-
-        webSocket("/ws") {
-            val outgoing = Channel<ServerMessage>(OUTBOX_CAPACITY)
-            val outbox = Outbox { message -> if (outgoing.trySend(message).isFailure) outgoing.close() }
-            val sender = launch {
-                for (message in outgoing) {
-                    send(Frame.Text(ProtocolJson.encodeToString(ServerMessage.serializer(), message)))
-                    if (message is ServerMessage.Rejected) break
-                }
-                close(CloseReason(CloseReason.Codes.NORMAL, "bye"))
-            }
-
-            val first = (incoming.receiveCatching().getOrNull() as? Frame.Text)?.let { decode(it) }
-            val room = when (first) {
-                is ClientMessage.Hello -> rooms[first.roomCode]
-                is ClientMessage.Attach -> rooms[first.roomCode]
-                else -> null
-            }
-            if (room == null) {
-                // A room that moved to another of its owner's hosts: say where.
-                val code = (first as? ClientMessage.Hello)?.roomCode ?: (first as? ClientMessage.Attach)?.roomCode
-                val movedTo = code?.let(rooms::movedTo)
-                outbox.send(
-                    if (movedTo != null) ServerMessage.Rejected(RejectReason.ROOM_MOVED, movedTo.ifEmpty { null })
-                    else ServerMessage.Rejected(RejectReason.ROOM_NOT_FOUND),
-                )
-                outgoing.close()
-                sender.join()
-                return@webSocket
-            }
-            val participantId = if (first is ClientMessage.Attach) {
-                room.attach(first, outbox, local = options.isLocal(call), accountsOnly = options.accountsOnly)
-            } else {
-                val hello = first as ClientMessage.Hello
-                val account = hello.accountToken?.let { token -> options.auth.verify(token)?.also { options.onAccountToken(token, it) } }
-                if (hello.accountToken != null && account == null) log.info("Room {}: account token not accepted, joining as a guest", room.code)
-                // A party screen someone in the room linked comes without an account.
-                if (account == null && options.accountsOnly && !room.isScreen(hello.guestToken)) {
-                    outbox.send(ServerMessage.Rejected(RejectReason.ACCOUNT_REQUIRED))
-                    null
-                } else {
-                    room.join(hello, outbox, local = options.isLocal(call), account = account)
-                }
-            }
-            if (participantId == null) {
-                outgoing.close()
-                sender.join()
-                return@webSocket
-            }
-            try {
-                for (frame in incoming) {
-                    val message = (frame as? Frame.Text)?.let { decode(it) } ?: continue
-                    room.handle(participantId, message, outbox)
-                }
-            } finally {
-                room.disconnect(participantId, outbox)
-                outgoing.close()
-            }
-        }
+        roomSocket(host)
 
         if (webApp != null && webApp.isDirectory) {
             webApp(webApp)
@@ -713,22 +225,48 @@ fun Application.ytmpModule(
     }
 }
 
-/** A TV waiting to be linked asks again after this long. */
-private const val SCREEN_WAIT_MS = 25_000L
+@Serializable
+private data class ClientLogReport(val message: String, val room: String? = null)
 
-/** "community_playlists" -> [SearchType.COMMUNITY_PLAYLISTS]. */
-private fun searchType(value: String): SearchType =
-    SearchType.entries.firstOrNull { it.wireName == value }
-        ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Unknown search type: $value")
+private const val CLIENT_LOG_MAX_LENGTH = 500
 
-/** The token in `Authorization: Bearer …`, if any. */
+private val clientLogLimit = PerMinuteLimit(perMinute = 20)
+
+/**
+ * Players in browsers report problems (a link that stopped working, long buffering) here, so
+ * they end up in the host's log next to what the host saw.
+ */
+private fun Route.clientLogRoute() {
+    post("/log") {
+        val from = call.request.origin.remoteAddress
+        val report = runCatching { call.receive<ClientLogReport>() }.getOrNull()
+            ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Expected {\"message\": …}")
+        if (clientLogLimit.allow(from)) {
+            val text = report.message.replace(Regex("\\s+"), " ").take(CLIENT_LOG_MAX_LENGTH)
+            log.info("client {}{}: {}", from, report.room?.take(12)?.let { " in $it" }.orEmpty(), text)
+        }
+        call.respond(HttpStatusCode.NoContent)
+    }
+}
+
+/** At most [perMinute] requests per address a minute (client reports, TV codes), so a broken page can't flood the host. */
+internal class PerMinuteLimit(private val perMinute: Int) {
+    private val counts = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Int>>()
+
+    fun allow(address: String): Boolean {
+        val minute = System.currentTimeMillis() / 60_000
+        if (counts.size > 1000) counts.clear()
+        val (at, count) = counts.compute(address) { _, old -> if (old == null || old.first != minute) minute to 1 else minute to old.second + 1 }!!
+        return at == minute && count <= perMinute
+    }
+}
+
 /** Proves you own a room without an account: the owner token from creating it. */
 const val OWNER_TOKEN_HEADER = "X-Ytmp-Owner"
 
+/** The token in `Authorization: Bearer …`, if any. */
 fun ApplicationCall.bearerToken(): String? =
     request.header(HttpHeaders.Authorization)?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }?.substring(7)?.trim()?.ifEmpty { null }
-
-private fun forbidden() = ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Only the hosting device can do this")
 
 /**
  * Serves the built web app. It is a single-page app, so unknown page paths get index.html;
@@ -752,41 +290,3 @@ private fun Route.webApp(dir: File) {
         }
     }
 }
-
-private fun decode(frame: Frame.Text): ClientMessage? =
-    runCatching { ProtocolJson.decodeFromString(ClientMessage.serializer(), frame.readText()) }
-        .onFailure { log.debug("Ignoring bad message: {}", it.message) }
-        .getOrNull()
-
-/**
- * Creates a room for [request] (also a clone of another room), owned by [ownerAccount] if
- * set. Throws [ApiException] for a request that can't be done here.
- */
-fun RoomManager.createFor(
-    request: CreateRoomRequest,
-    ownerAccount: String?,
-    template: RoleTemplate?,
-    supportsPrivateRooms: Boolean,
-    /** Joining needs this password (hashed), e.g. the owner's default one. */
-    passwordHash: String? = null,
-): Room {
-    val name = request.name.trim()
-    if (name.isEmpty() || name.length > 64) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Room name must be 1-64 characters")
-    if (request.visibility == RoomVisibility.PRIVATE && !supportsPrivateRooms) {
-        throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Solo rooms aren't supported here")
-    }
-    val code = request.code?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
-    if (code != null && !ROOM_CODE.matches(code)) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Room codes are 3 to 12 letters and digits")
-    val room = try {
-        create(name, request.visibility, ownerAccount = ownerAccount, template = template, clone = request.clone, passwordHash = passwordHash, chosenCode = code)
-    } catch (e: RoomCodeTaken) {
-        throw ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID, "The code ${e.code} is taken. Pick another one")
-    }
-    LoggerFactory.getLogger("dev.trashpanda.ytmp.host.Application").info(
-        "Created room {} ({}, {}{}{})", room.code, room.name, room.visibility, ownerAccount?.let { ", owner $it" } ?: "",
-        request.clone?.let { ", a clone with ${it.queue.size} songs queued" } ?: "",
-    )
-    return room
-}
-
-private fun notHere() = ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Not with this YouTube Music sign-in")
