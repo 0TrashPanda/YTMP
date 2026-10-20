@@ -7,7 +7,7 @@
 	// server's /account). Sections on the left (phones: a list first), the section on the right.
 	import { onDestroy, onMount } from 'svelte';
 	import { authServer } from '../../account';
-	import { getHost } from '../../api';
+	import { clearSongCache, getHost, getSongCache, setSongCache } from '../../api';
 	import { images, setDislikeButton, setImageQuality, setSwipeOpens, setTabOrder, setVideoArt } from '../../images.svelte';
 	import { nativeBridge } from '../../native';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
@@ -15,6 +15,7 @@
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
 	import AccountSection from './AccountSection.svelte';
+	import CacheSection from './CacheSection.svelte';
 	import Choice from './Choice.svelte';
 	import GesturesSection from './GesturesSection.svelte';
 	import LocalSection from './LocalSection.svelte';
@@ -55,6 +56,8 @@
 	});
 
 	const inApp = !!nativeBridge;
+	/** On the phone's own pages (its room list and rooms), which keep the phone's song cache. */
+	const onThisPhone = $derived(inApp && host?.kind === 'phone' && ['127.0.0.1', 'localhost'].includes(location.hostname));
 	const sections = $derived(
 		(
 			[
@@ -208,6 +211,11 @@
 					}}
 				/>
 				<p class="text-xs text-muted">The sync adjustment for Bluetooth is under <em>Play on</em> in a room.</p>
+				{#if onThisPhone}
+					<CacheSection load={getSongCache} clear={clearSongCache} change={setSongCache} {onToast} />
+				{:else}
+					<p class="text-xs text-muted">The song cache's settings are on this phone's own pages (the room list, rooms on this phone).</p>
+				{/if}
 				{/if}
 			{:else if section === 'gestures'}
 				<GesturesSection />

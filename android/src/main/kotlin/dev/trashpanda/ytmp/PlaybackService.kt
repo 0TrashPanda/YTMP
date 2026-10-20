@@ -21,7 +21,12 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.TeeDataSource
+import dev.trashpanda.ytmp.host.LocalHost
+import dev.trashpanda.ytmp.host.SongCache
+import dev.trashpanda.ytmp.protocol.Song
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -58,6 +63,9 @@ import org.json.JSONObject
  * are tied to the host's internet connection), the phone looks songs up itself with its own
  * YouTube Music module for the rest of the room, and streams through the host only when that
  * fails too (see docs/implementation/playback-sync.md).
+ *
+ * Before all that, a song downloaded or cached on this phone plays from here; what plays from
+ * elsewhere goes into the song cache as it passes ([CacheSink], docs/implementation/song-cache.md).
  */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
@@ -75,6 +83,13 @@ class PlaybackService : MediaSessionService() {
     private var clockOffset: Double? = null
 
     private var loadedItemId: String? = null
+    /** The song of [loadedItemId], for the song cache. */
+    private var loadedSong: TargetItem? = null
+    /** Songs the player may keep as they play (by song ID): [CacheSink] asks. Any thread. */
+    private val copying = java.util.concurrent.ConcurrentHashMap<String, Song>()
+    /** This item's file on the phone didn't play: from elsewhere then. */
+    private var savedFailedItemId: String? = null
+    private val cache get() = (application as YtmpApp).host.cache
     /** The song this phone told the room it has loaded ([reportReady]). */
     private var readySent: String? = null
     private var loadedUrl: String? = null
@@ -158,8 +173,9 @@ class PlaybackService : MediaSessionService() {
             )
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
-            // YouTube's links in pieces: asked for in one go, YouTube sends them too slowly.
-            .setMediaSourceFactory(DefaultMediaSourceFactory(ChunkedDataSource.Factory(DefaultDataSource.Factory(this))))
+            // YouTube's links in pieces: asked for in one go, YouTube sends them too slowly. What
+            // it reads goes into the song cache too.
+            .setMediaSourceFactory(DefaultMediaSourceFactory(cachingSources()))
             .build()
         exo.addListener(listener)
         wakeLock = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ytmp:playback").apply { setReferenceCounted(false) }
@@ -197,6 +213,13 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = session
+
+    private fun cachingSources(): DataSource.Factory {
+        val chunked = ChunkedDataSource.Factory(DefaultDataSource.Factory(this))
+        return DataSource.Factory {
+            TeeDataSource(chunked.createDataSource(), CacheSink { songId -> copying[songId]?.let(cache::copy) })
+        }
+    }
 
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) =
         super.onUpdateNotification(session, startInForegroundRequired || keepForeground)
@@ -314,9 +337,16 @@ class PlaybackService : MediaSessionService() {
         }
 
         if (item.itemId != loadedItemId || url != loadedUrl) {
+            if (item.itemId != loadedItemId) {
+                leaveSong()
+                startSong(target, item)
+            }
             loadedItemId = item.itemId
             loadedUrl = url
             source = from
+            // Kept as it plays (its song ID is the cache key the sink goes by), unless it's on the phone already.
+            val keep = item.song?.takeIf { from != Source.SAVED && cache.takes(it) }
+            if (keep != null) copying[keep.id] = keep
             Log.i(TAG, "load ${item.songId} \"${item.title}\" ${from.label} (${describe(url)})")
             if (from == Source.OWN) lookUpNext()
             bufferingSince = null
@@ -324,6 +354,7 @@ class PlaybackService : MediaSessionService() {
                 MediaItem.Builder()
                     .setMediaId(item.itemId)
                     .setUri(url)
+                    .setCustomCacheKey(keep?.id)
                     .setMediaMetadata(
                         MediaMetadata.Builder()
                             .setTitle(item.title)
@@ -360,13 +391,16 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun sourceFor(target: PlaybackTarget, item: TargetItem): Source = when {
+        item.itemId != savedFailedItemId && cache.localUri(item.songId) != null -> Source.SAVED
         item.itemId == hostItemId -> Source.HOST
         preferred == Source.OWN -> if (canLookUp(target, item.songId)) Source.OWN else Source.DIRECT
         else -> preferred
     }
 
     private fun urlFor(target: PlaybackTarget, item: TargetItem, from: Source): String? = when (from) {
-        Source.DIRECT -> target.streamUrl
+        Source.SAVED -> cache.localUri(item.songId)
+        // A song the room's host has cached: a path on that host.
+        Source.DIRECT -> target.streamUrl?.let { if (it.startsWith("/")) (target.room?.hostUrl ?: LocalHost.LOCAL_URL).trimEnd('/') + it else it }
         Source.HOST -> target.proxyUrl
         Source.OWN -> ownLink(item.songId) ?: run { lookUp(item.songId); null }
     }
@@ -525,8 +559,35 @@ class PlaybackService : MediaSessionService() {
         SyncCorrection.targetPosition(clockOffset?.let { target.copy(clockOffset = it) } ?: target, System.currentTimeMillis())
             .coerceAtMost(maxOf(0, target.item?.durationMs ?: 0))
 
+    /**
+     * A new song here. In a room elsewhere it counts as a play for this phone's song cache (rooms
+     * on this phone count their own).
+     */
+    private fun startSong(target: PlaybackTarget, item: TargetItem) {
+        loadedSong = item
+        cache.playingHere = item.songId
+        val song = item.song ?: return
+        if (target.room != null && !isOnThisPhone(target.room)) cache.started(song)
+    }
+
+    /** The player moves on: what it kept of the song is done (or dropped), and was it heard long enough to count. */
+    private fun leaveSong() {
+        val item = loadedSong ?: return
+        loadedSong = null
+        copying.remove(item.songId)
+        cache.leave(item.songId)
+        if (cache.playingHere == item.songId) cache.playingHere = null
+        val room = sourceRoom
+        val song = item.song ?: return
+        if (room != null && !isOnThisPhone(room)) {
+            val heard = exo.currentPosition
+            cache.finished(song, heard >= SongCache.COUNTS_AFTER_MS || heard >= item.durationMs - END_MARGIN_MS)
+        }
+    }
+
     private fun unload() {
         if (loadedItemId == null) return
+        leaveSong()
         loadedItemId = null
         loadedUrl = null
         exo.stop()
@@ -545,6 +606,8 @@ class PlaybackService : MediaSessionService() {
             val item = target.item
             val from = source
             val next = when {
+                // The file on the phone didn't play (gone, broken): as if it weren't there.
+                item != null && from == Source.SAVED -> Source.DIRECT.also { savedFailedItemId = item.itemId }
                 item == null || from == Source.HOST -> null
                 // The direct URL is probably tied to the host's IP: look songs up here for the rest
                 // of the room, or stream through the host.
@@ -671,6 +734,7 @@ class PlaybackService : MediaSessionService() {
 
     /** Where the audio comes from: the host's link, a link this phone looked up, or the host streaming it. */
     private enum class Source(val label: String) {
+        SAVED("from this phone"),
         DIRECT("direct"),
         OWN("looked up on this phone"),
         HOST("through the host"),
@@ -735,5 +799,8 @@ class PlaybackService : MediaSessionService() {
 
         /** Use a link this phone looked up only while it has at least this long (s) left. */
         private const val OWN_LINK_MARGIN_S = 600L
+
+        /** This close to its end (ms), a song counts as played. */
+        private const val END_MARGIN_MS = 5_000L
     }
 }

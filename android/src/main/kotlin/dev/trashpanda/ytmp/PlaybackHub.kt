@@ -56,6 +56,8 @@ data class TargetItem(
     val artist: String,
     val artUrl: String?,
     val durationMs: Long,
+    /** The whole song, for the song cache (what it is, whether it's an episode). */
+    val song: Song? = null,
 ) {
     companion object {
         /** The same item as the web app makes it (player.svelte.ts). */
@@ -68,6 +70,7 @@ data class TargetItem(
             // The smallest thumbnail that is at least 544 px, or the largest one.
             artUrl = song.thumbnails.sortedBy { it.width }.let { t -> (t.firstOrNull { it.width >= 544 } ?: t.lastOrNull())?.url },
             durationMs = song.durationMs,
+            song = song,
         )
     }
 }

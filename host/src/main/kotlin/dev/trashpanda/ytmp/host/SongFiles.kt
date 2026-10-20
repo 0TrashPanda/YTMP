@@ -10,10 +10,13 @@ import java.net.URI
 
 private val log = LoggerFactory.getLogger("ytmp")
 
-/** A song's whole audio, for downloads (docs/implementation/downloads.md). */
-fun interface AudioFiles {
-    /** Writes all of [songId]'s audio to [to]; answers its type, e.g. "audio/mp4". Throws if it stops halfway. */
-    suspend fun download(songId: String, to: File): String
+/** A song's whole audio, for downloads (docs/implementation/downloads.md) and the song cache. */
+interface AudioFiles {
+    /**
+     * Writes all of [songId]'s audio to [to]; answers its type, e.g. "audio/mp4". Throws if it
+     * stops halfway. [started] hears the type and size (when known) before the first bytes.
+     */
+    suspend fun download(songId: String, to: File, started: (type: String, size: Long?) -> Unit = { _, _ -> }): String
 }
 
 /** A song made into a file to keep: delete [file] when done with it. */
@@ -64,6 +67,7 @@ class SongFiles(private val audio: AudioFiles, private val dir: File? = null) {
             albumArtist = song.artists.firstOrNull()?.name,
             genre = if (song.podcast != null) "Podcast" else null,
             cover = cover,
+            songId = song.id,
         )
 
         /** "Artist - Title.m4a", without characters that file systems refuse. */
@@ -85,18 +89,19 @@ class SongFiles(private val audio: AudioFiles, private val dir: File? = null) {
             else -> "audio"
         }
 
-        /** The song's biggest picture, asked for at [COVER_SIZE] when Google can make it so; null if there's none. */
-        fun coverUrl(song: Song): String? {
+        /** The song's biggest picture, asked for at [size] px when Google can make it so; null if there's none. */
+        fun coverUrl(song: Song, size: Int = COVER_SIZE): String? {
             val best = song.thumbnails.maxByOrNull { it.width } ?: return null
             val host = runCatching { URI(best.url).host }.getOrNull() ?: return null
             if (!best.url.startsWith("https://") || COVER_HOSTS.none { host.endsWith(it) }) return null
-            if (best.width >= COVER_SIZE || !GOOGLE_SIZE.containsMatchIn(best.url)) return best.url
-            val height = if (best.width > 0) COVER_SIZE * best.height / best.width else COVER_SIZE
-            return best.url.replace(GOOGLE_SIZE, "=w$COVER_SIZE-h$height")
+            if (best.width >= size || !GOOGLE_SIZE.containsMatchIn(best.url)) return best.url
+            val height = if (best.width > 0) size * best.height / best.width else size
+            return best.url.replace(GOOGLE_SIZE, "=w$size-h$height")
         }
 
-        private fun cover(song: Song): ByteArray? {
-            val url = coverUrl(song) ?: return null
+        /** The song's cover, [size] px where Google can make it so, from YouTube's picture servers only; null when there's none. */
+        fun cover(song: Song, size: Int = COVER_SIZE): ByteArray? {
+            val url = coverUrl(song, size) ?: return null
             return try {
                 val connection = URI(url).toURL().openConnection() as HttpURLConnection
                 connection.connectTimeout = 10_000

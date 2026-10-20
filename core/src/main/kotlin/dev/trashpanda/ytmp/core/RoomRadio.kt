@@ -51,6 +51,8 @@ class RoomRadio(
 data class RoomHooks(
     /** Songs that finished playing, for the listening history. */
     val onPlayFinished: (FinishedPlay) -> Unit = {},
+    /** A room started a song (also again, with repeat one), for the song cache. */
+    val onSongStarted: (Song) -> Unit = {},
     /** A room with an owner account was saved: its copy elsewhere can be updated (see [Room.syncId]). */
     val onRoomSaved: (SavedRoom) -> Unit = {},
     /** A room with an owner account was closed or expired here (not moved away). */

@@ -302,6 +302,12 @@ enum class LocalLibraryKind {
 
     /** The music stored on the hosting phone. */
     @SerialName("phone") PHONE,
+
+    /**
+     * Songs the hosting phone has cached or downloaded ("Cached on this phone"): YouTube Music
+     * songs that keep their own IDs, so they play without internet (docs/implementation/song-cache.md).
+     */
+    @SerialName("cache") CACHE,
 }
 
 @Serializable
@@ -334,3 +340,32 @@ data class LocalLibraryPage(
 @Serializable
 @SerialName("LocalGroup")
 data class LocalGroup(val name: String, val songs: List<Int>)
+
+// The song cache (`GET /api/cache`, `PUT /api/cache`, `POST /api/cache/clear`): songs kept
+// so they start at once and, on a phone, play without internet (docs/features/sources.md#song-cache).
+
+@Serializable
+@SerialName("SongCacheStatus")
+data class SongCacheStatus(
+    val songs: Int,
+    val bytes: Long,
+    /** 0: the cache is off. */
+    val maxBytes: Long,
+    /** Downloaded songs it lists too (a phone), not counted in [bytes]. */
+    val downloads: Int = 0,
+    /** Where it can be kept (a phone: its own storage, an SD card); empty where that isn't a setting. */
+    val places: List<SongCachePlace> = emptyList(),
+    val place: String? = null,
+    /** The size and place can be changed here (a phone); a server has them in ytmp.toml. */
+    val settable: Boolean = false,
+    /** Being moved to another place right now. */
+    val moving: Boolean = false,
+)
+
+@Serializable
+@SerialName("SongCachePlace")
+data class SongCachePlace(val id: String, val name: String, val freeBytes: Long? = null)
+
+@Serializable
+@SerialName("SongCacheSettings")
+data class SongCacheSettings(val maxBytes: Long, val place: String? = null)

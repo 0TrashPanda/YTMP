@@ -21,6 +21,7 @@ data class Config(
     val database: DatabaseConfig = DatabaseConfig(),
     val accounts: AccountsConfig = AccountsConfig(),
     val audio: AudioConfig = AudioConfig(),
+    val cache: CacheConfig = CacheConfig(),
     val logs: LogsConfig = LogsConfig(),
 ) {
     companion object {
@@ -44,6 +45,10 @@ data class Config(
                 ),
                 audio = base.audio.copy(
                     proxy = env["YTMP_AUDIO_PROXY"] ?: base.audio.proxy,
+                ),
+                cache = base.cache.copy(
+                    dir = env["YTMP_CACHE_DIR"] ?: base.cache.dir,
+                    size = env["YTMP_CACHE_SIZE"] ?: base.cache.size,
                 ),
                 logs = base.logs.copy(
                     dir = env["YTMP_LOG_DIR"] ?: base.logs.dir,
@@ -100,6 +105,42 @@ data class AudioConfig(
     val proxy: String = "always",
 ) {
     fun proxyMode(): AudioProxyMode = AudioProxyMode.parse(proxy)
+}
+
+/** The song cache (docs/implementation/song-cache.md). */
+@Serializable
+data class CacheConfig(
+    /** Its folder. Empty: `cache` next to the SQLite database (in Docker: the data volume). */
+    val dir: String = "",
+    /** At most this much, e.g. "5GB" or "500MB"; "0" turns it off. */
+    val size: String = "5GB",
+) {
+    /** [dir], or `cache` next to [database]'s file. */
+    fun folder(database: DatabaseConfig): File = when {
+        dir.isNotBlank() -> File(dir)
+        database.type == "sqlite" -> File(File(database.path).absoluteFile.parentFile, "cache")
+        else -> File("cache")
+    }
+
+    /** [size] in bytes. */
+    fun bytes(): Long = parseSize(size)
+
+    companion object {
+        /** "5GB", "500 MB", "1.5G", "0" -> bytes (1 GB = 1024 MB). */
+        fun parseSize(text: String): Long {
+            val match = Regex("""(?i)\s*([0-9]+(?:\.[0-9]+)?)\s*([KMGT]?)B?\s*""").matchEntire(text)
+                ?: throw IllegalArgumentException("Not a size: \"$text\" (e.g. \"5GB\")")
+            val (number, unit) = match.destructured
+            val factor = when (unit.uppercase()) {
+                "K" -> 1L shl 10
+                "M" -> 1L shl 20
+                "G" -> 1L shl 30
+                "T" -> 1L shl 40
+                else -> 1L
+            }
+            return (number.toDouble() * factor).toLong()
+        }
+    }
 }
 
 /** Log files (see server/src/main/resources/logback.xml); the log also goes to the console. */

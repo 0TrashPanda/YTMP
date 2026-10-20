@@ -1072,7 +1072,7 @@ export interface HomePage {
   sections: HomeSection[];
 }
 
-export type LocalLibraryKind = "mpd" | "phone";
+export type LocalLibraryKind = "mpd" | "phone" | "cache";
 
 export interface LocalLibrarySummary {
   id: string;
@@ -1099,6 +1099,28 @@ export interface LocalLibraryPage {
   songs: Song[];
   genres: LocalGroup[];
   folders: LocalGroup[];
+}
+
+export interface SongCachePlace {
+  id: string;
+  name: string;
+  freeBytes: number | null;
+}
+
+export interface SongCacheStatus {
+  songs: number;
+  bytes: number;
+  maxBytes: number;
+  downloads: number;
+  places: SongCachePlace[];
+  place: string | null;
+  settable: boolean;
+  moving: boolean;
+}
+
+export interface SongCacheSettings {
+  maxBytes: number;
+  place: string | null;
 }
 
 export interface YoutubeAccount {

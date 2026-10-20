@@ -159,6 +159,7 @@ class RoomManager(
         room.claimCode = { code -> claim(room, code) }
         room.addChangeListener { roomChanged(room.code) }
         room.onPlayFinished = hooks.onPlayFinished
+        room.onSongStarted = hooks.onSongStarted
         scope.launch { room.setAvailableOutputs(outputs.value) }
         return true
     }

@@ -3,4 +3,5 @@
 <full-backup-content>
     <exclude domain="sharedpref" path="youtube.xml" />
     <exclude domain="file" path="logs/" />
+    <exclude domain="file" path="song-cache/" />
 </full-backup-content>

@@ -87,6 +87,11 @@ your YouTube Music, the song graph), how it behaves a `HostOptions`. Routes are 
 its YouTube Music) is `HostContext`. The server adds its own routes (accounts, history, room
 sync) through `extraApi`.
 
+**Songs' audio** (`host/`): sources are wrapped, in front of YouTube Music: `LocalMusic`
+(`local:` songs) and the song cache `SongCache` (cached and downloaded songs), each with a
+`streams` (what rooms play), an `audio` (the `/api/audio` route) and for local music a
+`radio` and `catalog`. A host sets them up in that order (server `Main.kt`, phone `LocalHost.kt`).
+
 **Speakers and TVs** (`host/`): an `OutputDriver` per kind. Devices that each play a room by
 themselves extend `DeviceDriver` and only give a `DeviceSession` (keep one device in step with
 the room); `ZoneOutputs` has its own loop on `RoomFollowingDriver`. A host lists its drivers once

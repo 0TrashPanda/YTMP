@@ -414,7 +414,13 @@ class ApplicationTest {
         application {
             val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
             // Not an m4a: passed on as it came.
-            val files = SongFiles({ songId, to -> asked += songId; to.writeText("audio"); "audio/webm" })
+            val files = SongFiles(object : AudioFiles {
+                override suspend fun download(songId: String, to: java.io.File, started: (type: String, size: Long?) -> Unit): String {
+                    asked += songId
+                    to.writeText("audio")
+                    return "audio/webm"
+                }
+            })
             ytmpModule(rooms, HostSources(search, downloads = files), HostOptions(kind = HostKind.SERVER, mayProxyAudio = { it.request.headers["X-Test-Lan"] == "1" }))
         }
         val client = jsonClient()

@@ -84,6 +84,20 @@ class M4aTagsTest {
     }
 
     @Test
+    fun `the song ID goes in, and is read back from the start of the file`() {
+        val ftyp = box("ftyp", "dash".toByteArray(), int(0))
+        val moov = box("moov", box("mvhd", ByteArray(20)))
+        val file = ftyp + moov + box("sidx", ByteArray(12)) + box("moof", ByteArray(16)) + box("mdat", audio)
+
+        val out = tagged(file, M4aTags.Tags("Song", cover = jpeg, songId = "ytm:abc_-1"))
+
+        assertEquals("ytm:abc_-1", M4aTags.read(out)[M4aTags.ID_ITEM]!!.decodeToString())
+        assertEquals("ytm:abc_-1", M4aTags.readSongId(out.inputStream()))
+        assertNull(M4aTags.readSongId(tagged(file, M4aTags.Tags("Song")).inputStream()))
+        assertNull(M4aTags.readSongId(ByteArray(3).inputStream()))
+    }
+
+    @Test
     fun `a file name without characters file systems refuse`() {
         val song = Song("ytm:a", "What? / Why: \"this\"", listOf(ArtistRef(null, "AC/DC")), null, 0, emptyList())
         assertEquals("AC_DC - What_ _ Why_ _this_.m4a", SongFiles.fileName(song, "m4a"))
@@ -93,9 +107,9 @@ class M4aTagsTest {
     @Test
     fun `tags for songs and episodes`() {
         val song = Song("ytm:a", "Title", listOf(ArtistRef(null, "A"), ArtistRef(null, "B")), AlbumRef(null, "Album"), 0, emptyList())
-        assertEquals(M4aTags.Tags("Title", "A, B", "Album", "A"), SongFiles.tags(song, null))
+        assertEquals(M4aTags.Tags("Title", "A, B", "Album", "A", songId = "ytm:a"), SongFiles.tags(song, null))
         val episode = song.copy(album = null, podcast = PodcastRef("p", "The Show"))
-        assertEquals(M4aTags.Tags("Title", "A, B", "The Show", "A", "Podcast"), SongFiles.tags(episode, null))
+        assertEquals(M4aTags.Tags("Title", "A, B", "The Show", "A", "Podcast", songId = "ytm:a"), SongFiles.tags(episode, null))
     }
 
     @Test

@@ -210,6 +210,10 @@ class Room(
     @Volatile
     var onPlayFinished: ((FinishedPlay) -> Unit)? = null
 
+    /** Called (with the room locked, so it must not block) when a song starts, before its stream is looked up. */
+    @Volatile
+    var onSongStarted: ((Song) -> Unit)? = null
+
     /** Last time someone was connected. Used to delete empty rooms. */
     @Volatile
     var lastActive: Long = clock()
@@ -1442,6 +1446,7 @@ class Room(
     private fun replayCurrent() {
         val item = current ?: return
         reportFinished(item, QueueItemResult.PLAYED)
+        onSongStarted?.invoke(item.song)
         currentStartedAt = clock()
         limits.started(item.song.id)
         playback.set(0)
@@ -1507,7 +1512,10 @@ class Room(
         if (item == null) wantPlaying = false
         emit(Event.NowPlayingChanged(item))
         emitPlayback()
-        if (item != null) resolve(item)
+        if (item != null) {
+            onSongStarted?.invoke(item.song)
+            resolve(item)
+        }
     }
 
     /** Resolves the stream of the current [item], then starts it (or skips it if it can't play). */

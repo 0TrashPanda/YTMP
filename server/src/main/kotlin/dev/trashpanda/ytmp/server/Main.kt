@@ -9,6 +9,9 @@ import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.LyricsLookup
 import dev.trashpanda.ytmp.host.SongFiles
+import dev.trashpanda.ytmp.host.SongCache
+import dev.trashpanda.ytmp.host.songCacheRoutes
+import dev.trashpanda.ytmp.host.songsInUse
 import dev.trashpanda.ytmp.host.MpdOutputs
 import dev.trashpanda.ytmp.host.SonosOutputs
 import dev.trashpanda.ytmp.host.LocalMusic
@@ -102,6 +105,9 @@ fun main(args: Array<String>) {
         val graph = SongGraph(db)
         graph.buildIfNeeded(accounts)
         val cached = CachedSource(ytm, RadioSource { seed -> ytm.radio(seed).also { graph.learnRadio(seed, it) } }, ytm, ytm)
+        // Songs played here, kept so they start at once without a YouTube lookup.
+        val songCache = SongCache(config.cache.folder(config.database), config.cache.bytes(), lookup = ytm, audio = ytm, scope = this)
+        log.info("Song cache: {} ({} MB at most)", songCache.dir, songCache.maxBytes / (1024 * 1024))
         val ownUrl = normalizeOrigin(config.accounts.url)
         val issuer = config.accounts.name.ifBlank {
             accounts.setting("issuer") ?: (ownUrl?.let { URI(it).host } ?: hostName()).also { accounts.setSetting("issuer", it) }
@@ -131,7 +137,7 @@ fun main(args: Array<String>) {
         /** One of this server's own accounts, by account ID (`user@issuer`). */
         fun localAccount(accountId: String): String? = localUsername(accountId)?.let(accounts::find)?.id
         val rooms = RoomManager(
-            local.streams(ytm), this, config.rooms.style(), config.rooms.codeLength, outputs = outputs.devices, store = JdbcRoomStore(db),
+            local.streams(songCache.streams), this, config.rooms.style(), config.rooms.codeLength, outputs = outputs.devices, store = JdbcRoomStore(db),
             // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
             // Party rooms whose admins are all gone for 5 minutes tell the others they can clone them.
             timeouts = RoomTimeouts(guestSoloRoom = 30.days, adminless = 5.minutes),
@@ -149,11 +155,14 @@ fun main(args: Array<String>) {
                 onPlayFinished = { play ->
                     plays.report(play)
                     youtube.report(play, ::localAccount)
+                    songCache.finished(play)
                 },
+                onSongStarted = songCache::started,
             ),
             bookmarks = AccountBookmarks(auth, this),
         )
         rooms.startCleanup()
+        songCache.inUse = { rooms.songsInUse() }
         val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, defaultPassword = service::roomPassword)
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
         outputs.attach(rooms)
@@ -166,8 +175,9 @@ fun main(args: Array<String>) {
                 similar = local.radio(cached),
                 catalog = local.catalog(cached),
                 lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
-                audio = local.audio(ytm),
-                downloads = SongFiles(ytm),
+                audio = local.audio(songCache.audio(ytm)),
+                downloads = SongFiles(songCache.files(ytm)),
+                cache = songCache,
                 local = local,
                 zones = zones,
                 // Your account's YouTube Music, when you're logged in with an account of this server.
@@ -207,6 +217,8 @@ fun main(args: Array<String>) {
                 service.routes(this)
                 hub.routes(this)
                 youtube.routes(this) { call -> service.sessionAccount(call)?.id }
+                // Settings → Server: how full the song cache is, Clear cache.
+                songCacheRoutes("/admin/cache", songCache, settings = null) { call -> service.sessionAccount(call)?.isAdmin == true }
             },
         )
     }.start(wait = true)

@@ -79,7 +79,7 @@ tools/          smoke-test.py (checks a running phone or server)
 | Passwords | PBKDF2-HMAC-SHA256, 600 000 iterations (JDK only, no extra library) |
 | YouTube cookies | Encrypted with a secret key from the server config |
 | YTM region | Server settings `language` and `location`. Default: **English**, **Belgium** (`language = "en"`, `location = "BE"`). |
-| Song cache | Planned: server 5 GB, phone 1 GB by default, configurable. See [song-cache](song-cache.md) |
+| Song cache | Server 5 GB, phone 1 GB by default, configurable. See [song-cache](song-cache.md) |
 | Phone hosting | A foreground service with a "YTMP is hosting" notification, so Android doesn't kill the host |
 | Logging | Plain log files with limits (server: 14 days / 100 MB, app: 7 days / 20 MB), no external crash reporting. See [server admin](../features/server-admin.md#logs-) and [Android app](android-app.md#logs-) |
 

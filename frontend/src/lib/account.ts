@@ -8,6 +8,7 @@
 import { answer, ApiRequestError } from './api';
 import { nativeBridge } from './native';
 import type {
+	SongCacheStatus,
 	AccountInfo,
 	AccountSettings,
 	HistoryPage,
@@ -135,7 +136,10 @@ export const authServer = {
 		call<AccountInfo>('/api/admin/accounts', { username, password, displayName }),
 	setPassword: (username: string, password: string) =>
 		call<null>(`/api/admin/accounts/${encodeURIComponent(username)}/password`, { password }),
-	createInvite: () => call<InviteResponse>('/api/admin/invites', {})
+	createInvite: () => call<InviteResponse>('/api/admin/invites', {}),
+	/** The server's song cache: how full it is, and Clear cache (its size is in ytmp.toml). */
+	songCache: () => call<SongCacheStatus>('/api/admin/cache'),
+	clearSongCache: () => call<SongCacheStatus>('/api/admin/cache/clear', {})
 };
 
 // --- identity (any host's pages) ----------------------------------------------------------

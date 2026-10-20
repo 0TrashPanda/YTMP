@@ -1,4 +1,6 @@
 import type {
+	SongCacheSettings,
+	SongCacheStatus,
 	AlbumPage,
 	ApiError,
 	ArtistPage,
@@ -488,6 +490,20 @@ export async function downloadFile(song: Song): Promise<{ blob: Blob; dispositio
 	const response = await fetch('/api/download', { method: 'POST', headers, body: JSON.stringify(song) });
 	if (!response.ok) await answer(response);
 	return { blob: await response.blob(), disposition: response.headers.get('Content-Disposition') };
+}
+
+// --- the song cache of the phone this page is on (Settings → Playback) ---
+
+export function getSongCache(): Promise<SongCacheStatus> {
+	return request('/api/cache');
+}
+
+export function setSongCache(settings: SongCacheSettings): Promise<SongCacheStatus> {
+	return request('/api/cache', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
+}
+
+export function clearSongCache(): Promise<SongCacheStatus> {
+	return request('/api/cache/clear', { method: 'POST' });
 }
 
 /** Audio streamed through the host, for when the direct stream URL doesn't work. */

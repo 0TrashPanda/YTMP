@@ -29,7 +29,7 @@ YouTube offers audio in a few formats, including **AAC in an `.m4a`** container,
 module already prefers. That's a normal music file that every phone, PC and music player
 can play, so the host only **adds tags**: title, artist, album (a podcast's name for an
 episode, with genre *Podcast*), album artist and the cover (the song's largest picture,
-1200 px when Google can make it so; only from YouTube's picture servers). Planned: the song's ID too (a
+1200 px when Google can make it so; only from YouTube's picture servers), and the song's ID (a
 freeform item `----:dev.trashpanda.ytmp:id`), so the phone's
 [song cache](song-cache.md#downloaded-songs) knows which song a download is. It doesn't
 re-encode, so there is no quality loss and no ffmpeg.

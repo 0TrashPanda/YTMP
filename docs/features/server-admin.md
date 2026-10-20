@@ -5,7 +5,7 @@ For the person running a YTMP server.
 ## Admin page
 
 > So far: the server admin manages accounts on `/account` (invite links, create accounts,
-> set passwords). The rest below is still to do.
+> set passwords) and sees the song cache (how full, *Clear cache*). The rest below is still to do.
 
 A web page (for server admins only) to manage the server without editing config files
 by hand:
@@ -15,7 +15,8 @@ by hand:
 - **Rooms**: see active rooms, close rooms, manage "always on" rooms
 - **Trusted servers**: which other auth servers this server trusts
   (see [accounts](accounts.md#auth-servers))
-- **Cache**: size, usage and clearing of the [song cache](sources.md#song-cache)
+- **Cache** ✅: usage and clearing of the [song cache](sources.md#song-cache) (its size and
+  folder are in `[cache]` of `ytmp.toml`)
 - **Server settings**: room codes, timeouts, who may create rooms, tracking default, …
 
 ## Updates

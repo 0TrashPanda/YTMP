@@ -87,7 +87,7 @@ class OnDeviceAudioProxy(
         }
     }
 
-    override suspend fun download(songId: String, to: File): String {
+    override suspend fun download(songId: String, to: File, started: (type: String, size: Long?) -> Unit): String {
         var source = stream(songId, false)
         var refreshed = false
         var position = 0L
@@ -110,8 +110,11 @@ class OnDeviceAudioProxy(
                         Log.w(TAG, "download $songId: YouTube answered $status at byte $position of $total")
                         throw SourceException("YouTube answered $status")
                     }
-                    type = type ?: connection.contentType
-                    total = total ?: ByteRange.totalSize(connection.getHeaderField("Content-Range"))
+                    if (type == null) {
+                        type = connection.contentType ?: SongFiles.MP4
+                        total = ByteRange.totalSize(connection.getHeaderField("Content-Range"))
+                        started(type!!, total)
+                    }
                     val got = withContext(Dispatchers.IO) { connection.inputStream.use { it.copyTo(out) } }
                     position += got
                     // Without a size, the one answer was the whole file.
@@ -140,20 +143,4 @@ class OnDeviceAudioProxy(
         /** A piece taking longer than this (ms) is what a listener hears as buffering. */
         const val SLOW_PIECE_MS = 5000L
     }
-}
-
-/** HTTP byte ranges, as far as audio streaming needs them. */
-object ByteRange {
-    const val OPEN_END = Long.MAX_VALUE / 2
-
-    /** "bytes=100-" -> (100, [OPEN_END]); null or unsupported -> the whole file. */
-    fun parse(header: String?): Pair<Long, Long> {
-        val match = Regex("""bytes=(\d+)-(\d*)""").matchEntire(header?.trim().orEmpty()) ?: return 0L to OPEN_END
-        val (start, end) = match.destructured
-        return start.toLong() to (end.toLongOrNull() ?: OPEN_END)
-    }
-
-    /** "bytes 0-1023/5000" -> 5000. */
-    fun totalSize(contentRange: String?): Long? =
-        contentRange?.let { Regex("""/(\d+)$""").find(it)?.groupValues?.get(1)?.toLongOrNull() }
 }

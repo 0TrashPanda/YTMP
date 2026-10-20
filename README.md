@@ -81,6 +81,11 @@ Music, without Premium, and not tied to a single music service.
 - A *Local* tab with your own music: a Raspberry Pi's music folder (shared with MPD) and the
   music on your phone, with albums, artists, songs, genres, folders, search and Shuffle all.
   It remembers where you were.
+- A **song cache** on the server and the phone: songs you play are kept, so next time they
+  start at once without asking YouTube, and on the phone they play without internet (*Local →
+  Cached on this phone*, with your downloads). Songs streamed anyway are kept for free, others
+  from their second play; podcast episodes aren't. 5 GB on a server (`ytmp.toml`), 1 GB on a
+  phone (*Settings → Playback*, on the phone or its SD card), with *Clear cache*.
 
 **People and accounts**
 - Roles and permissions with a Discord-style editor (one role per person plus per-person
@@ -115,7 +120,6 @@ Music, without Premium, and not tied to a single music service.
 
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
-- A song cache on the server and the phone: songs you played start at once and play offline
 - YTMP playlists, explore page, sleep timer
 
 ## Platforms

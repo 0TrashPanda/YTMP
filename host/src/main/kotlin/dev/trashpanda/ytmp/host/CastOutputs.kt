@@ -227,7 +227,8 @@ class CastOutputs(
             loadedItemId = item.itemId
             settledAt = System.currentTimeMillis() + SETTLE_MS
             failed = false
-            val direct = view.streamUrl?.takeIf { !useProxy }
+            // A cached song's link is a path on the host (/api/audio/…): that's the proxy URL.
+            val direct = view.streamUrl?.takeIf { !useProxy && !it.startsWith("/") }
             // The current song with the ones before and after it, so the device's own buttons can skip.
             suspend fun loadWith(url: String?) {
                 val items = listOfNotNull(view.previous?.let { castItem(it) }, castItem(item, url), view.next?.let { castItem(it) })

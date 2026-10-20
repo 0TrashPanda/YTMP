@@ -40,7 +40,8 @@ import java.util.IdentityHashMap
 /**
  * One song in a [LocalLibrary]. [key]: the library's own name for it (MPD: its path). [folder]:
  * where it is; an album is the songs with the same album name in the same folder. [genre]: ""
- * when it has none.
+ * when it has none. [song]: a song with an ID of its own (the song cache's YouTube Music songs),
+ * used as it is but for its covers; null: a song of this library (`local:…`).
  */
 data class LocalTrack(
     val key: String,
@@ -54,6 +55,7 @@ data class LocalTrack(
     val durationMs: Long,
     val folder: String = "",
     val genre: String = "",
+    val song: Song? = null,
 )
 
 /** Music the host reaches itself: an MPD's music folder ([MpdLibrary]), the music on the hosting phone. */
@@ -106,6 +108,8 @@ class LocalMusic {
             runCatching { LocalLibrarySummary(library.id, library.name, library.kind, library.tracks().size) }
                 .onFailure { log.warn("Local music {}: {}", library.name, it.message) }
                 .getOrNull()
+                // Nothing cached yet: not worth a place in the Local tab.
+                ?.takeUnless { it.kind == LocalLibraryKind.CACHE && it.songCount == 0 }
         }.sortedBy { it.kind },
     )
 
@@ -230,23 +234,25 @@ class LocalMusic {
         val ordered = withoutCopies(tracks).sortedWith(compareBy<LocalTrack>({ it.albumArtist.lowercase() }, { it.album.lowercase() }, { it.disc ?: 0 }, { it.track ?: 0 }, { it.title.lowercase() }))
         val trackOf = HashMap<String, LocalTrack>()
         val songOf = HashMap<LocalTrack, Song>()
+        // The song cache's songs are in folders that say what they are (Downloaded, Cached), not where.
+        val folderOf = { t: LocalTrack -> if (library.kind == LocalLibraryKind.CACHE) "" else t.folder }
         for (t in ordered) {
-            val id = songId(lib, t.key)
-            val song = Song(
-                id = id,
+            val song = t.song?.copy(thumbnails = art(library, t.key)) ?: Song(
+                id = songId(lib, t.key),
                 title = t.title,
                 artists = listOf(ArtistRef(artistId(lib, t.artist), t.artist)),
                 album = t.album.takeIf { it.isNotEmpty() }?.let { AlbumRef(albumId(lib, t.folder, it), it) },
                 durationMs = t.durationMs,
                 thumbnails = art(library, t.key),
             )
+            val id = song.id
             trackOf[id] = t
             songOf[t] = song
         }
-        val albums = ordered.filter { it.album.isNotEmpty() }.groupBy { it.folder to it.album.lowercase() }.values.map { group ->
+        val albums = ordered.filter { it.album.isNotEmpty() }.groupBy { folderOf(it) to it.album.lowercase() }.values.map { group ->
             val sorted = group.sortedWith(compareBy<LocalTrack>({ it.disc ?: 0 }, { it.track ?: 0 }, { it.key }))
             val first = sorted.first()
-            val id = albumId(lib, first.folder, first.album)
+            val id = albumId(lib, folderOf(first), first.album)
             // The album artist; songs by several artists without one: a compilation.
             val artist = sorted.map { it.albumArtist }.distinctBy { it.lowercase() }.singleOrNull() ?: VARIOUS_ARTISTS
             val year = sorted.firstNotNullOfOrNull { it.year }

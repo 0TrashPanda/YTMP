@@ -26,6 +26,14 @@ url = ""
 # YTMP_AUDIO_PROXY overrides it.
 proxy = "always"
 
+[cache]
+# Songs played here are kept, so they start at once and need no YouTube lookup (podcast
+# episodes aren't). Empty dir: a "cache" folder next to the database (in Docker the data
+# volume). YTMP_CACHE_DIR and YTMP_CACHE_SIZE override these.
+dir = ""
+# At most this much, e.g. "5GB" or "500MB"; "0" turns it off.
+size = "5GB"
+
 [sonos]
 # Find Sonos speakers (SSDP). Needs UDP multicast replies to reach the server.
 discovery = true

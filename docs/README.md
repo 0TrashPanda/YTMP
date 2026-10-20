@@ -47,7 +47,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [implementation/storage.md](implementation/storage.md) | Database (SQLite/PostgreSQL), song graph storage, radio generation |
 | [implementation/android-app.md](implementation/android-app.md) | Android app structure, native audio playback, app updates |
 | [implementation/downloads.md](implementation/downloads.md) | How downloads are made (tagging, formats) |
-| [implementation/song-cache.md](implementation/song-cache.md) | The song cache on server and phone: storing, serving, removing (planned) |
+| [implementation/song-cache.md](implementation/song-cache.md) | The song cache on server and phone: storing, serving, removing |
 | [implementation/chromecast.md](implementation/chromecast.md) | Chromecast output module |
 | [implementation/sonos.md](implementation/sonos.md) | Sonos output module |
 | [implementation/mpd.md](implementation/mpd.md) | MPD output module (e.g. a Raspberry Pi on a speaker) |

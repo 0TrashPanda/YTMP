@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.edit
 import android.os.Build
+import android.os.Environment
 import android.net.ConnectivityManager
 import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
@@ -17,6 +18,8 @@ import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ShareAddress
+import dev.trashpanda.ytmp.protocol.SongCachePlace
+import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ScreenUnlinkRequest
@@ -110,8 +113,31 @@ class LocalHost(private val context: Context) {
 
     /** Songs' audio straight from YouTube, through the phone: for players, speakers and downloads. */
     private val audio = OnDeviceAudioProxy { songId, fresh -> ytm.stream(songId, fresh) }
-    /** Download in the song menu: for friends' browsers (the host's /api/download) and this phone's Music folder. */
-    val downloads = PhoneDownloads(context, SongFiles(audio, context.cacheDir), scope)
+    private val streams = object : StreamResolver {
+        override suspend fun resolveStream(songId: String) = ytm.resolveStream(songId)
+        override suspend fun resolve(songId: String) = ytm.resolve(songId)
+    }
+    private val cacheSettings = context.getSharedPreferences("ytmp.cache", Context.MODE_PRIVATE)
+
+    /** Download in the song menu: for friends' browsers (the host's /api/download) and this phone's Music folder; a cached song from its file. */
+    val downloads: PhoneDownloads = PhoneDownloads(
+        context,
+        SongFiles(object : AudioFiles {
+            override suspend fun download(songId: String, to: File, started: (type: String, size: Long?) -> Unit) = cache.files(audio).download(songId, to, started)
+        }, context.cacheDir),
+        scope,
+        phoneLibrary,
+    )
+
+    /**
+     * Songs played here, kept so they start at once and play without internet (Settings →
+     * Playback: its size, and the phone's own storage or the SD card).
+     */
+    val cache = SongCache(
+        cacheDir(cacheSettings.getString(CACHE_PLACE, PLACE_PHONE)!!), cacheSettings.getLong(CACHE_SIZE, DEFAULT_CACHE_BYTES),
+        lookup = streams, audio = audio, scope = scope, downloads = downloads,
+    )
+    private val cacheLibrary = cache.library { lanUrl() ?: LOCAL_URL }
 
     /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
     private val cached = CachedSource(
@@ -128,10 +154,7 @@ class LocalHost(private val context: Context) {
     )
     private val plays = PlayReporter(authLink.auth, scope)
     val rooms: RoomManager = RoomManager(
-        streams = local.streams(object : StreamResolver {
-            override suspend fun resolveStream(songId: String) = ytm.resolveStream(songId)
-            override suspend fun resolve(songId: String) = ytm.resolve(songId)
-        }),
+        streams = local.streams(cache.streams),
         scope = scope, outputs = outputs.devices, store = PhoneRoomStore(context),
         radio = RoomRadio(
             local.radio(cached),
@@ -146,7 +169,9 @@ class LocalHost(private val context: Context) {
             onPlayFinished = { play ->
                 plays.report(play)
                 addToYoutubeHistory(play)
+                cache.finished(play)
             },
+            onSongStarted = cache::started,
             onRoomSaved = { sync.saved(it) },
             onRoomClosed = { sync.closed(it) },
             onRoomDisowned = { account, syncId -> sync.closed(account, syncId) },
@@ -154,6 +179,41 @@ class LocalHost(private val context: Context) {
         // Where you are in podcast episodes, on your server: resume them in any room or device.
         bookmarks = AccountBookmarks(authLink.auth, scope),
     )
+
+    /** Where the song cache can be: the app's own storage, or its folder on an SD card (no permission needed). */
+    private fun cachePlaces(): List<SongCachePlace> = buildList {
+        add(SongCachePlace(PLACE_PHONE, "This phone", File(context.filesDir, "song-cache").let { it.mkdirs(); it.usableSpace }))
+        sdCard()?.let { add(SongCachePlace(PLACE_SD, "SD card", it.usableSpace)) }
+    }
+
+    private fun sdCard(): File? = context.getExternalFilesDirs(null).drop(1).firstOrNull { it != null && Environment.getExternalStorageState(it) == Environment.MEDIA_MOUNTED }
+
+    /** The folder for [place]; the phone's own when the SD card isn't there (the cache starts empty then). */
+    private fun cacheDir(place: String): File {
+        val sd = if (place == PLACE_SD) sdCard() else null
+        if (place == PLACE_SD && sd == null) cacheSettings.edit { putString(CACHE_PLACE, PLACE_PHONE) }
+        return if (sd != null) File(sd, "song-cache") else File(context.filesDir, "song-cache")
+    }
+
+    private val cacheControls = object : CacheSettings {
+        override fun places() = cachePlaces()
+
+        override fun place() = cacheSettings.getString(CACHE_PLACE, PLACE_PHONE)
+
+        override suspend fun change(settings: SongCacheSettings) {
+            val place = settings.place?.takeIf { wanted -> cachePlaces().any { it.id == wanted } } ?: place()!!
+            cacheSettings.edit {
+                putLong(CACHE_SIZE, settings.maxBytes.coerceAtLeast(0))
+                putString(CACHE_PLACE, place)
+            }
+            cache.setMaxBytes(settings.maxBytes)
+            cache.moveTo(cacheDir(place))
+            showCacheLibrary()
+        }
+    }
+
+    /** "Cached on this phone" in the Local tab (it shows once there's a song in it). */
+    private fun showCacheLibrary() = local.add(cacheLibrary)
 
     /** Your rooms here and on your server (docs/features/room-sync.md). */
     private val sync: RoomSync by lazy { RoomSync(context, authLink, { rooms }, ::lanUrl, scope) }
@@ -188,6 +248,11 @@ class LocalHost(private val context: Context) {
         sync.start()
         outputs.attach(rooms)
         if (phoneMusicOn) local.add(phoneLibrary)
+        cache.inUse = { rooms.songsInUse() }
+        downloads.onSaved = cache::downloaded
+        showCacheLibrary()
+        // So downloads play from the Music folder from the first song on.
+        scope.launch { runCatching { downloads.all() } }
         wifi.start()
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
             ytmpModule(
@@ -198,8 +263,9 @@ class LocalHost(private val context: Context) {
                     similar = local.radio(cached),
                     catalog = local.catalog(cached),
                     lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
-                    audio = local.audio(audio),
+                    audio = local.audio(cache.audio(audio)),
                     downloads = downloads.files,
+                    cache = cache,
                     local = local,
                     zones = zones,
                     personal = youtube,
@@ -218,6 +284,7 @@ class LocalHost(private val context: Context) {
                     onAccountToken = sync::remember,
                     onLocalAccount = { authLink.usedBy(it.id) },
                     deviceOwner = { authLink.ownerAccount },
+                    cacheSettings = cacheControls,
                 ),
                 webApp = webApp,
                 extraApi = {
@@ -301,6 +368,12 @@ class LocalHost(private val context: Context) {
     companion object {
         const val PORT = 8765
         private const val PHONE_MUSIC = "phoneMusic"
+        private const val CACHE_SIZE = "size"
+        private const val CACHE_PLACE = "place"
+        private const val PLACE_PHONE = "phone"
+        private const val PLACE_SD = "sd"
+        /** About 250 songs. */
+        private const val DEFAULT_CACHE_BYTES = 1L shl 30
         /** Reading the music on the phone: its own permission since Android 13. */
         val MUSIC_PERMISSION = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
         /** Mobile data: friends can't reach the phone there. */

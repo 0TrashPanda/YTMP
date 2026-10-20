@@ -33,9 +33,9 @@ The Android app needs **Android 11 or newer**. A native Linux app is a [future i
   background.
 - **Media controls**: lock screen and notification controls, and headphone / Bluetooth
   buttons (play/pause, next, previous).
-- **Offline** (planned; downloads and the phone's music are built): without internet, downloaded
-  songs and local files can still be played, in a solo room or in a room on the local
-  network.
+- **Offline** (built, not yet tried on a real phone): without internet, cached and downloaded
+  songs (*Local → Cached on this phone*) and the phone's own music still play, in a solo room
+  or in a room on the local network.
 - **App updates**: the app is distributed through GitHub Releases, so it **checks for new
   versions itself** when it starts and offers to download and install them (Update / Later /
   Skip this version). The settings (avatar → App) show the version and have **Check for

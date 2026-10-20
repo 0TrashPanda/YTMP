@@ -86,7 +86,8 @@ export function setPhoneMusic(on: boolean): Promise<string | null> {
 export async function loadLocal(fresh = false): Promise<void> {
 	try {
 		const all = (await getLocalLibraries(fresh)).libraries;
-		local.libraries = all.filter((l) => (l.kind === 'phone' ? true : local.network));
+		// The phone's own music and its cached songs always; music on the network when that's on.
+		local.libraries = all.filter((l) => (l.kind === 'mpd' ? local.network : true));
 	} catch {
 		local.libraries = [];
 	}

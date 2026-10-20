@@ -463,7 +463,9 @@ class NativePlayer implements RoomPlayer {
 								title: song.title,
 								artist: artistNames(song),
 								artUrl: artUrl(song, 544),
-								durationMs: song.durationMs
+								durationMs: song.durationMs,
+								// For the phone's song cache.
+								song
 							}
 						: null,
 				streamUrl: now?.streamUrl ?? null,

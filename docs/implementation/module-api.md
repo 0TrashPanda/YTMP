@@ -166,7 +166,7 @@ module now answers `search`, `suggestions`, `stream`, `audio`, `radio`, `artist`
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/songs/{id}/stream` ✅ | Resolve a **direct stream URL** on demand: `{ url, expiresAt, mimeType, bitrate, loudnessDb, durationMs }`. `durationMs` ✅ is the exact length (listings round podcast lengths); the host gives the current song that length. `loudnessDb` is always null for now |
-| GET | `/songs/{id}/audio?format=` ✅ | The **audio bytes** themselves, with HTTP `Range` support. Used for proxying (✅) and [downloads](downloads.md) (✅, the whole file), later the cache. `format` is a preference (for example `m4a`; not read yet). |
+| GET | `/songs/{id}/audio?format=` ✅ | The **audio bytes** themselves, with HTTP `Range` support. Used for proxying (✅), [downloads](downloads.md) (✅, the whole file) and the [song cache](song-cache.md) (✅, the whole file). `format` is a preference (for example `m4a`; not read yet). |
 
 - `/stream` is for the direct path of the [hybrid approach](playback-sync.md). `/audio` is
   for the proxied path and the host's [song cache](song-cache.md).

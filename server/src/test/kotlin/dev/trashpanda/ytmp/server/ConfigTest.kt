@@ -56,4 +56,17 @@ class ConfigTest {
     fun `missing file gives defaults`() {
         assertEquals(Config(), Config.load(File("/does/not/exist.toml"), env = emptyMap()))
     }
+
+    @Test
+    fun `the song cache's size and folder`() {
+        assertEquals(5L shl 30, CacheConfig().bytes())
+        assertEquals(500L shl 20, CacheConfig(size = "500 MB").bytes())
+        assertEquals(3L shl 29, CacheConfig(size = "1.5g").bytes())
+        assertEquals(0, CacheConfig(size = "0").bytes())
+        assertEquals(File("/var/lib/ytmp/cache"), CacheConfig().folder(DatabaseConfig(path = "/var/lib/ytmp/ytmp.db")))
+        assertEquals(File("/music/cache"), CacheConfig(dir = "/music/cache").folder(DatabaseConfig()))
+        val config = Config.load(null, env = mapOf("YTMP_CACHE_SIZE" to "2GB", "YTMP_CACHE_DIR" to "/c"))
+        assertEquals(2L shl 30, config.cache.bytes())
+        assertEquals(File("/c"), config.cache.folder(config.database))
+    }
 }

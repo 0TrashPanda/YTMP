@@ -2,6 +2,7 @@
 	// Settings → Server (the server admin only): invites, new accounts, and setting someone's password.
 	import { authServer } from '../../account';
 	import type { AccountInfo, AuthServerInfo } from '../../protocol.gen';
+	import CacheSection from './CacheSection.svelte';
 
 	let { info, onToast }: { info: AuthServerInfo; onToast: (text: string) => void } = $props();
 
@@ -73,6 +74,10 @@
 	<input class={input} type="password" bind:value={newUserPassword} placeholder="Password (8+ characters)" autocomplete="new-password" />
 	<button class="rounded-full bg-raised py-2 font-medium hover:bg-line disabled:opacity-40" disabled={busy || !newUsername.trim() || !newUserPassword}>Create</button>
 </form>
+
+<div class={card}>
+	<CacheSection load={authServer.songCache} clear={authServer.clearSongCache} card {onToast} />
+</div>
 
 <section class="flex flex-col gap-1">
 	<h3 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">Accounts</h3>

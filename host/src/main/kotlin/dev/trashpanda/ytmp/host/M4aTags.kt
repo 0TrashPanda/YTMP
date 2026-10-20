@@ -1,7 +1,10 @@
 package dev.trashpanda.ytmp.host
 
 import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.EOFException
 import java.io.File
+import java.io.InputStream
 import java.io.OutputStream
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -22,6 +25,8 @@ object M4aTags {
         val genre: String? = null,
         /** JPEG or PNG; anything else is left out. */
         val cover: ByteArray? = null,
+        /** The song's YTMP ID (`ytm:…`), so the app knows which song a download is (`----:dev.trashpanda.ytmp:id`). */
+        val songId: String? = null,
     )
 
     /** Copies [input] to [output] with [tags] instead of the tags it had. */
@@ -46,16 +51,61 @@ object M4aTags {
         }
     }
 
-    /** The tags in an .m4a file's bytes: item name ("©nam") to its data (text as UTF-8). For tests and checks. */
+    /**
+     * The song ID ([Tags.songId]) of an .m4a file, read from its start (the tags are at the
+     * front in YouTube's files and in ours); null when it has none.
+     */
+    fun readSongId(input: InputStream): String? {
+        val data = DataInputStream(input.buffered())
+        while (true) {
+            val size = try {
+                data.readInt().toLong() and 0xffffffffL
+            } catch (e: EOFException) {
+                return null
+            }
+            val type = ByteArray(4).also(data::readFully).toString(Charsets.ISO_8859_1)
+            val header = if (size == 1L) 16 else 8
+            val length = if (size == 1L) data.readLong() else size
+            if (size == 0L || length < header) return null
+            if (type == "moov") {
+                if (length > MAX_MOOV) return null
+                val moov = ByteArray(length.toInt())
+                ByteBuffer.wrap(moov).putInt(length.toInt()).put(type.toByteArray(Charsets.ISO_8859_1))
+                data.readFully(moov, 8, length.toInt() - 8)
+                return read(moov)[ID_ITEM]?.toString(Charsets.UTF_8)
+            }
+            // Only boxes before the moov are skipped (ftyp): the audio comes after it.
+            if (type == "mdat" || type == "moof") return null
+            // Not skipNBytes: Android has it only from 14 on.
+            var left = length - header
+            while (left > 0) {
+                val skipped = data.skip(left)
+                if (skipped <= 0) {
+                    if (data.read() < 0) return null
+                    left--
+                } else {
+                    left -= skipped
+                }
+            }
+        }
+    }
+
+    /**
+     * The tags in an .m4a file's bytes: item name ("©nam") to its data (text as UTF-8). For tests
+     * and checks. A freeform item is "----:mean:name".
+     */
     fun read(data: ByteArray): Map<String, ByteArray> {
         val moov = children(data, 0, data.size).firstOrNull { it.type == "moov" } ?: return emptyMap()
         val udta = children(data, moov.body, moov.end).firstOrNull { it.type == "udta" } ?: return emptyMap()
         val meta = children(data, udta.body, udta.end).firstOrNull { it.type == "meta" } ?: return emptyMap()
         val ilst = children(data, meta.body + 4, meta.end).firstOrNull { it.type == "ilst" } ?: return emptyMap()
-        return children(data, ilst.body, ilst.end).associate { item ->
-            val value = children(data, item.body, item.end).first { it.type == "data" }
-            item.type to data.copyOfRange(value.body + 8, value.end)
-        }
+        return children(data, ilst.body, ilst.end).mapNotNull { item ->
+            val parts = children(data, item.body, item.end)
+            val value = parts.firstOrNull { it.type == "data" } ?: return@mapNotNull null
+            fun text(type: String) = parts.firstOrNull { it.type == type }?.let { String(data, it.body + 4, it.end - it.body - 4, Charsets.UTF_8) }
+            val name = if (item.type == "----") "----:${text("mean")}:${text("name")}" else item.type
+            name to data.copyOfRange(value.body + 8, value.end)
+        }.toMap()
     }
 
     // --- boxes ---
@@ -172,6 +222,9 @@ object M4aTags {
             else -> null
         }
         if (cover != null && coverType != null) items.write(box("covr", box("data", int(coverType), int(0), cover)))
+        tags.songId?.let { id ->
+            items.write(box("----", box("mean", int(0), ID_MEAN.toByteArray()), box("name", int(0), ID_NAME.toByteArray()), box("data", int(TYPE_UTF8), int(0), id.toByteArray())))
+        }
         // iTunes' handler, without which some players skip the tags.
         val hdlr = box("hdlr", int(0), int(0), "mdir".toByteArray(), "appl".toByteArray(), int(0), int(0), byteArrayOf(0))
         return box("meta", int(0), hdlr, box("ilst", items.toByteArray()))
@@ -248,6 +301,11 @@ object M4aTags {
         }
     }
 
+    private const val ID_MEAN = "dev.trashpanda.ytmp"
+    private const val ID_NAME = "id"
+    const val ID_ITEM = "----:$ID_MEAN:$ID_NAME"
+    /** A moov bigger than this isn't read for its ID (with a cover it's some 100 KB). */
+    private const val MAX_MOOV = 16L * 1024 * 1024
     private const val TYPE_UTF8 = 1
     private const val TYPE_JPEG = 13
     private const val TYPE_PNG = 14

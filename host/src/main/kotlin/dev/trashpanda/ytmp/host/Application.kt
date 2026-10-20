@@ -16,6 +16,8 @@ import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.ShareAddress
 import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.protocol.SongCachePlace
+import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import io.ktor.http.CacheControl
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -81,6 +83,8 @@ data class HostSources(
     val audio: AudioProxy? = null,
     /** Songs made into tagged files to keep (Download in the song menu); local music isn't offered. */
     val downloads: SongFiles? = null,
+    /** Songs kept so they start at once and need no lookup (docs/implementation/song-cache.md); [audio] and the rooms' streams go through it. */
+    val cache: SongCache? = null,
     /** Local music (the Local tab): a Raspberry Pi's music folder, the music on the hosting phone. */
     val local: LocalMusic? = null,
     /** Amplifier zones, for another host that takes their player over. */
@@ -137,7 +141,23 @@ data class HostOptions(
      * rooms on someone else's phone or server use your account's YouTube Music here. A server.
      */
     val crossOriginPersonal: Boolean = false,
+    /**
+     * The song cache's size and place can be changed here (a phone's Settings → Playback), by
+     * the hosting device itself. Null: they're fixed (a server's ytmp.toml).
+     */
+    val cacheSettings: CacheSettings? = null,
 )
+
+/** Where the song cache may be kept and how big it is, as a setting (a phone). */
+interface CacheSettings {
+    /** Where it can be: the phone's own storage, an SD card when there is one. */
+    fun places(): List<SongCachePlace>
+
+    fun place(): String?
+
+    /** Saves [settings] and applies them (a new place moves what's cached). */
+    suspend fun change(settings: SongCacheSettings)
+}
 
 /** What works without an account on an accounts-only host: what's needed to log in, and audio (speakers can't log in). */
 // A TV becoming a party screen has no account (/api/screens); linking it needs someone in the room.
@@ -206,6 +226,8 @@ fun Application.ytmpModule(
             catalogRoutes(host)
             personalRoutes(host)
             screenRoutes(host)
+            // The song cache, in the hosting phone's settings (a server has its own, for its admin).
+            songCacheRoutes("/cache", sources.cache, options.cacheSettings) { options.isLocal(it) }
             clientLogRoute()
             // Another YTMP host that takes over a zones player asks what this host's zones had before.
             get("/zones/handover") {

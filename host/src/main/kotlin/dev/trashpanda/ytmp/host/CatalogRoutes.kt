@@ -18,6 +18,7 @@ import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -85,10 +86,11 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
     get("/local") {
         call.respond(sources.local?.summaries() ?: LocalLibraries(emptyList()))
     }
-    // Covers of local music that the host serves itself (the music on a phone).
+    // Covers of local music that the host serves itself (the music on a phone), and of cached songs.
     get("/local/art/{songId}") {
         val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 544
-        if (sources.local?.respondArt(call, call.parameters["songId"]!!, size) != true) call.respond(HttpStatusCode.NotFound)
+        val songId = call.parameters["songId"]!!
+        if (sources.local?.respondArt(call, songId, size) != true && sources.cache?.respondArt(call, songId, size) != true) call.respond(HttpStatusCode.NotFound)
     }
     get("/local/{id}") {
         val page = sources.local?.page(call.parameters["id"]!!) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "That music isn't on the network now")
@@ -100,6 +102,13 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
         val songId = call.parameters["songId"]!!
         val range = call.request.header(HttpHeaders.Range)
         if (!options.mayProxyAudio(call)) {
+            // A cached song's link is this route: a device that may not stream through the host
+            // gets YouTube's link instead, as it would without the cache.
+            val cache = sources.cache
+            if (cache != null && cache.has(songId)) {
+                val link = runCatching { cache.directLink(songId) }.onFailure { log.info("audio {}: no link for a device outside the network: {}", songId, it.message) }.getOrNull()
+                if (link != null) return@get call.respondRedirect(link)
+            }
             // Behind a reverse proxy the peer is the proxy; the visitor is in X-Forwarded-For.
             val forwarded = call.request.headers[HttpHeaders.XForwardedFor]?.let { " (forwarded for $it)" }.orEmpty()
             log.info("audio {}: not streamed to {}{} (outside the network)", songId, call.request.origin.remoteAddress, forwarded)

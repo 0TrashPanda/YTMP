@@ -157,13 +157,15 @@ class RemoteSourceModule(
     }
 
     /** The module's whole audio for a download, into [to]; throws when it stops before the end. */
-    override suspend fun download(songId: String, to: File): String =
+    override suspend fun download(songId: String, to: File, started: (type: String, size: Long?) -> Unit): String =
         client.prepareGet("$baseUrl/songs/${songId.encodeURLPathPart()}/audio") { auth() }.execute { response ->
             response.orThrow()
             val expected = response.contentLength()
+            val type = response.contentType()?.withoutParameters()?.toString() ?: SongFiles.MP4
+            started(type, expected)
             val written = to.outputStream().use { response.bodyAsChannel().copyTo(it) }
             if (expected != null && written < expected) throw SourceException("The download stopped at ${written * 100 / expected}%")
-            response.contentType()?.withoutParameters()?.toString() ?: SongFiles.MP4
+            type
         }
 
     private class ProxiedAudio(response: HttpResponse, private val body: ByteReadChannel) : OutgoingContent.ReadChannelContent() {
