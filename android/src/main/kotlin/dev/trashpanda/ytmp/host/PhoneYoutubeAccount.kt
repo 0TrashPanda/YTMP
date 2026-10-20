@@ -39,7 +39,7 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
 
     private val homes = TtlCache<Unit, HomePage>(1, 30.minutes, System::currentTimeMillis)
     private val libraries = TtlCache<Unit, HomePage>(1, 5.minutes, System::currentTimeMillis)
-    private val playlists = TtlCache<String, PlaylistPage>(50, 5.minutes, System::currentTimeMillis)
+    private val playlists = TtlCache<String, PlaylistPage>(200, 5.minutes, System::currentTimeMillis)
 
     private var cookie: String?
         get() = prefs.getString("cookie", null)
@@ -94,7 +94,8 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
 
     override suspend fun library(): HomePage = libraries.get(Unit) { requireSignedIn(); ytm().library() }
 
-    override suspend fun playlist(id: String): PlaylistPage = playlists.get(id) { requireSignedIn(); ytm().personalPlaylist(id) }
+    override suspend fun playlist(id: String, more: String?): PlaylistPage =
+        playlists.get(if (more == null) id else "$id\n$more") { requireSignedIn(); ytm().personalPlaylist(id, more) }
 
     // Thumbs are looked up per song (the one playing) and remembered; changing one updates it.
     private val ratings = TtlCache<String, LikeStatus>(500, 30.minutes, System::currentTimeMillis)

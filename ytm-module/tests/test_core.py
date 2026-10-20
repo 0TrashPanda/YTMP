@@ -406,6 +406,30 @@ def test_own_playlists_come_with_their_items(monkeypatch):
     assert [s["id"] for s in page["songs"]] == ["ytm:aaaaaaaaaaa", "ytm:bbbbbbbbbbb"]
 
 
+def test_own_playlists_come_in_parts(monkeypatch):
+    ytm, user = _signed_in_core(monkeypatch)
+
+    # The first part: ytmusicapi stops after it (limit 0) and the token is kept.
+    def first_part(playlist_id, limit=None):
+        assert limit == 0
+        shelf = {"contents": [{"song": 1}, {"continuationItemRenderer": {"continuationEndpoint": {"continuationCommand": {"token": "NEXT"}}}}]}
+        assert core.ytmusicapi.mixins.playlists.get_continuations_2025(shelf, limit, None, None) == []
+        return {"title": "Liked music", "owned": False, "trackCount": 250, "tracks": [{"videoId": "aaaaaaaaaaa", "title": "A", "artists": [], "duration_seconds": 100}]}
+
+    monkeypatch.setattr(user, "get_playlist", first_part)
+    page = ytm.playlist("LM", personal=True)
+    assert (page["more"], page["songCount"], page["itemIds"]) == ("NEXT", 250, [""])
+
+    # The next part: only its songs, with their places, and no token after the last part.
+    sent = []
+    monkeypatch.setattr(user, "_send_request", lambda endpoint, body: sent.append(body) or {"onResponseReceivedActions": [{"appendContinuationItemsAction": {"continuationItems": ["x"]}}]}, raising=False)
+    monkeypatch.setattr(core, "parse_playlist_items", lambda items: [{"videoId": "bbbbbbbbbbb", "title": "B", "artists": [], "setVideoId": "S9", "duration_seconds": 90}])
+    monkeypatch.setattr(core, "get_continuation_token", lambda items: None)
+    more = ytm.playlist("LM", personal=True, more="NEXT")
+    assert sent == [{"continuation": "NEXT"}]
+    assert ([s["id"] for s in more["songs"]], more["itemIds"], more["more"]) == (["ytm:bbbbbbbbbbb"], ["S9"], None)
+
+
 def test_a_playlist_youtube_wont_show_says_so_plainly():
     import pytest
 

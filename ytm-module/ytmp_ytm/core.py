@@ -17,8 +17,12 @@ from dataclasses import dataclass, field
 
 import requests
 import yt_dlp
+import ytmusicapi.mixins.playlists
 from ytmusicapi import LikeStatus, YTMusic
+from ytmusicapi.continuations import CONTINUATION_ITEMS, get_continuation_token
 from ytmusicapi.helpers import initialize_headers
+from ytmusicapi.navigation import nav
+from ytmusicapi.parsers.playlists import parse_playlist_items
 
 from . import pot
 
@@ -26,7 +30,7 @@ MODULE_ID = "ytm"
 _PREFIXES = ("ytm:", "yt:")
 _LARGE_ART = 544
 _ARTIST_SONGS = 20
-# Public playlists can be huge; your own (Liked music too) are loaded whole.
+# Public playlists can be huge; your own (Liked music too) come in parts (YouTube's, ~100 songs).
 _PLAYLIST_SONGS = 1000
 _HOME_SECTIONS = 12
 _LIBRARY_ITEMS = 200
@@ -319,28 +323,60 @@ class YtmCore:
             "songs": songs,
         }
 
-    def playlist(self, playlist_id: str, personal: bool = False) -> dict:
-        """A playlist with its songs: a public one, or with [personal] also the signed-in account's own (Liked music is "LM")."""
+    def playlist(self, playlist_id: str, personal: bool = False, more: str | None = None) -> dict:
+        """A playlist with its songs: a public one, or with [personal] also the signed-in account's own (Liked music is "LM").
+
+        Your own come in parts: the first, then [more] (the page's "more") asks for the next songs only.
+        """
         ytm = self._signed_in() if personal else self._ytm
+        if personal and more:
+            return self._more_of_playlist(ytm, playlist_id, more)
+        token = None
         try:
-            p = ytm.get_playlist(playlist_id, limit=None if personal else _PLAYLIST_SONGS)
+            if personal and _first_part_only:
+                _first_part.token = None
+                p = ytm.get_playlist(playlist_id, limit=0)
+                token = _first_part.token
+            else:
+                p = ytm.get_playlist(playlist_id, limit=None if personal else _PLAYLIST_SONGS)
         except Exception as e:
             # ytmusicapi's message is about YouTube's page layout: keep it for the log only.
             log.info("playlist %s: %s", playlist_id, e)
             raise NotFound("Couldn't find this playlist (it may be private)") from e
         author = p.get("author")
-        tracks = [(t, s) for t in p.get("tracks") or [] if (s := _song_from_search(t))]
         owned = bool(personal and p.get("owned"))
+        count = p.get("trackCount")
         return {
             "id": playlist_id,
             "title": p.get("title") or "",
             "author": (author.get("name") if isinstance(author, dict) else author) or None,
             "description": p.get("description"),
             "thumbnails": _thumbnails(p.get("thumbnails") or []),
-            "songs": [s for _, s in tracks],
+            **_playlist_songs(p.get("tracks") or [], places=personal),
             "owned": owned,
-            # Each song's place in your own playlist, for removing and moving it.
-            "itemIds": [t.get("setVideoId") or "" for t, _ in tracks] if owned else [],
+            "more": token,
+            "songCount": count if isinstance(count, int) else None,
+        }
+
+    def _more_of_playlist(self, ytm: YTMusic, playlist_id: str, token: str) -> dict:
+        """The next part of your own playlist: only its songs (and the token for the part after it)."""
+        try:
+            response = ytm._send_request("browse", {"continuation": token})
+            items = nav(response, CONTINUATION_ITEMS, True) or []
+            tracks = parse_playlist_items(items)
+            following = get_continuation_token(items) if items else None
+        except Exception as e:
+            log.info("playlist %s, more: %s", playlist_id, e)
+            raise NotFound("Couldn't load more songs of this playlist") from e
+        # Only the songs count: the page adds them to the part(s) it has.
+        return {
+            "id": playlist_id,
+            "title": "",
+            "author": None,
+            "description": None,
+            "thumbnails": [],
+            **_playlist_songs(tracks, places=True),
+            "more": following if tracks else None,
         }
 
     def podcast(self, podcast_id: str) -> dict:
@@ -685,6 +721,32 @@ def _home_item(c: dict) -> dict | None:
             "thumbnails": _thumbnails(c.get("thumbnails") or []),
         }
     return None
+
+
+def _playlist_songs(tracks: list[dict], places: bool) -> dict:
+    """A playlist's songs, and with [places] each one's place in it (your own: for removing and moving it)."""
+    pairs = [(t, s) for t in tracks if (s := _song_from_search(t))]
+    return {"songs": [s for _, s in pairs], "itemIds": [t.get("setVideoId") or "" for t, _ in pairs] if places else []}
+
+
+# Your own playlists in parts: ytmusicapi loads the parts after the first itself (get_playlist's
+# limit), and doesn't say how to ask for the next one. With limit 0 it stops after the first
+# part, and this keeps that part's token (per thread). If a new ytmusicapi works differently,
+# they're loaded whole, as before.
+_first_part = threading.local()
+_load_parts = getattr(ytmusicapi.mixins.playlists, "get_continuations_2025", None)
+
+
+def _first_part_then_token(results, limit, request_func, parse_func):
+    if limit == 0:
+        _first_part.token = get_continuation_token(results.get("contents") or [])
+        return []
+    return _load_parts(results, limit, request_func, parse_func)
+
+
+_first_part_only = _load_parts is not None
+if _first_part_only:
+    ytmusicapi.mixins.playlists.get_continuations_2025 = _first_part_then_token
 
 
 def _account(user: YTMusic) -> dict:

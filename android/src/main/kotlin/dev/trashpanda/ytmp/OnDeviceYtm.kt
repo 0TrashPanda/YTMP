@@ -159,8 +159,8 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("library")).toString())
     }
 
-    suspend fun personalPlaylist(id: String): PlaylistPage = python {
-        ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id, true)).toString())
+    suspend fun personalPlaylist(id: String, more: String?): PlaylistPage = python {
+        ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id, true, more)).toString())
     }
 
     suspend fun rating(songId: String): LikeStatus = python {

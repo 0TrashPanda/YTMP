@@ -52,15 +52,19 @@
 		if (canSeek) room.run({ kind: 'Seek', positionMs: timeMs });
 	}
 
-	// The list follows the song, unless you scrolled it yourself just now.
+	// The list follows the song, unless you scrolled it yourself just now. It opens at the line
+	// being sung, and glides from there.
 	let list = $state<HTMLElement>();
+	let placedIn: HTMLElement | null = null;
 	let scrolledAt = 0;
 	const userScrolled = () => (scrolledAt = Date.now());
 	$effect(() => {
 		const index = current;
-		if (!list || large || index < 0 || Date.now() - scrolledAt < 4000) return;
+		if (!list || large || index < 0 || Date.now() - scrolledAt < 4000 || !list.clientHeight) return;
 		const line = list.querySelector<HTMLElement>(`[data-line="${index}"]`);
-		if (line) list.scrollTo({ top: line.offsetTop - list.clientHeight / 2 + line.offsetHeight / 2, behavior: 'smooth' });
+		if (!line) return;
+		list.scrollTo({ top: line.offsetTop - list.clientHeight / 2 + line.offsetHeight / 2, behavior: placedIn === list ? 'smooth' : 'instant' });
+		placedIn = list;
 	});
 
 	// --- karaoke (large) ---------------------------------------------------------------------

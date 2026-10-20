@@ -59,8 +59,15 @@ data class PlaylistPage(
     val songs: List<Song>,
     /** One of your own playlists: you can remove, move and rename (`/api/me/playlists/{id}`). */
     val owned: Boolean = false,
-    /** For [owned] playlists: each song's place in it, in the same order as [songs] ("" if unknown). */
+    /** Your own playlists (and Liked music): each song's place in it, in the same order as [songs] ("" if unknown). */
     val itemIds: List<String> = emptyList(),
+    /**
+     * Your own playlists (and Liked music) come in parts: this asks for the next songs
+     * (`/api/me/playlists/{id}?more=…`, which answers with only those); null when there are no more.
+     */
+    val more: String? = null,
+    /** How many songs it has in all, when known (also the ones not loaded yet). */
+    val songCount: Int? = null,
 )
 
 /** A song in one of your playlists ([PlaylistPage.itemIds]). */
@@ -298,7 +305,11 @@ data class LocalLibrarySummary(val id: String, val name: String, val kind: Local
 @SerialName("LocalLibraries")
 data class LocalLibraries(val libraries: List<LocalLibrarySummary>)
 
-/** One library, whole: the Local tab filters it as you type. [albums] and [artists] are search items (album, artist). */
+/**
+ * One library, whole: the Local tab filters it as you type. [albums] and [artists] are search
+ * items (album, artist). [genres]: by name. [folders]: every folder that has songs itself, by
+ * its path in the library ("" is the top, "/" between folders).
+ */
 @Serializable
 @SerialName("LocalLibraryPage")
 data class LocalLibraryPage(
@@ -308,4 +319,11 @@ data class LocalLibraryPage(
     val albums: List<SearchItem>,
     val artists: List<SearchItem>,
     val songs: List<Song>,
+    val genres: List<LocalGroup> = emptyList(),
+    val folders: List<LocalGroup> = emptyList(),
 )
+
+/** A genre or folder of a [LocalLibraryPage]: its [songs] as places in the page's songs, in album order. */
+@Serializable
+@SerialName("LocalGroup")
+data class LocalGroup(val name: String, val songs: List<Int>)

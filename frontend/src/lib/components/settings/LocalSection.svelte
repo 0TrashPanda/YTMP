@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Settings → Local music: which music the Local tab shows on this device.
-	import { local, setLocalNetwork, setPhoneMusic } from '../../local.svelte';
+	import { local, localPlace, setLocalNetwork, setLocalRemember, setPhoneMusic } from '../../local.svelte';
 	import { nativeBridge } from '../../native';
 	import Switch from './Switch.svelte';
 
@@ -33,5 +33,12 @@
 			<Switch checked={local.phone} label="Music on this phone" disabled={busy} onchange={phone} />
 		</div>
 	{/if}
+	<div class="flex items-center gap-4">
+		<div class="min-w-0 flex-1">
+			<p class="text-sm font-medium">Remember where you were</p>
+			<p class="text-xs text-muted">The Local tab opens where you left it: the same music, tab, search and place in the list, also after closing the app. Off: it opens at the start.</p>
+		</div>
+		<Switch checked={localPlace.remember} label="Remember where you were" onchange={setLocalRemember} />
+	</div>
 	<p class="text-xs text-muted">The Local tab shows up when there's music to show. Saved on this {nativeBridge ? 'phone' : 'device'}.</p>
 </section>

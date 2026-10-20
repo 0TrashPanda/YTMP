@@ -9,6 +9,7 @@ import dev.trashpanda.ytmp.protocol.AlbumRef
 import dev.trashpanda.ytmp.protocol.AlbumSummary
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.LocalGroup
 import dev.trashpanda.ytmp.protocol.LocalLibraries
 import dev.trashpanda.ytmp.protocol.LocalLibraryKind
 import dev.trashpanda.ytmp.protocol.LocalLibraryPage
@@ -38,7 +39,8 @@ import java.util.IdentityHashMap
 
 /**
  * One song in a [LocalLibrary]. [key]: the library's own name for it (MPD: its path). [folder]:
- * where it is; an album is the songs with the same album name in the same folder.
+ * where it is; an album is the songs with the same album name in the same folder. [genre]: ""
+ * when it has none.
  */
 data class LocalTrack(
     val key: String,
@@ -51,6 +53,7 @@ data class LocalTrack(
     val year: String?,
     val durationMs: Long,
     val folder: String = "",
+    val genre: String = "",
 )
 
 /** Music the host reaches itself: an MPD's music folder ([MpdLibrary]), the music on the hosting phone. */
@@ -109,13 +112,23 @@ class LocalMusic {
     suspend fun page(id: String): LocalLibraryPage? {
         val library = libraries.value[id] ?: return null
         val b = build(library)
+        val songs = b.songs.sortedBy { it.title.lowercase() }
+        val place = songs.withIndex().associate { (i, song) -> song.id to i }
+        // Genres and folders list their songs in album order, as places in [songs].
+        fun groups(of: (LocalTrack) -> String) = b.songs.groupBy { of(b.trackOf.getValue(it.id)) }
+            .map { (name, inIt) -> LocalGroup(name, inIt.map { place.getValue(it.id) }) }
         return LocalLibraryPage(
             library.id,
             library.name,
             library.kind,
             albums = b.albums.sortedBy { it.title.lowercase() }.map { SearchItem.AlbumResult(it.summary, listOf(ArtistRef(it.artistId, it.artist))) },
             artists = b.artists.map { SearchItem.ArtistResult(it.id, it.name, it.thumbnails) },
-            songs = b.songs.sortedBy { it.title.lowercase() },
+            songs = songs,
+            // One genre whatever its spelling ("rock" and "Rock"), named as most of its songs have it.
+            genres = groups { it.genre.lowercase() }.filter { it.name.isNotBlank() }
+                .map { g -> g.copy(name = g.songs.map { b.trackOf.getValue(songs[it].id).genre }.groupingBy { it }.eachCount().maxBy { it.value }.key) }
+                .sortedBy { it.name.lowercase() },
+            folders = groups { it.folder.trim('/') }.sortedBy { it.name.lowercase() },
         )
     }
 

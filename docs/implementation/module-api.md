@@ -217,7 +217,7 @@ signed in give `401 not_signed_in`.
 | GET | `/me/library` | Playlists (Liked music first) and podcasts, as home sections |
 | GET | `/me/playlists` | The account's own playlists (to save songs to) |
 | POST | `/me/playlists` | Create a private playlist: `{ title, songIds }` → `{ id }` |
-| GET | `/me/playlists/{id}` | A playlist, also private ones (`LM` = Liked music) |
+| GET | `/me/playlists/{id}` | A playlist, also private ones (`LM` = Liked music), in parts: the first (~100 songs, YouTube Music's own parts) with `more`, a token; `?more=…` answers with only the next songs (and the next `more`, null after the last) |
 | POST | `/me/playlists/{id}/songs` | Add songs: `{ songIds: [...] }` |
 | GET / PUT | `/me/likes/{songId}` | `{ liked, disliked }` (thumbs up or down, never both) |
 | POST | `/me/playlists/{id}/remove` | `{ items: [{ songId, itemId }] }`: remove songs (`itemId`: their place, from `PlaylistPage.itemIds`) |

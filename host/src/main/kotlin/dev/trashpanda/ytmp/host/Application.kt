@@ -517,7 +517,7 @@ fun Application.ytmpModule(
                     if (title.isEmpty() || title.length > 150) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Playlist name must be 1-150 characters")
                     call.respond(CreatePlaylistResponse(owner.createPlaylist(title, request.songIds)))
                 }
-                get("/playlists/{id}") { call.respond(call.owner().playlist(call.parameters["id"]!!)) }
+                get("/playlists/{id}") { call.respond(call.owner().playlist(call.parameters["id"]!!, call.request.queryParameters["more"])) }
                 post("/playlists/{id}/songs") {
                     val owner = call.owner()
                     owner.addToPlaylist(call.parameters["id"]!!, call.receive<SaveSongsRequest>().songIds)

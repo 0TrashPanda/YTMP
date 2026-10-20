@@ -10,11 +10,14 @@
 		songs,
 		name,
 		toAutoplay = false,
+		whole,
 		onToast
 	}: {
 		room: RoomConnection;
 		/** Null while loading. */
 		songs: Song[] | null;
+		/** All of it, when [songs] is only the part loaded so far (your playlists). */
+		whole?: () => Promise<Song[]>;
 		/** The album's or playlist's title, for the toasts. */
 		name: string;
 		/** "Add to autoplay" instead of "Add to queue" (playlists). */
@@ -22,21 +25,26 @@
 		onToast: (text: string) => void;
 	} = $props();
 
+	const all = async () => (whole ? await whole() : songs) ?? [];
+
 	async function addToAutoplay() {
-		if (!songs?.length) return;
-		const e = await room.run({ kind: 'AutoplaySongs', songs });
+		const list = await all();
+		if (!list.length) return;
+		const e = await room.run({ kind: 'AutoplaySongs', songs: list });
 		onToast(e ? e.message : `${name} plays when the queue is empty`);
 	}
 
 	async function addAll(position: 'next' | 'end') {
-		if (!songs?.length) return;
-		const e = await room.run({ kind: 'AddSongs', songs, position });
+		const list = await all();
+		if (!list.length) return;
+		const e = await room.run({ kind: 'AddSongs', songs: list, position });
 		onToast(e ? e.message : position === 'next' ? room.playNextText(name) : `Added ${name} to the queue`);
 	}
 
 	async function playNow() {
-		if (!songs?.length) return;
-		const [first, ...rest] = songs;
+		const list = await all();
+		if (!list.length) return;
+		const [first, ...rest] = list;
 		let e = await room.run({ kind: 'PlayNow', song: first });
 		if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
 		if (e) onToast(e.message);

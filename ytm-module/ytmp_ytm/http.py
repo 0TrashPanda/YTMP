@@ -283,8 +283,8 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         return {"id": user.create_playlist(str(body.get("title") or ""), list(body.get("songIds") or []))}
 
     @app.get("/me/playlists/{playlist_id}", dependencies=[Depends(check_key)])
-    def my_playlist(playlist_id: str, user: core.YtmCore = Depends(me)):
-        return user.playlist(playlist_id, personal=True)
+    def my_playlist(playlist_id: str, more: str | None = None, user: core.YtmCore = Depends(me)):
+        return user.playlist(playlist_id, personal=True, more=more)
 
     @app.post("/me/playlists/{playlist_id}/songs", dependencies=[Depends(check_key)])
     def my_playlist_add(playlist_id: str, body: dict, user: core.YtmCore = Depends(me)):

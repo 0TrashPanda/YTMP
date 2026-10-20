@@ -127,6 +127,7 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.RELATIVE_PATH,
             MediaStore.Audio.Media.MIME_TYPE,
+            MediaStore.Audio.Media.GENRE,
         )
         val found = ArrayList<LocalTrack>()
         context.contentResolver.query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, columns, "${MediaStore.Audio.Media.IS_MUSIC} != 0", null, null)?.use { c ->
@@ -148,6 +149,7 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
                     year = if (c.isNull(6)) null else c.getInt(6).takeIf { it > 0 }?.toString(),
                     durationMs = c.getLong(7),
                     folder = c.getString(8).orEmpty(),
+                    genre = text(10).orEmpty(),
                 )
             }
         }

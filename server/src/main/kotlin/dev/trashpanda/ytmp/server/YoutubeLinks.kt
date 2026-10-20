@@ -148,7 +148,7 @@ class YoutubeLinks(
 
         override suspend fun library(): HomePage = withCookie { module.myLibrary(it) }
 
-        override suspend fun playlist(id: String): PlaylistPage = withCookie { module.myPlaylist(it, id) }
+        override suspend fun playlist(id: String, more: String?): PlaylistPage = withCookie { module.myPlaylist(it, id, more) }
 
         override suspend fun liked(songId: String): Boolean = rating(songId).liked
 

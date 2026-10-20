@@ -194,8 +194,11 @@ class RemoteSourceModule(
 
     suspend fun myLibrary(cookie: String): HomePage = client.get("$baseUrl/me/library") { me(cookie) }.orThrow().body()
 
-    suspend fun myPlaylist(cookie: String, id: String): PlaylistPage =
-        client.get("$baseUrl/me/playlists/${id.encodeURLPathPart()}") { me(cookie) }.orThrow().body()
+    suspend fun myPlaylist(cookie: String, id: String, more: String?): PlaylistPage =
+        client.get("$baseUrl/me/playlists/${id.encodeURLPathPart()}") {
+            me(cookie)
+            if (more != null) parameter("more", more)
+        }.orThrow().body()
 
     suspend fun myPlaylists(cookie: String): List<PlaylistSummary> = client.get("$baseUrl/me/playlists") { me(cookie) }.orThrow().body()
 

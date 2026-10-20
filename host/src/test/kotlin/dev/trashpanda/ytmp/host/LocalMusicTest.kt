@@ -84,9 +84,35 @@ class LocalMusicTest {
     }
 
     @Test
+    fun `genres and folders list their songs in album order`() = runBlocking {
+        val local = LocalMusic()
+        local.add(
+            Shelf(
+                "pi",
+                listOf(
+                    track("Avril/Let Go/02.mp3", "Losing Grip", "Avril Lavigne", "Let Go", 1).copy(genre = "Rock"),
+                    track("Avril/Let Go/01.mp3", "Complicated", "Avril Lavigne", "Let Go", 2).copy(genre = "rock"),
+                    track("Adele/21/01.mp3", "Rolling in the Deep", "Adele", "21", 1).copy(genre = "Soul"),
+                    track("Loose.mp3", "Alone", "Nobody", "", 1).copy(folder = ""),
+                    // The phone's folders end with "/".
+                    track("x", "Rumour Has It", "Adele", "21", 2).copy(folder = "Adele/21/", genre = "Rock"),
+                ),
+            ),
+        )
+        val page = local.page("pi")!!
+        fun titles(places: List<Int>) = places.map { page.songs[it].title }
+        // One genre whatever its spelling, named as most of its songs have it.
+        assertEquals(listOf("Rock", "Soul"), page.genres.map { it.name })
+        assertEquals(listOf("Rumour Has It", "Losing Grip", "Complicated"), titles(page.genres.first().songs))
+        assertEquals(listOf("", "Adele/21", "Avril/Let Go"), page.folders.map { it.name })
+        assertEquals(listOf("Rolling in the Deep", "Rumour Has It"), titles(page.folders[1].songs))
+        assertEquals(listOf("Alone"), titles(page.folders[0].songs))
+    }
+
+    @Test
     fun `an MPD's tags become tracks`() {
-        val t = MpdLibrary.track(mapOf("file" to "A/B/03 Song.mp3", "Artist" to "Band", "Album" to "Record", "Track" to "3/12", "Date" to "2004-05-01", "duration" to "201.5"))!!
-        assertEquals(LocalTrack("A/B/03 Song.mp3", "03 Song", "Band", "Band", "Record", null, 3, "2004", 201_500, folder = "A/B"), t)
+        val t = MpdLibrary.track(mapOf("file" to "A/B/03 Song.mp3", "Artist" to "Band", "Album" to "Record", "Track" to "3/12", "Date" to "2004-05-01", "duration" to "201.5", "Genre" to "Pop"))!!
+        assertEquals(LocalTrack("A/B/03 Song.mp3", "03 Song", "Band", "Band", "Record", null, 3, "2004", 201_500, folder = "A/B", genre = "Pop"), t)
         assertNull(MpdLibrary.track(mapOf("file" to "http://radio.example/stream")))
         assertEquals("Unknown artist", MpdLibrary.track(mapOf("file" to "x.mp3"))!!.artist)
     }

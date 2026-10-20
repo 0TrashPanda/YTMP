@@ -270,6 +270,11 @@ export function getPlaylist(id: string, personal = false): Promise<PlaylistPage>
 		: cached(`playlist:${id}`, () => request(`/api/playlists/${encodeURIComponent(id)}`));
 }
 
+/** The next songs of one of your playlists, after the part(s) loaded ([PlaylistPage.more]). */
+export function getPlaylistPart(id: string, more: string): Promise<PlaylistPage> {
+	return request(`/api/me/playlists/${encodeURIComponent(id)}?more=${encodeURIComponent(more)}`);
+}
+
 /** The song's lyrics (LRCLIB, or its source's own), or null when nobody has them. */
 export function getLyrics(song: Song): Promise<Lyrics | null> {
 	const query = new URLSearchParams({

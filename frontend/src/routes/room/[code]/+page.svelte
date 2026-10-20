@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto, pushState, replaceState } from '$app/navigation';
-	import { onDestroy, onMount, untrack } from 'svelte';
+	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import Icon from '../../../lib/components/Icon.svelte';
 	import PlayerBar from '../../../lib/components/PlayerBar.svelte';
 	import NowPlaying from '../../../lib/components/NowPlaying.svelte';
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
 	import LocalView from '../../../lib/components/LocalView.svelte';
-	import { local, loadLocal } from '../../../lib/local.svelte';
+	import LocalGroupView from '../../../lib/components/LocalGroupView.svelte';
+	import { local, loadLocal, localPlace, forgetLocalPlace } from '../../../lib/local.svelte';
 	import Sidebar from '../../../lib/components/Sidebar.svelte';
 	import AvatarMenu from '../../../lib/components/AvatarMenu.svelte';
 	import SettingsScreen, { type SettingsSection } from '../../../lib/components/settings/SettingsScreen.svelte';
@@ -73,52 +74,85 @@
 	let searchType = $state<SearchType>('all');
 	let menu = $state<MenuTarget | null>(null);
 
-	// What the main area shows besides the home page: search, find similar, artist, album,
-	// playlist and podcast pages, as a stack (the back arrow pops it). The logo switches between home
-	// and the last one, which stays as it was.
+	// The pages you opened, in order, Home at the bottom: Home, Library and Local (the bottom
+	// bar), and search, find similar, artist, album, playlist, podcast, genre and folder pages.
+	// Back (the phone's, or the back arrow) goes to the one before, scrolled as you left it.
+	type Section = 'home' | 'library' | 'local';
 	type View =
 		| { kind: 'search'; query: string }
 		| { kind: 'similar'; song: Song }
 		| { kind: 'artist'; id: string; name: string }
 		| { kind: 'album'; id: string; title: string }
 		| { kind: 'playlist'; id: string; title: string; personal?: boolean }
-		| { kind: 'podcast'; id: string; title: string };
-	let views = $state<View[]>([]);
-	let browsing = $state(false);
-	const view = $derived(browsing ? (views.at(-1) ?? null) : null);
+		| { kind: 'podcast'; id: string; title: string }
+		| { kind: 'genre'; library: string; name: string }
+		| { kind: 'folder'; library: string; path: string };
+	type Page = ({ kind: Section } | View) & { scrollTop?: number };
+	const MAX_PAGES = 50;
+	let pages = $state<Page[]>([{ kind: 'home' }]);
+	const top = $derived(pages.at(-1)!);
+	const isSection = (p: Page): p is Page & { kind: Section } => p.kind === 'home' || p.kind === 'library' || p.kind === 'local';
+	const view = $derived(isSection(top) ? null : top);
+	/** The bottom bar's page under the pages opened from it. */
+	const section = $derived((pages.findLast(isSection)?.kind ?? 'home') as Section);
+	/** Counts page changes: a scroll waiting for a page that's no longer shown stops. */
+	let pageChanges = 0;
 
-	function show(next: View) {
+	/** Opens [next] on top of the page shown now. */
+	function show(next: Page) {
 		closePlayer();
-		const top = views.at(-1);
+		leavePage();
 		// A new search replaces the results on top instead of piling up.
-		views = [...(next.kind === 'search' && top?.kind === 'search' ? views.slice(0, -1) : views), next].slice(-20);
-		browsing = true;
+		const below = next.kind === 'search' && top.kind === 'search' ? pages.slice(0, -1) : pages;
+		const kept = [...below, next].slice(-MAX_PAGES);
+		pages = kept[0].kind === 'home' ? kept : [{ kind: 'home' }, ...kept.slice(1)];
+		scrollPageTo(next.scrollTop ?? 0);
+	}
+
+	/** Back to the page before, scrolled as you left it. */
+	function back() {
+		if (pages.length < 2) return;
+		closePlayer();
+		leavePage();
+		pages = pages.slice(0, -1);
+		scrollPageTo(top.scrollTop ?? 0);
+	}
+
+	/** Remembers how far the page shown now is scrolled, for coming back to it. */
+	function leavePage() {
+		const y = scroller?.scrollTop ?? 0;
+		top.scrollTop = y;
+		if (top.kind === 'local') localPlace.scrollTop = y;
+	}
+
+	/** Scrolls the new page to [y] once it's that long (its content may still be loading). */
+	async function scrollPageTo(y: number) {
+		const mine = ++pageChanges;
+		headerHidden = false;
+		await tick();
+		const until = Date.now() + 3000;
+		const attempt = () => {
+			if (!scroller || mine !== pageChanges) return;
+			scroller.scrollTo({ top: y });
+			if (scroller.scrollTop < y - 1 && Date.now() < until) requestAnimationFrame(attempt);
+		};
+		attempt();
 	}
 
 	/** The search shown in the search box: the last one. */
-	const query = $derived(views.findLast((v): v is Extract<View, { kind: 'search' }> => v.kind === 'search')?.query ?? '');
-
-	function back() {
-		views = views.slice(0, -1);
-		if (views.length === 0) browsing = false;
-	}
+	const query = $derived(pages.findLast((v): v is Extract<View, { kind: 'search' }> => v.kind === 'search')?.query ?? '');
 
 	/** The logo: always Home; on Home already, it loads new suggestions (like pulling down). */
 	function goHome() {
-		const onHome = !browsing && section === 'home' && !expanded;
-		closePlayer();
-		browsing = false;
-		section = 'home';
-		scroller?.scrollTo({ top: 0 });
-		if (onHome) {
+		if (top.kind === 'home' && !expanded) {
+			scroller?.scrollTo({ top: 0 });
 			forgetHome();
 			homeVersion++;
-		}
+		} else pickSection('home');
 	}
 
 	// Home, Library (in the app with YouTube Music sign-in) and Local (when there's local
 	// music): the bottom bar, under the pages above.
-	let section = $state<'home' | 'library' | 'local'>('home');
 	const sections = $derived(
 		([
 			['home', 'Home'],
@@ -142,11 +176,16 @@
 	/** Saving this song to one of your YouTube Music playlists. */
 	let saving = $state<Song | null>(null);
 
-	function pickSection(next: 'home' | 'library' | 'local') {
-		closePlayer();
-		section = next;
-		browsing = false;
-		scroller?.scrollTo({ top: 0 });
+	/** A page of the bottom bar; the one shown already goes back to its top. */
+	function pickSection(next: Section) {
+		if (top.kind === next) {
+			closePlayer();
+			scroller?.scrollTo({ top: 0, behavior: 'smooth' });
+			return;
+		}
+		// Local opens where you were, or (Remember where you were off) at the start.
+		if (next === 'local' && !localPlace.remember) forgetLocalPlace();
+		show({ kind: next, scrollTop: next === 'local' ? localPlace.scrollTop : 0 });
 	}
 
 	// The full player (album art, controls, Up next) over everything. A history entry, so
@@ -320,12 +359,8 @@
 			history.back();
 			return 'handled';
 		}
-		if (browsing) {
+		if (pages.length > 1) {
 			back();
-			return 'handled';
-		}
-		if (section !== 'home') {
-			pickSection('home');
 			return 'handled';
 		}
 		if (scroller && scroller.scrollTop > 0) {
@@ -363,16 +398,26 @@
 
 	// Phones: pull Home down to load new suggestions.
 	let homeVersion = $state(0);
-	let pullStart: number | null = null;
+	let pullStart: { x: number; y: number } | null = null;
+	/** Null until the finger has moved enough to tell a pull down from a sideways swipe (a row of songs). */
+	let pullDown: boolean | null = null;
 	let pull = $state(0);
 	const PULL_TO_REFRESH = 72;
 	function pullStartAt(event: TouchEvent) {
-		pullStart = !view && section === 'home' && (scroller?.scrollTop ?? 1) <= 0 ? event.touches[0].clientY : null;
+		const t = event.touches[0];
+		pullStart = top.kind === 'home' && (scroller?.scrollTop ?? 1) <= 0 ? { x: t.clientX, y: t.clientY } : null;
+		pullDown = null;
 	}
 	function pullMove(event: TouchEvent) {
 		if (pullStart === null) return;
-		const distance = event.touches[0].clientY - pullStart;
-		if (distance <= 0 || (scroller?.scrollTop ?? 0) > 0) {
+		const t = event.touches[0];
+		const distance = t.clientY - pullStart.y;
+		if (pullDown === null) {
+			const sideways = Math.abs(t.clientX - pullStart.x);
+			if (sideways < 10 && Math.abs(distance) < 10) return;
+			pullDown = distance > sideways;
+		}
+		if (!pullDown || distance <= 0 || (scroller?.scrollTop ?? 0) > 0) {
 			pull = 0;
 			return;
 		}
@@ -508,7 +553,7 @@
 	<div class="flex h-full flex-col">
 		<div class="relative flex min-h-0 flex-1">
 			<Sidebar
-				section={browsing ? null : section}
+				section={view ? null : section}
 				onLogo={goHome}
 				onSection={pickSection}
 				onPlaylist={(p) => openPlaylist(p, true)}
@@ -610,8 +655,9 @@
 						</div>
 					{/if}
 					<main class="mx-auto w-full max-w-7xl p-3 sm:p-6">
+						{#key top}
 						{#if view}
-							{#if views.length > 1}
+							{#if pages.length > 1 && !isSection(pages.at(-2)!)}
 								<button class="mb-2 flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted hover:bg-raised hover:text-white" onclick={back}>
 									<Icon name="back" size={20} />
 									Back
@@ -648,10 +694,31 @@
 								<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={(target) => (menu = target)} onGone={back} />
 							{:else if view.kind === 'podcast'}
 								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
+							{:else if view.kind === 'genre' || view.kind === 'folder'}
+								{@const library = view.library}
+								<LocalGroupView
+									{room}
+									{library}
+									genre={view.kind === 'genre' ? view.name : undefined}
+									folder={view.kind === 'folder' ? view.path : undefined}
+									onFolder={(path) => show({ kind: 'folder', library, path })}
+									onToast={toast}
+									onMenu={(target) => (menu = target)}
+								/>
 							{/if}
-						{:else if section === 'local'}
-							<LocalView {room} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} onAlbum={(a) => openAlbum(a)} onPlaylist={openPlaylist} onPodcast={openPodcast} />
-						{:else if section === 'library'}
+						{:else if top.kind === 'local'}
+							<LocalView
+								{room}
+								onToast={toast}
+								onMenu={(target) => (menu = target)}
+								onArtist={openArtist}
+								onAlbum={(a) => openAlbum(a)}
+								onPlaylist={openPlaylist}
+								onPodcast={openPodcast}
+								onGenre={(library, name) => show({ kind: 'genre', library, name })}
+								onFolder={(library, path) => show({ kind: 'folder', library, path })}
+							/>
+						{:else if top.kind === 'library'}
 							<LibraryView
 								onToast={toast}
 								onArtist={openArtist}
@@ -673,6 +740,7 @@
 								/>
 							{/key}
 						{/if}
+						{/key}
 					</main>
 				</div>
 
@@ -712,7 +780,7 @@
 			<!-- Like YTM's bottom bar, on phones (desktop: the Sidebar). -->
 			<nav class="flex shrink-0 bg-surface sm:hidden">
 				{#each sections as [value, label] (value)}
-					{@const active = section === value && !browsing}
+					{@const active = section === value && !view}
 					<button class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs {active ? 'text-white' : 'text-muted'}" aria-current={active ? 'page' : undefined} onclick={() => pickSection(value)}>
 						<Icon name={value} size={24} />
 						{label}

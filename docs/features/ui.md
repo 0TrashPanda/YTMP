@@ -162,7 +162,7 @@ in *Up next* also *Remove*. The defaults:
 |---------|----------------|--------------------|
 | **Tap** | **Play next** (the start of the queue) | **Play now**: jump to it, like YTM (the songs before it go to the history as skipped; a played song plays again; an autoplay song plays next, so the queue stays) |
 | **Swipe right** | **Add to queue** (the end) | **Play next** (moved to the start of the queue) |
-| **Swipe left** | **Play now** | **Remove**, like YTM |
+| **Swipe left** | **Play now** | **Remove**, like YTM (the current song too: the next one plays) |
 | **Hold** | Open the [song menu](#song-menu) | Open the song menu |
 | **Drag** (the handle) | Move it in your own playlists | Move it |
 
@@ -233,11 +233,12 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - Browsing is cached (in the page and on the host): going back to an artist or album is
   instant, and album pages start loading when you hover them.
 - Search results end with a link to search the same words **on YouTube Music**.
-- Search, find similar, artist, album and playlist pages stack up (a **Back** button goes to the
-  previous one). The **YTMP logo** switches between the home page and the last of those,
-  kept as it was.
-- The phone's **Back** button (app) closes what's open, goes back through those pages, then to
-  Home. On Home it either stops (the app goes to the background, like YTM) or goes on to the
+- Every page you open stacks up in order: Home, Library and Local (the bottom bar), and
+  search, find similar, artist, album, playlist, genre and folder pages. Going back shows the
+  page before, **scrolled as you left it**. Pages opened from other pages have a **Back**
+  button. The **YTMP logo** goes to Home (on Home: new suggestions).
+- The phone's **Back** button (app) closes what's open, then steps back through those pages
+  in the order you opened them, down to Home. On Home it either stops (the app goes to the background, like YTM) or goes on to the
   room list: a setting, separately for solo rooms (default: stop) and party rooms (default:
   room list).
 - The **avatar** (top right, in rooms and on the room list) opens a short menu, like YTM's:
@@ -249,9 +250,13 @@ Open it with the **⋮** button or by **right-clicking** the song.
   devices, your roles, password, log out; on other hosts: who you're logged in as there),
   **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
   bottom), **Playback** (app: headphones, Back button), **Look** (image quality, video
-  pictures), **App** (version, updates, logs) and **Server** (the admin: invites, accounts).
+  pictures, songs per page), **Local music**, **App** (version, updates, logs) and **Server** (the admin: invites, accounts).
   Desktop: the sections on the left; phones: the list, then a section.
-- **Pull Home down** to load new suggestions. Rows that scroll sideways have **page dots**.
+- **Pull Home down** to load new suggestions (only a pull down: swiping a row sideways never
+  refreshes). Rows that scroll sideways have **page dots**.
+- **Long lists** come in pages: Liked music and your own playlists load more as you scroll
+  down; songs in Local have **Load more**. How many songs a page has (100, 300 or 1000) is a
+  setting in *Settings → Look* (on the device).
 - Phones: the mini player's progress line is at its **bottom**, between it and the bottom bar.
 - Actions that need a room permission (for example adding songs) are **disabled** when you
   don't have that permission.
@@ -293,8 +298,9 @@ Open it with the **⋮** button or by **right-clicking** the song.
 > Built.
 
 - The **Lyrics** tab of the full player (between *Up next* and *Related*, like YTM): the
-  current song's lyrics, **synced** when they're timed (the line being sung is white and the
-  list scrolls along; tap a line to go there, if you may seek), otherwise plain text. It
+  current song's lyrics, **synced** when they're timed (they open at the line being sung,
+  which is white, and the list scrolls along; tap a line to go there, if you may seek),
+  otherwise plain text. It
   says where they're from. Not for podcast episodes.
 - Works for **every source**, including local files and media servers later.
 - Sources: **[LRCLIB](https://lrclib.net)** (free, synced lyrics, looked up by title,

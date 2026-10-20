@@ -85,15 +85,22 @@ computer: the left side). It shows when there's local music:
 - **Music on this phone**: the songs stored on the phone, in rooms on the phone. Android asks
   once whether YTMP may read them.
 
-The tab is like YouTube Music's library: **Albums** (the default, with covers), **Artists** and
-**Songs**, a search box that only searches this music, and **Shuffle all** (plays everything
-mixed, the queue stays as it is). Albums and artists open their pages, with Play, Play next
-and Add to queue. When an album ends, more of the same music follows (some of the same
+The tab is like YouTube Music's library: **Albums** (the default, with covers), **Artists**,
+**Songs** (300 at a time, with *Load more*; see [songs per page](ui.md)), **Genres** and
+**Folders**, a search box that only searches this music (folders at any depth too), and
+**Shuffle all** (plays everything mixed, the queue stays as it is). Albums, artists, genres and
+folders open their pages, with Play, Play next and Add to queue (a folder: also what's in the
+folders inside it); a folder page lists its folders, then its songs.
+
+The tab **remembers where you were**: the music, the chip, the search and how far you
+scrolled. Going back (from an album, say) always returns there; with *Remember where you were*
+on (the default) the tab also opens there, even after closing the app. Off: it opens at the
+start. When an album ends, more of the same music follows (some of the same
 artist), never YouTube. Copies of a song in the music folder show once. These songs play
 everywhere: this phone, browsers, Chromecasts, Sonos, MPD and the amplifier's rooms.
 
-Settings → **Local music** switches *Music on the network* and *Music on this phone* on or off
-(on this device). Likes and YouTube Music playlists aren't for local songs, so those buttons
+Settings → **Local music** switches *Music on the network*, *Music on this phone* and
+*Remember where you were* on or off (on this device). Likes and YouTube Music playlists aren't for local songs, so those buttons
 don't show for them.
 
 ## Media servers

@@ -963,6 +963,8 @@ export interface PlaylistPage {
   songs: Song[];
   owned: boolean;
   itemIds: string[];
+  more: string | null;
+  songCount: number | null;
 }
 
 export type SearchType = "all" | "songs" | "videos" | "albums" | "artists" | "community_playlists" | "featured_playlists" | "podcasts" | "episodes";
@@ -1057,6 +1059,11 @@ export interface LocalLibraries {
   libraries: LocalLibrarySummary[];
 }
 
+export interface LocalGroup {
+  name: string;
+  songs: number[];
+}
+
 export interface LocalLibraryPage {
   id: string;
   name: string;
@@ -1064,6 +1071,8 @@ export interface LocalLibraryPage {
   albums: SearchItem[];
   artists: SearchItem[];
   songs: Song[];
+  genres: LocalGroup[];
+  folders: LocalGroup[];
 }
 
 export interface YoutubeAccount {

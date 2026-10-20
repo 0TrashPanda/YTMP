@@ -106,24 +106,3 @@ into YTMP:
 The settings were reorganised (a quick menu behind the avatar, one Settings screen, see
 [UI](ui.md)), but they still need a visual update: how the Settings screen and the room
 settings look, and making them feel like one app (the room settings still look like Discord's).
-
-## Wishes for the app (2026-10-17)
-
-Fixes and small features to do later:
-
-- **Back** sometimes goes somewhere unexpected: the phone's Back button should step back
-  through the pages you opened, in order.
-- **Local tab remembers where you were** (a setting): the chip (albums, artists, songs), the
-  search, the library and how far you scrolled, also after visiting an album.
-- **More ways to browse local music**: by genre and by folder, next to albums, artists and
-  songs.
-- **Swipe left on the current song** in *Up next* to remove it (the next song plays), like
-  the other songs; now only its menu has *Remove*.
-- **Lyrics**: opening them scrolls down from the top every time; they should open at the
-  current line.
-- **Liked music** loads all your likes at once: load them in pages (more as you scroll).
-- **Local songs** stop at 300: a *Load more* button for the next 300.
-- **How many items a page loads** (Liked music, Local songs, …) as a setting.
-- **Bug: pull to refresh while swiping a row sideways.** On Home, swiping *Listen again* (or
-  another row) sideways can also pull the page down to refresh: a sideways swipe should never
-  refresh.

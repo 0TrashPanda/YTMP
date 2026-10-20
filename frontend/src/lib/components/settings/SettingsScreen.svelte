@@ -11,7 +11,7 @@
 	import { images, setDislikeButton, setImageQuality, setSwipeOpens, setTabOrder, setVideoArt } from '../../images.svelte';
 	import { nativeBridge } from '../../native';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
-	import { saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type VideoArt } from '../../storage';
+	import { saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type PageSize, type TabOrder, type VideoArt } from '../../storage';
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
 	import AccountSection from './AccountSection.svelte';
@@ -97,6 +97,7 @@
 	let soloBack = $state(saved.backLimit(true));
 	let partyBack = $state(saved.backLimit(false));
 	let headphones = $state(saved.headphonesAction);
+	let pageSize = $state(String(saved.pageSize) as `${PageSize}`);
 	let nextPlays = $state(saved.nextPlays);
 	const qualityOptions: [ImageQuality, string][] = [
 		['high', 'High'],
@@ -226,6 +227,20 @@
 					options={videoArtOptions}
 					value={images.videoArt}
 					onchange={setVideoArt}
+				/>
+				<Choice
+					label="Songs per page"
+					hint="Long lists (Liked music, your playlists, songs in Local) show this many songs at first, and this many more when you get to the end."
+					options={[
+						['100', '100'],
+						['300', '300'],
+						['1000', '1000']
+					] as [`${PageSize}`, string][]}
+					value={pageSize}
+					onchange={(v) => {
+						pageSize = v;
+						saved.pageSize = Number(v) as PageSize;
+					}}
 				/>
 				<Choice
 					label="Dislike button in the player bar"

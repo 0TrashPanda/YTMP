@@ -27,7 +27,7 @@
 		numbered?: boolean;
 		showAlbum?: boolean;
 		/** One of your own playlists (or Liked music): its songs can be removed from it (the song menu). */
-		playlist?: { id: string; itemIds: string[]; likedMusic: boolean; onChanged: () => void };
+		playlist?: { id: string; itemIds: string[]; likedMusic: boolean; onRemoved: (index: number) => void };
 		/** Songs can be dragged to another place (your own playlists). */
 		onMove?: (from: number, to: number) => void;
 		onToast: (text: string) => void;
@@ -131,7 +131,7 @@
 			id: playlist.id,
 			itemId: playlist.itemIds[index] || null,
 			likedMusic: playlist.likedMusic,
-			onRemoved: playlist.onChanged
+			onRemoved: () => playlist.onRemoved(index)
 		};
 		onMenu({ song, place: 'search', playlist: inPlaylist, x: rect.right - 256, y: rect.bottom });
 	}
@@ -147,7 +147,7 @@
 			id: playlist.id,
 			itemId: playlist.itemIds[index] || null,
 			likedMusic: playlist.likedMusic,
-			onRemoved: playlist.onChanged
+			onRemoved: () => playlist.onRemoved(index)
 		};
 		onMenu({ song, place: 'search', playlist: inPlaylist, x: atPointer ? event.clientX : rect.right - 256, y: atPointer ? event.clientY : rect.bottom });
 	}

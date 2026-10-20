@@ -90,6 +90,14 @@ them encrypted with the account (`YoutubeLinks.kt`, AES-GCM) and sends them to t
 Works without a Google Cloud project. An expired sign-in shows as signed out. yt-dlp stays
 anonymous (it doesn't use the cookies).
 
+**Your playlists in parts:** Liked music and your own playlists load part by part (YouTube
+Music's own parts, ~100 songs), so a big library opens quickly. ytmusicapi's `get_playlist`
+loads all parts itself and doesn't hand out the token for the next one, so `core.py` wraps
+its `get_continuations_2025`: with `limit=0` it stops after the first part and keeps that
+part's token (per thread) as the page's `more`. The next part is one `browse` request with
+that token, parsed with ytmusicapi's own `parse_playlist_items`. If a newer ytmusicapi
+renames that function, playlists simply load whole again.
+
 ## Android on-device variant ✅ (Chaquopy)
 
 Built: the app embeds the module with Chaquopy, see [android-app](android-app.md). Not built:

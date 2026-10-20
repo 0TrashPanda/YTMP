@@ -248,7 +248,8 @@
 			case 'addToQueue':
 				return moves;
 			case 'remove':
-				return slot.kind === 'item' && canRemove(slot.item);
+				// The current song too: the next one plays.
+				return canRemove(slot.item);
 			case 'radio':
 				return room.can('start_radio') && !slot.item.song.podcast;
 			case 'menu':

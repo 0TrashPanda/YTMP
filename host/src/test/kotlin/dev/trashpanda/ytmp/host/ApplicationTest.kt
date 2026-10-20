@@ -461,7 +461,7 @@ class ApplicationTest {
         override suspend fun account() = account
         override suspend fun home() = HomePage(listOf(HomeSection("Mine", emptyList())))
         override suspend fun library() = HomePage(listOf(HomeSection("Playlists", emptyList())))
-        override suspend fun playlist(id: String) = PlaylistPage(id, "Liked music", null, null, emptyList(), emptyList())
+        override suspend fun playlist(id: String, more: String?) = PlaylistPage(id, "Liked music", null, null, emptyList(), emptyList())
         val liked = mutableSetOf<String>()
         val saved = mutableListOf<Pair<String, List<String>>>()
         override suspend fun liked(songId: String) = songId in liked

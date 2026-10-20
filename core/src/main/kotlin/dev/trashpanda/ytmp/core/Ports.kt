@@ -88,7 +88,8 @@ interface PersonalCatalog {
     /** "Playlists" (Liked music first) and "Podcasts". */
     suspend fun library(): HomePage
 
-    suspend fun playlist(id: String): PlaylistPage
+    /** The first part of one of your playlists, or with [more] (its [PlaylistPage.more]) only the next songs. */
+    suspend fun playlist(id: String, more: String? = null): PlaylistPage
 
     /** Thumbs up. */
     suspend fun liked(songId: String): Boolean

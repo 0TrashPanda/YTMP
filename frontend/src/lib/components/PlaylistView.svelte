@@ -1,11 +1,13 @@
 <script lang="ts">
 	// A playlist page (community or YouTube Music's own, or one of yours): its songs, in order.
+	// Yours (Liked music too) load in parts: more songs as you scroll down.
 	import { thumbUrl } from '../images.svelte';
-	import { deletePlaylist, getPlaylist, movePlaylistItem, renamePlaylist } from '../api';
+	import { deletePlaylist, getPlaylist, getPlaylistPart, movePlaylistItem, renamePlaylist } from '../api';
+	import { saved } from '../storage';
 	import Icon from './Icon.svelte';
 	import { youtube } from '../youtube.svelte';
 	import { formatTime } from '../format';
-	import type { PlaylistPage } from '../protocol.gen';
+	import type { PlaylistPage, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import PlayAllButtons from './PlayAllButtons.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
@@ -58,8 +60,65 @@
 		void id;
 		playlist = null;
 	});
-	/** Load it again (after removing a song). */
+	/** Load it again (after a move that didn't work). */
 	const reload = () => version++;
+
+	// Long lists: this many songs at first, this many more each time you scroll to the end;
+	// your own playlists load the next part from YouTube Music when it's needed.
+	const pageSize = saved.pageSize;
+	let shown = $state(pageSize);
+	let loadingPart = $state<Promise<void> | null>(null);
+	let partFailed = $state(false);
+
+	/** Adds the next part of the playlist (once at a time). */
+	function loadPart(): Promise<void> {
+		const p = playlist;
+		if (!p?.more || partFailed) return Promise.resolve();
+		loadingPart ??= getPlaylistPart(p.id, p.more)
+			.then((next) => {
+				// Songs moved or removed meanwhile are kept as they are now.
+				if (playlist?.id === p.id && playlist.more === p.more)
+					playlist = { ...playlist, songs: [...playlist.songs, ...next.songs], itemIds: [...playlist.itemIds, ...next.itemIds], more: next.more };
+			})
+			.catch((e) => {
+				partFailed = true;
+				onToast(e instanceof Error ? e.message : "Couldn't load more songs");
+			})
+			.finally(() => (loadingPart = null));
+		return loadingPart;
+	}
+
+	// Part after part until there are enough to show.
+	$effect(() => {
+		if (playlist?.more && playlist.songs.length < shown && !partFailed && !loadingPart) void loadPart();
+	});
+
+	/** At the end of the list: more songs. */
+	let end = $state<HTMLElement>();
+	$effect(() => {
+		if (!end) return;
+		const watcher = new IntersectionObserver(
+			(entries) => {
+				if (entries.some((e) => e.isIntersecting) && playlist && (playlist.songs.length > shown || playlist.more)) shown += pageSize;
+			},
+			{ rootMargin: '800px 0px' }
+		);
+		watcher.observe(end);
+		return () => watcher.disconnect();
+	});
+
+	/** All of it (at most 1000 songs, like other playlists), for Play and the other buttons. */
+	async function whole(): Promise<Song[]> {
+		while (playlist?.more && playlist.songs.length < 1000 && !partFailed) await loadPart();
+		return playlist?.songs.slice(0, 1000) ?? [];
+	}
+
+	/** A song removed from it (Liked music: unliked): gone from the list right away. */
+	function removed(index: number) {
+		if (!playlist) return;
+		const others = <T,>(list: T[]) => list.filter((_, i) => i !== index);
+		playlist = { ...playlist, songs: others(playlist.songs), itemIds: others(playlist.itemIds), songCount: playlist.songCount && playlist.songCount - 1 };
+	}
 
 	// Your own playlists: move songs, rename, delete. Liked music: remove (unlike).
 	const likedMusic = $derived(mine && id === 'LM');
@@ -69,6 +128,8 @@
 	let renaming = $state<string | null>(null);
 
 	async function move(from: number, to: number) {
+		// To the end of what's loaded: the song after it is in the next part.
+		if (to === (playlist?.songs.length ?? 0) - 1) await loadPart();
 		const p = playlist;
 		if (!p) return;
 		const songs = [...p.songs];
@@ -160,7 +221,7 @@
 			{/if}
 			{#if playlist}
 				<p class="mt-1 text-muted">
-					{#if playlist.author}<span class="font-medium text-white">{playlist.author}</span> • {/if}{playlist.songs.length} songs • {formatTime(total)}
+					{#if playlist.author}<span class="font-medium text-white">{playlist.author}</span> • {/if}{playlist.songCount ?? playlist.songs.length} songs{playlist.more ? '' : ` • ${formatTime(total)}`}
 				</p>
 				{#if playlist.description}
 					<button class="mt-1 max-w-prose text-left text-sm text-muted {showDescription ? '' : 'line-clamp-2'}" onclick={() => (showDescription = !showDescription)}>
@@ -168,7 +229,7 @@
 					</button>
 				{/if}
 			{/if}
-			<PlayAllButtons {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay {onToast} />
+			<PlayAllButtons {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay whole={playlist?.more ? whole : undefined} {onToast} />
 		</div>
 	</header>
 
@@ -182,12 +243,16 @@
 		<section class="flex flex-col gap-1">
 			<SongList
 				{room}
-				songs={playlist.songs}
-				playlist={editable || likedMusic ? { id: playlist.id, itemIds: playlist.itemIds, likedMusic, onChanged: reload } : undefined}
+				songs={playlist.songs.slice(0, shown)}
+				playlist={editable || likedMusic ? { id: playlist.id, itemIds: playlist.itemIds, likedMusic, onRemoved: removed } : undefined}
 				onMove={editable ? move : undefined}
 				{onToast}
 				{onMenu}
 			/>
+			<div bind:this={end}></div>
+			{#if playlist.songs.length > shown || playlist.more}
+				<p class="px-2 py-2 text-sm text-muted">{partFailed ? "Couldn't load more songs." : 'Loading more…'}</p>
+			{/if}
 		</section>
 	{/if}
 </div>
