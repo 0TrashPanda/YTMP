@@ -131,3 +131,64 @@ export const ACTION_ICONS = {
 	remove: 'remove',
 	none: 'close'
 } as const;
+
+/**
+ * Taps, swipes and holds on the rows of a list ([where]: a song list or Up next), each row
+ * being a [Row]. What a gesture does is in [gestures]; [allowed] says whether the room lets you
+ * (the song menu always opens), [run] does it, [menu] opens the song menu. A right-click always
+ * opens the menu; holding a finger does the Hold action.
+ */
+export class RowGestures<Row> {
+	readonly swipe = new RowSwipe();
+	/** Touch or mouse, for the last press. */
+	private pointer = 'mouse';
+
+	constructor(
+		private readonly where: Where,
+		private readonly allowed: (action: QueueAction, row: Row) => boolean,
+		private readonly run: (action: QueueAction, row: Row, event: MouseEvent | null, element: HTMLElement | null) => void,
+		private readonly menu: (row: Row, event: MouseEvent, atPointer: boolean) => void
+	) {}
+
+	/** For the row's `onpointerdown`. */
+	pressed(event: PointerEvent): void {
+		this.pointer = event.pointerType;
+	}
+
+	/** Does what [gesture] is set to for [row]; [event] and [element] place the menu. */
+	act(gesture: Gesture, row: Row, event: MouseEvent | null, element: HTMLElement | null): void {
+		const action = gestures[this.where][gesture];
+		if (action !== 'menu' && !this.allowed(action, row)) return;
+		this.run(action, row, event, element);
+	}
+
+	/** For the row's `ontouchmove`: may it be swiped that way. */
+	canSwipe(row: Row): (way: 'left' | 'right') => boolean {
+		return (way) => {
+			const action = gestures[this.where][way];
+			return action !== 'none' && this.allowed(action, row);
+		};
+	}
+
+	/** For the row's `ontouchend`. */
+	swiped(row: Row, element: HTMLElement): void {
+		const done = this.swipe.end();
+		if (done) this.act(done.direction, row, null, element);
+	}
+
+	/** For the row's `oncontextmenu`: a right-click, or a finger held down. */
+	held(event: MouseEvent, row: Row): void {
+		if (this.pointer === 'touch' && gestures[this.where].hold !== 'menu') {
+			event.preventDefault();
+			this.swipe.cancel();
+			this.act('hold', row, null, event.currentTarget as HTMLElement);
+		} else {
+			this.menu(row, event, true);
+		}
+	}
+
+	/** What letting go of a swipe of [offset] px would do. */
+	actionFor(offset: number): QueueAction {
+		return gestures[this.where][offset > 0 ? 'right' : 'left'];
+	}
+}

@@ -2,6 +2,7 @@
 	// Play, Play next and Add to queue for a whole album or playlist. A playlist goes into
 	// autoplay instead of the queue ([toAutoplay]): it plays when the queue is empty.
 	import type { Song } from '../protocol.gen';
+	import { addToQueue, playNext } from '../songActions';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
 
@@ -37,8 +38,7 @@
 	async function addAll(position: 'next' | 'end') {
 		const list = await all();
 		if (!list.length) return;
-		const e = await room.run({ kind: 'AddSongs', songs: list, position });
-		onToast(e ? e.message : position === 'next' ? room.playNextText(name) : `Added ${name} to the queue`);
+		await (position === 'next' ? playNext : addToQueue)(room, list, name, onToast);
 	}
 
 	async function playNow() {

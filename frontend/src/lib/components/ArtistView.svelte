@@ -2,7 +2,8 @@
 	import { hideIfBroken } from '../pictures';
 	// An artist page: top songs, albums and singles.
 	import { thumbUrl } from '../images.svelte';
-	import { getArtist, yourRadio } from '../api';
+	import { getArtist } from '../api';
+	import { addToQueue, playNext, startRadio } from '../songActions';
 	import type { AlbumSummary, ArtistPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import AlbumGrid from './AlbumGrid.svelte';
@@ -47,14 +48,13 @@
 	async function radio() {
 		const first = artist?.songs[0];
 		if (!first) return;
-		const e = await room.run({ kind: 'StartRadio', song: first, songs: await yourRadio(first.id) });
-		onToast(e ? e.message : `Starting a radio from ${artist!.name}`);
+		await startRadio(room, first, onToast, artist!.name);
 	}
 
 	async function addAll(position: 'next' | 'end') {
 		if (!artist?.songs.length) return;
-		const e = await room.run({ kind: 'AddSongs', songs: artist.songs, position });
-		onToast(e ? e.message : `Added ${artist.songs.length} songs by ${artist.name}`);
+		const name = `${artist.songs.length} songs by ${artist.name}`;
+		await (position === 'next' ? playNext : addToQueue)(room, artist.songs, name, onToast);
 	}
 </script>
 

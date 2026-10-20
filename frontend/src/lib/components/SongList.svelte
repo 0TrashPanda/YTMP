@@ -2,9 +2,9 @@
 	// A list of songs (search, find similar, artist, album, playlist, history and Local pages). Tap,
 	// swipe right, swipe left and hold do what Settings → Taps and swipes says (play next, add
 	// to queue, play now, the song menu by default); ⋮ or right-click = song menu.
-	import { yourRadio } from '../api';
 	import { artistNames, formatTime } from '../format';
-	import { ACTION_ICONS, ACTION_NAMES, gestures, RowSwipe, type Gesture, type QueueAction } from '../gestures.svelte';
+	import { ACTION_ICONS, ACTION_NAMES, gestures, RowGestures, type QueueAction } from '../gestures.svelte';
+	import { addToQueue, menuAt, playNext, playNow, quoted, startRadio } from '../songActions';
 	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -69,11 +69,9 @@
 
 	// --- tap, swipe and hold ---------------------------------------------------------------
 
-	const swipe = new RowSwipe();
-	/** Touch or mouse, for the last press: holding a finger does the Hold action, a right-click always opens the menu. */
-	let pointer = 'mouse';
+	type Row = { song: Song; index: number };
 
-	function allowed(action: QueueAction, song: Song): boolean {
+	function allowed(action: QueueAction, { song }: Row): boolean {
 		switch (action) {
 			case 'playNow':
 				return room.can('play_now');
@@ -82,85 +80,47 @@
 				return room.can('add_songs');
 			case 'radio':
 				return room.can('start_radio') && !song.podcast;
-			case 'menu':
-				return true;
 			default:
 				return false;
 		}
 	}
 
-	/** Does what [gesture] is set to for [song]; [event] places the menu. */
-	async function act(gesture: Gesture, song: Song, index: number, event: MouseEvent | null, row: HTMLElement | null) {
-		const action = gestures.list[gesture];
-		if (action === 'menu') return openMenu(song, index, event, row);
-		if (!allowed(action, song)) return;
-		let error;
+	function run(action: QueueAction, row: Row, event: MouseEvent | null, element: HTMLElement | null) {
+		const { song } = row;
 		switch (action) {
+			case 'menu':
+				return openMenu(row, menuAt(element ?? (event!.currentTarget as HTMLElement)));
 			case 'playNow':
-				error = await room.run({ kind: 'PlayNow', song });
-				if (error) onToast(error.message);
-				return;
+				return playNow(room, song, onToast);
 			case 'playNext':
-				error = await room.run({ kind: 'AddSongs', songs: [song], position: 'next' });
-				onToast(error ? error.message : room.playNextText(`"${song.title}"`));
-				return;
+				return playNext(room, [song], quoted(song), onToast);
 			case 'addToQueue':
-				error = await room.run({ kind: 'AddSongs', songs: [song], position: 'end' });
-				onToast(error ? error.message : `Added "${song.title}" to the queue`);
-				return;
+				return addToQueue(room, [song], quoted(song), onToast);
 			case 'radio':
-				error = await room.run({ kind: 'StartRadio', song, songs: await yourRadio(song.id) });
-				onToast(error ? error.message : `Starting a radio from "${song.title}"`);
-				return;
+				return startRadio(room, song, onToast);
 		}
 	}
 
-	function swiped(song: Song, index: number, row: HTMLElement) {
-		const done = swipe.end();
-		if (done) act(done.direction, song, index, null, row);
-	}
-
-	/** Hold (touch) does the Hold action; a right-click opens the menu. */
-	function held(event: MouseEvent, song: Song, index: number) {
-		if (pointer === 'touch' && gestures.list.hold !== 'menu') {
-			event.preventDefault();
-			swipe.cancel();
-			act('hold', song, index, null, event.currentTarget as HTMLElement);
-		} else {
-			menu(event, song, index, true);
-		}
-	}
-
-	function openMenu(song: Song, index: number, event: MouseEvent | null, row: HTMLElement | null) {
-		const rect = (row ?? (event?.currentTarget as HTMLElement)).getBoundingClientRect();
-		const inPlaylist = playlist && {
-			id: playlist.id,
-			itemId: playlist.itemIds[index] || null,
-			likedMusic: playlist.likedMusic,
-			onRemoved: () => playlist.onRemoved(index)
-		};
-		onMenu({ song, place: 'search', playlist: inPlaylist, listened: fromHistory(index), x: rect.right - 256, y: rect.bottom });
-	}
-
-	function fromHistory(index: number) {
-		return listened && { id: listened.ids[index], onRemoved: () => listened.onRemoved(index) };
-	}
-
-	/** The action a swipe of [offset] px would do. */
-	const swipeAction = (offset: number): QueueAction => gestures.list[offset > 0 ? 'right' : 'left'];
-
-	function menu(event: MouseEvent, song: Song, index: number, atPointer: boolean) {
+	/** The ⋮ button or a right-click. */
+	function menu(row: Row, event: MouseEvent, atPointer: boolean) {
 		event.preventDefault();
 		event.stopPropagation();
-		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		openMenu(row, menuAt(event.currentTarget as HTMLElement, event, atPointer));
+	}
+
+	function openMenu({ song, index }: Row, at: { x: number; y: number }) {
 		const inPlaylist = playlist && {
 			id: playlist.id,
 			itemId: playlist.itemIds[index] || null,
 			likedMusic: playlist.likedMusic,
 			onRemoved: () => playlist.onRemoved(index)
 		};
-		onMenu({ song, place: 'search', playlist: inPlaylist, listened: fromHistory(index), x: atPointer ? event.clientX : rect.right - 256, y: atPointer ? event.clientY : rect.bottom });
+		const inHistory = listened && { id: listened.ids[index], onRemoved: () => listened.onRemoved(index) };
+		onMenu({ song, place: 'search', playlist: inPlaylist, listened: inHistory, ...at });
 	}
+
+	const rows = new RowGestures<Row>('list', allowed, run, menu);
+	const swipe = rows.swipe;
 </script>
 
 <div bind:this={list} class="relative flex flex-col gap-1">
@@ -175,7 +135,7 @@
 	>
 		<!-- Under the song while it's swiped: what letting go does. -->
 		{#if offset !== 0}
-			{@const action = swipeAction(offset)}
+			{@const action = rows.actionFor(offset)}
 			<div
 				class="absolute inset-0 flex items-center gap-2 px-5 text-sm font-medium text-white transition-colors
 					{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(key) ? (action === 'remove' ? 'bg-accent' : 'bg-d-green') : 'bg-line'}"
@@ -188,14 +148,14 @@
 		class="group relative flex touch-pan-y items-center gap-3 rounded-md px-2 py-2 {dragging ? 'bg-raised' : offset !== 0 ? 'bg-surface' : 'hover:bg-raised'} {offset !== 0 ? '' : 'transition-transform duration-200'}"
 		style:transform="translateX({offset}px)"
 		role="listitem"
-		onpointerdown={(e) => (pointer = e.pointerType)}
-		oncontextmenu={(e) => held(e, song, i)}
+		onpointerdown={(e) => rows.pressed(e)}
+		oncontextmenu={(e) => rows.held(e, { song, index: i })}
 		ontouchstart={(e) => swipe.start(e, key)}
-		ontouchmove={(e) => swipe.move(e, (way) => { const a = gestures.list[way]; return a !== 'none' && allowed(a, song); })}
-		ontouchend={(e) => swiped(song, i, e.currentTarget as HTMLElement)}
+		ontouchmove={(e) => swipe.move(e, rows.canSwipe({ song, index: i }))}
+		ontouchend={(e) => rows.swiped({ song, index: i }, e.currentTarget as HTMLElement)}
 		ontouchcancel={() => swipe.cancel()}
 	>
-		<button class="flex min-w-0 flex-1 items-center gap-3 text-left" onclick={(e) => act('tap', song, i, e, e.currentTarget.parentElement)} title={ACTION_NAMES[gestures.list.tap]}>
+		<button class="flex min-w-0 flex-1 items-center gap-3 text-left" onclick={(e) => rows.act('tap', { song, index: i }, e, e.currentTarget.parentElement)} title={ACTION_NAMES[gestures.list.tap]}>
 			{#if numbered}
 				<span class="w-8 shrink-0 text-center text-muted tabular-nums">{i + 1}</span>
 			{:else}
@@ -213,7 +173,7 @@
 			<!-- Some listings have no length (episodes in search); it's known once it plays. -->
 			<span class="text-sm text-muted tabular-nums">{song.durationMs ? formatTime(song.durationMs) : ''}</span>
 		</button>
-		<button class="rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="More for {song.title}" onclick={(e) => menu(e, song, i, false)}>
+		<button class="rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="More for {song.title}" onclick={(e) => menu({ song, index: i }, e, false)}>
 			<Icon name="more" />
 		</button>
 		{#if onMove}

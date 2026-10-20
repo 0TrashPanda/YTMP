@@ -3,6 +3,7 @@
 	// play next; ⋮ or right-click = the song menu.
 	import { thumbUrl } from '../images.svelte';
 	import { getPodcast } from '../api';
+	import { menuAt, playNext, playNow, quoted } from '../songActions';
 	import { formatTime } from '../format';
 	import type { Episode, PodcastPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -38,16 +39,14 @@
 	});
 
 	async function play(episode: Episode, now: boolean) {
-		const e = await room.run(now ? { kind: 'PlayNow', song: episode.song } : { kind: 'AddSongs', songs: [episode.song], position: 'next' });
-		if (e) onToast(e.message);
-		else if (!now) onToast(room.playNextText(`"${episode.song.title}"`));
+		if (now) await playNow(room, episode.song, onToast);
+		else await playNext(room, [episode.song], quoted(episode.song), onToast);
 	}
 
 	function menu(event: MouseEvent, episode: Episode, atPointer: boolean) {
 		event.preventDefault();
 		event.stopPropagation();
-		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-		onMenu({ song: episode.song, place: 'search', x: atPointer ? event.clientX : rect.right - 256, y: atPointer ? event.clientY : rect.bottom });
+		onMenu({ song: episode.song, place: 'search', ...menuAt(event.currentTarget as HTMLElement, event, atPointer) });
 	}
 
 	/** "1 hr 5 min" like YTM, instead of 65:00. */

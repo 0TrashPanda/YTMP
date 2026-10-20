@@ -3,6 +3,7 @@
 	// that scrolls sideways (tap = play next, ⋮ or right-click = song menu); albums,
 	// playlists, artists and podcasts are cards that open their page.
 	import { getHome } from '../api';
+	import { menuAt, playNext, quoted } from '../songActions';
 	import { itemCard, type PageHandlers } from '../cards';
 	import { artistNames } from '../format';
 	import type { HomePage, SearchItem, Song } from '../protocol.gen';
@@ -32,16 +33,12 @@
 	const songs = (items: SearchItem[]): Song[] => items.flatMap((i) => (i.kind === 'song' ? [i.song] : []));
 	const cards = (items: SearchItem[]) => items.flatMap((i) => itemCard(i, open) ?? []);
 
-	async function playNext(song: Song) {
-		const e = await room.run({ kind: 'AddSongs', songs: [song], position: 'next' });
-		onToast(e ? e.message : room.playNextText(`"${song.title}"`));
-	}
+	const playSongNext = (song: Song) => playNext(room, [song], quoted(song), onToast);
 
 	function menu(event: MouseEvent, song: Song, atPointer: boolean) {
 		event.preventDefault();
 		event.stopPropagation();
-		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-		onMenu({ song, place: 'search', x: atPointer ? event.clientX : rect.right - 256, y: atPointer ? event.clientY : rect.bottom });
+		onMenu({ song, place: 'search', ...menuAt(event.currentTarget as HTMLElement, event, atPointer) });
 	}
 </script>
 
@@ -77,7 +74,7 @@
 					>
 						{#each list as song, j (song.id + j)}
 							<div class="flex min-w-0 snap-start items-center gap-1 rounded-md hover:bg-raised" role="listitem" oncontextmenu={(e) => menu(e, song, true)}>
-								<button class="flex min-w-0 flex-1 items-center gap-3 px-2 py-1.5 text-left" title="Play next" onclick={() => playNext(song)}>
+								<button class="flex min-w-0 flex-1 items-center gap-3 px-2 py-1.5 text-left" title="Play next" onclick={() => playSongNext(song)}>
 									<Art {song} size={96} class="h-12 w-12" />
 									<div class="min-w-0 flex-1">
 										<div class="truncate font-medium">{song.title}</div>

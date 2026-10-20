@@ -22,7 +22,8 @@
 	// The song menu (docs/features/ui.md#song-menu): right-click a song, or its ⋮ button.
 	import { onMount, tick } from 'svelte';
 	import type { Command } from '../protocol.gen';
-	import { removeFromPlaylist, yourRadio } from '../api';
+	import { removeFromPlaylist } from '../api';
+	import { autoplayThis, runCommand, startRadio } from '../songActions';
 	import { listening } from '../listening.svelte';
 	import { likes } from '../likes.svelte';
 	import type { RoomConnection } from '../room.svelte';
@@ -63,9 +64,7 @@
 
 	async function command(c: Command, done?: string) {
 		onClose();
-		const error = await room.run(c);
-		if (error) onToast(error.message);
-		else if (done) onToast(done);
+		await runCommand(room, c, onToast, done);
 	}
 
 	const entries = $derived.by(() => {
@@ -107,14 +106,20 @@
 				list.push({
 					icon: 'radio',
 					label: 'Start radio',
-					run: async () => command({ kind: 'StartRadio', song: seed, songs: await yourRadio(seed.id) }, `Starting a radio from "${seed.title}"`)
+					run: () => {
+						onClose();
+						void startRadio(room, seed, onToast);
+					}
 				});
 			}
 			if (room.can('autoplay_from_here')) {
 				list.push({
 					icon: 'autoplay',
 					label: 'Autoplay this',
-					run: async () => command({ kind: 'AutoplayFromHere', song: seed, songs: await yourRadio(seed.id) }, `Autoplay: songs like "${seed.title}"`)
+					run: () => {
+						onClose();
+						void autoplayThis(room, seed, onToast);
+					}
 				});
 			}
 			// Read everything from the target before closing: closing clears it.

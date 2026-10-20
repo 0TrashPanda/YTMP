@@ -4,6 +4,7 @@
 	// playlists open their page.
 	import { thumbUrl } from '../images.svelte';
 	import { search, similar } from '../api';
+	import { playNext, quoted } from '../songActions';
 	import { itemCard } from '../cards';
 	import { artistNames } from '../format';
 	import type { AlbumRef, ArtistRef, PodcastRef, SearchItem, SearchPage, SearchType, Song } from '../protocol.gen';
@@ -100,10 +101,7 @@
 
 	const cards = (items: SearchItem[]) => items.flatMap((i) => card(i) ?? []);
 
-	async function playNext(song: Song) {
-		const e = await room.run({ kind: 'AddSongs', songs: [song], position: 'next' });
-		onToast(e ? e.message : room.playNextText(`"${song.title}"`));
-	}
+	const playSongNext = (song: Song) => playNext(room, [song], quoted(song), onToast);
 
 	/** The top result, as one big card: a song plays next, anything else opens. */
 	function top(item: SearchItem): { title: string; subtitle: string; art: string | undefined; round: boolean; open: () => void; prefetch?: () => void } {
@@ -114,7 +112,7 @@
 				subtitle: `${song.podcast ? 'Episode' : item.video ? 'Video' : 'Song'} • ${artistNames(song)}`,
 				art: thumbUrl(song.thumbnails, 400),
 				round: false,
-				open: () => playNext(song)
+				open: () => playSongNext(song)
 			};
 		}
 		const c = card(item)!;

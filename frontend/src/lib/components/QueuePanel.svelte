@@ -7,7 +7,8 @@
 	import { tick } from 'svelte';
 	import { yourRadio } from '../api';
 	import { artistNames, formatTime } from '../format';
-	import { ACTION_ICONS, ACTION_NAMES, gestures, RowSwipe, type Gesture, type QueueAction } from '../gestures.svelte';
+	import { ACTION_ICONS, ACTION_NAMES, gestures, RowGestures, type QueueAction } from '../gestures.svelte';
+	import { menuAt } from '../songActions';
 	import type { ItemList, QueueItem } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -228,11 +229,8 @@
 
 	// --- tap, swipe and hold ----------------------------------------------------------------
 
-	const swipe = new RowSwipe();
 	/** Swiped away, waiting for the host to remove it. */
 	let removing = $state<string | null>(null);
-	/** Touch or mouse, for the last press: holding a finger does the Hold action, a right-click always opens the menu. */
-	let pointer = 'mouse';
 
 	function canRemove(item: QueueItem) {
 		return room.can(item.addedBy === room.participantId ? 'remove_own' : 'remove_others');
@@ -259,12 +257,10 @@
 		}
 	}
 
-	/** Does what [gesture] is set to in Up next for [slot]. */
-	async function act(gesture: Gesture, slot: Slot, event: MouseEvent | null, row: HTMLElement | null) {
+	/** Does [action] (one of Settings → Taps and swipes) for [slot]. */
+	async function run(action: QueueAction, slot: Slot, event: MouseEvent | null, row: HTMLElement | null) {
 		if (slot.kind === 'header') return;
-		const action = gestures.queue[gesture];
-		if (action === 'menu') return showMenu(slot, event, row);
-		if (!allowed(action, slot)) return;
+		if (action === 'menu') return openMenu(slot, menuAt(row ?? (event!.currentTarget as HTMLElement)));
 		const item = slot.item;
 		const queueLength = roomState?.queue.length ?? 0;
 		switch (action) {
@@ -291,36 +287,14 @@
 		}
 	}
 
-	function swiped(slot: Slot, row: HTMLElement) {
-		const done = swipe.end();
-		if (done) act(done.direction, slot, null, row);
-	}
-
-	/** Hold (touch) does the Hold action; a right-click opens the menu. */
-	function held(event: MouseEvent, slot: Slot) {
-		if (pointer === 'touch' && gestures.queue.hold !== 'menu') {
-			event.preventDefault();
-			swipe.cancel();
-			act('hold', slot, null, event.currentTarget as HTMLElement);
-		} else {
-			menu(event, slot, true);
-		}
-	}
-
-	function showMenu(slot: Slot, event: MouseEvent | null, row: HTMLElement | null) {
-		if (slot.kind === 'header') return;
-		const rect = (row ?? (event?.currentTarget as HTMLElement)).getBoundingClientRect();
-		onMenu({ song: slot.item.song, item: slot.item, place: slot.kind === 'current' ? 'current' : slot.place, x: rect.right - 256, y: rect.bottom });
-	}
+	const rows = new RowGestures<Slot>('queue', allowed, run, menu);
+	const swipe = rows.swipe;
 
 	/** How far a song is swiped, or swiped away. */
 	function swipeOffset(key: string): string {
 		if (removing === key) return '-100%';
 		return `${swipe.offset(key)}px`;
 	}
-
-	/** The action a swipe of [offset] px would do. */
-	const swipeAction = (offset: number): QueueAction => gestures.queue[offset > 0 ? 'right' : 'left'];
 
 	// --- actions ---------------------------------------------------------------------------
 
@@ -335,18 +309,17 @@
 		return slot.kind === 'item' && room.can(slot.place === 'autoplay' ? 'add_songs' : 'play_now');
 	}
 
-	function menu(event: MouseEvent, slot: Slot, atPointer: boolean) {
+	/** The ⋮ button or a right-click. */
+	function menu(slot: Slot, event: MouseEvent, atPointer: boolean) {
 		if (slot.kind === 'header') return;
 		event.preventDefault();
 		event.stopPropagation();
-		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-		onMenu({
-			song: slot.item.song,
-			item: slot.item,
-			place: slot.kind === 'current' ? 'current' : slot.place,
-			x: atPointer ? event.clientX : rect.right - 256,
-			y: atPointer ? event.clientY : rect.bottom
-		});
+		openMenu(slot, menuAt(event.currentTarget as HTMLElement, event, atPointer));
+	}
+
+	function openMenu(slot: Slot, at: { x: number; y: number }) {
+		if (slot.kind === 'header') return;
+		onMenu({ song: slot.item.song, item: slot.item, place: slot.kind === 'current' ? 'current' : slot.place, ...at });
 	}
 
 	function subtitle(item: QueueItem, place: Place | 'current') {
@@ -406,7 +379,7 @@
 							<Icon name="remove" size={22} />
 						</div>
 					{:else if swiping}
-						{@const action = swipeAction(offset)}
+						{@const action = rows.actionFor(offset)}
 						<div
 							class="absolute inset-0 flex items-center gap-2 px-5 text-sm font-medium text-white transition-colors
 								{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(slot.key) ? (action === 'remove' ? 'bg-accent' : 'bg-d-green') : 'bg-line'}"
@@ -422,11 +395,11 @@
 							{dragging ? 'bg-line' : ''}
 							{swiping ? '' : 'transition-transform duration-200'}"
 						style:transform="translateX({swipeOffset(slot.key)})"
-						onpointerdown={(e) => (pointer = e.pointerType)}
-						oncontextmenu={(e) => held(e, slot)}
+						onpointerdown={(e) => rows.pressed(e)}
+						oncontextmenu={(e) => rows.held(e, slot)}
 						ontouchstart={(e) => !drag && swipe.start(e, slot.key)}
-						ontouchmove={(e) => swipe.move(e, (way) => { const a = gestures.queue[way]; return a !== 'none' && allowed(a, slot); })}
-						ontouchend={(e) => swiped(slot, e.currentTarget as HTMLElement)}
+						ontouchmove={(e) => swipe.move(e, rows.canSwipe(slot))}
+						ontouchend={(e) => rows.swiped(slot, e.currentTarget as HTMLElement)}
 						ontouchcancel={() => swipe.cancel()}
 						role="listitem"
 					>
@@ -434,7 +407,7 @@
 						<button
 							class="flex min-w-0 flex-1 items-center gap-3 text-left {canOpen(slot) ? '' : 'cursor-default'}"
 							aria-disabled={!canOpen(slot)}
-							onclick={(e) => act('tap', slot, e, e.currentTarget.parentElement)}
+							onclick={(e) => rows.act('tap', slot, e, e.currentTarget.parentElement)}
 							title={ACTION_NAMES[gestures.queue.tap]}
 						>
 							<Art song={slot.item.song} size={40} class="h-10 w-10" />
@@ -448,7 +421,7 @@
 						<button
 							class="rounded-full p-1.5 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus:opacity-100 {gestures.queue.hold === 'menu' ? 'pointer-coarse:hidden' : 'pointer-coarse:opacity-100'}"
 							aria-label="More for {slot.item.song.title}"
-							onclick={(e) => menu(e, slot, false)}
+							onclick={(e) => menu(slot, e, false)}
 						>
 							<Icon name="more" size={18} />
 						</button>
