@@ -290,14 +290,9 @@ class MainActivity : ComponentActivity() {
         CastScreenState(devices.map { CastScreenDevice(it.id, it.name) }, shown)
 
     /** The speakers and TVs this phone found, the party screens it shows, and what plays on them (bridge `nearby`). */
-    private fun nearbyState() = combine(
-        combine(app.host.casts.devices, app.host.sonos.devices, app.host.mpd.devices, app.host.zones.devices) { a, b, c, d -> a + b + c + d },
-        app.host.castScreens.shown,
-        app.host.nearby.playing,
-        NearbyState::of,
-    )
+    private fun nearbyState() = combine(app.host.outputs.devices, app.host.castScreens.shown, app.host.nearby.playing, NearbyState::of)
 
-    private fun nearbyDevices(): List<OutputDevice> = app.host.casts.devices.value + app.host.sonos.devices.value + app.host.mpd.devices.value + app.host.zones.devices.value
+    private fun nearbyDevices(): List<OutputDevice> = app.host.outputs.devices.value
 
     /** [url] is on the site of the page shown now (one of the app's pages): only that page may use it. */
     private fun fromThisPage(url: String): Boolean {

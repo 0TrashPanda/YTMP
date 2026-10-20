@@ -14,7 +14,6 @@ import dev.trashpanda.ytmp.protocol.QueueItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +21,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
 import java.net.URLEncoder
@@ -43,7 +41,7 @@ data class CastDeviceAddress(val id: String, val name: String, val host: String,
  * host's `/tv` page there, which plays the music itself (docs/features/ui.md#party-screen).
  */
 class CastOutputs(
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
     /**
      * Where a TV opens the party screen page; null: [audioBaseUrl]. DashCast is an `https`
      * page, which can only show `https` pages: a server's public address works best.
@@ -51,9 +49,8 @@ class CastOutputs(
     private val pageBaseUrl: ((localAddress: InetAddress) -> String)? = null,
     /** Base URL of this host as seen from a device that reached us at [InetAddress] (our side of the connection). */
     private val audioBaseUrl: (localAddress: InetAddress) -> String,
-) : OutputDriver {
+) : DeviceDriver(scope, "Cast device") {
     private val known = MutableStateFlow<Map<String, CastDeviceAddress>>(emptyMap())
-    private val drivers = HashMap<String, Job>()
 
     /** The devices as room outputs. Pass to [RoomManager]. */
     override val devices: StateFlow<List<OutputDevice>> = known
@@ -71,74 +68,35 @@ class CastOutputs(
     /** Where the device with [id] is, if it was found. */
     fun address(id: String): CastDeviceAddress? = known.value[id]
 
-    /** Starts a driver for every room, now and as rooms are created. */
-    fun attach(rooms: RoomManager) {
-        scope.launch {
-            rooms.list.collect { list ->
-                val codes = list.map { it.code }.toSet()
-                synchronized(drivers) {
-                    for (code in drivers.keys - codes) drivers.remove(code)?.cancel()
-                    for (code in codes - drivers.keys) rooms[code]?.let { drivers[code] = scope.launch { drive(it) } }
-                }
-            }
-        }
-    }
+    override fun has(id: String) = id in known.value
 
-    override fun play(room: OutputRoom): Job = scope.launch { drive(room) }
+    override fun name(id: String) = known.value[id]?.name ?: id
 
-    private suspend fun drive(room: OutputRoom) {
-        val changed = Channel<Unit>(Channel.CONFLATED)
-        room.addChangeListener { changed.trySend(Unit) }
-        val sessions = HashMap<String, CastSession>()
-        // Devices this room has played on: when another app runs there later, it took them over.
-        val playedOn = HashSet<String>()
-        try {
-            while (true) {
-                // React to changes right away, and check the devices regularly anyway.
-                withTimeoutOrNull(SYNC_INTERVAL_MS) { changed.receive() }
-                val view = room.view()
-                for (id in sessions.keys - view.activeOutputs.keys) sessions.remove(id)?.stop()
-                // Switched off here: turning it on again takes it, also from another app.
-                playedOn.retainAll(view.activeOutputs.keys)
-                for ((id, volume) in view.activeOutputs) {
-                    val device = known.value[id] ?: continue
-                    val session = sessions.getOrPut(id) { CastSession(device, resuming = id in playedOn) }
-                    try {
-                        session.sync(view, volume, room.code, report = room::notice, skipped = room::outputSkipped, ready = { room.outputReady(id, it) }) { actual ->
-                            room.reportOutputVolume(id, actual)
-                        }
-                        if (session.loadedSomething) playedOn += id
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: OutputTakenOver) {
-                        // Leave it be: the other app is playing.
-                        log.info("Cast device {}: {}", device.name, e.message)
-                        session.close()
-                        sessions.remove(id)
-                        playedOn -= id
-                        room.outputTakenOver(id)
-                    } catch (e: Exception) {
-                        log.warn("Cast device {} failed", device.name, e)
-                        session.close()
-                        sessions.remove(id) // Reconnect on the next round.
-                        // A new song doesn't wait for it.
-                        if (view.starting) view.current?.let { room.outputReady(id, it.itemId) }
-                    }
-                }
-            }
-        } finally {
-            sessions.values.forEach { it.close() }
-        }
-    }
+    override fun session(id: String, resuming: Boolean): DeviceSession = CastSession(known.value.getValue(id), resuming)
 
     /** One room playing on one Cast device. */
     private inner class CastSession(
         private val device: CastDeviceAddress,
         /** This room played here before (the connection dropped): don't take it from another app. */
         private val resuming: Boolean = false,
-    ) {
-        /** A song was loaded on the device in this session. */
-        var loadedSomething = false
+    ) : DeviceSession {
+        override var loadedSomething = false
+            private set
+
+        override suspend fun sync(view: RoomView, wantedVolume: Double?, room: OutputRoom, outputId: String) =
+            sync(view, wantedVolume, room.code, report = room::notice, skipped = room::outputSkipped, ready = { room.outputReady(outputId, it) }) { actual ->
+                room.reportOutputVolume(outputId, actual)
+            }
+
+        override fun takenOver() = close()
+
+        /** Reconnect on the next round. */
+        override fun failed(): Boolean {
+            close()
+            return true
+        }
+
+        override suspend fun end() = close()
 
         private var channel: CastChannel? = null
         private var player: CastMediaPlayer? = null
@@ -155,7 +113,7 @@ class CastOutputs(
         /** The songs before and after the current one in the device's own queue (our item ids). */
         private var neighbors: Pair<String?, String?> = null to null
 
-        suspend fun sync(
+        private suspend fun sync(
             view: RoomView,
             wantedVolume: Double?,
             roomCode: String,
@@ -374,7 +332,7 @@ class CastOutputs(
         /** Google's player runs on the device (this connection started it). */
         private var launched = false
 
-        suspend fun stop() {
+        override suspend fun stop() {
             runCatching { if (shownUrl != null) channel?.let { CastWebPage(it).stop() } else player?.stop() }
             close()
         }
@@ -391,7 +349,6 @@ class CastOutputs(
 
     companion object {
         private val log = LoggerFactory.getLogger(CastOutputs::class.java)
-        private const val SYNC_INTERVAL_MS = 2_000L
 
         /** Cast devices start a little late after loading or seeking; aim ahead. */
         private const val LOAD_LEAD_MS = 1_000L

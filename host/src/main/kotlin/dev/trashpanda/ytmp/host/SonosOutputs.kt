@@ -2,14 +2,10 @@ package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.core.OutputDevice
 import dev.trashpanda.ytmp.core.OutputRoom
-import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.RoomView
 import dev.trashpanda.ytmp.protocol.OutputKind
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,7 +14,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
 import java.net.InetAddress
@@ -39,12 +34,11 @@ data class SonosAddress(val id: String, val name: String, val host: String, val 
  * See docs/implementation/sonos.md.
  */
 class SonosOutputs(
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
     /** Base URL of this host as seen from a speaker that reached us at [InetAddress]. */
     private val audioBaseUrl: (localAddress: InetAddress) -> String,
-) : OutputDriver {
+) : DeviceDriver(scope, "Sonos") {
     private val known = MutableStateFlow<Map<String, SonosAddress>>(emptyMap())
-    private val drivers = HashMap<String, Job>()
 
     /** The speakers as room outputs. */
     override val devices: StateFlow<List<OutputDevice>> = known
@@ -99,74 +93,35 @@ class SonosOutputs(
         }
     }
 
-    /** Starts a driver for every room, now and as rooms are created. */
-    fun attach(rooms: RoomManager) {
-        scope.launch {
-            rooms.list.collect { list ->
-                val codes = list.map { it.code }.toSet()
-                synchronized(drivers) {
-                    for (code in drivers.keys - codes) drivers.remove(code)?.cancel()
-                    for (code in codes - drivers.keys) rooms[code]?.let { drivers[code] = scope.launch { drive(it) } }
-                }
-            }
-        }
-    }
+    override fun has(id: String) = id in known.value
 
-    override fun play(room: OutputRoom): Job = scope.launch { drive(room) }
+    override fun name(id: String) = known.value[id]?.name ?: id
 
-    private suspend fun drive(room: OutputRoom) {
-        val changed = Channel<Unit>(Channel.CONFLATED)
-        room.addChangeListener { changed.trySend(Unit) }
-        val sessions = HashMap<String, Session>()
-        try {
-            while (true) {
-                withTimeoutOrNull(SYNC_INTERVAL_MS) { changed.receive() }
-                val view = room.view()
-                for (id in sessions.keys - view.activeOutputs.keys) sessions.remove(id)?.stop()
-                for ((id, volume) in view.activeOutputs) {
-                    val device = known.value[id] ?: continue
-                    val session = sessions.getOrPut(id) { Session(device) }
-                    try {
-                        session.sync(view, volume, report = room::notice, ready = { room.outputReady(id, it) }) { actual -> room.reportOutputVolume(id, actual) }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: OutputTakenOver) {
-                        // Leave it be: no stop, the other app is playing.
-                        log.info("Sonos {}: {}", device.name, e.message)
-                        sessions.remove(id)
-                        room.outputTakenOver(id)
-                    } catch (e: Exception) {
-                        log.warn("Sonos {} failed: {}", device.name, e.message)
-                        session.failedAt = System.currentTimeMillis()
-                        // A new song doesn't wait for it.
-                        if (view.starting) view.current?.let { room.outputReady(id, it.itemId) }
-                    }
-                }
-            }
-        } finally {
-            sessions.values.forEach { runCatching { it.stop() } }
-        }
-    }
+    override fun session(id: String, resuming: Boolean): DeviceSession = Session(known.value.getValue(id))
 
     /** One room playing on one Sonos speaker. */
-    private inner class Session(private val device: SonosAddress) {
+    private inner class Session(private val device: SonosAddress) : DeviceSession {
         private val player = SonosPlayer(device.host, device.port)
         private var loadedItemId: String? = null
         private var settledAt = 0L
         private var appliedVolume: Double? = null
         private var lastVolumeCheck = 0L
-        private var failed = false
-        var failedAt = 0L
+        /** The current song couldn't play here. */
+        private var songFailed = false
+        private var failedAt = 0L
         /** Loaded while the room waited for everyone to load the song: it plays when the room starts it. */
         private var waitingToStart = false
 
-        suspend fun sync(
-            view: RoomView,
-            wantedVolume: Double?,
-            report: suspend (String) -> Unit,
-            ready: suspend (itemId: String) -> Unit,
-            reportVolume: suspend (Double) -> Unit,
-        ) {
+        /** It waits a little before trying again. */
+        override fun failed(): Boolean {
+            failedAt = System.currentTimeMillis()
+            return false
+        }
+
+        override suspend fun sync(view: RoomView, wantedVolume: Double?, room: OutputRoom, outputId: String) {
+            val report: suspend (String) -> Unit = room::notice
+            val ready: suspend (String) -> Unit = { room.outputReady(outputId, it) }
+            val reportVolume: suspend (Double) -> Unit = { room.reportOutputVolume(outputId, it) }
             val now = System.currentTimeMillis()
             if (now - failedAt < RETRY_AFTER_MS) return
             if (appliedVolume == null) {
@@ -194,7 +149,7 @@ class SonosOutputs(
             val expected = view.positionAt(now)
             if (item.itemId != loadedItemId) {
                 loadedItemId = item.itemId
-                failed = false
+                songFailed = false
                 settledAt = now + SETTLE_MS
                 val url = audioBaseUrl(player.localAddress) + "/api/audio/" + URLEncoder.encode(item.song.id, "UTF-8")
                 try {
@@ -211,7 +166,7 @@ class SonosOutputs(
                     if (view.playing) player.play()
                     if (expected > SEEK_THRESHOLD_MS) player.seek(expected + if (view.starting) 0 else LOAD_LEAD_MS)
                 } catch (e: SonosException) {
-                    failed = true
+                    songFailed = true
                     log.warn("Sonos {} couldn't play {}: {}", device.name, item.song.title, e.message)
                     report("${device.name} couldn't play \"${item.song.title}\": ${e.message}")
                 }
@@ -219,7 +174,7 @@ class SonosOutputs(
                 if (view.starting) ready(item.itemId)
                 return
             }
-            if (failed) return
+            if (songFailed) return
             if (waitingToStart) {
                 if (!view.playing) return
                 // Everyone has the song: it starts now.
@@ -249,7 +204,7 @@ class SonosOutputs(
             }
         }
 
-        suspend fun stop() {
+        override suspend fun stop() {
             if (loadedItemId != null) runCatching { player.stop() }
             loadedItemId = null
         }
@@ -281,7 +236,6 @@ class SonosOutputs(
 
     companion object {
         private val log = LoggerFactory.getLogger(SonosOutputs::class.java)
-        private const val SYNC_INTERVAL_MS = 2_000L
         private const val SETTLE_MS = 6_000L
         private const val LOAD_LEAD_MS = 1_000L
         /** Starting a song this far in: seek there after loading. */

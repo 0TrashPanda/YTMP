@@ -2,7 +2,6 @@ package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.core.OutputDevice
 import dev.trashpanda.ytmp.core.OutputRoom
-import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.RoomView
 import dev.trashpanda.ytmp.protocol.OutputKind
 import kotlinx.coroutines.CancellationException
@@ -40,14 +39,14 @@ import java.net.URLEncoder
  * puts back what the zone had. See docs/implementation/zones.md.
  */
 class ZoneOutputs(
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
     /** Base URL of this host as seen from a player that reached us at [InetAddress]. */
     private val audioBaseUrl: (localAddress: InetAddress) -> String,
     /** Its MPDs that feed zones aren't offered by themselves too. */
     private val mpd: MpdOutputs? = null,
     /** Where a file's `music` goes (the Local tab). */
     private val local: LocalMusic? = null,
-) : OutputDriver {
+) : RoomFollowingDriver(scope) {
     /** One zone: [control] makes its requests. */
     class Zone(val id: String, val name: String, val player: Player, val control: ZoneControl)
 
@@ -60,7 +59,6 @@ class ZoneOutputs(
     private val sources = HashMap<String, Pair<String, Job>>()
     /** The local music each source shares, by source. */
     private val libraries = HashMap<String, String>()
-    private val drivers = HashMap<String, Job>()
 
     // Shared by all rooms on this host, under [lock]: who has each player and zone, and what
     // each zone had before (put back when it's switched off).
@@ -170,21 +168,6 @@ class ZoneOutputs(
         config to validateZones(config, host)
     }
 
-    /** Starts a driver for every room, now and as rooms are created. */
-    fun attach(rooms: RoomManager) {
-        scope.launch {
-            rooms.list.collect { list ->
-                val codes = list.map { it.code }.toSet()
-                synchronized(drivers) {
-                    for (code in drivers.keys - codes) drivers.remove(code)?.cancel()
-                    for (code in codes - drivers.keys) rooms[code]?.let { drivers[code] = scope.launch { drive(it) } }
-                }
-            }
-        }
-    }
-
-    override fun play(room: OutputRoom): Job = scope.launch { drive(room) }
-
     /** A zone switched on in one room. */
     private class ZoneRun(var zone: Zone) {
         var settledAt = 0L
@@ -197,7 +180,7 @@ class ZoneOutputs(
         var switched = false
     }
 
-    private suspend fun drive(room: OutputRoom) {
+    override suspend fun drive(room: OutputRoom) {
         val me = Any()
         val changed = Channel<Unit>(Channel.CONFLATED)
         room.addChangeListener { changed.trySend(Unit) }

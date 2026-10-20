@@ -27,9 +27,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
@@ -102,8 +99,9 @@ class LocalHost(private val context: Context) {
         zoneFinder.forgetAll()
     }
     /** Speakers here that play a room on another host (a server), which can't reach them. */
-    val nearby = NearbySpeakers(scope, listOf(casts, sonos, mpd, zones))
-    private val outputs = combine(casts.devices, sonos.devices, mpd.devices, zones.devices) { a, b, c, d -> a + b + c + d }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+    /** Every kind of speaker and TV on the network. */
+    val outputs = OutputDrivers(scope, listOf(casts, sonos, mpd, zones))
+    val nearby = NearbySpeakers(scope, outputs.all)
     val authLink = AuthLink(context, PORT)
     /** The phone owner's YouTube Music account. */
     val youtube = PhoneYoutubeAccount(context) { ytm }
@@ -127,7 +125,7 @@ class LocalHost(private val context: Context) {
             override suspend fun resolveStream(songId: String) = ytm.resolveStream(songId)
             override suspend fun resolve(songId: String) = ytm.resolve(songId)
         }),
-        scope = scope, outputs = outputs, store = PhoneRoomStore(context),
+        scope = scope, outputs = outputs.devices, store = PhoneRoomStore(context),
         onPlayFinished = { play ->
             plays.report(play)
             addToYoutubeHistory(play)
@@ -175,10 +173,7 @@ class LocalHost(private val context: Context) {
         val webApp = installWebApp()
         rooms.startCleanup()
         sync.start()
-        casts.attach(rooms)
-        sonos.attach(rooms)
-        mpd.attach(rooms)
-        zones.attach(rooms)
+        outputs.attach(rooms)
         if (phoneMusicOn) local.add(phoneLibrary)
         wifi.start()
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {

@@ -10,9 +10,7 @@ import dev.trashpanda.ytmp.host.MpdOutputs
 import dev.trashpanda.ytmp.host.SonosOutputs
 import dev.trashpanda.ytmp.host.LocalMusic
 import dev.trashpanda.ytmp.host.ZoneOutputs
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import dev.trashpanda.ytmp.host.OutputDrivers
 import dev.trashpanda.ytmp.host.CachedSource
 import dev.trashpanda.ytmp.host.PlayReporter
 import dev.trashpanda.ytmp.host.TrustedAuthServers
@@ -80,9 +78,7 @@ fun main(args: Array<String>) {
         val casts = CastOutputs(this, pageBaseUrl = { localAddress -> publicUrl ?: audioBase(localAddress) }, audioBaseUrl = audioBase)
         casts.addConfigured(config.cast.devices)
         if (config.cast.discovery) casts.discover()
-        val sonos = SonosOutputs(this) { localAddress ->
-            config.cast.audioBaseUrl.trimEnd('/').ifEmpty { "http://${localAddress.hostAddress}:${config.server.port}" }
-        }
+        val sonos = SonosOutputs(this, audioBase)
         config.sonos.devices.forEach(sonos::addHost)
         if (config.sonos.discovery) sonos.discover(keep = config.sonos.devices.toSet())
         val mpd = MpdOutputs(this, audioBase)
@@ -93,7 +89,7 @@ fun main(args: Array<String>) {
         val zones = ZoneOutputs(this, audioBase, mpd, local)
         for (url in config.zones.files) zones.addSource(url, url)
         if (config.zones.discovery) zones.discover()
-        val outputs = combine(casts.devices, sonos.devices, mpd.devices, zones.devices) { a, b, c, d -> a + b + c + d }.stateIn(this, SharingStarted.Eagerly, emptyList())
+        val outputs = OutputDrivers(this, listOf(casts, sonos, mpd, zones))
 
         val db = Database.open(config.database)
         val accounts = Accounts(db)
@@ -129,7 +125,7 @@ fun main(args: Array<String>) {
         /** One of this server's own accounts, by account ID (`user@issuer`). */
         fun localAccount(accountId: String): String? = localUsername(accountId)?.let(accounts::find)?.id
         val rooms = RoomManager(
-            local.streams(ytm), this, config.rooms.style(), config.rooms.codeLength, outputs = outputs, store = JdbcRoomStore(db),
+            local.streams(ytm), this, config.rooms.style(), config.rooms.codeLength, outputs = outputs.devices, store = JdbcRoomStore(db),
             // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
             // Party rooms whose admins are all gone for 5 minutes tell the others they can clone them.
             timeouts = RoomTimeouts(guestSoloRoom = 30.days, adminless = 5.minutes),
@@ -149,10 +145,7 @@ fun main(args: Array<String>) {
         rooms.startCleanup()
         val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, defaultPassword = service::roomPassword)
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
-        casts.attach(rooms)
-        sonos.attach(rooms)
-        mpd.attach(rooms)
-        zones.attach(rooms)
+        outputs.attach(rooms)
 
         ytmpModule(
             rooms,
