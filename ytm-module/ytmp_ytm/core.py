@@ -67,6 +67,10 @@ log = logging.getLogger("ytmp_ytm")
 _NEW_EPISODES = 10
 # The podcast of an episode whose podcast couldn't be looked up: still an episode (no music radio after it).
 _UNKNOWN_PODCAST = {"id": "", "name": "Podcast"}
+# What YouTube Music calls a podcast episode in a watch playlist.
+_EPISODE = "MUSIC_VIDEO_TYPE_PODCAST_EPISODE"
+# Albums as playlists (album links: music.youtube.com/playlist?list=OLAK5uy_…).
+_ALBUM_PLAYLIST = "OLAK5uy_"
 # Which podcast an episode is from (video ID -> {id, name}), shared by all accounts: it never changes.
 _podcast_of_episode: dict[str, dict | None] = {}
 _podcast_lock = threading.Lock()
@@ -254,6 +258,22 @@ class YtmCore:
             raise NotFound(str(e)) from e
         return [song for t in playlist.get("tracks") or [] if (song := parse.song_from_watch(t))][:limit]
 
+    def song(self, song_id: str) -> dict:
+        """One song (or episode) by its ID, for a link to it: what it is, by whom, how long."""
+        vid = video_id(song_id)
+        try:
+            tracks = self._ytm.get_watch_playlist(videoId=vid, limit=1).get("tracks") or []
+        except Exception as e:  # ytmusicapi raises plain exceptions for unknown IDs
+            raise NotFound(str(e)) from e
+        track = next((t for t in tracks if t.get("videoId") == vid), None)
+        song = parse.song_from_watch(track) if track else None
+        if not song:
+            raise NotFound("YouTube Music doesn't have that song")
+        if track.get("videoType") == _EPISODE:
+            # An episode plays as one (resumed, at the room's speed) with its podcast.
+            song["podcast"] = self._podcast_of(vid) or _UNKNOWN_PODCAST
+        return song
+
     def artist(self, artist_id: str) -> dict:
         """An artist page: their top songs, albums and singles."""
         try:
@@ -283,8 +303,10 @@ class YtmCore:
         }
 
     def album(self, album_id: str) -> dict:
-        """An album with its songs (they use the album's art)."""
+        """An album with its songs (they use the album's art). Also by its playlist ID (OLAK5uy_…), as album links have it."""
         try:
+            if album_id.startswith(_ALBUM_PLAYLIST):
+                album_id = self._ytm.get_album_browse_id(album_id) or album_id
             alb = self._ytm.get_album(album_id)
         except Exception as e:
             raise NotFound(str(e)) from e

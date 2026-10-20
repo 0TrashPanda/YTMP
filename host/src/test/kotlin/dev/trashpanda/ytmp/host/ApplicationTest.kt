@@ -502,6 +502,28 @@ class ApplicationTest {
 
     private fun home(title: String) = HomePage(listOf(HomeSection(title, emptyList())))
 
+    @Test
+    fun `a song by its ID, for a pasted link`() = testApplication {
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            val catalog = object : CatalogSource by generalCatalog {
+                override suspend fun song(id: String) = if (id == song.id) song else throw SourceException("YouTube Music doesn't have that song")
+            }
+            ytmpModule(rooms, HostSources(search, catalog = catalog), HostOptions(kind = HostKind.SERVER))
+        }
+        assertEquals(song, jsonClient().get("/api/songs/ytm:abc").body<Song>())
+        assertEquals(HttpStatusCode.BadGateway, client.get("/api/songs/ytm:other").status)
+    }
+
+    @Test
+    fun `no song lookups where the source has none`() = testApplication {
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, HostSources(search, catalog = generalCatalog), HostOptions(kind = HostKind.SERVER))
+        }
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/songs/ytm:abc").status)
+    }
+
     private val generalCatalog = object : CatalogSource {
         override suspend fun artist(id: String) = error("no")
         override suspend fun album(id: String) = error("no")

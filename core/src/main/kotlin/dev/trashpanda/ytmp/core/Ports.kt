@@ -67,6 +67,9 @@ interface CatalogSource {
 
     suspend fun podcast(id: String): PodcastPage
 
+    /** One song (or episode) by its ID, for a link to it. */
+    suspend fun song(id: String): Song = throw UnsupportedOperationException("Songs can't be looked up here")
+
     suspend fun home(): HomePage
 
     /** Home, not from a cache: pulled down to refresh. */

@@ -70,6 +70,16 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
     get("/albums/{id}") { call.respond(catalog("album").album(call.parameters["id"]!!)) }
     get("/playlists/{id}") { call.respond(catalog("playlist").playlist(call.parameters["id"]!!)) }
     get("/podcasts/{id}") { call.respond(catalog("podcast").podcast(call.parameters["id"]!!)) }
+    // A song by its ID: a link to it was pasted in the search box.
+    get("/songs/{id}") {
+        val source = catalog("song")
+        val song = try {
+            source.song(call.parameters["id"]!!)
+        } catch (e: UnsupportedOperationException) {
+            throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, e.message ?: "Songs can't be looked up here")
+        }
+        call.respond(song)
+    }
     get("/home") {
         // The owner's own home page in their app; everyone else gets the general one.
         // ?fresh=1: pulled down to refresh, so not from the cache.

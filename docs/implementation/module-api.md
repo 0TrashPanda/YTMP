@@ -152,7 +152,8 @@ module now answers `search`, `suggestions`, `stream`, `audio`, `radio`, `artist`
 | GET | `/search/suggestions?q=` ✅ | Suggestions while typing: `{ items: ["daft punk", …] }` (the host: `GET /api/search/suggestions?q=`, empty without a source) |
 | GET | `/search?isrc=` | Find a song by ISRC (optional `isrc_lookup` capability, helps [matching](storage.md#song-matching)) |
 | GET | `/songs/{id}` | Song details |
-| GET | `/albums/{id}` ✅ | Album with songs (see Recommendations below) |
+| GET | `/albums/{id}` ✅ | Album with songs (see Recommendations below); also by the album's playlist ID (`OLAK5uy_…`), as album links have it |
+| GET | `/songs/{id}` ✅ | One song (or episode, with its podcast) by its ID, for a pasted link |
 | GET | `/artists/{id}` ✅ | Artist: top songs, albums, singles |
 | GET | `/podcasts/{id}` ✅ | A podcast: `PodcastPage` (`id, title, author, description, thumbnails, episodes: [{ song, date, description }]`). Episodes are `Song`s with `podcast: { id, name }` |
 | GET | `/playlists/{id}?cursor=` | Public playlist with songs ✅ (`PlaylistPage`: `id, title, author, description, thumbnails, songs`; the first 200 songs, no paging yet) |

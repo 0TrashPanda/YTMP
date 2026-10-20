@@ -562,3 +562,50 @@ def test_subscribing_rates_the_podcasts_playlist():
     ytm.set_podcast_saved("MPSPabc", True)
     ytm.set_podcast_saved("MPSPabc", False)
     assert account.rated == [("abc", core.LikeStatus.LIKE), ("abc", core.LikeStatus.INDIFFERENT)]
+
+
+class _LinkYtm:
+    """YouTube Music as far as links need it: a watch playlist per video, album IDs by playlist."""
+
+    def get_watch_playlist(self, videoId, limit):
+        if videoId == "gone":
+            raise Exception("Video unavailable")
+        kind = "MUSIC_VIDEO_TYPE_PODCAST_EPISODE" if videoId == "episode" else "MUSIC_VIDEO_TYPE_ATV"
+        return {"tracks": [{"videoId": videoId, "title": f"Title {videoId}", "artists": [{"name": "Someone", "id": "UCx"}],
+                            "album": {"name": "Album", "id": "MPREb_x"}, "length": "3:05", "thumbnail": [], "videoType": kind},
+                           {"videoId": "other", "title": "Next"}]}
+
+    def get_episode(self, video_id):
+        return {"author": {"id": "MPSPtalk", "name": "Talk show"}}
+
+    def get_album_browse_id(self, playlist_id):
+        return "MPREb_fromlink" if playlist_id == "OLAK5uy_abc" else None
+
+    def get_album(self, browse_id):
+        return {"title": f"Album {browse_id}", "tracks": [], "artists": []}
+
+
+def test_a_song_by_its_link():
+    import pytest
+
+    ytm = core.YtmCore.__new__(core.YtmCore)
+    ytm._ytm = _LinkYtm()
+    core._podcast_of_episode.clear()
+    song = ytm.song("ytm:abc")
+    assert song["id"] == "ytm:abc"
+    assert song["title"] == "Title abc"
+    assert song["durationMs"] == 185_000
+    assert song["album"] == {"id": "MPREb_x", "name": "Album"}
+    assert "podcast" not in song
+    # An episode stays one, with its podcast.
+    assert ytm.song("ytm:episode")["podcast"] == {"id": "MPSPtalk", "name": "Talk show"}
+    with pytest.raises(core.NotFound):
+        ytm.song("ytm:gone")
+
+
+def test_an_album_by_its_playlist_id():
+    ytm = core.YtmCore.__new__(core.YtmCore)
+    ytm._ytm = _LinkYtm()
+    album = ytm.album("OLAK5uy_abc")
+    assert album["id"] == "MPREb_fromlink"
+    assert album["title"] == "Album MPREb_fromlink"

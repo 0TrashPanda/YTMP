@@ -1,19 +1,22 @@
 <script lang="ts">
 	// Search, like YTM: typing shows suggestions (recent searches when empty); Enter or a
 	// suggestion searches and opens the results. Desktop: a box with a dropdown. Phones: a
-	// button that opens a full-screen search page. ↑/↓ pick, Esc closes.
+	// button that opens a full-screen search page. ↑/↓ pick, Esc closes. A pasted link
+	// (YouTube Music, YouTube, a YTMP room) opens what it points at; typed, it's the one row.
 	import { tick } from 'svelte';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { suggestions } from '../api';
+	import { linkLabel, parseLink, type Link } from '../links';
 	import { saved } from '../storage';
 	import Icon from './Icon.svelte';
 
 	let {
 		query,
 		onsearch,
-		onopen
+		onopen,
+		onlink
 	}: {
 		/** The current search (shown in the box). */
 		query: string;
@@ -21,6 +24,8 @@
 		onsearch: (query: string) => void;
 		/** The search box was opened (e.g. to show the header). */
 		onopen: () => void;
+		/** A link was pasted (or entered): open what it points at. [text]: the link as given. */
+		onlink: (link: Link, text: string) => void;
 	} = $props();
 
 	const wide = new MediaQuery('min-width: 640px');
@@ -51,9 +56,11 @@
 	// stays until a newer one is there, so it updates in place instead of flickering.
 	let asked = 0;
 	let shown = 0;
+	const link = $derived(parseLink(text));
+
 	$effect(() => {
 		const q = text;
-		if (!active || !q.trim()) return;
+		if (!active || !q.trim() || link) return;
 		const timer = setTimeout(() => {
 			const id = ++asked;
 			suggestions(q)
@@ -68,8 +75,9 @@
 		return () => clearTimeout(timer);
 	});
 
-	type Row = { text: string; recent: boolean };
+	type Row = { text: string; recent: boolean; link?: Link };
 	const rows = $derived.by((): Row[] => {
+		if (link) return [{ text: linkLabel(link), recent: false, link }];
 		const q = text.trim().toLowerCase();
 		if (!q) return recent.slice(0, 10).map((t) => ({ text: t, recent: true }));
 		// Matching recent searches first (at most two), then YTM's suggestions.
@@ -101,11 +109,29 @@
 	function search(q: string) {
 		const value = q.trim();
 		if (!value) return;
+		const found = parseLink(value);
+		if (found) return openLink(found, value);
 		recent = [value, ...recent.filter((t) => t.toLowerCase() !== value.toLowerCase())].slice(0, 20);
 		saved.recentSearches = recent;
 		text = value;
 		close();
 		onsearch(value);
+	}
+
+	/** Links aren't kept with the recent searches: the page they open is the point. */
+	function openLink(found: Link, value: string) {
+		text = value;
+		close();
+		onlink(found, value);
+	}
+
+	/** Pasting a link opens it right away, without Enter. */
+	function changed(event: Event) {
+		highlighted = -1;
+		const e = event as InputEvent;
+		const pasted = e.inputType === 'insertFromPaste' || (e.data?.length ?? 0) > 8;
+		const found = pasted ? parseLink(text) : null;
+		if (found) openLink(found, text.trim());
 	}
 
 	function forget(t: string) {
@@ -129,7 +155,7 @@
 			highlighted = highlighted <= 0 ? rows.length - 1 : highlighted - 1;
 		} else if (event.key === 'Enter') {
 			event.preventDefault();
-			search(highlighted >= 0 ? rows[highlighted].text : text);
+			search(highlighted >= 0 && !rows[highlighted].link ? rows[highlighted].text : text);
 		} else if (event.key === 'Escape') {
 			close();
 		}
@@ -167,7 +193,7 @@
 		aria-activedescendant={active && highlighted >= 0 ? `suggestion-${highlighted}` : undefined}
 		onfocus={() => !active && open()}
 		onblur={() => wide.current && close()}
-		oninput={() => (highlighted = -1)}
+		oninput={changed}
 		onkeydown={keydown}
 	/>
 	{#if text}
@@ -189,11 +215,17 @@
 				aria-selected={i === highlighted}
 				class="flex cursor-pointer items-center gap-4 {full ? 'px-4 py-3' : 'px-4 py-2'} {i === highlighted ? 'bg-line' : 'hover:bg-line'}"
 				onpointerdown={(e) => e.preventDefault()}
-				onclick={() => search(row.text)}
+				onclick={() => (row.link ? openLink(row.link, text.trim()) : search(row.text))}
 			>
-				<Icon name={row.recent ? 'history' : 'search'} size={22} class="shrink-0 text-muted" />
-				<span class="min-w-0 flex-1 truncate {full ? 'text-base' : ''}">{typed}<b class="font-bold">{rest}</b></span>
-				{#if row.recent && !text.trim()}
+				<Icon name={row.link ? 'open' : row.recent ? 'history' : 'search'} size={22} class="shrink-0 text-muted" />
+				{#if row.link}
+					<span class="min-w-0 flex-1 truncate font-bold {full ? 'text-base' : ''}">{row.text}</span>
+				{:else}
+					<span class="min-w-0 flex-1 truncate {full ? 'text-base' : ''}">{typed}<b class="font-bold">{rest}</b></span>
+				{/if}
+				{#if row.link}
+					<!-- Nothing to edit. -->
+				{:else if row.recent && !text.trim()}
 					<button class="-my-2 rounded-full p-2 text-muted hover:text-white" aria-label="Remove {row.text} from recent searches" onpointerdown={(e) => e.preventDefault()} onclick={(e) => (e.stopPropagation(), forget(row.text))}>
 						<Icon name="close" size={18} />
 					</button>

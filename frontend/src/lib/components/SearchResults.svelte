@@ -3,7 +3,8 @@
 	// song. Songs: tap = play next, ⋮ or right-click = song menu. Albums, artists and
 	// playlists open their page.
 	import { thumbUrl } from '../images.svelte';
-	import { search, similar } from '../api';
+	import { getSong, search, similar } from '../api';
+	import { parseLink } from '../links';
 	import { playNext, quoted } from '../songActions';
 	import { itemCard } from '../cards';
 	import { artistNames } from '../format';
@@ -55,6 +56,8 @@
 	];
 
 	let page = $state<SearchPage>({ sections: [] });
+	/** A pasted song link: that song is the result. */
+	const link = $derived(similarTo ? null : parseLink(query));
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 
@@ -63,6 +66,7 @@
 		const q = query.trim();
 		const seed = similarTo;
 		const t = type;
+		const songLink = link?.kind === 'song' ? link : null;
 		if (!q && !seed) {
 			page = { sections: [] };
 			return;
@@ -72,7 +76,9 @@
 				loading = true;
 				error = null;
 				try {
-					page = seed
+					page = songLink
+						? { sections: [{ title: 'From the link', type: null, items: [{ kind: 'song', song: await getSong(songLink.id, controller.signal), video: false }] }] }
+						: seed
 						? {
 								sections: [
 									{ title: `Similar to ${seed.title}`, type: null, items: (await similar(seed.id, controller.signal)).map((song) => ({ kind: 'song', song, video: false })) }
@@ -122,7 +128,7 @@
 </script>
 
 <section class="flex flex-col gap-4">
-	{#if !similarTo}
+	{#if !similarTo && !link}
 		<div class="-mx-1 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]" role="toolbar" aria-label="What to search for">
 			{#each CHIPS as [value, label] (value)}
 				<button
@@ -137,7 +143,7 @@
 	{#if error}
 		<p class="px-2 text-muted">{error}</p>
 	{:else if loading && empty}
-		<p class="px-2 text-muted">{similarTo ? 'Finding similar songs…' : 'Searching…'}</p>
+		<p class="px-2 text-muted">{similarTo ? 'Finding similar songs…' : link ? 'Looking up the link…' : 'Searching…'}</p>
 	{:else if empty && (query.trim() || similarTo)}
 		<p class="px-2 text-muted">No results.</p>
 	{/if}
@@ -182,7 +188,14 @@
 		{/if}
 	{/each}
 
-	{#if !similarTo && query.trim()}
+	{#if link?.kind === 'song' && link.playlist && !empty}
+		{@const list = link.playlist}
+		<button class="mx-2 flex items-center gap-2 self-start rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => onPlaylist({ id: list, title: '' })}>
+			<Icon name="library" size={18} /> Open the playlist it's in
+		</button>
+	{/if}
+
+	{#if !similarTo && query.trim() && !link}
 		<a
 			class="mt-2 flex items-center gap-2 self-start rounded-full px-3 py-2 text-sm text-muted hover:bg-raised hover:text-white"
 			href="https://music.youtube.com/search?q={encodeURIComponent(query.trim())}"

@@ -229,6 +229,11 @@ export function search(query: string, type: SearchType, signal?: AbortSignal): P
 	);
 }
 
+/** One song by its ID (a link to it was pasted in the search box). */
+export function getSong(id: string, signal?: AbortSignal): Promise<Song> {
+	return abortable(cached(`song:${id}`, () => request<Song>(`/api/songs/${encodeURIComponent(id)}`)), signal);
+}
+
 /** What to search for, while typing. Empty when the host has no suggestions. */
 export function suggestions(query: string, signal?: AbortSignal): Promise<string[]> {
 	const q = query.toLowerCase();

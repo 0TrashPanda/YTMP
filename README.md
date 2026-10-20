@@ -54,6 +54,8 @@ Music, without Premium, and not tied to a single music service.
 - Home with YouTube Music's suggestions (quick picks, new releases, mixes).
 - Search with suggestions while typing and YouTube Music's chips: songs, videos, albums,
   artists, playlists, podcasts, episodes.
+- Paste a YouTube Music or YouTube link in the search box to open that song, album,
+  playlist, artist or podcast (or a YTMP room link to open the room).
 - Artist, album, playlist and podcast pages.
 - Lyrics, synced line by line (from LRCLIB or YouTube Music), and a karaoke mode that shows
   them large on the party screen and in everyone's player.

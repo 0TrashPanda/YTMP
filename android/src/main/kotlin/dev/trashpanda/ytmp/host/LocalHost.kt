@@ -148,6 +148,7 @@ class LocalHost(private val context: Context) {
             override suspend fun album(id: String) = ytm.album(id)
             override suspend fun playlist(id: String) = ytm.playlist(id)
             override suspend fun podcast(id: String) = ytm.podcast(id)
+            override suspend fun song(id: String) = ytm.song(id)
             override suspend fun home() = ytm.home()
         },
         suggest = { ytm.suggestions(it) },

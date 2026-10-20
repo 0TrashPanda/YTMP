@@ -114,6 +114,10 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         ProtocolJson.decodeFromString(PodcastPage.serializer(), json.callAttr("dumps", core.callAttr("podcast", id)).toString())
     }
 
+    override suspend fun song(id: String): Song = python {
+        ProtocolJson.decodeFromString(Song.serializer(), json.callAttr("dumps", core.callAttr("song", id)).toString())
+    }
+
     override suspend fun home(): HomePage = python {
         ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("home")).toString())
     }

@@ -125,6 +125,8 @@ class RemoteSourceModule(
     override suspend fun podcast(id: String): PodcastPage =
         client.get("$baseUrl/podcasts/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
 
+    override suspend fun song(id: String): Song = client.get("$baseUrl/songs/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
+
     override suspend fun home(): HomePage = client.get("$baseUrl/home") { auth() }.orThrow().body()
 
     /** YouTube Music's lyrics for the song, or null when it has none. */

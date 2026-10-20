@@ -113,8 +113,13 @@ the browser, ✕ removes one). On **phones** the header has a search button that
 full-screen search page (back arrow, the box, suggestions as rows with ↖ to put one in the
 box and keep typing); the phone's back button closes it.
 
-Planned: it also accepts **links** (YTMP, YouTube Music and YouTube links); pasting one
-shows that song (or playlist/album/artist) directly.
+It also accepts **links** ✅: pasting a YouTube Music or YouTube link opens what it points
+at right away, without Enter: an album, playlist, artist or podcast opens its page; a song
+(or video, or episode) shows as the result (*From the link*, tap = play next), with *Open
+the playlist it's in* when the link plays it in one (not YouTube's endless mixes). A YTMP
+room link opens that room. A link that's typed rather than pasted shows one row instead of
+suggestions (*Open this album*, …) that Enter or a tap opens. Links don't go into the recent
+searches.
 
 Like YouTube Music, **chips** above the results pick what to search for ✅: **All**,
 **Songs**, **Videos**, **Albums**, **Artists**, **Community playlists** and **Featured

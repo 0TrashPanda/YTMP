@@ -31,6 +31,7 @@
 	import SearchBox from '../../../lib/components/SearchBox.svelte';
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
+	import type { Link } from '../../../lib/links';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import CloneSheet from '../../../lib/components/CloneSheet.svelte';
 	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
@@ -179,6 +180,17 @@
 
 	function searchFor(text: string) {
 		show({ kind: 'search', query: text });
+	}
+
+	/** A link pasted in the search box: its page, or a song as the search's result (SearchResults), or another room. */
+	function openLink(link: Link, text: string) {
+		if (link.kind === 'song') searchFor(text);
+		else if (link.kind === 'album') show({ kind: 'album', id: link.id, title: '' });
+		else if (link.kind === 'playlist') openPlaylist({ id: link.id, title: '' });
+		else if (link.kind === 'artist') show({ kind: 'artist', id: link.id, name: '' });
+		else if (link.kind === 'podcast') show({ kind: 'podcast', id: link.id, title: '' });
+		else if (link.code === room?.roomCode && new URL(link.url).origin === location.origin) toast("You're in this room");
+		else location.href = link.url;
 	}
 
 	/** Right-click (or ⋮) on the current song outside the queue: the full player and the player bar. */
@@ -530,7 +542,7 @@
 						<button class="text-xl font-black tracking-tight sm:hidden" title="Home" onclick={goHome}>
 							YT<span class="text-accent">MP</span>
 						</button>
-						<SearchBox {query} onopen={() => (headerHidden = false)} onsearch={searchFor} />
+						<SearchBox {query} onopen={() => (headerHidden = false)} onsearch={searchFor} onlink={openLink} />
 						<div class="ml-auto flex items-center gap-2">
 							<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
 							<!-- Phones: centered in the header. -->

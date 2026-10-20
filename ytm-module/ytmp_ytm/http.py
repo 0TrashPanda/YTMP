@@ -148,6 +148,10 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
     def podcast(podcast_id: str):
         return ytm.podcast(podcast_id)
 
+    @app.get("/songs/{song_id}", dependencies=[Depends(check_key)])
+    def song(song_id: str):
+        return ytm.song(song_id)
+
     @app.get("/songs/{song_id}/lyrics", dependencies=[Depends(check_key)])
     def lyrics(song_id: str):
         return ytm.lyrics(song_id)
