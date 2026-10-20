@@ -25,6 +25,10 @@ import dev.trashpanda.ytmp.protocol.AccountSettings
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.HistoryPage
+import dev.trashpanda.ytmp.protocol.EpisodeProgress
+import dev.trashpanda.ytmp.protocol.EpisodeProgressList
+import dev.trashpanda.ytmp.protocol.EpisodeProgressReport
+import dev.trashpanda.ytmp.protocol.MarkEpisodeRequest
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import io.ktor.client.request.header
@@ -82,7 +86,7 @@ class AccountApiTest {
         val db = Database.open(DatabaseConfig(path = Files.createTempDirectory("ytmp").resolve("ytmp.db").toString()))
         val accounts = Accounts(db)
         val key = accounts.signingKey()
-        val service = AccountService(accounts, "test.example", key, signup, History(db), trackingDefault = true, graph = SongGraph(db), isOwnOrigin = { it == origin })
+        val service = AccountService(accounts, "test.example", key, signup, History(db), trackingDefault = true, graph = SongGraph(db), isOwnOrigin = { it == origin }, episodes = Episodes(db))
         val auth = TrustedAuthServers(isOwnOrigin = { it == origin }, ownTemplates = service::roleTemplate, ownPlays = service::recordPlay).apply { trust(AuthServerRef(null, "test.example"), key.public) }
         application {
             val scope = CoroutineScope(SupervisorJob())
@@ -295,6 +299,33 @@ class AccountApiTest {
         val first = client.get("/api/account/history") { bearerAuth(phone) }.body<HistoryPage>().plays.first()
         assertEquals(HttpStatusCode.NoContent, client.delete("/api/account/history/${first.id}") { bearerAuth(scoped) }.status)
         assertEquals(1, client.get("/api/account/history") { bearerAuth(phone) }.body<HistoryPage>().plays.size)
+    }
+
+    @Test
+    fun `hosts report episode progress, your own devices read it, podcast pages mark it`() = testApplication {
+        setup(SignupMode.OPEN)
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>().sessionToken
+        val phone = client.postJson("/api/account/host-token", HostTokenRequest(PHONE_APP_ORIGIN), anna).body<HostTokenResponse>().token
+        val friend = client.postJson("/api/account/host-token", HostTokenRequest("http://192.168.1.50:8765"), anna).body<HostTokenResponse>().token
+        val hour = 3_600_000L
+        // A friend's host may report where you are (like plays), but not read it.
+        assertEquals(HttpStatusCode.NoContent, client.postJson("/api/auth/episodes", EpisodeProgressReport("ytm:ep1", 20 * 60_000L, hour), friend).status)
+        client.postJson("/api/auth/episodes", EpisodeProgressReport("ytm:ep2", hour - 30_000, hour), phone)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/auth/episodes/ytm:ep1") { bearerAuth(friend) }.status)
+        assertEquals(EpisodeProgress("ytm:ep1", 20 * 60_000L, hour, played = false), client.get("/api/auth/episodes/ytm:ep1") { bearerAuth(phone) }.body<EpisodeProgress>())
+        assertEquals(HttpStatusCode.NoContent, client.get("/api/auth/episodes/ytm:none") { bearerAuth(phone) }.status)
+
+        // The podcast page: near the end is played; marking it unplayed starts it over.
+        val list = client.get("/api/account/episodes?ids=ytm:ep1,ytm:ep2,ytm:none") { bearerAuth(phone) }.body<EpisodeProgressList>().episodes.associateBy { it.id }
+        assertEquals(setOf("ytm:ep1", "ytm:ep2"), list.keys)
+        assertTrue(list.getValue("ytm:ep2").played)
+        client.put("/api/account/episodes/ytm:ep2") { bearerAuth(anna); contentType(ContentType.Application.Json); setBody(MarkEpisodeRequest(false)) }
+        client.put("/api/account/episodes/ytm:ep1") { bearerAuth(anna); contentType(ContentType.Application.Json); setBody(MarkEpisodeRequest(true)) }
+        val marked = client.get("/api/account/episodes?ids=ytm:ep1,ytm:ep2") { bearerAuth(anna) }.body<EpisodeProgressList>().episodes.associateBy { it.id }
+        assertEquals(EpisodeProgress("ytm:ep2", 0, hour, played = false), marked["ytm:ep2"])
+        assertEquals(EpisodeProgress("ytm:ep1", 0, hour, played = true), marked["ytm:ep1"])
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/account/episodes?ids=ytm:ep1") { bearerAuth(friend) }.status)
     }
 
     @Test

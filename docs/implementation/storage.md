@@ -32,6 +32,7 @@ path = "/var/lib/ytmp/ytmp.db"     # sqlite
 | `plays` | Listening history: one row per song heard (song as JSON plus title/artists for search, when, heard ms, skipped, room, added by me, listened with as JSON, shared), indexed by account + time |
 | `room_copies` | Copies of accounts' rooms that live on another host (a phone): sync ID, account, where the room lives now (`home`), epoch, room JSON, last seen. See [room sync](room-sync.md) |
 | `songs`, `song_sources`, `song_edges` | The song graph, see [below](#song-graph) |
+| `episode_progress` | Per account and episode: where they stopped, the length, played; for resuming in any room and the played marks (`Episodes.kt`) |
 
 On **Android**, the app has its own local **SQLite** database (`PhoneRoomStore`) with one
 table, `rooms`, so its rooms survive restarts; other settings are in SharedPreferences.

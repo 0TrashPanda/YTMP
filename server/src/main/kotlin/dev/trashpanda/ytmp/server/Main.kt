@@ -13,6 +13,7 @@ import dev.trashpanda.ytmp.host.SonosOutputs
 import dev.trashpanda.ytmp.host.LocalMusic
 import dev.trashpanda.ytmp.host.ZoneOutputs
 import dev.trashpanda.ytmp.host.OutputDrivers
+import dev.trashpanda.ytmp.host.AccountBookmarks
 import dev.trashpanda.ytmp.host.HostSources
 import dev.trashpanda.ytmp.host.CachedSource
 import dev.trashpanda.ytmp.host.PlayReporter
@@ -108,13 +109,14 @@ fun main(args: Array<String>) {
         val isOwnOrigin = { origin: String -> origin == ownUrl || origin in localOrigins(config.server.port) }
         val service = AccountService(
             accounts, issuer, key, config.accounts.signupMode(), History(db), config.accounts.trackingDefault,
-            graph = graph, isOwnOrigin = isOwnOrigin,
+            graph = graph, isOwnOrigin = isOwnOrigin, episodes = Episodes(db),
         )
         val auth = TrustedAuthServers(
             isOwnOrigin = isOwnOrigin,
             ownTemplates = service::roleTemplate,
             ownPlays = service::recordPlay,
             ownSimilar = { username, seed -> service.similar(username, seed) },
+            ownEpisodes = TrustedAuthServers.OwnEpisodes(service::episodeProgress, service::reportEpisode),
         )
         auth.trust(AuthServerRef(url = null, issuer = issuer), key.public)
         trustServers(auth, config.accounts.trusted, ownIssuer = issuer)
@@ -148,6 +150,7 @@ fun main(args: Array<String>) {
                     youtube.report(play, ::localAccount)
                 },
             ),
+            bookmarks = AccountBookmarks(auth, this),
         )
         rooms.startCleanup()
         val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, defaultPassword = service::roomPassword)

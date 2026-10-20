@@ -1,12 +1,14 @@
 <script lang="ts">
 	// A podcast page: what it's about, and its episodes (newest first). Tap an episode =
 	// play next; ⋮ or right-click = the song menu. With YouTube Music: Subscribe (your library).
+	// With a YTMP account: how far you got in each episode, and marking them played.
 	import { thumbUrl } from '../images.svelte';
 	import { getMyPodcast, getPodcast, setPodcastSaved } from '../api';
 	import { youtube } from '../youtube.svelte';
+	import { listening } from '../listening.svelte';
 	import { menuAt, playNext, playNow, quoted } from '../songActions';
 	import { formatTime } from '../format';
-	import type { Episode, PodcastPage } from '../protocol.gen';
+	import type { Episode, EpisodeProgress, PodcastPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
@@ -38,6 +40,24 @@
 			.then((p) => podcastId === id && (podcast = p))
 			.catch((e) => (error = e instanceof Error ? e.message : "Couldn't load the podcast"));
 	});
+
+	/** How far you got in the episodes (by song ID), on your account. */
+	let progress = $state<Map<string, EpisodeProgress>>(new Map());
+	$effect(() => {
+		const page = podcast;
+		progress = new Map();
+		if (!page || !listening.available) return;
+		listening
+			.episodes(page.episodes.map((e) => e.song.id))
+			.then((p) => podcast === page && (progress = p))
+			.catch(() => {});
+	});
+
+	function marked(songId: string, played: boolean) {
+		const next = new Map(progress);
+		next.set(songId, { id: songId, positionMs: 0, durationMs: progress.get(songId)?.durationMs ?? 0, played });
+		progress = next;
+	}
 
 	/** In your YouTube Music library; null: not known (signed out, or not loaded yet). */
 	let saved = $state<boolean | null>(null);
@@ -74,7 +94,9 @@
 	function menu(event: MouseEvent, episode: Episode, atPointer: boolean) {
 		event.preventDefault();
 		event.stopPropagation();
-		onMenu({ song: episode.song, place: 'search', ...menuAt(event.currentTarget as HTMLElement, event, atPointer) });
+		const song = episode.song;
+		const mark = listening.available ? { played: !!progress.get(song.id)?.played, onMarked: (played: boolean) => marked(song.id, played) } : undefined;
+		onMenu({ song, place: 'search', episode: mark, ...menuAt(event.currentTarget as HTMLElement, event, atPointer) });
 	}
 
 	/** "1 hr 5 min" like YTM, instead of 65:00. */
@@ -131,16 +153,28 @@
 		<section class="flex flex-col gap-1">
 			<h2 class="px-2 pb-1 text-xl font-bold">Episodes</h2>
 			{#each podcast.episodes as episode, i (episode.song.id + i)}
+				{@const heard = progress.get(episode.song.id)}
 				<div class="group flex items-start gap-3 rounded-md px-2 py-3 hover:bg-raised" role="listitem" oncontextmenu={(e) => menu(e, episode, true)}>
 					<button class="flex min-w-0 flex-1 items-start gap-3 text-left" onclick={() => play(episode, false)} title="Play next">
-						<div class="aspect-video w-28 shrink-0 overflow-hidden rounded bg-raised sm:w-36">
+						<div class="relative aspect-video w-28 shrink-0 overflow-hidden rounded bg-raised sm:w-36">
 							{#if episode.song.thumbnails.at(-1)}
-								<img src={thumbUrl(episode.song.thumbnails, 160)} alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+								<img src={thumbUrl(episode.song.thumbnails, 160)} alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover {heard?.played ? 'opacity-50' : ''}" />
+							{/if}
+							<!-- How far you got, like YouTube Music. -->
+							{#if heard && !heard.played && heard.positionMs > 0 && heard.durationMs > 0}
+								<div class="absolute inset-x-0 bottom-0 h-1 bg-white/30">
+									<div class="h-full bg-accent" style:width="{Math.min(100, (heard.positionMs / heard.durationMs) * 100)}%"></div>
+								</div>
 							{/if}
 						</div>
 						<div class="min-w-0 flex-1">
 							<div class="line-clamp-2 font-medium">{episode.song.title}</div>
-							<div class="text-sm text-muted">
+							<div class="flex items-center gap-1 text-sm text-muted">
+								{#if heard?.played}
+									<Icon name="check" size={16} /> Played •
+								{:else if heard && heard.positionMs > 0 && heard.durationMs > heard.positionMs}
+									{length(heard.durationMs - heard.positionMs)} left •
+								{/if}
 								{[episode.date, episode.song.durationMs ? length(episode.song.durationMs) : null].filter(Boolean).join(' • ')}
 							</div>
 							{#if episode.description}

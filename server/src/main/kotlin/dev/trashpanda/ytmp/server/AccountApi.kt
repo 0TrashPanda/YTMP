@@ -35,6 +35,10 @@ import dev.trashpanda.ytmp.protocol.RoomOpenMode
 import dev.trashpanda.ytmp.protocol.RoomPasswordRequest
 import dev.trashpanda.ytmp.protocol.HistoryPage
 import dev.trashpanda.ytmp.protocol.HistoryRadio
+import dev.trashpanda.ytmp.protocol.EpisodeProgress
+import dev.trashpanda.ytmp.protocol.EpisodeProgressList
+import dev.trashpanda.ytmp.protocol.EpisodeProgressReport
+import dev.trashpanda.ytmp.protocol.MarkEpisodeRequest
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.Song
 import io.ktor.server.plugins.cors.routing.CORS
@@ -74,6 +78,8 @@ class AccountService(
     private val graph: SongGraph? = null,
     /** This server's own page origins: their tokens only ever reach this server (see [historyAccount]). */
     private val isOwnOrigin: (String) -> Boolean = { false },
+    /** How far accounts got in podcast episodes. */
+    private val episodes: Episodes? = null,
 ) {
     private val throttle = LoginThrottle(clock)
 
@@ -120,6 +126,18 @@ class AccountService(
         }
     }
 
+    /** A host says where [username] (one of ours) is in an episode. */
+    fun reportEpisode(username: String, report: EpisodeProgressReport) {
+        val account = accounts.find(username) ?: return
+        episodes?.report(account.id, report.id, report.positionMs, report.durationMs)
+    }
+
+    /** Where [username] (one of ours) is in an episode, for a host resuming it. */
+    fun episodeProgress(username: String, episodeId: String): EpisodeProgress? {
+        val account = accounts.find(username) ?: return null
+        return episodes?.progress(account.id, listOf(episodeId))?.firstOrNull()
+    }
+
     /**
      * Songs that go with [seedSongId] in the song graph, for [username] (one of ours) as far as
      * their settings allow, or with [personal] false (or no account) only from everyone's
@@ -152,6 +170,43 @@ class AccountService(
             val songId = call.request.queryParameters["id"]?.trim().orEmpty()
             if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
             call.respond(SearchResponse(io { similar(claims.sub, songId, personal = mayReadHistory(claims)) }))
+        }
+
+        // A host says where the account is in a podcast episode (paused, skipped, ended), with any
+        // host token of the account; reading it back (to resume) takes one that only reaches the
+        // account's own devices, like the history.
+        post("/auth/episodes") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            val report = call.receive<EpisodeProgressReport>()
+            io { reportEpisode(claims.sub, report) }
+            call.respond(HttpStatusCode.NoContent)
+        }
+        get("/auth/episodes/{id}") {
+            val claims = call.ownToken()?.takeIf(::mayReadHistory) ?: throw notLoggedIn()
+            val progress = io { episodeProgress(claims.sub, call.parameters["id"]!!) }
+            if (progress == null) call.respond(HttpStatusCode.NoContent) else call.respond(progress)
+        }
+
+        // Played marks on podcast pages, also from the pages of your phone's app and of rooms on
+        // other hosts (CORS), like the history.
+        route("/account/episodes") {
+            install(CORS) {
+                anyHost()
+                allowHeader(HttpHeaders.Authorization)
+                allowHeader(HttpHeaders.ContentType)
+                allowMethod(HttpMethod.Put)
+            }
+            get {
+                val account = call.historyAccount()
+                val ids = call.request.queryParameters["ids"].orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                call.respond(EpisodeProgressList(io { episodes?.progress(account.id, ids).orEmpty() }))
+            }
+            put("/{id}") {
+                val account = call.historyAccount()
+                val played = call.receive<MarkEpisodeRequest>().played
+                io { episodes?.mark(account.id, call.parameters["id"]!!, played) }
+                call.respond(HttpStatusCode.NoContent)
+            }
         }
 
         // A host sends a song the account heard, with the host token the account gave it.

@@ -146,6 +146,8 @@ class LocalHost(private val context: Context) {
             onRoomClosed = { sync.closed(it) },
             onRoomDisowned = { account, syncId -> sync.closed(account, syncId) },
         ),
+        // Where you are in podcast episodes, on your server: resume them in any room or device.
+        bookmarks = AccountBookmarks(authLink.auth, scope),
     )
 
     /** Your rooms here and on your server (docs/features/room-sync.md). */

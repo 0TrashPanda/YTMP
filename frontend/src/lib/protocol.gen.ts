@@ -905,6 +905,21 @@ export interface HistoryPage {
   more: boolean;
 }
 
+export interface EpisodeProgress {
+  id: string;
+  positionMs: number;
+  durationMs: number;
+  played: boolean;
+}
+
+export interface EpisodeProgressList {
+  episodes: EpisodeProgress[];
+}
+
+export interface MarkEpisodeRequest {
+  played: boolean;
+}
+
 export type HistoryRadio = "off" | "solo" | "all";
 
 export interface AccountSettings {

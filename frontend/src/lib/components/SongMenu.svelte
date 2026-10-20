@@ -12,6 +12,8 @@
 		playlist?: { id: string; itemId: string | null; likedMusic: boolean; onRemoved: () => void };
 		/** A song in your listening history ([id]: its entry there), shown there: it can be removed. */
 		listened?: { id: string; onRemoved: () => void };
+		/** A podcast episode with a played mark (your account): it can be marked played or unplayed. */
+		episode?: { played: boolean; onMarked: (played: boolean) => void };
 		/** Where to show the menu (the click or the ⋮ button). */
 		x: number;
 		y: number;
@@ -197,6 +199,23 @@
 		}
 		if (ytmId) {
 			list.push({ icon: 'open', label: 'Open in YouTube Music', href: `https://music.youtube.com/watch?v=${encodeURIComponent(ytmId)}`, run: onClose });
+		}
+		if (target.episode) {
+			const { played, onMarked } = target.episode;
+			const current = song;
+			list.push({
+				icon: played ? 'replay' : 'check',
+				label: played ? 'Mark as unplayed' : 'Mark as played',
+				run: async () => {
+					onClose();
+					try {
+						await listening.markEpisode(current.id, !played);
+						onMarked(!played);
+					} catch (e) {
+						onToast(e instanceof Error ? e.message : "Couldn't mark it");
+					}
+				}
+			});
 		}
 		if (target.listened) {
 			const { id, onRemoved } = target.listened;

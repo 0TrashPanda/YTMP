@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.core
 
 import dev.trashpanda.ytmp.protocol.PlaylistItemRef
+import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import dev.trashpanda.ytmp.protocol.LikeStatus
 import dev.trashpanda.ytmp.protocol.Lyrics
 import dev.trashpanda.ytmp.protocol.AlbumPage
@@ -160,6 +161,19 @@ interface PersonalCatalog {
 
 /** This account, if it's signed in and search and radio should go through it ([PersonalCatalog.personalize]). */
 suspend fun PersonalCatalog.personalized(): PersonalCatalog? = takeIf { personalize() && account() != null }
+
+/**
+ * Where people are in podcast episodes, kept on their accounts (docs/features/ui.md#podcasts):
+ * a room asks it to resume an episode someone added, and tells it when an episode is paused,
+ * skipped or ends for everyone listening.
+ */
+interface EpisodeBookmarks {
+    /** Where the account in [accountToken] stopped in [episodeId], or null. */
+    suspend fun progress(accountToken: String, episodeId: String): EpisodeProgress?
+
+    /** The account in [accountToken] is at [positionMs] in [episode]. Must not block. */
+    fun report(accountToken: String, episode: Song, positionMs: Long)
+}
 
 /** A speaker or TV the host found, that rooms can play on. */
 data class OutputDevice(val id: String, val name: String, val kind: OutputKind)

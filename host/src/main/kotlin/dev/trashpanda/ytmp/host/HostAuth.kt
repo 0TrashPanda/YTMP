@@ -6,6 +6,8 @@ import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.RoleTemplate
+import dev.trashpanda.ytmp.protocol.EpisodeProgress
+import dev.trashpanda.ytmp.protocol.EpisodeProgressReport
 import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.Song
 import java.net.URLEncoder
@@ -38,6 +40,12 @@ interface HostAuth {
      * [token] (from that account's listening where the server allows it). Empty when there are none.
      */
     suspend fun similar(token: String, seedSongId: String): List<Song> = emptyList()
+
+    /** Where the account in [token] is in an episode, from its auth server (null: nowhere, or not shared with this host). */
+    suspend fun episodeProgress(token: String, episodeId: String): EpisodeProgress? = null
+
+    /** Tells the account in [token]'s auth server where it is in an episode. */
+    suspend fun reportEpisode(token: String, report: EpisodeProgressReport) {}
 }
 
 /** Guests only. */
@@ -61,7 +69,15 @@ class TrustedAuthServers(
     private val ownPlays: ((username: String, report: PlayReport) -> Unit)? = null,
     /** The song graph of this server, for its own accounts (by username), without HTTP. */
     private val ownSimilar: ((username: String, seedSongId: String) -> List<Song>)? = null,
+    /** Episode progress of this server's own accounts (by username), without HTTP. */
+    private val ownEpisodes: OwnEpisodes? = null,
 ) : HostAuth {
+    /** A server's own accounts' episode progress ([episodeProgress], [reportEpisode]). */
+    class OwnEpisodes(
+        val progress: (username: String, episodeId: String) -> EpisodeProgress?,
+        val report: (username: String, report: EpisodeProgressReport) -> Unit,
+    )
+
     private class Trusted(val ref: AuthServerRef, val key: PublicKey)
 
     private val trusted = ConcurrentHashMap<String, Trusted>()
@@ -114,8 +130,65 @@ class TrustedAuthServers(
         }.onFailure { log.warn("No songs from the song graph of {}: {}", claims.iss, it.message) }.getOrDefault(emptyList())
     }
 
+    override suspend fun episodeProgress(token: String, episodeId: String): EpisodeProgress? = withContext(Dispatchers.IO) {
+        val (claims, server) = ownerOf(token) ?: return@withContext null
+        runCatching {
+            val url = server.url
+            if (url == null) ownEpisodes?.progress?.invoke(claims.sub, episodeId) else fetchEpisodeProgress(url, token, episodeId)
+        }.onFailure { log.warn("No episode progress from {}: {}", claims.iss, it.message) }.getOrNull()
+    }
+
+    override suspend fun reportEpisode(token: String, report: EpisodeProgressReport) = withContext(Dispatchers.IO) {
+        val (claims, server) = ownerOf(token) ?: return@withContext
+        runCatching {
+            val url = server.url
+            if (url == null) ownEpisodes?.report?.invoke(claims.sub, report) else postJson(url, "/api/auth/episodes", token, ProtocolJson.encodeToString(EpisodeProgressReport.serializer(), report))
+        }.onFailure { log.warn("Couldn't save episode progress for {}: {}", claims.accountId, it.message) }
+        Unit
+    }
+
+    /** The account in [token] (a login, not a scoped token) and its trusted auth server. */
+    private fun ownerOf(token: String): Pair<AccountTokens.Claims, AuthServerRef>? {
+        val claims = AccountTokens.verify(token, { trusted[it]?.key }, clock() / 1000)?.takeIf { it.scope == null } ?: return null
+        return trusted[claims.iss]?.ref?.let { claims to it }
+    }
+
     private companion object {
         val log = LoggerFactory.getLogger(TrustedAuthServers::class.java)
+    }
+}
+
+/** Where an account is in an episode, from its auth server (null: nowhere). Blocking. */
+private fun fetchEpisodeProgress(url: String, token: String, episodeId: String): EpisodeProgress? {
+    val connection = URI("${url.trimEnd('/')}/api/auth/episodes/${URLEncoder.encode(episodeId, Charsets.UTF_8)}").toURL().openConnection() as HttpURLConnection
+    connection.connectTimeout = 5_000
+    connection.readTimeout = 5_000
+    connection.setRequestProperty("Authorization", "Bearer $token")
+    try {
+        return when (connection.responseCode) {
+            200 -> ProtocolJson.decodeFromString(EpisodeProgress.serializer(), connection.inputStream.bufferedReader().readText())
+            204 -> null
+            else -> throw SourceException("$url answered ${connection.responseCode}")
+        }
+    } finally {
+        connection.disconnect()
+    }
+}
+
+/** POSTs [json] to [path] on an auth server, with a host token of one of its accounts. Blocking. */
+private fun postJson(url: String, path: String, token: String, json: String) {
+    val connection = URI("${url.trimEnd('/')}$path").toURL().openConnection() as HttpURLConnection
+    connection.connectTimeout = 10_000
+    connection.readTimeout = 10_000
+    connection.requestMethod = "POST"
+    connection.doOutput = true
+    connection.setRequestProperty("Authorization", "Bearer $token")
+    connection.setRequestProperty("Content-Type", "application/json")
+    try {
+        connection.outputStream.use { it.write(json.toByteArray()) }
+        if (connection.responseCode !in 200..299) throw SourceException("$url answered ${connection.responseCode}")
+    } finally {
+        connection.disconnect()
     }
 }
 

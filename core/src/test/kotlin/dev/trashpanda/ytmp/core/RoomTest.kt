@@ -7,6 +7,8 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.builtins.ListSerializer
 import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.PodcastRef
+import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.ItemList
 import dev.trashpanda.ytmp.protocol.RepeatMode
@@ -68,6 +70,34 @@ class RoomTest {
 
     private suspend fun Room.run(client: FakeClient, command: Command) =
         handle(client.participantId, ClientMessage.CommandMessage("c", command))
+
+    @Test
+    fun `an episode resumes where your account says, and your account hears where you paused`() = runTest {
+        val reports = mutableListOf<Triple<String, String, Long>>()
+        val bookmarks = object : EpisodeBookmarks {
+            override suspend fun progress(accountToken: String, episodeId: String) =
+                if (accountToken == "anna-token") EpisodeProgress(episodeId, 20 * 60_000L, 60 * 60_000L, played = false) else null
+            override fun report(accountToken: String, episode: Song, positionMs: Long) {
+                reports += Triple(accountToken, episode.id, positionMs)
+            }
+        }
+        val room = Room(
+            "ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> "https://stream/$id" }, backgroundScope,
+            bookmarks = bookmarks,
+        ) { testScheduler.currentTime }
+        val anna = FakeClient()
+        room.join(
+            ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Anna", null, "owner-token", accountToken = "anna-token"), anna,
+            account = AccountIdentity("anna@test", "Anna"),
+        )
+        val episode = Song("ytm:ep", "Episode", emptyList(), null, 60 * 60_000L, emptyList(), podcast = PodcastRef("MPSPp", "Podcast"))
+        room.run(anna, Command.AddSongs(listOf(episode), QueuePosition.END))
+        runCurrent()
+        assertEquals(20 * 60_000L, anna.state.playback.positionMs)
+        advanceTimeBy(60_000)
+        room.run(anna, Command.Pause)
+        assertEquals(Triple("anna-token", "ytm:ep", 21 * 60_000L), reports.single())
+    }
 
     @Test
     fun `a client that follows the events has the room the host has`() = runTest {

@@ -71,6 +71,8 @@ class RoomManager(
     private val radio: RoomRadio? = null,
     /** What the host hears about its rooms. */
     private val hooks: RoomHooks = RoomHooks(),
+    /** Where people are in podcast episodes, on their accounts (resume in any room). */
+    private val bookmarks: EpisodeBookmarks? = null,
 ) {
     private val rooms = ConcurrentHashMap<String, Room>()
     /** Rooms by the codes they had before ([Room.formerCodes]): links and QR codes with them still work. */
@@ -100,7 +102,7 @@ class RoomManager(
                 lateinit var room: Room
                 room = Room.restore(
                     s, streams, scope, onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, clock = clock,
-                    radio = radio?.forRoom { room.ownerAccount },
+                    radio = radio?.forRoom { room.ownerAccount }, bookmarks = bookmarks,
                 )
                 add(room)
             }
@@ -139,7 +141,7 @@ class RoomManager(
             lateinit var room: Room
             room = Room(
                 code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radio?.forRoom { room.ownerAccount },
-                onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, clock = clock,
+                onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, bookmarks = bookmarks, clock = clock,
             )
             if (clone != null) room.startFrom(clone)
             if (passwordHash != null) room.startWithPassword(passwordHash)
@@ -214,7 +216,7 @@ class RoomManager(
             lateinit var room: Room
             room = Room.restore(
                 state, streams, scope, onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, radio = radio?.forRoom { room.ownerAccount },
-                clock = clock, code = code, epoch = epoch,
+                bookmarks = bookmarks, clock = clock, code = code, epoch = epoch,
             )
             if (add(room)) {
                 moved.remove(code)

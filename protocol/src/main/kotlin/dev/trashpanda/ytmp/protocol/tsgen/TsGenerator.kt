@@ -26,6 +26,8 @@ import dev.trashpanda.ytmp.protocol.InviteResponse
 import dev.trashpanda.ytmp.protocol.LinkAuthServerRequest
 import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.HistoryPage
+import dev.trashpanda.ytmp.protocol.EpisodeProgressList
+import dev.trashpanda.ytmp.protocol.MarkEpisodeRequest
 import dev.trashpanda.ytmp.protocol.AccountSettings
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.ArtistPage
@@ -199,6 +201,8 @@ fun main(args: Array<String>) {
     generator.addRoot(LinkAuthServerRequest.serializer().descriptor)
     generator.addRoot(RoleTemplate.serializer().descriptor)
     generator.addRoot(HistoryPage.serializer().descriptor)
+    generator.addRoot(EpisodeProgressList.serializer().descriptor)
+    generator.addRoot(MarkEpisodeRequest.serializer().descriptor)
     generator.addRoot(AccountSettings.serializer().descriptor)
     generator.addRoot(PlayReport.serializer().descriptor)
     generator.addRoot(ArtistPage.serializer().descriptor)

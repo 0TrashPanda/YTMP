@@ -1,11 +1,11 @@
 // Your YTMP listening history (docs/features/history-and-recommendations.md), in the room's
-// Library. It's kept on your account's server, and pages reach it there: on that server's own
+// Library, and how far you got in podcast episodes (their played marks). It's kept on your account's server, and pages reach it there: on that server's own
 // pages with your login; in the phone's app with your login there (a token made for the app's
 // own pages: those only reach your own phone); on another host's pages with a token just for
 // this, from /connect. See docs/implementation/auth.md#your-history-on-other-pages.
 import { answer, ApiRequestError, getHost } from './api';
 import { APP_HOME_ORIGIN, identity, session } from './account';
-import type { HistoryPage, HostInfo } from './protocol.gen';
+import type { EpisodeProgress, EpisodeProgressList, HistoryPage, HostInfo, MarkEpisodeRequest } from './protocol.gen';
 
 interface Access {
 	/** Your server's address. */
@@ -43,12 +43,14 @@ class ListeningHistory {
 		this.available = !!this.#access;
 	}
 
-	async #call<T>(path: string, method = 'GET'): Promise<T> {
+	async #call<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
 		const access = this.#access;
 		if (!access) throw new ApiRequestError('Log in with your YTMP account to see your history');
 		let response: Response;
 		try {
-			response = await fetch(access.server + path, { method, headers: { Authorization: `Bearer ${access.token}` } });
+			const headers: Record<string, string> = { Authorization: `Bearer ${access.token}` };
+			if (body !== undefined) headers['Content-Type'] = 'application/json';
+			response = await fetch(access.server + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
 		} catch {
 			throw new ApiRequestError(`Can't reach ${new URL(access.server).host}, where your history is`);
 		}
@@ -65,6 +67,18 @@ class ListeningHistory {
 
 	async remove(id: string): Promise<void> {
 		await this.#call<null>(`/api/account/history/${encodeURIComponent(id)}`, 'DELETE');
+	}
+
+	/** How far you got in these podcast episodes (by song ID), for those that have any. */
+	async episodes(ids: string[]): Promise<Map<string, EpisodeProgress>> {
+		if (!ids.length) return new Map();
+		const list = await this.#call<EpisodeProgressList>(`/api/account/episodes?ids=${encodeURIComponent(ids.join(','))}`);
+		return new Map(list.episodes.map((e) => [e.id, e]));
+	}
+
+	/** Marks an episode played, or unplayed (from the start). */
+	async markEpisode(id: string, played: boolean): Promise<void> {
+		await this.#call<null>(`/api/account/episodes/${encodeURIComponent(id)}`, 'PUT', { played } satisfies MarkEpisodeRequest);
 	}
 }
 

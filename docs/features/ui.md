@@ -136,8 +136,14 @@ YTMP plays YouTube Music's podcasts like YTM does:
   has *Go to (podcast)* instead of radio and find similar.
 - **Exact length**: YTM lists rounded lengths ("3 hr 36 min") and none in search; the
   host takes the exact length from the stream when the episode starts.
-- **Resume**: an episode left halfway (skipped, or another song played) goes on from there
-  the next time it plays **in that room**. Under 30 s in, or under a minute left, starts over.
+- **Resume**: an episode left halfway (paused, skipped, or another song played) goes on from
+  there the next time it plays. With a YTMP account that's **in any room, on any device**:
+  your server keeps how far you got (for whoever added the episode); without one, in that
+  room. Under 30 s in, or under a minute left, starts over.
+- **Played marks** (with a YTMP account): a podcast page shows how far you got in each
+  episode (a bar, and "40 min left") and which you heard to the end ("Played"). The song
+  menu has *Mark as played* / *Mark as unplayed*. Kept on your server, also with your history
+  paused.
 - **Back 10 s / ahead 30 s** buttons while an episode plays (player bar and the
   now-playing screen).
 - **No autoplay radio after an episode**: the room stops, like a podcast app.
@@ -145,8 +151,7 @@ YTMP plays YouTube Music's podcasts like YTM does:
   YouTube Music library (*Library → Podcasts*), or takes it out.
 - **New episodes** on Home (with a YouTube Music sign-in): the first row is the newest episodes
   of the podcasts you're subscribed to, from YouTube Music's own New episodes list.
-- Not yet: playback speed, marking episodes played, resume across rooms or devices (it's per
-  room for now).
+- Not yet: playback speed.
 
 ## Search history & recently played
 

@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
+import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.ItemList
 import dev.trashpanda.ytmp.protocol.MAX_START_WAIT_SECONDS
@@ -36,6 +37,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -82,6 +84,8 @@ class Room(
      * room on their other devices ([oldSyncId]). Called with the room locked, must not block.
      */
     private val onOwnerChanged: (oldAccount: String?, oldSyncId: String?) -> Unit = { _, _ -> },
+    /** Where people are in podcast episodes, on their accounts: to resume them in any room. Null: only this room's own. */
+    private val bookmarks: EpisodeBookmarks? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : OutputRoom {
     /** Proves the owner (given to whoever created the room, and to a new owner). Changes when the owner does. */
@@ -1336,6 +1340,7 @@ class Room(
 
     private fun pausePlayback() {
         if (!wantPlaying) return
+        current?.takeIf { it.song.podcast != null && streamUrl != null }?.let { bookmark(it.song, position()) }
         playback.set(position())
         wantPlaying = false
         startGate.stop()
@@ -1395,7 +1400,11 @@ class Room(
 
     private fun retireCurrent(result: QueueItemResult) {
         val item = current ?: return
-        if (item.song.podcast != null) rememberEpisodePosition(item.song, if (result == QueueItemResult.PLAYED) item.song.durationMs else position())
+        if (item.song.podcast != null) {
+            val at = if (result == QueueItemResult.PLAYED) item.song.durationMs else position()
+            rememberEpisodePosition(item.song, at)
+            if (streamUrl != null) bookmark(item.song, at)
+        }
         reportFinished(item, result)
         current = null
         appendHistory(item, result)
@@ -1428,6 +1437,23 @@ class Room(
         if (positionMs < RESUME_MIN_MS || positionMs > song.durationMs - RESUME_END_MS) return
         episodePositions[song.id] = positionMs
         while (episodePositions.size > MAX_EPISODE_POSITIONS) episodePositions.remove(episodePositions.keys.first())
+    }
+
+    /** Everyone listening is at [positionMs] in [episode]: their accounts keep it ([bookmarks]). */
+    private fun bookmark(episode: Song, positionMs: Long) {
+        val store = bookmarks ?: return
+        for (m in members.values) if (m.online && !m.screen) m.accountToken?.let { store.report(it, episode, positionMs) }
+    }
+
+    /**
+     * An episode starts where whoever added it stopped, on any room or device ([bookmarks]),
+     * unless this room has a place of its own for it or it was played. Before its stream is ready.
+     */
+    private fun resumeFrom(progress: EpisodeProgress?, item: QueueItem) {
+        if (progress == null || progress.played || position() >= RESUME_MIN_MS) return
+        val at = progress.positionMs
+        val duration = item.song.durationMs
+        if (at >= RESUME_MIN_MS && (duration <= 0 || at <= duration - RESUME_END_MS)) playback.set(at)
     }
 
     private fun appendHistory(item: QueueItem, result: QueueItemResult) {
@@ -1468,17 +1494,34 @@ class Room(
     /** Resolves the stream of the current [item], then starts it (or skips it if it can't play). */
     private fun resolve(item: QueueItem) {
         resolveJob?.cancel()
+        // An episode: where whoever added it stopped, looked up while the stream loads.
+        val bookmarkToken = item.song.takeIf { it.podcast != null && bookmarks != null }?.let { members[item.addedBy]?.accountToken }
         resolveJob = scope.launch {
+            val progress = bookmarkToken?.let { token ->
+                async {
+                    try {
+                        bookmarks?.progress(token, item.song.id)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        log.info("Room {}: no episode progress for {}: {}", code, item.song.id, e.message)
+                        null
+                    }
+                }
+            }
             val started = System.nanoTime()
             val stream = runCatching { streams.resolve(item.song.id) }
             val took = (System.nanoTime() - started) / 1_000_000
             stream.onSuccess { log.info("Room {}: {} \"{}\" ready in {} ms", code, item.song.id, item.song.title, took) }
                 .onFailure { if (it !is CancellationException) log.warn("Room {}: {} \"{}\" can't play after {} ms: {}", code, item.song.id, item.song.title, took, it.message) }
+            // Not while holding the room: the lookup may take a moment.
+            val saved = progress?.await()
             val next = mutex.withLock {
                 if (current?.itemId != item.itemId) return@withLock null
                 stream.onSuccess {
                     failedInARow = 0
                     exactDuration(item, it.durationMs)
+                    resumeFrom(saved, current ?: item)
                     streamUrl = it.url
                     playback.resume()
                     emit(Event.StreamReady(item.itemId, it.url))
@@ -1768,6 +1811,7 @@ class Room(
             onInfoChanged: () -> Unit = {},
             onOwnerChanged: (oldAccount: String?, oldSyncId: String?) -> Unit = { _, _ -> },
             radio: RadioSource? = null,
+            bookmarks: EpisodeBookmarks? = null,
             /** The code here, when it's not [SavedRoom.code] (a room that moved here, whose code was taken). */
             code: String = saved.code,
             /** The epoch here: one more when it moved here. */
@@ -1775,7 +1819,7 @@ class Room(
             clock: () -> Long = System::currentTimeMillis,
         ) = Room(
             code, saved.name, saved.ownerToken, saved.visibility, streams, scope, saved.ownerAccount, radio = radio,
-            onInfoChanged = onInfoChanged, onOwnerChanged = onOwnerChanged, clock = clock,
+            onInfoChanged = onInfoChanged, onOwnerChanged = onOwnerChanged, bookmarks = bookmarks, clock = clock,
             // Rooms saved before syncing get their ID now.
             syncId = saved.syncId ?: saved.ownerAccount?.let { Ids.token() },
             epoch = epoch,

@@ -133,6 +133,18 @@ class Database private constructor(private val url: String, private val user: St
                 // The same play heard by several accounts (counted once in the server's graph).
                 "CREATE INDEX plays_room_time ON plays (room_code, played_at)",
             ),
+            // 7: how far accounts got in podcast episodes, see Episodes
+            listOf(
+                """CREATE TABLE episode_progress (
+                    account_id VARCHAR(32) NOT NULL,
+                    episode_id VARCHAR(256) NOT NULL,
+                    position_ms BIGINT NOT NULL,
+                    duration_ms BIGINT NOT NULL,
+                    played BOOLEAN NOT NULL,
+                    updated_at BIGINT NOT NULL,
+                    PRIMARY KEY (account_id, episode_id)
+                )""",
+            ),
         )
 
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {

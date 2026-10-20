@@ -119,6 +119,11 @@ a login there). A host token alone isn't enough: every host you join has one. Wh
   YouTube Music one (the *Also use my YouTube Music and history there* checkbox), kept in the
   page (`ytmp.historyFrom`) and sent only to your server, never to the host.
 
+Episode progress (`/api/account/episodes`, the podcast pages' played marks) works the same.
+Hosts report it as episodes are paused, skipped or end (`POST /api/auth/episodes`, any host
+token of the account, like plays), but reading it back to resume an episode
+(`GET /api/auth/episodes/{id}`) takes a token that only reaches the account's own devices.
+
 The same rule decides how much of the [song graph](storage.md#generating-a-radio) a host
 gets: `GET /api/auth/radio?id=` takes any host token of the account, but only those for the
 app's pages or the server's own include the account's own listening.

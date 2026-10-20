@@ -88,3 +88,34 @@ enum class HistoryRadio {
 @Serializable
 @SerialName("RoomPasswordRequest")
 data class RoomPasswordRequest(val password: String?)
+
+/** How far you got in a podcast episode (kept on your account's auth server, see docs/features/ui.md#podcasts). */
+@Serializable
+@SerialName("EpisodeProgress")
+data class EpisodeProgress(
+    /** The episode's song ID. */
+    val id: String,
+    /** Where you stopped, in ms (0 when played or not started). */
+    val positionMs: Long,
+    val durationMs: Long,
+    /** Heard to the end (or marked played). */
+    val played: Boolean,
+)
+
+/**
+ * `POST /api/auth/episodes` (a host, with the account's host token): where the account is in an
+ * episode, when it's paused, skipped or ends in a room.
+ */
+@Serializable
+@SerialName("EpisodeProgressReport")
+data class EpisodeProgressReport(val id: String, val positionMs: Long, val durationMs: Long)
+
+/** `GET /api/account/episodes?ids=…`: the progress of those episodes that have some. */
+@Serializable
+@SerialName("EpisodeProgressList")
+data class EpisodeProgressList(val episodes: List<EpisodeProgress>)
+
+/** `PUT /api/account/episodes/{id}`: mark an episode played or unplayed. */
+@Serializable
+@SerialName("MarkEpisodeRequest")
+data class MarkEpisodeRequest(val played: Boolean)
