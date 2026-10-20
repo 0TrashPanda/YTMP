@@ -169,7 +169,7 @@ module now answers `search`, `suggestions`, `stream`, `audio`, `radio`, `artist`
 | GET | `/songs/{id}/audio?format=` ✅ | The **audio bytes** themselves, with HTTP `Range` support. Used for proxying (✅) and [downloads](downloads.md) (✅, the whole file), later the cache. `format` is a preference (for example `m4a`; not read yet). |
 
 - `/stream` is for the direct path of the [hybrid approach](playback-sync.md). `/audio` is
-  for the proxied path and the cache.
+  for the proxied path and the host's [song cache](song-cache.md).
 - `loudnessDb` (YouTube's loudness value, when available) is used for loudness normalisation.
 
 ### Recommendations
@@ -235,9 +235,8 @@ signed in give `401 not_signed_in`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/status` | yt-dlp / ytmusicapi versions, cache size, last update |
+| GET | `/admin/status` | yt-dlp / ytmusicapi versions, last update |
 | POST | `/admin/update` | Update yt-dlp now |
-| DELETE | `/admin/cache` | Clear the audio cache |
 
 ## Output modules
 

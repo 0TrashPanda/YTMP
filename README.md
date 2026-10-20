@@ -115,6 +115,7 @@ Music, without Premium, and not tied to a single music service.
 
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
+- A song cache on the server and the phone: songs you played start at once and play offline
 - YTMP playlists, explore page, sleep timer
 
 ## Platforms

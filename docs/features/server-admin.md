@@ -15,7 +15,7 @@ by hand:
 - **Rooms**: see active rooms, close rooms, manage "always on" rooms
 - **Trusted servers**: which other auth servers this server trusts
   (see [accounts](accounts.md#auth-servers))
-- **Cache**: size, usage and clearing of the YTM audio cache
+- **Cache**: size, usage and clearing of the [song cache](sources.md#song-cache)
 - **Server settings**: room codes, timeouts, who may create rooms, tracking default, …
 
 ## Updates

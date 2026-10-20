@@ -10,8 +10,8 @@ Feature description: [features/sources.md](../features/sources.md#youtube-music-
 - The stream URL is fetched **on demand**, when the song is about to be played.
 - Stream links are cached until shortly before they expire (`YtmCore._streams`); a link
   YouTube refuses is dropped (`forget_stream`).
-- Planned: an optional **local cache** of audio for frequently played songs, for faster
-  start and fewer requests to YouTube.
+- The audio cache is not in the module but in the host (server and phone alike): see
+  [song-cache](song-cache.md) (planned).
 
 **On a listener's computer:** the same module can run next to a browser, so the web app
 gets stream links from the listener's own IP address (see

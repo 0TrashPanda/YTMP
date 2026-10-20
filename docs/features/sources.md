@@ -125,9 +125,40 @@ focus** (see [future ideas](future-ideas.md)).
 
 - Search and fetch metadata for songs, albums, artists and playlists.
 - Play without YouTube Premium.
-- Optional **local cache** so frequently played songs start faster (planned).
+- A [song cache](#song-cache) on the server and on the phone (planned).
 - Available both **as a server-side service** and **on-device on Android**, so a
   phone can host without a server.
+
+## Song cache
+
+> Planned. Implementation: [song-cache](../implementation/song-cache.md).
+
+Songs you play are kept, so they start at once next time, need no YouTube lookup, and play
+without internet on the phone. It works by itself: there is nothing to pick.
+
+- **Every song that is played is saved** in the cache of the host that plays or serves it:
+  the server, or the phone. Podcast episodes too, by the same rules.
+- **A maximum size**, on by default: **5 GB on a server** (`ytmp.toml`), **1 GB on a phone**
+  (*Settings → Playback*; about 250 songs). Both show how full the cache is and have
+  **Clear cache**. On a server the admin sets it (see [server admin](server-admin.md)).
+- **When the cache is almost full**, songs are removed to make room: first the songs that
+  haven't been played for the longest time, and of those the ones played least. A song played
+  often stays longer than one played once, even if that one was a bit more recent. A big
+  episode makes room for itself the same way.
+- **Downloads are separate**: a song you [download](ui.md#song-menu) is yours and is never
+  removed; the cache only holds copies YTMP manages itself.
+- Only songs from online sources (YouTube Music, later YouTube) are cached. Local music and
+  media servers are already files.
+
+Where the cache is used:
+
+| | Phone | Server |
+|---|---|---|
+| Its own playing | Rooms on the phone, and **rooms on a server** the phone listens to: cached songs play from the phone itself | — |
+| Speakers | Speakers the phone plays on (Chromecast, Sonos, MPD, zones) get cached songs from the phone | The server's speakers get cached songs from the server |
+| Others in the room | Friends' browsers and phones in a room on the phone get cached songs from the phone | **All listeners** in a server room get cached songs from the server instead of from YouTube (with `proxy = "lan"` only devices on the server's network; others stream from YouTube as now) |
+| No YouTube lookup | A cached song isn't looked up on YouTube | A cached song isn't looked up on YouTube (fewer lookups, less risk of the [bot check](../implementation/ytm-module.md)) |
+| Offline | Without internet, cached songs still play in a solo room on the phone; the Local tab shows **Cached on this phone** to pick them from | — |
 - With a [linked YouTube account](accounts.md#linked-youtube-account) ✅: access
   to the user's playlists and likes.
 - **YouTube's bot check** ✅ ("confirm you're not a bot", for a whole home network at once)
