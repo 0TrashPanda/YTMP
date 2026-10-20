@@ -23,6 +23,11 @@ import dev.trashpanda.ytmp.protocol.AccountSettings
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.HistoryPage
+import dev.trashpanda.ytmp.protocol.PlayReport
+import dev.trashpanda.ytmp.protocol.SearchResponse
+import io.ktor.client.request.header
+import io.ktor.client.request.options
+import io.ktor.http.HttpHeaders
 import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.host.PlayReporter
@@ -75,7 +80,7 @@ class AccountApiTest {
         val db = Database.open(DatabaseConfig(path = Files.createTempDirectory("ytmp").resolve("ytmp.db").toString()))
         val accounts = Accounts(db)
         val key = accounts.signingKey()
-        val service = AccountService(accounts, "test.example", key, signup, History(db), trackingDefault = true)
+        val service = AccountService(accounts, "test.example", key, signup, History(db), trackingDefault = true, graph = SongGraph(db), isOwnOrigin = { it == origin })
         val auth = TrustedAuthServers(isOwnOrigin = { it == origin }, ownTemplates = service::roleTemplate, ownPlays = service::recordPlay).apply { trust(AuthServerRef(null, "test.example"), key.public) }
         application {
             val scope = CoroutineScope(SupervisorJob())
@@ -248,6 +253,46 @@ class AccountApiTest {
             assertEquals(template.roles, welcome.state.roles)
             assertEquals("crowd", welcome.state.participants.single().roleId)
         }
+    }
+
+    @Test
+    fun `your history from your phone's app and with a history token, not with a token for another host`() = testApplication {
+        val service = setup(SignupMode.OPEN)
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>().sessionToken
+        fun song(id: String) = Song(id, "Song $id", listOf(ArtistRef(null, "Artist")), null, 200_000, emptyList())
+        val start = System.currentTimeMillis() - 3_600_000
+        service.recordPlay("anna", PlayReport(song("ytm:a"), start, 200_000, false, "SOLO", "Mine", true, "Anna", emptyList(), false))
+        service.recordPlay("anna", PlayReport(song("ytm:b"), start + 200_000, 200_000, false, "SOLO", "Mine", true, "Anna", emptyList(), false))
+
+        val phone = client.postJson("/api/account/host-token", HostTokenRequest(PHONE_APP_ORIGIN), anna).body<HostTokenResponse>().token
+        val friend = client.postJson("/api/account/host-token", HostTokenRequest("http://192.168.1.50:8765"), anna).body<HostTokenResponse>().token
+        val scoped = client.post("/api/account/history-token") { bearerAuth(anna) }.body<HostTokenResponse>().token
+        for (token in listOf(anna, phone, scoped)) assertEquals(2, client.get("/api/account/history") { bearerAuth(token) }.body<HistoryPage>().plays.size)
+        // Every host you join has a token like this: it doesn't open your history.
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/account/history") { bearerAuth(friend) }.status)
+        // The history token is only for that: no export, no deleting everything, no settings.
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/account/history/export") { bearerAuth(scoped) }.status)
+        assertEquals(HttpStatusCode.Unauthorized, client.delete("/api/account/history?all=true") { bearerAuth(scoped) }.status)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/account/settings") { bearerAuth(scoped) }.status)
+        // Pages elsewhere may call it.
+        val preflight = client.options("/api/account/history") {
+            header(HttpHeaders.Origin, "http://192.168.1.50:8765")
+            header(HttpHeaders.AccessControlRequestMethod, "DELETE")
+            header(HttpHeaders.AccessControlRequestHeaders, "authorization")
+        }
+        assertEquals(HttpStatusCode.OK, preflight.status)
+        assertEquals("*", preflight.headers[HttpHeaders.AccessControlAllowOrigin])
+
+        // Hosts ask for songs that go together (the song graph), with any token of the account.
+        for (token in listOf(phone, friend)) {
+            assertEquals(listOf("ytm:b"), client.get("/api/auth/radio?id=ytm:a") { bearerAuth(token) }.body<SearchResponse>().items.map { it.id })
+        }
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/auth/radio?id=ytm:a").status)
+
+        val first = client.get("/api/account/history") { bearerAuth(phone) }.body<HistoryPage>().plays.first()
+        assertEquals(HttpStatusCode.NoContent, client.delete("/api/account/history/${first.id}") { bearerAuth(scoped) }.status)
+        assertEquals(1, client.get("/api/account/history") { bearerAuth(phone) }.body<HistoryPage>().plays.size)
     }
 
     @Test

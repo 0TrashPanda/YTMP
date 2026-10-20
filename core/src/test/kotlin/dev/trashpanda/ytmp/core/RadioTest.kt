@@ -79,6 +79,30 @@ class RadioTest {
     }
 
     @Test
+    fun `songs from the song graph are mixed into a room's radio, and are the radio when there's no other`() = runTest {
+        val manager = RoomManager(
+            { "https://s/$it" }, backgroundScope, clock = { testScheduler.currentTime },
+            radio = { seed -> if (seed.startsWith("local")) error("not on YouTube Music") else radio.radio(seed) },
+            graphRadio = { owner, seed -> if (owner == "anna@test") listOf(song("$seed-g1"), song("$seed-g2")) else emptyList() },
+        )
+        suspend fun radioIn(owner: String?, seed: String): List<String> {
+            val room = manager.create("Party", RoomVisibility.PUBLIC, ownerAccount = owner)
+            room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), {
+                messages += it
+                if (it is ServerMessage.Welcome) me = it.participantId
+            })
+            room.run(Command.StartRadio(song(seed)))
+            runCurrent()
+            return room.state().autoplay.map { it.song.id }
+        }
+
+        assertEquals(listOf("a-1", "a-g1", "a-2", "a-3", "a-g2", "a-4"), radioIn("anna@test", "a").take(6))
+        assertEquals((1..10).map { "a-$it" }, radioIn(null, "a"))
+        // A short radio is topped up from its last song: the graph keeps it going.
+        assertEquals(listOf("local-g1", "local-g2", "local-g2-g1", "local-g2-g2"), radioIn("anna@test", "local"))
+    }
+
+    @Test
     fun `without internet the room pauses after a few songs instead of skipping everything`() = runTest {
         val room = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { throw Exception("Failed to resolve 'www.youtube.com'") }, backgroundScope, radio = radio) { testScheduler.currentTime }
         room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Me", null, "owner"), {

@@ -1,7 +1,8 @@
 # Architecture
 
 > Status: built this way (milestones 1–4 and much of 5). The *history & graph service*
-> below exists for listening history; the song graph isn't built yet.
+> below has the listening history and the song graph (`server/.../History.kt`, `SongGraph.kt`);
+> recap isn't built yet.
 
 ## Tech stack
 

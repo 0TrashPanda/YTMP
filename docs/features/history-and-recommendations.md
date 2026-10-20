@@ -8,10 +8,10 @@ account's **auth server**.
 ## Listening history
 
 > Implemented: tracking on/off (pause), "keep me out of others' history" (account setting,
-> or a checkbox for guests), recording every song heard with the fields below, and a
-> history page with search, delete (one entry, a range of days, everything) and export
-> (JSON). Radio is built with YouTube Music's radio (see below). Recap and the song graph
-> are not built yet.
+> or a checkbox for guests), recording every song heard with the fields below, **History in
+> the room's Library** (below), and a page on your server's account page with search, delete
+> (one entry, a range of days, everything) and export (JSON). The song graph is built and mixed
+> into radio and find similar (below). Recap is not built yet.
 
 When tracking is on, YTMP keeps a **full history of every song played** for the account,
 **in order**.
@@ -51,9 +51,26 @@ taste, and you can choose which kind(s) the recap, song graph and radio use.
 The user can:
 
 - view and search their history
+- **play** from it: its songs work like songs anywhere else (see below)
 - **pause** tracking at any time
 - **export** their history
 - **delete** single entries, a time range, or everything
+
+### History in the room
+
+Like YouTube Music's, your history is in the **Library**: the *History* button at the top
+opens it, newest first and grouped by day (*Today*, *Yesterday*, then the date). Under each
+song: when, in which room, who you listened with, who added it and whether you skipped it.
+
+- It's there wherever you're logged in with your YTMP account: on your server's pages, in the
+  app (also in rooms on the phone itself), and in rooms on other hosts when you let them use
+  your YouTube Music and history (the question when you log in there). The Library shows
+  then, also without a YouTube Music sign-in.
+- Its songs work like any other list: **tap, swipe and hold** do what *Settings → Taps and
+  swipes* says (play next, add to queue, play now, start radio, the song menu), and the song
+  menu has everything it has elsewhere, plus **Remove from your history**.
+- **Search** your history at the top. Older days load as you scroll.
+- On your server's own pages, *Export or delete days* goes to the full history page.
 
 ## Recap
 
@@ -70,7 +87,11 @@ A personal overview built from the history, in the style of Spotify Wrapped:
 
 ## Song graph
 
-> Not built yet. Storage plan: [storage](../implementation/storage.md#song-graph-planned-not-built-yet).
+> Built: the personal and server graphs from listening, YouTube Music's radios as edges, merging
+> songs by title, artist and length, and mixing it into radio, autoplay, find similar and
+> *Related*. How it's stored and weighed: [storage](../implementation/storage.md#song-graph).
+> Not yet: audio fingerprinting, and YouTube Music's radios fetched by a phone (only a server's
+> are learned).
 
 Because the history keeps the **order** in which songs were played, YTMP can build a
 **graph of songs**:
@@ -88,10 +109,19 @@ There are two graphs:
 
 - **Personal graph** per account, built from your own history.
 - **Server graph** per server, combined from the listening of everyone on that server
-  who has tracking on, plus all edges learned from YouTube Music.
+  who has tracking on, plus all edges learned from YouTube Music. A song a whole party heard
+  counts once.
 
-Radio and find similar can use either one, or a mix of both. A shared graph learns much
-faster in a small group of friends.
+Radio and find similar use a mix of both; your own listening counts most. A shared graph
+learns much faster in a small group of friends.
+
+- What of your own listening counts is an account setting (*Settings → Account → Radio learns
+  from*): **solo listening and parties** (the default; parties count a bit less), **only solo
+  listening**, or **not my listening** (then only everyone's and YouTube Music's).
+- Your own listening only goes into radios made for you: in your rooms, on your server and
+  on your phone, and in *Find similar* when you ask. Another host you join (a friend's phone)
+  only gets what everyone on your server listens to.
+- Deleting from your history takes it out of the graph too (it's rebuilt from what's left).
 
 ### Learning from YouTube Music
 
@@ -107,8 +137,10 @@ of **song connections**:
 ## Radio / Mix
 
 > Implemented: *Start radio* and *Autoplay from here* with **YouTube Music's radio** (and the
-> autoplay room setting, see [queue](queue.md#autoplay-queue)). The song graph comes next and
-> will be mixed in.
+> autoplay room setting, see [queue](queue.md#autoplay-queue)), with the **song graph** mixed
+> in: one song from the graph after every two of YouTube Music's. Where YouTube Music has no
+> radio (local music) or doesn't answer, the graph's songs are the radio. The room owner's
+> graph is used.
 
 A radio is an endless list of songs similar to a starting point. There are two ways to use
 it from the [song menu](ui.md#song-menu):
@@ -127,8 +159,8 @@ artist or the current queue: it walks the graph to find songs that often go toge
 
 ## Find similar
 
-> Built with YouTube Music's radio: *Find similar* in the song menu, and the *Related* tab of
-> the full player. The song graph will be mixed in later.
+> Built with YouTube Music's radio and the song graph (yours, as whoever asks): *Find similar*
+> in the song menu, and the *Related* tab of the full player.
 
 Like a radio, but **it does not touch the queue**. Starting from a song, an artist or an
 album, YTMP shows a **list of similar songs** that you can browse, and you pick the ones

@@ -70,13 +70,21 @@ class RoomSync(
 
     private val home get() = RoomHome(HostKind.PHONE, hostId, hostName, lanUrl())
 
-    /** An account token was accepted here: keep the newest per account. */
+    /**
+     * An account token was accepted here: keep the newest per account, and the newest made for
+     * the app's own pages (with that one, the server shares your own listening: see [tokenFor]).
+     */
     fun remember(token: String, account: AccountIdentity) {
-        if (prefs.getString("token:${account.id}", null) == token) return
-        prefs.edit().putString("token:${account.id}", token).apply()
+        val forApp = authLink.auth.claims(token)?.aud == LocalHost.LOCAL_URL
+        if (prefs.getString("token:${account.id}", null) == token && (!forApp || prefs.getString("appToken:${account.id}", null) == token)) return
+        prefs.edit().putString("token:${account.id}", token).apply { if (forApp) putString("appToken:${account.id}", token) }.apply()
     }
 
     private fun token(account: String): String? = prefs.getString("token:$account", null)
+
+    /** The token of [account] to ask its server with: the one for the app's own pages when it's still good, else the newest. */
+    fun tokenFor(account: String): String? =
+        prefs.getString("appToken:$account", null)?.takeIf { authLink.auth.claims(it) != null } ?: token(account)
 
     /** The last copy each room's server took (by sync ID). */
     private val sent = ConcurrentHashMap<String, SavedRoom>()

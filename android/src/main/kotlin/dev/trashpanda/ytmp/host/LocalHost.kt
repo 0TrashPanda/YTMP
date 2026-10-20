@@ -135,6 +135,10 @@ class LocalHost(private val context: Context) {
         radio = local.radio(cached),
         // Every room here is the phone owner's, so radio goes through their YouTube Music.
         ownerRadio = { _, seed -> if (LocalMusic.isLocal(seed)) null else youtube.personalized()?.radio(seed) },
+        // The song graph of the owner's server: their listening, and everyone's there.
+        graphRadio = { owner, seed ->
+            (owner ?: authLink.ownerAccount)?.let(sync::tokenFor)?.let { authLink.auth.similar(it, seed) }.orEmpty().filter { local.playable(it.id) }
+        },
         onRoomSaved = { sync.saved(it) },
         onRoomClosed = { sync.closed(it) },
         onRoomDisowned = { account, syncId -> sync.closed(account, syncId) },
@@ -206,6 +210,10 @@ class LocalHost(private val context: Context) {
                 lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
                 zones = zones,
                 local = local,
+                // Find similar and Related: the song graph of the asker's server, with their login.
+                songGraph = { call, seed ->
+                    call.bearerToken()?.let { authLink.auth.similar(it, seed) }.orEmpty().filter { local.playable(it.id) }
+                },
             )
         }.start(wait = false)
         Log.i(TAG, "Hosting on port $PORT")

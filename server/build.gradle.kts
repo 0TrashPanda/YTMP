@@ -17,6 +17,7 @@ dependencies {
     implementation(project(":host"))
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.server.cors)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktoml.core)

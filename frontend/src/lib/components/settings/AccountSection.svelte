@@ -3,7 +3,7 @@
 	// rooms on other devices, your roles, password). On another host (a phone): who you're
 	// logged in as there, and a link to your account on your server.
 	import { authServer, identity, session } from '../../account';
-	import type { AccountInfo, AccountSettings, AuthServerInfo, HostInfo, RoomOpenMode } from '../../protocol.gen';
+	import type { AccountInfo, AccountSettings, AuthServerInfo, HistoryRadio, HostInfo, RoomOpenMode } from '../../protocol.gen';
 	import LoginForm from '../LoginForm.svelte';
 	import Switch from './Switch.svelte';
 	import TemplateSettings from './TemplateSettings.svelte';
@@ -118,6 +118,22 @@
 					<p class="text-xs text-muted">Others won't see that they listened with you. Applies to rooms you join after changing it.</p>
 				</div>
 				<Switch checked={s.hideFromOthers} label="Keep me out of others' history" disabled={busy} onchange={(on) => saveSettings({ ...s, hideFromOthers: on })} />
+			</div>
+			<div class="flex flex-col gap-2">
+				<div>
+					<p class="text-sm font-medium">Radio learns from</p>
+					<p class="text-xs text-muted">Radio, autoplay and Find similar mix in songs you often play after each other. What everyone on this server plays counts too.</p>
+				</div>
+				<select
+					class="rounded-lg bg-raised px-3 py-2.5 outline-none"
+					value={s.historyRadio}
+					disabled={busy}
+					onchange={(e) => saveSettings({ ...s, historyRadio: e.currentTarget.value as HistoryRadio })}
+				>
+					<option value="all">My solo listening and parties</option>
+					<option value="solo">Only my solo listening</option>
+					<option value="off">Not my listening</option>
+				</select>
 			</div>
 		</section>
 

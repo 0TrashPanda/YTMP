@@ -1,5 +1,5 @@
 <script lang="ts">
-	// A list of songs (search, find similar, artist, album, playlist and Local pages). Tap,
+	// A list of songs (search, find similar, artist, album, playlist, history and Local pages). Tap,
 	// swipe right, swipe left and hold do what Settings → Taps and swipes says (play next, add
 	// to queue, play now, the song menu by default); ⋮ or right-click = song menu.
 	import { yourRadio } from '../api';
@@ -17,6 +17,8 @@
 		numbered = false,
 		showAlbum = true,
 		playlist,
+		details,
+		listened,
 		onMove,
 		onToast,
 		onMenu
@@ -28,6 +30,10 @@
 		showAlbum?: boolean;
 		/** One of your own playlists (or Liked music): its songs can be removed from it (the song menu). */
 		playlist?: { id: string; itemIds: string[]; likedMusic: boolean; onRemoved: (index: number) => void };
+		/** A third line under each song (your history: when, where, with whom). */
+		details?: string[];
+		/** Songs of your listening history (their entries' IDs): they can be removed from it (the song menu). */
+		listened?: { ids: string[]; onRemoved: (index: number) => void };
 		/** Songs can be dragged to another place (your own playlists). */
 		onMove?: (from: number, to: number) => void;
 		onToast: (text: string) => void;
@@ -133,7 +139,11 @@
 			likedMusic: playlist.likedMusic,
 			onRemoved: () => playlist.onRemoved(index)
 		};
-		onMenu({ song, place: 'search', playlist: inPlaylist, x: rect.right - 256, y: rect.bottom });
+		onMenu({ song, place: 'search', playlist: inPlaylist, listened: fromHistory(index), x: rect.right - 256, y: rect.bottom });
+	}
+
+	function fromHistory(index: number) {
+		return listened && { id: listened.ids[index], onRemoved: () => listened.onRemoved(index) };
 	}
 
 	/** The action a swipe of [offset] px would do. */
@@ -149,7 +159,7 @@
 			likedMusic: playlist.likedMusic,
 			onRemoved: () => playlist.onRemoved(index)
 		};
-		onMenu({ song, place: 'search', playlist: inPlaylist, x: atPointer ? event.clientX : rect.right - 256, y: atPointer ? event.clientY : rect.bottom });
+		onMenu({ song, place: 'search', playlist: inPlaylist, listened: fromHistory(index), x: atPointer ? event.clientX : rect.right - 256, y: atPointer ? event.clientY : rect.bottom });
 	}
 </script>
 
@@ -196,6 +206,9 @@
 				<div class="truncate text-sm text-muted">
 					{artistNames(song)}{showAlbum && song.album ? ` • ${song.album.name}` : ''}
 				</div>
+				{#if details?.[i]}
+					<div class="truncate text-xs text-muted">{details[i]}</div>
+				{/if}
 			</div>
 			<!-- Some listings have no length (episodes in search); it's known once it plays. -->
 			<span class="text-sm text-muted tabular-nums">{song.durationMs ? formatTime(song.durationMs) : ''}</span>

@@ -65,7 +65,7 @@ The UI is English only for now. Translations (for example Dutch) could be added 
 Store the [song graph](history-and-recommendations.md#song-graph) in a real graph
 database (for example Neo4j or Memgraph) instead of normal tables, for bigger graphs or
 more advanced recommendations. Not needed at the current scale (see
-[storage](../implementation/storage.md#song-graph-planned-not-built-yet)).
+[storage](../implementation/storage.md#song-graph)).
 
 ## Spotify module
 

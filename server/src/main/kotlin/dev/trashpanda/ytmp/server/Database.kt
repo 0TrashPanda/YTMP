@@ -110,6 +110,29 @@ class Database private constructor(private val url: String, private val user: St
                 )""",
                 "CREATE INDEX room_copies_account ON room_copies (account)",
             ),
+            // 6: the song graph, see SongGraph (account_id is '' for the server's and YouTube Music's edges)
+            listOf(
+                "CREATE TABLE songs (id VARCHAR(32) PRIMARY KEY, match_key VARCHAR(600) NOT NULL, duration_ms BIGINT NOT NULL)",
+                "CREATE INDEX songs_match_key ON songs (match_key)",
+                "CREATE TABLE song_sources (source_id VARCHAR(256) PRIMARY KEY, song_id VARCHAR(32) NOT NULL, data TEXT NOT NULL, updated_at BIGINT NOT NULL)",
+                "CREATE INDEX song_sources_song ON song_sources (song_id)",
+                """CREATE TABLE song_edges (
+                    from_song VARCHAR(32) NOT NULL,
+                    to_song VARCHAR(32) NOT NULL,
+                    scope VARCHAR(16) NOT NULL,
+                    account_id VARCHAR(32) NOT NULL,
+                    solo_plays INTEGER NOT NULL,
+                    shared_plays INTEGER NOT NULL,
+                    skips INTEGER NOT NULL,
+                    ytm_rank INTEGER,
+                    updated_at BIGINT NOT NULL,
+                    PRIMARY KEY (from_song, to_song, scope, account_id)
+                )""",
+                "CREATE INDEX song_edges_from ON song_edges (from_song, scope, account_id)",
+                "CREATE INDEX song_edges_to ON song_edges (to_song, scope, account_id)",
+                // The same play heard by several accounts (counted once in the server's graph).
+                "CREATE INDEX plays_room_time ON plays (room_code, played_at)",
+            ),
         )
 
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {

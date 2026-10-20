@@ -7,6 +7,8 @@
 	import NowPlaying from '../../../lib/components/NowPlaying.svelte';
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
+	import HistoryView from '../../../lib/components/HistoryView.svelte';
+	import { listening } from '../../../lib/listening.svelte';
 	import LocalView from '../../../lib/components/LocalView.svelte';
 	import LocalGroupView from '../../../lib/components/LocalGroupView.svelte';
 	import { local, loadLocal, localPlace, forgetLocalPlace } from '../../../lib/local.svelte';
@@ -75,8 +77,8 @@
 	let menu = $state<MenuTarget | null>(null);
 
 	// The pages you opened, in order: Home at the bottom, then Library or Local (the bottom bar
-	// starts over from there), then search, find similar, artist, album, playlist, podcast, genre
-	// and folder pages. Back (the phone's, or the back arrow) goes to the one before, scrolled as
+	// starts over from there), then search, find similar, artist, album, playlist, podcast, genre,
+	// folder and history pages. Back (the phone's, or the back arrow) goes to the one before, scrolled as
 	// you left it.
 	type Section = 'home' | 'library' | 'local';
 	type View =
@@ -87,7 +89,8 @@
 		| { kind: 'playlist'; id: string; title: string; personal?: boolean }
 		| { kind: 'podcast'; id: string; title: string }
 		| { kind: 'genre'; library: string; name: string }
-		| { kind: 'folder'; library: string; path: string };
+		| { kind: 'folder'; library: string; path: string }
+		| { kind: 'history' };
 	type Page = ({ kind: Section } | View) & { scrollTop?: number };
 	const MAX_PAGES = 50;
 	let pages = $state<Page[]>([{ kind: 'home' }]);
@@ -152,14 +155,14 @@
 		} else pickSection('home');
 	}
 
-	// Home, Library (in the app with YouTube Music sign-in) and Local (when there's local
-	// music): the bottom bar, under the pages above.
+	// Home, Library (in the app with YouTube Music sign-in, or with your YTMP history) and Local
+	// (when there's local music): the bottom bar, under the pages above.
 	const sections = $derived(
 		([
 			['home', 'Home'],
 			['library', 'Library'],
 			['local', 'Local']
-		] as const).filter(([value]) => value === 'home' || (value === 'library' ? youtube.available : !!local.libraries?.length))
+		] as const).filter(([value]) => value === 'home' || (value === 'library' ? youtube.available || listening.available : !!local.libraries?.length))
 	);
 	$effect(() => {
 		void loadLocal();
@@ -255,6 +258,7 @@
 		player = createPlayer(room);
 		room.connect();
 		youtube.load();
+		void listening.load();
 	}
 	if (initialName.trim()) {
 		// Logged in on this server's pages, but not yet for its rooms: that first (log in once).
@@ -701,6 +705,8 @@
 								<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={(target) => (menu = target)} onGone={back} />
 							{:else if view.kind === 'podcast'}
 								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
+							{:else if view.kind === 'history'}
+								<HistoryView {room} onToast={toast} onMenu={(target) => (menu = target)} />
 							{:else if view.kind === 'genre' || view.kind === 'folder'}
 								{@const library = view.library}
 								<LocalGroupView
@@ -728,6 +734,7 @@
 						{:else if top.kind === 'library'}
 							<LibraryView
 								onToast={toast}
+								onHistory={() => show({ kind: 'history' })}
 								onArtist={openArtist}
 								onAlbum={(a) => openAlbum(a)}
 								onPlaylist={(p) => openPlaylist(p, true)}

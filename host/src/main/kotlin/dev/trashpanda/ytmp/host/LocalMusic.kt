@@ -164,6 +164,9 @@ class LocalMusic {
         return (same + rest).shuffled()
     }
 
+    /** Whether [songId] can play here: not local music, or local music of a library this host has (the song graph knows songs of other hosts' too). */
+    fun playable(songId: String): Boolean = !isLocal(songId) || runCatching { parse(songId) }.getOrNull() != null
+
     /** The stream link of a local song, or null when [songId] isn't local music. */
     suspend fun stream(songId: String): ResolvedStream? {
         val (library, kind, key) = parse(songId) ?: return null

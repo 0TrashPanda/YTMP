@@ -1,17 +1,18 @@
 <script lang="ts">
 	// Your library, like YTM's: your playlists (Liked music first) and podcasts, through your
 	// YouTube Music sign-in. Signed out, it asks you to sign in. The search field filters it by
-	// name (and author), as you type.
+	// name (and author), as you type. With a YTMP account, History opens your listening history.
 	import { getLibrary } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
 	import { fuzzyFind } from '../format';
 	import type { HomePage } from '../protocol.gen';
 	import type { Card } from './CardGrid.svelte';
 	import { youtube } from '../youtube.svelte';
+	import { listening } from '../listening.svelte';
 	import CardGrid from './CardGrid.svelte';
 	import Icon from './Icon.svelte';
 
-	let { onToast, ...open }: { onToast: (text: string) => void } & PageHandlers = $props();
+	let { onToast, onHistory, ...open }: { onToast: (text: string) => void; onHistory: () => void } & PageHandlers = $props();
 
 	let library = $state<HomePage | null>(null);
 	let error = $state<string | null>(null);
@@ -47,7 +48,17 @@
 </script>
 
 <div class="flex flex-col gap-8 pb-4">
-	{#if !youtube.account}
+	{#if listening.available}
+		<div class="flex gap-2 px-2">
+			<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={onHistory}>
+				<Icon name="history" size={20} />
+				History
+			</button>
+		</div>
+	{/if}
+	{#if !youtube.account && !youtube.available}
+		<!-- No YouTube Music here: just your history. -->
+	{:else if !youtube.account}
 		<div class="flex flex-col items-center gap-4 px-6 py-16 text-center">
 			<Icon name="library" size={56} class="text-muted" />
 			<h2 class="text-xl font-bold">Your playlists and podcasts</h2>

@@ -48,7 +48,7 @@
 		}
 	}
 
-	/** Also your YouTube Music there (it comes from this server; that host never gets your sign-in). */
+	/** Also your YouTube Music and listening history there (they come from this server; that host never gets your sign-in). */
 	let withYoutube = $state(true);
 
 	/** Back to the host's page without a login: [answer] `none` (not logged in), or `declined`. */
@@ -84,7 +84,8 @@
 			const otherHost = target.origin !== location.origin;
 			if (otherHost) remember(token.account.id, target.origin, WITH_YOUTUBE, withYoutube);
 			const youtube = otherHost && withYoutube ? await authServer.youtubeToken().catch(() => undefined) : undefined;
-			returnWithIdentity(target.toString(), token, youtube);
+			const history = otherHost && withYoutube ? await authServer.historyToken().catch(() => undefined) : undefined;
+			returnWithIdentity(target.toString(), token, youtube, history);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Something went wrong';
 			busy = false;
@@ -119,9 +120,9 @@
 			<label class="flex items-start gap-2 text-sm">
 				<input type="checkbox" class="mt-0.5 accent-accent" bind:checked={withYoutube} />
 				<span>
-					Also use my YouTube Music there
+					Also use my YouTube Music and history there
 					<span class="block text-xs text-muted">
-						Your Home, Library and likes in rooms there come from this server; the host never gets your sign-in. Deleting or changing playlists stays here.
+						Your Home, Library, likes and listening history in rooms there come from this server; the host never gets your sign-in. Deleting or changing playlists stays here.
 					</span>
 				</span>
 			</label>

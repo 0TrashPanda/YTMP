@@ -181,8 +181,8 @@ module now answers `search`, `suggestions`, `stream`, `audio`, `radio`, `artist`
 | GET | `/artists/{id}` | ✅ Artist page: name, art, description, top songs, albums, singles |
 | GET | `/albums/{id}` | ✅ Album page: title, kind, year, artists, art, songs |
 
-The host stores every radio/related result as **YTM edges** in the song graph (see
-[storage](storage.md#song-graph-planned-not-built-yet)).
+A server stores the radios it fetches as **YTM edges** in the song graph (see
+[storage](storage.md#song-graph)); a phone doesn't yet.
 
 ### Lyrics
 

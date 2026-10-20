@@ -46,7 +46,10 @@ data class HistoryEntry(
     val shared: Boolean,
 )
 
-/** `GET /api/account/history?before=&limit=&q=`, newest first. */
+/**
+ * `GET /api/account/history?before=&limit=&q=`, newest first. Also for the pages of your
+ * phone's app and of rooms on other hosts (see docs/implementation/auth.md#your-history-on-other-pages).
+ */
 @Serializable
 @SerialName("HistoryPage")
 data class HistoryPage(val plays: List<HistoryEntry>, val more: Boolean)
@@ -63,7 +66,23 @@ data class AccountSettings(
     val openElsewhere: RoomOpenMode = RoomOpenMode.ASK,
     /** Rooms you create start with your default password (set with `PUT /api/account/room-password`). */
     val hasRoomPassword: Boolean = false,
+    /** Which of your listening radio and Find similar learn from (the song graph). */
+    val historyRadio: HistoryRadio = HistoryRadio.ALL,
 )
+
+/** Which of your listening the song graph uses for your radio. */
+@Serializable
+@SerialName("HistoryRadio")
+enum class HistoryRadio {
+    /** Not your own listening (what everyone on the server listens to still counts). */
+    @SerialName("off") OFF,
+
+    /** Only your solo rooms. */
+    @SerialName("solo") SOLO,
+
+    /** Solo rooms and parties (parties count a bit less). */
+    @SerialName("all") ALL,
+}
 
 /** `PUT /api/account/room-password`: your default room password, or none (null). */
 @Serializable

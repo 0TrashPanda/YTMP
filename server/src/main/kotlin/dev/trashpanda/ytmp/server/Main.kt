@@ -25,6 +25,8 @@ import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import io.ktor.server.application.Application
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import dev.trashpanda.ytmp.core.RadioSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -66,7 +68,6 @@ fun main(args: Array<String>) {
         expectSuccess = false
     }
     val ytm = RemoteSourceModule(http, config.ytm.url.trimEnd('/'), config.ytm.key)
-    val cached = CachedSource(ytm, ytm, ytm, ytm)
     val audioProxy = config.audio.proxyMode()
     log.info("Streaming audio through the server: {}", audioProxy.name.lowercase())
 
@@ -96,16 +97,25 @@ fun main(args: Array<String>) {
 
         val db = Database.open(config.database)
         val accounts = Accounts(db)
+        // The song graph learns from YouTube Music's radios too (docs/features/history-and-recommendations.md#song-graph).
+        val graph = SongGraph(db)
+        graph.buildIfNeeded(accounts)
+        val cached = CachedSource(ytm, RadioSource { seed -> ytm.radio(seed).also { graph.learnRadio(seed, it) } }, ytm, ytm)
         val ownUrl = normalizeOrigin(config.accounts.url)
         val issuer = config.accounts.name.ifBlank {
             accounts.setting("issuer") ?: (ownUrl?.let { URI(it).host } ?: hostName()).also { accounts.setSetting("issuer", it) }
         }
         val key = accounts.signingKey()
-        val service = AccountService(accounts, issuer, key, config.accounts.signupMode(), History(db), config.accounts.trackingDefault)
+        val isOwnOrigin = { origin: String -> origin == ownUrl || origin in localOrigins(config.server.port) }
+        val service = AccountService(
+            accounts, issuer, key, config.accounts.signupMode(), History(db), config.accounts.trackingDefault,
+            graph = graph, isOwnOrigin = isOwnOrigin,
+        )
         val auth = TrustedAuthServers(
-            isOwnOrigin = { it == ownUrl || it in localOrigins(config.server.port) },
+            isOwnOrigin = isOwnOrigin,
             ownTemplates = service::roleTemplate,
             ownPlays = service::recordPlay,
+            ownSimilar = { username, seed -> service.similar(username, seed) },
         )
         auth.trust(AuthServerRef(url = null, issuer = issuer), key.public)
         trustServers(auth, config.accounts.trusted, ownIssuer = issuer)
@@ -114,9 +124,10 @@ fun main(args: Array<String>) {
 
         val plays = PlayReporter(auth, this)
         val youtube = YoutubeLinks(accounts, config.ytm.key, ytm, this)
+        /** The username of one of this server's own accounts, by account ID (`user@issuer`). */
+        fun localUsername(accountId: String): String? = accountId.takeIf { it.endsWith("@$issuer") }?.substringBeforeLast('@')
         /** One of this server's own accounts, by account ID (`user@issuer`). */
-        fun localAccount(accountId: String): String? =
-            accountId.takeIf { it.endsWith("@$issuer") }?.substringBeforeLast('@')?.let(accounts::find)?.id
+        fun localAccount(accountId: String): String? = localUsername(accountId)?.let(accounts::find)?.id
         val rooms = RoomManager(
             local.streams(ytm), this, config.rooms.style(), config.rooms.codeLength, outputs = outputs, store = JdbcRoomStore(db),
             // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
@@ -128,7 +139,12 @@ fun main(args: Array<String>) {
             },
             radio = local.radio(cached),
             // A room with an owner account of this server: radio through that account's YouTube Music.
-            ownerRadio = { owner, seed -> if (LocalMusic.isLocal(seed)) null else owner?.let(::localAccount)?.let(youtube::of)?.personalized()?.radio(seed) },
+            ownerRadio = { owner, seed ->
+                if (LocalMusic.isLocal(seed)) null
+                else owner?.let(::localAccount)?.let(youtube::of)?.personalized()?.radio(seed)?.also { graph.learnRadio(seed, it) }
+            },
+            // The song graph: the owner's listening (an account here) and everyone's.
+            graphRadio = { owner, seed -> withContext(Dispatchers.IO) { service.similar(owner?.let(::localUsername), seed) }.filter { local.playable(it.id) } },
         )
         rooms.startCleanup()
         val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, defaultPassword = service::roomPassword)
@@ -171,6 +187,19 @@ fun main(args: Array<String>) {
                 val token = call.bearerToken()
                 val id = token?.let(auth::verify)?.id ?: token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
                 id?.let(::localAccount)?.let(youtube::of)
+            },
+            // Find similar and Related: the song graph of whoever asks (one of our accounts, or one
+            // of a server we trust, which decides itself), else of everyone here.
+            songGraph = { call, seed ->
+                val token = call.bearerToken()
+                val songs = when {
+                    token != null && auth.verify(token) != null -> auth.similar(token, seed)
+                    else -> {
+                        val id = token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
+                        withContext(Dispatchers.IO) { service.similar(id?.let(::localUsername), seed) }
+                    }
+                }
+                songs.filter { local.playable(it.id) }
             },
         )
     }.start(wait = true)

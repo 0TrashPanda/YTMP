@@ -905,11 +905,14 @@ export interface HistoryPage {
   more: boolean;
 }
 
+export type HistoryRadio = "off" | "solo" | "all";
+
 export interface AccountSettings {
   tracking: boolean;
   hideFromOthers: boolean;
   openElsewhere: RoomOpenMode;
   hasRoomPassword: boolean;
+  historyRadio: HistoryRadio;
 }
 
 export interface PlayReport {

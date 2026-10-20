@@ -76,6 +76,11 @@ class RoomManager(
      * without one), when they have one and want it ([PersonalCatalog.personalized]). Null: the shared [radio].
      */
     private val ownerRadio: suspend (ownerAccount: String?, seedSongId: String) -> List<Song>? = { _, _ -> null },
+    /**
+     * Songs that go with the seed in the song graph (the owner's listening and the server's),
+     * mixed into every radio ([mixRadio]). Empty: none known.
+     */
+    private val graphRadio: suspend (ownerAccount: String?, seedSongId: String) -> List<Song> = { _, _ -> emptyList() },
     /** A room with an owner account was saved: its copy elsewhere can be updated (see [Room.syncId]). Must not block. */
     private val onRoomSaved: (SavedRoom) -> Unit = {},
     /** A room with an owner account was closed or expired here (not moved away). Must not block. */
@@ -311,7 +316,7 @@ class RoomManager(
      */
     private fun radioFor(owner: () -> String?): RadioSource? {
         val shared = radio ?: return null
-        return RadioSource { seed ->
+        val base = RadioSource { seed ->
             try {
                 ownerRadio(owner(), seed)?.let { return@RadioSource it }
             } catch (e: CancellationException) {
@@ -321,6 +326,8 @@ class RoomManager(
             }
             shared.radio(seed)
         }
+        // The song graph is mixed in; it's the whole radio when there's no other (or that failed).
+        return RadioSource { seed -> mixedRadio({ base.radio(seed) }, { graphRadio(owner(), seed) }) }
     }
 
     private fun refreshList() {

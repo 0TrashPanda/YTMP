@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.core.ScreenRefused
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.core.personalized
+import dev.trashpanda.ytmp.core.mixedRadio
 import dev.trashpanda.ytmp.protocol.AlbumRef
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ROOM_CODE
@@ -214,6 +215,11 @@ fun Application.ytmpModule(
     zones: ZoneOutputs? = null,
     /** Local music (the Local tab): a Raspberry Pi's music folder, the music on the hosting phone. */
     local: LocalMusic? = null,
+    /**
+     * Songs that go with a song in the song graph, for whoever asks (their account's listening,
+     * where their auth server allows it), mixed into Find similar and Related. Null: none.
+     */
+    songGraph: (suspend (call: ApplicationCall, seedSongId: String) -> List<Song>)? = null,
 ) {
     val screens = ScreenPairings()
     install(ContentNegotiation) { json(ProtocolJson) }
@@ -269,6 +275,12 @@ fun Application.ytmpModule(
             return personal
         }
         return personal?.takeIf { isDeviceOwner() }
+    }
+
+    /** [radio] (of [songId]) with the song graph's songs for whoever asks mixed in ([mixedRadio]). */
+    suspend fun ApplicationCall.withGraph(songId: String, radio: suspend () -> List<Song>): List<Song> {
+        val graph = songGraph ?: return radio()
+        return mixedRadio(radio) { graph(this, songId) }
     }
 
     /**
@@ -399,7 +411,7 @@ fun Application.ytmpModule(
                 val songId = call.request.queryParameters["id"]?.trim().orEmpty()
                 if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
                 val source = similar ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No radio source")
-                call.respond(SearchResponse(call.asYou({ radio(songId) }) { source.radio(songId) }.filter { it.id != songId }))
+                call.respond(SearchResponse(call.withGraph(songId) { call.asYou({ radio(songId) }) { source.radio(songId) } }.filter { it.id != songId }))
             }
             get("/lyrics") {
                 // The song as the page knows it: LRCLIB looks lyrics up by title, artist, album and length.
@@ -472,7 +484,8 @@ fun Application.ytmpModule(
                 get("/similar") {
                     val songId = call.request.queryParameters["id"]?.trim().orEmpty()
                     if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
-                    call.respond(SearchResponse((call.owner().radio(songId) ?: throw notHere()).filter { it.id != songId }))
+                    val owner = call.owner()
+                    call.respond(SearchResponse(call.withGraph(songId) { owner.radio(songId) ?: throw notHere() }.filter { it.id != songId }))
                 }
                 get("/youtube") {
                     val mine = call.personal()

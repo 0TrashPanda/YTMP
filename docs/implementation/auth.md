@@ -103,6 +103,26 @@ Known limits: a host holding your token could add made-up plays to your history;
 auth server can't be reached when a song ends (a phone without internet), that play is lost
 (no retry queue yet).
 
+### Your history on other pages
+
+The room's *Library → History* reads the history from the account's auth server, with CORS
+(`GET /api/account/history`, `DELETE /api/account/history/{id}`; export and deleting days need
+a login there). A host token alone isn't enough: every host you join has one. What works
+(`historyAccount` in `AccountApi.kt`, `frontend/src/lib/listening.svelte.ts`):
+
+- **The server's own pages**: the login session.
+- **The app's own pages** (`http://127.0.0.1:8765`, the same on every phone): the host token
+  made for that origin, which the app got from your server's pages (log in once). A token for
+  that origin only ever reaches your own phone, so it may read your history. Tokens made for
+  the server's own origins likewise.
+- **Other hosts' pages**: a token with `scope = "history"`, from `/connect` together with the
+  YouTube Music one (the *Also use my YouTube Music and history there* checkbox), kept in the
+  page (`ytmp.historyFrom`) and sent only to your server, never to the host.
+
+The same rule decides how much of the [song graph](storage.md#generating-a-radio) a host
+gets: `GET /api/auth/radio?id=` takes any host token of the account, but only those for the
+app's pages or the server's own include the account's own listening.
+
 ### Log in once
 
 - **Server pages** (`logInOnce` in `frontend/src/lib/account.ts`): with a login session on the

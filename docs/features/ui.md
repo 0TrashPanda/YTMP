@@ -148,6 +148,8 @@ YTMP plays YouTube Music's podcasts like YTM does:
 
 - **Search history** ✅: recent searches are shown when you open the search bar, and can
   be removed one by one.
+- **Listening history** ✅: *Library → History* (with a YTMP account), see
+  [history in the room](history-and-recommendations.md#history-in-the-room).
 - **Recently played** (planned): a list of songs, albums, playlists and rooms you played
   recently.
 
@@ -185,7 +187,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
 > the start), Start radio, Autoplay from here, Find similar, Go to artist / album / podcast
 > (their pages; a search when the source gives no ID), Like and Save to playlist (with a
 > linked YouTube Music account), Open in YouTube Music, and Remove (from the queue, the
-> history or the autoplay queue). Planned: YTMP playlists, Download, Share, and a
+> history or the autoplay queue; in *Library → History*: from your listening history). Planned: YTMP playlists, Download, Share, and a
 > customisable menu. The current song has the menu too: right-click
 > the album art in the full player or the player bar, or its ⋮.
 >

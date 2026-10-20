@@ -57,7 +57,9 @@ Music, without Premium, and not tied to a single music service.
 - Artist, album, playlist and podcast pages.
 - Lyrics, synced line by line (from LRCLIB or YouTube Music), and a karaoke mode that shows
   them large on the party screen and in everyone's player.
-- Radio from a song, autoplay when the queue runs out, find similar.
+- Radio from a song, autoplay when the queue runs out, find similar. With a YTMP account they
+  learn which songs you (and everyone on your server) play after each other, and mix those
+  in; local music gets a radio from it too.
 - Podcasts: exact episode lengths, resume where you stopped, back 10 s / ahead 30 s, no
   music radio after an episode.
 
@@ -82,7 +84,8 @@ Music, without Premium, and not tied to a single music service.
   overrides), kicking and bans.
 - YTMP accounts (username and password) on a server, also usable in rooms on a phone that
   is linked to that server.
-- Listening history (off by default), with search, delete and export.
+- Listening history (off by default) in the Library: play from it like any list, search,
+  remove songs; export and delete days on your account page.
 - **Sign in to YouTube Music on your phone:** your own Home, a Library with your playlists,
   liked songs and podcasts (searchable), liking and saving to playlists, and search and radio that fit
   your taste. The sign-in stays on the phone, and guests in a room on your phone never see it.
@@ -109,7 +112,7 @@ Music, without Premium, and not tied to a single music service.
 
 - New podcast episodes on Home, playback speed, played marks
 - More sources: YouTube, other music folders, Plex / Jellyfin
-- Learning which songs go together (song graph) for better radio, and recaps
+- Recaps from your listening history ("you listened 12 hours with Sam")
 - YTMP playlists, explore page, sleep timer
 
 ## Platforms

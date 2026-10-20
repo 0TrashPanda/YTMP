@@ -7,6 +7,7 @@
 	import type { SearchItemPlaylist } from '../protocol.gen';
 	import { local } from '../local.svelte';
 	import { youtube } from '../youtube.svelte';
+	import { listening } from '../listening.svelte';
 	import Icon from './Icon.svelte';
 
 	let {
@@ -42,7 +43,7 @@
 	let query = $state('');
 	const shown = $derived(fuzzyFind(playlists, query, (p) => `${p.title} ${p.author ?? ''}`));
 
-	const sections = $derived((['home', 'library', 'local'] as const).filter((s) => s === 'home' || (s === 'library' ? youtube.available : !!local.libraries?.length)));
+	const sections = $derived((['home', 'library', 'local'] as const).filter((s) => s === 'home' || (s === 'library' ? youtube.available || listening.available : !!local.libraries?.length)));
 	const labels = { home: 'Home', library: 'Library', local: 'Local' };
 </script>
 

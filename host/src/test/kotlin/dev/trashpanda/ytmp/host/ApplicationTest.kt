@@ -109,6 +109,27 @@ class ApplicationTest {
         ProtocolJson.decodeFromString(ServerMessage.serializer(), (incoming.receive() as Frame.Text).readText())
 
     @Test
+    fun `find similar mixes in the song graph of whoever asks`() = testApplication {
+        fun song(id: String) = Song(id, "Song $id", listOf(ArtistRef(null, "Artist")), null, 200_000, emptyList())
+        application {
+            val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(
+                rooms, search, audio = null, webApp = null, HostOptions(kind = HostKind.SERVER),
+                similar = { seed -> if (seed == "local:x") throw SourceException("not on YouTube Music") else listOf(song(seed), song("r1"), song("r2"), song("r3")) },
+                songGraph = { call, seed -> if (call.request.headers[HttpHeaders.Authorization] == "Bearer anna") listOf(song("$seed-g1"), song("r2")) else emptyList() },
+            )
+        }
+        val client = createClient { install(ContentNegotiation) { json(ProtocolJson) } }
+        suspend fun similar(id: String, token: String?) = client.get("/api/similar?id=$id") { token?.let { header(HttpHeaders.Authorization, "Bearer $it") } }
+
+        assertEquals(listOf("r1", "a-g1", "r2", "r3"), similar("a", "anna").body<dev.trashpanda.ytmp.protocol.SearchResponse>().items.map { it.id })
+        assertEquals(listOf("r1", "r2", "r3"), similar("a", null).body<dev.trashpanda.ytmp.protocol.SearchResponse>().items.map { it.id })
+        // Not on YouTube Music (a local file): the song graph alone, if it knows the song.
+        assertEquals(listOf("local:x-g1", "r2"), similar("local:x", "anna").body<dev.trashpanda.ytmp.protocol.SearchResponse>().items.map { it.id })
+        assertEquals(HttpStatusCode.BadGateway, similar("local:x", null).status)
+    }
+
+    @Test
     fun `an accounts-only host lets nobody in without an account`() = testApplication {
         val auth = object : HostAuth {
             override fun servers() = listOf(AuthServerRef("https://accounts.example", "accounts.example"))

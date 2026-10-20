@@ -6,6 +6,9 @@ import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.RoleTemplate
+import dev.trashpanda.ytmp.protocol.SearchResponse
+import dev.trashpanda.ytmp.protocol.Song
+import java.net.URLEncoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -29,6 +32,12 @@ interface HostAuth {
 
     /** Sends a finished song to the listening history of the account in [token]. */
     suspend fun reportPlay(token: String, report: PlayReport) {}
+
+    /**
+     * Songs that go with [seedSongId] in the song graph of the auth server of the account in
+     * [token] (from that account's listening where the server allows it). Empty when there are none.
+     */
+    suspend fun similar(token: String, seedSongId: String): List<Song> = emptyList()
 }
 
 /** Guests only. */
@@ -50,6 +59,8 @@ class TrustedAuthServers(
     private val ownTemplates: ((username: String) -> RoleTemplate?)? = null,
     /** Stores plays of this server's own accounts (by username), without HTTP. */
     private val ownPlays: ((username: String, report: PlayReport) -> Unit)? = null,
+    /** The song graph of this server, for its own accounts (by username), without HTTP. */
+    private val ownSimilar: ((username: String, seedSongId: String) -> List<Song>)? = null,
 ) : HostAuth {
     private class Trusted(val ref: AuthServerRef, val key: PublicKey)
 
@@ -62,6 +73,9 @@ class TrustedAuthServers(
     fun clear() = trusted.clear()
 
     override fun servers() = trusted.values.map { it.ref }
+
+    /** What [token] says, if it's valid and from a trusted auth server (whatever host it's for). */
+    fun claims(token: String): AccountTokens.Claims? = AccountTokens.verify(token, { trusted[it]?.key }, clock() / 1000)
 
     override fun verify(token: String): AccountIdentity? {
         val claims = AccountTokens.verify(token, { trusted[it]?.key }, clock() / 1000) ?: return null
@@ -90,8 +104,32 @@ class TrustedAuthServers(
         }.onFailure { log.warn("Couldn't get the role template of {}: {}", claims.accountId, it.message) }.getOrNull()
     }
 
+    override suspend fun similar(token: String, seedSongId: String): List<Song> = withContext(Dispatchers.IO) {
+        val claims = AccountTokens.verify(token, { trusted[it]?.key }, clock() / 1000) ?: return@withContext emptyList()
+        if (claims.scope != null) return@withContext emptyList()
+        val server = trusted[claims.iss]?.ref ?: return@withContext emptyList()
+        runCatching {
+            val url = server.url
+            if (url == null) ownSimilar?.invoke(claims.sub, seedSongId).orEmpty() else fetchSimilar(url, token, seedSongId)
+        }.onFailure { log.warn("No songs from the song graph of {}: {}", claims.iss, it.message) }.getOrDefault(emptyList())
+    }
+
     private companion object {
         val log = LoggerFactory.getLogger(TrustedAuthServers::class.java)
+    }
+}
+
+/** Songs that go with [seedSongId] in the song graph of an auth server, with a host token of one of its accounts. Blocking. */
+private fun fetchSimilar(url: String, token: String, seedSongId: String): List<Song> {
+    val connection = URI("${url.trimEnd('/')}/api/auth/radio?id=${URLEncoder.encode(seedSongId, Charsets.UTF_8)}").toURL().openConnection() as HttpURLConnection
+    connection.connectTimeout = 5_000
+    connection.readTimeout = 5_000
+    connection.setRequestProperty("Authorization", "Bearer $token")
+    try {
+        if (connection.responseCode != 200) throw SourceException("$url answered ${connection.responseCode}")
+        return ProtocolJson.decodeFromString(SearchResponse.serializer(), connection.inputStream.bufferedReader().readText()).items
+    } finally {
+        connection.disconnect()
     }
 }
 

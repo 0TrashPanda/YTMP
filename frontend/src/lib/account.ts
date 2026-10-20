@@ -107,6 +107,8 @@ export const authServer = {
 	setRoomPassword: (password: string | null) => call<AccountSettings>('/api/account/room-password', { password }, 'PUT'),
 	/** A token for your YouTube Music here, for the pages of rooms on other hosts. */
 	youtubeToken: () => call<HostTokenResponse>('/api/account/youtube-token', undefined, 'POST'),
+	/** A token for your listening history here, for the pages of rooms on other hosts. */
+	historyToken: () => call<HostTokenResponse>('/api/account/history-token', undefined, 'POST'),
 	history: (before: number | null, query: string) => {
 		const params = new URLSearchParams({ limit: '50' });
 		if (before !== null) params.set('before', String(before));
@@ -167,6 +169,7 @@ export const identity = {
 	forget() {
 		write('ytmp.identity', null);
 		write('ytmp.youtubeFrom', null);
+		write('ytmp.historyFrom', null);
 	},
 
 	/** In the app, on the phone's own pages: takes a login that your server's pages handed over (see [logInOnce]). */
@@ -190,6 +193,12 @@ export const identity = {
 		return value && value.expiresAt > Date.now() ? value : null;
 	},
 
+	/** Your listening history on your own server, for this host's pages (from /connect, with your YouTube Music). */
+	get history(): { server: string; token: string } | null {
+		const value = read<{ server: string; token: string; expiresAt: number }>('ytmp.historyFrom');
+		return value && value.expiresAt > Date.now() ? value : null;
+	},
+
 	/**
 	 * Takes an identity that /connect put in the URL fragment, and removes it from the URL. A
 	 * quiet check ([connectQuietly]) may also come back with `none` (not logged in there) or
@@ -202,11 +211,13 @@ export const identity = {
 			write('ytmp.connectDeclined', Date.now());
 		} else if (answer !== 'none') {
 			try {
-				const value = JSON.parse(answer) as Identity & { youtube?: { server: string; token: string; expiresAt: number } };
+				type Remote = { server: string; token: string; expiresAt: number };
+				const value = JSON.parse(answer) as Identity & { youtube?: Remote; history?: Remote };
 				if (value.token && value.account) {
-					const { youtube, ...mine } = value;
+					const { youtube, history, ...mine } = value;
 					write('ytmp.identity', mine);
 					write('ytmp.youtubeFrom', youtube?.token ? youtube : null);
+					write('ytmp.historyFrom', history?.token ? history : null);
 				}
 			} catch {
 				// Not ours or broken; ignore.
@@ -261,7 +272,7 @@ export async function connectQuietly(host: HostInfo): Promise<boolean> {
 // --- log in once ---------------------------------------------------------------------------
 
 /** The app's own pages (the phone's built-in host, android/.../LocalHost.kt). */
-const APP_HOME_ORIGIN = 'http://127.0.0.1:8765';
+export const APP_HOME_ORIGIN = 'http://127.0.0.1:8765';
 
 /** An identity this close to running out is renewed. */
 const RENEW_MS = 7 * 24 * 3600_000;
@@ -304,10 +315,14 @@ async function shareWithApp(): Promise<void> {
 	}
 }
 
-/** On /connect: sends [token] (and maybe [youtube], your YouTube Music here) back to the page at [returnUrl]. */
-export function returnWithIdentity(returnUrl: string, token: HostTokenResponse, youtube?: HostTokenResponse): void {
+/**
+ * On /connect: sends [token] (and maybe [youtube] and [history], your YouTube Music and listening
+ * history here) back to the page at [returnUrl].
+ */
+export function returnWithIdentity(returnUrl: string, token: HostTokenResponse, youtube?: HostTokenResponse, history?: HostTokenResponse): void {
 	const url = new URL(returnUrl);
-	const extra = youtube ? { youtube: { server: location.origin, token: youtube.token, expiresAt: youtube.expiresAt } } : {};
+	const remote = (t: HostTokenResponse) => ({ server: location.origin, token: t.token, expiresAt: t.expiresAt });
+	const extra = { ...(youtube ? { youtube: remote(youtube) } : {}), ...(history ? { history: remote(history) } : {}) };
 	url.hash = FRAGMENT + encodeURIComponent(JSON.stringify({ ...token, ...extra }));
 	location.href = url.toString();
 }

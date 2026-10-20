@@ -10,6 +10,8 @@
 		place: SongPlace;
 		/** The song is in one of your own playlists (or Liked music), shown there: it can be removed. */
 		playlist?: { id: string; itemId: string | null; likedMusic: boolean; onRemoved: () => void };
+		/** A song in your listening history ([id]: its entry there), shown there: it can be removed. */
+		listened?: { id: string; onRemoved: () => void };
 		/** Where to show the menu (the click or the ⋮ button). */
 		x: number;
 		y: number;
@@ -21,6 +23,7 @@
 	import { onMount, tick } from 'svelte';
 	import type { Command } from '../protocol.gen';
 	import { removeFromPlaylist, yourRadio } from '../api';
+	import { listening } from '../listening.svelte';
 	import { likes } from '../likes.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import { isYoutubeSong } from '../ownModule';
@@ -189,6 +192,26 @@
 		}
 		if (ytmId) {
 			list.push({ icon: 'open', label: 'Open in YouTube Music', href: `https://music.youtube.com/watch?v=${encodeURIComponent(ytmId)}`, run: onClose });
+		}
+		if (target.listened) {
+			const { id, onRemoved } = target.listened;
+			const current = song;
+			list.push(null);
+			list.push({
+				icon: 'remove',
+				label: 'Remove from your history',
+				danger: true,
+				run: async () => {
+					onClose();
+					try {
+						await listening.remove(id);
+						onToast(`Removed "${current.title}" from your history`);
+						onRemoved();
+					} catch (e) {
+						onToast(e instanceof Error ? e.message : "Couldn't remove it");
+					}
+				}
+			});
 		}
 		if (item && room.can(item.addedBy === room.participantId ? 'remove_own' : 'remove_others')) {
 			list.push(null);

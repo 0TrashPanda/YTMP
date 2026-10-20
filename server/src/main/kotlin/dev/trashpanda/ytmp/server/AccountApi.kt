@@ -34,6 +34,11 @@ import dev.trashpanda.ytmp.protocol.AccountSettings
 import dev.trashpanda.ytmp.protocol.RoomOpenMode
 import dev.trashpanda.ytmp.protocol.RoomPasswordRequest
 import dev.trashpanda.ytmp.protocol.HistoryPage
+import dev.trashpanda.ytmp.protocol.HistoryRadio
+import dev.trashpanda.ytmp.protocol.SearchResponse
+import dev.trashpanda.ytmp.protocol.Song
+import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.routing.route
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.core.DefaultRoles
 import dev.trashpanda.ytmp.core.Permissions
@@ -52,7 +57,9 @@ import kotlin.time.Duration.Companion.minutes
 /**
  * This server as an auth server: accounts, logins, and the tokens other hosts accept.
  * Only the server's own pages use these endpoints (no CORS): a host page gets its token
- * through the `/connect` page, so passwords are only typed on the auth server.
+ * through the `/connect` page, so passwords are only typed on the auth server. Except your
+ * listening history: the pages of your phone's app and of rooms on other hosts read it too
+ * (see [historyAccount]).
  */
 class AccountService(
     val accounts: Accounts,
@@ -63,6 +70,10 @@ class AccountService(
     /** Whether new accounts keep a listening history until they change it. */
     private val trackingDefault: Boolean = false,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** The song graph, learned from the history. */
+    private val graph: SongGraph? = null,
+    /** This server's own page origins: their tokens only ever reach this server (see [historyAccount]). */
+    private val isOwnOrigin: (String) -> Boolean = { false },
 ) {
     private val throttle = LoginThrottle(clock)
 
@@ -97,10 +108,27 @@ class AccountService(
             ?.copy(hasRoomPassword = roomPassword(account) != null)
             ?: AccountSettings(tracking = trackingDefault, hideFromOthers = false, hasRoomPassword = roomPassword(account) != null)
 
-    /** A host reports a song [username] heard; kept only if they track their history. */
+    /** A host reports a song [username] heard; kept only if they track their history (and learned by the song graph). */
     fun recordPlay(username: String, report: PlayReport) {
         val account = accounts.find(username) ?: return
-        if (settings(account).tracking) history.add(account.id, report)
+        if (!settings(account).tracking) return
+        val graph = graph ?: return history.add(account.id, report)
+        // One at a time: the song graph counts a play heard by several accounts once.
+        synchronized(graph) {
+            history.add(account.id, report)
+            runCatching { graph.played(account.id, report) }.onFailure { log.warn("The song graph couldn't learn a play: {}", it.message) }
+        }
+    }
+
+    /**
+     * Songs that go with [seedSongId] in the song graph, for [username] (one of ours) as far as
+     * their settings allow, or with [personal] false (or no account) only from everyone's
+     * listening and YouTube Music's radios.
+     */
+    fun similar(username: String?, seedSongId: String, personal: Boolean = true): List<Song> {
+        val graph = graph ?: return emptyList()
+        val account = username?.let(accounts::find)?.takeIf { personal }
+        return graph.similar(seedSongId, account?.id, account?.let(::settings)?.historyRadio ?: HistoryRadio.ALL)
     }
 
     /** For a host checking a token of ours: the template of [username]. */
@@ -114,6 +142,16 @@ class AccountService(
         get("/auth/role-template") {
             val claims = call.ownToken() ?: throw notLoggedIn()
             call.respond(io { roleTemplate(claims.sub) } ?: throw notLoggedIn())
+        }
+
+        // A host asks for songs that go with a song (for a radio, or Find similar), with the
+        // host token the account gave it. From your own phone (its app's pages) and this server,
+        // also from your own listening; other hosts get what everyone here listens to.
+        get("/auth/radio") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            val songId = call.request.queryParameters["id"]?.trim().orEmpty()
+            if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
+            call.respond(SearchResponse(io { similar(claims.sub, songId, personal = mayReadHistory(claims)) }))
         }
 
         // A host sends a song the account heard, with the host token the account gave it.
@@ -150,37 +188,48 @@ class AccountService(
             call.respond(io { settings(account) })
         }
 
-        get("/account/history") {
-            val account = call.account()
-            val params = call.request.queryParameters
-            val limit = (params["limit"]?.toIntOrNull() ?: 50).coerceIn(1, 200)
-            val (plays, more) = io { history.page(account.id, params["before"]?.toLongOrNull(), limit, params["q"]) }
-            call.respond(HistoryPage(plays, more))
-        }
+        // Your history. Reading it and deleting single songs also works from the pages of your
+        // phone's app and of rooms on other hosts (CORS); the rest only here, logged in.
+        route("/account/history") {
+            install(CORS) {
+                anyHost()
+                allowHeader(HttpHeaders.Authorization)
+                allowMethod(HttpMethod.Delete)
+            }
+            get {
+                val account = call.historyAccount()
+                val params = call.request.queryParameters
+                val limit = (params["limit"]?.toIntOrNull() ?: 50).coerceIn(1, 200)
+                val (plays, more) = io { history.page(account.id, params["before"]?.toLongOrNull(), limit, params["q"]) }
+                call.respond(HistoryPage(plays, more))
+            }
 
-        get("/account/history/export") {
-            val account = call.account()
-            val plays = io { history.all(account.id) }
-            call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=\"ytmp-history-${account.username}.json\"")
-            call.respond(plays)
-        }
+            get("/export") {
+                val account = call.account()
+                val plays = io { history.all(account.id) }
+                call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=\"ytmp-history-${account.username}.json\"")
+                call.respond(plays)
+            }
 
-        delete("/account/history/{id}") {
-            val account = call.account()
-            if (!io { history.delete(account.id, call.parameters["id"]!!) }) throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Not in your history")
-            call.respond(HttpStatusCode.NoContent)
-        }
+            delete("/{id}") {
+                val account = call.historyAccount()
+                if (!io { history.delete(account.id, call.parameters["id"]!!) }) throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Not in your history")
+                graph?.rebuildSoon()
+                call.respond(HttpStatusCode.NoContent)
+            }
 
-        // ?from=&to= (ms) deletes a time range; ?all=true deletes everything.
-        delete("/account/history") {
-            val account = call.account()
-            val params = call.request.queryParameters
-            val from = params["from"]?.toLongOrNull()
-            val to = params["to"]?.toLongOrNull()
-            if (from == null && to == null && params["all"] != "true") throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Say what to delete")
-            val count = io { history.deleteRange(account.id, from, to) }
-            log.info("{} deleted {} plays from their history", account.username, count)
-            call.respond(HttpStatusCode.NoContent)
+            // ?from=&to= (ms) deletes a time range; ?all=true deletes everything.
+            delete {
+                val account = call.account()
+                val params = call.request.queryParameters
+                val from = params["from"]?.toLongOrNull()
+                val to = params["to"]?.toLongOrNull()
+                if (from == null && to == null && params["all"] != "true") throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Say what to delete")
+                val count = io { history.deleteRange(account.id, from, to) }
+                log.info("{} deleted {} plays from their history", account.username, count)
+                graph?.rebuildSoon()
+                call.respond(HttpStatusCode.NoContent)
+            }
         }
 
         get("/account/role-template") {
@@ -243,6 +292,11 @@ class AccountService(
             call.respond(youtubeToken(call.account()))
         }
 
+        // Your listening history here, for the pages of rooms on other hosts (they call this server).
+        post("/account/history-token") {
+            call.respond(scopedToken(call.account(), HISTORY_SCOPE))
+        }
+
         post("/account/host-token") {
             val account = call.account()
             val origin = normalizeOrigin(call.receive<HostTokenRequest>().origin)
@@ -288,6 +342,26 @@ class AccountService(
         return io { accounts.sessionAccount(token) } ?: throw notLoggedIn()
     }
 
+    /**
+     * Whose history this request may read: a login here, a token just for that ([HISTORY_SCOPE],
+     * for the pages of rooms on other hosts), or a host token made for your phone's own app
+     * ([PHONE_APP_ORIGIN]) or this server's pages: those never reach another host. A host token
+     * for another host is not enough: every host you join has one.
+     */
+    private suspend fun ApplicationCall.historyAccount(): Accounts.Account {
+        val token = bearerToken() ?: throw notLoggedIn()
+        io { accounts.sessionAccount(token) }?.let { return it }
+        val claims = AccountTokens.verify(token, { iss -> if (iss == issuer) key.public else null }, clock() / 1000) ?: throw notLoggedIn()
+        val allowed = claims.scope == HISTORY_SCOPE || (claims.scope == null && mayReadHistory(claims))
+        return io { accounts.find(claims.sub) }?.takeIf { allowed } ?: throw notLoggedIn()
+    }
+
+    /** A host token that only reaches the account's own devices: for the phone's own app, or this server's pages. */
+    private fun mayReadHistory(claims: AccountTokens.Claims): Boolean {
+        val origin = normalizeOrigin(claims.aud) ?: return false
+        return origin == PHONE_APP_ORIGIN || isOwnOrigin(origin)
+    }
+
     /** A host token signed by us (made for any host), from `Authorization: Bearer`. */
     private fun ApplicationCall.ownToken(): AccountTokens.Claims? = bearerToken()?.let(::verifyOwnToken)
 
@@ -313,10 +387,13 @@ class AccountService(
     }
 
     /** A token for [account]'s YouTube Music on this server, for pages of other hosts (30 days). */
-    fun youtubeToken(account: Accounts.Account): HostTokenResponse {
+    fun youtubeToken(account: Accounts.Account): HostTokenResponse = scopedToken(account, YOUTUBE_SCOPE)
+
+    /** A token for one thing of [account] on this server ([scope]), for pages of other hosts (30 days). */
+    private fun scopedToken(account: Accounts.Account, scope: String): HostTokenResponse {
         val now = clock() / 1000
         val exp = now + HOST_TOKEN_LIFETIME.inWholeSeconds
-        val claims = AccountTokens.Claims(issuer, account.username, account.displayName, "", now, exp, scope = YOUTUBE_SCOPE)
+        val claims = AccountTokens.Claims(issuer, account.username, account.displayName, "", now, exp, scope = scope)
         return HostTokenResponse(AccountTokens.sign(claims, key.private), exp * 1000, toInfo(account))
     }
 
@@ -370,3 +447,9 @@ class LoginThrottle(private val clock: () -> Long) {
 
 /** [AccountTokens.Claims.scope] of tokens that are only for an account's YouTube Music on its server. */
 const val YOUTUBE_SCOPE = "youtube"
+
+/** [AccountTokens.Claims.scope] of tokens that are only for reading an account's listening history (and deleting songs from it). */
+const val HISTORY_SCOPE = "history"
+
+/** Where the app's own pages are, on every phone (android/.../LocalHost.kt): tokens for it only reach your own phone. */
+const val PHONE_APP_ORIGIN = "http://127.0.0.1:8765"
