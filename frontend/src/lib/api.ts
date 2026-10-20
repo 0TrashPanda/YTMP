@@ -21,6 +21,7 @@ import type {
 	HostInfo,
 	PlaylistPage,
 	PodcastPage,
+	PodcastSavedRequest,
 	RoomInfo,
 	RoomListResponse,
 	RoomVisibility,
@@ -298,6 +299,17 @@ export function getLyrics(song: Song): Promise<Lyrics | null> {
 
 export function getPodcast(id: string): Promise<PodcastPage> {
 	return cached(`podcast:${id}`, () => request(`/api/podcasts/${encodeURIComponent(id)}`));
+}
+
+/** A podcast as you (your YouTube Music): whether you're subscribed ([PodcastPage.saved]). */
+export function getMyPodcast(id: string): Promise<PodcastPage> {
+	return request(`/api/me/podcasts/${encodeURIComponent(id)}`);
+}
+
+/** Subscribes to a podcast (adds it to your YouTube Music library), or unsubscribes. Library and Home change with it. */
+export async function setPodcastSaved(id: string, saved: boolean): Promise<void> {
+	await request<null>(`/api/me/podcasts/${encodeURIComponent(id)}/saved`, { method: 'PUT', body: JSON.stringify({ saved } satisfies PodcastSavedRequest) });
+	forgetPersonal();
 }
 
 /** Suggestions for the home page: quick picks, new releases, mixes (yours, with your YouTube Music). */

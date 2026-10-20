@@ -45,6 +45,7 @@ import dev.trashpanda.ytmp.protocol.YoutubeSignInRequest
 import dev.trashpanda.ytmp.protocol.SyncedRoomsResponse
 import dev.trashpanda.ytmp.protocol.MovedRoomResponse
 import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.PodcastSavedRequest
 import dev.trashpanda.ytmp.protocol.MyPlaylists
 import dev.trashpanda.ytmp.protocol.SaveSongsRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistRequest
@@ -215,6 +216,7 @@ fun main(args: Array<String>) {
     generator.addRoot(SyncedRoomsResponse.serializer().descriptor)
     generator.addRoot(MovedRoomResponse.serializer().descriptor)
     generator.addRoot(LikeStatus.serializer().descriptor)
+    generator.addRoot(PodcastSavedRequest.serializer().descriptor)
     generator.addRoot(MyPlaylists.serializer().descriptor)
     generator.addRoot(SaveSongsRequest.serializer().descriptor)
     generator.addRoot(CreatePlaylistRequest.serializer().descriptor)

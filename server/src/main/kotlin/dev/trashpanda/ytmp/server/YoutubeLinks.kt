@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp.server
 import dev.trashpanda.ytmp.core.FinishedPlay
 import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.host.ApiException
+import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
@@ -149,6 +150,10 @@ class YoutubeLinks(
         override suspend fun library(): HomePage = withCookie { module.myLibrary(it) }
 
         override suspend fun playlist(id: String, more: String?): PlaylistPage = withCookie { module.myPlaylist(it, id, more) }
+
+        override suspend fun podcast(id: String): PodcastPage = withCookie { module.myPodcast(it, id) }
+
+        override suspend fun setPodcastSaved(id: String, saved: Boolean) = withCookie { module.setMyPodcastSaved(it, id, saved) }
 
         override suspend fun liked(songId: String): Boolean = rating(songId).liked
 

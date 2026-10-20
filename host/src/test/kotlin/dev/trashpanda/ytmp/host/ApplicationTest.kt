@@ -8,6 +8,8 @@ import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.HomeSection
 import dev.trashpanda.ytmp.protocol.PlaylistPage
+import dev.trashpanda.ytmp.protocol.PodcastPage
+import dev.trashpanda.ytmp.protocol.PodcastSavedRequest
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
@@ -498,6 +500,9 @@ class ApplicationTest {
             ratings[songId] = rating
             if (rating.liked) liked += songId else liked -= songId
         }
+        val podcasts = mutableSetOf<String>()
+        override suspend fun podcast(id: String) = PodcastPage(id, "A podcast", null, null, emptyList(), emptyList(), saved = id in podcasts)
+        override suspend fun setPodcastSaved(id: String, saved: Boolean) { if (saved) podcasts += id else podcasts -= id }
         override suspend fun removeFromPlaylist(playlistId: String, items: List<PlaylistItemRef>) { edits += "remove $playlistId ${items.joinToString { it.itemId }}" }
         override suspend fun movePlaylistItem(playlistId: String, itemId: String, beforeItemId: String?) { edits += "move $playlistId $itemId before $beforeItemId" }
         override suspend fun renamePlaylist(playlistId: String, title: String) { edits += "rename $playlistId $title" }
@@ -547,6 +552,17 @@ class ApplicationTest {
         owner.personalize = true
         owner.account = null
         assertEquals("all", searchTitle())
+    }
+
+    @Test
+    fun `subscribing to a podcast`() = testApplication {
+        val owner = Owner(YoutubeAccount("Jonah", "@jonah", null))
+        setupPhone(generalCatalog, owner)
+        val client = jsonClient()
+        assertEquals(false, client.get("/api/me/podcasts/MPSPabc").body<PodcastPage>().saved)
+        assertEquals(HttpStatusCode.NoContent, client.put("/api/me/podcasts/MPSPabc/saved") { contentType(ContentType.Application.Json); setBody(PodcastSavedRequest(true)) }.status)
+        assertEquals(true, client.get("/api/me/podcasts/MPSPabc").body<PodcastPage>().saved)
+        assertEquals(setOf("MPSPabc"), owner.podcasts)
     }
 
     @Test

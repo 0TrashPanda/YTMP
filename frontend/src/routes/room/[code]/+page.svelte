@@ -171,8 +171,9 @@
 		show({ kind: 'playlist', id: playlist.id, title: playlist.title, personal });
 	}
 
+	/** An episode whose podcast YouTube Music didn't say has no page to open. */
 	function openPodcast(podcast: PodcastRef) {
-		show({ kind: 'podcast', id: podcast.id, title: podcast.name });
+		if (podcast.id) show({ kind: 'podcast', id: podcast.id, title: podcast.name });
 	}
 
 	function searchFor(text: string) {

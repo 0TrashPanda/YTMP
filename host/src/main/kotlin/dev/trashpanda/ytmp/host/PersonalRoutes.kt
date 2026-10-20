@@ -7,6 +7,7 @@ import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.LikeStatus
 import dev.trashpanda.ytmp.protocol.MovePlaylistItemRequest
 import dev.trashpanda.ytmp.protocol.MyPlaylists
+import dev.trashpanda.ytmp.protocol.PodcastSavedRequest
 import dev.trashpanda.ytmp.protocol.RemovePlaylistItemsRequest
 import dev.trashpanda.ytmp.protocol.RenamePlaylistRequest
 import dev.trashpanda.ytmp.protocol.SaveSongsRequest
@@ -139,6 +140,13 @@ internal fun Route.personalRoutes(host: HostContext) = with(host) {
         }
         delete("/playlists/{id}") {
             call.owner().deletePlaylist(call.parameters["id"]!!)
+            call.respond(HttpStatusCode.NoContent)
+        }
+        // Podcasts as you: subscribed or not, and subscribing.
+        get("/podcasts/{id}") { call.respond(call.owner().podcast(call.parameters["id"]!!) ?: throw notHere()) }
+        put("/podcasts/{id}/saved") {
+            val owner = call.owner()
+            owner.setPodcastSaved(call.parameters["id"]!!, call.receive<PodcastSavedRequest>().saved)
             call.respond(HttpStatusCode.NoContent)
         }
         get("/likes/{songId}") { call.respond(call.owner().rating(call.parameters["songId"]!!)) }

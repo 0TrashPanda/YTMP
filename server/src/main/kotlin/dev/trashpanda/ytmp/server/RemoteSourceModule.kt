@@ -7,6 +7,7 @@ import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.host.AudioProxy
 import dev.trashpanda.ytmp.host.SourceBlockedException
 import dev.trashpanda.ytmp.host.SourceException
+import dev.trashpanda.ytmp.protocol.PodcastSavedRequest
 import dev.trashpanda.ytmp.protocol.Lyrics
 import dev.trashpanda.ytmp.protocol.Song
 import io.ktor.client.HttpClient
@@ -207,6 +208,13 @@ class RemoteSourceModule(
 
     suspend fun addToMyPlaylist(cookie: String, id: String, songIds: List<String>) {
         client.post("$baseUrl/me/playlists/${id.encodeURLPathPart()}/songs") { me(cookie, SaveSongsRequest(songIds)) }.orThrow()
+    }
+
+    suspend fun myPodcast(cookie: String, id: String): PodcastPage =
+        client.get("$baseUrl/me/podcasts/${id.encodeURLPathPart()}") { me(cookie) }.orThrow().body()
+
+    suspend fun setMyPodcastSaved(cookie: String, id: String, saved: Boolean) {
+        client.put("$baseUrl/me/podcasts/${id.encodeURLPathPart()}/saved") { me(cookie, PodcastSavedRequest(saved)) }.orThrow()
     }
 
     suspend fun myRating(cookie: String, songId: String): LikeStatus =

@@ -8,6 +8,7 @@ import android.webkit.CookieManager
 import dev.trashpanda.ytmp.NotSignedInException
 import dev.trashpanda.ytmp.OnDeviceYtm
 import dev.trashpanda.ytmp.core.PersonalCatalog
+import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.PlaylistItemRef
@@ -96,6 +97,19 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
 
     override suspend fun playlist(id: String, more: String?): PlaylistPage =
         playlists.get(if (more == null) id else "$id\n$more") { requireSignedIn(); ytm().personalPlaylist(id, more) }
+
+    override suspend fun podcast(id: String): PodcastPage {
+        requireSignedIn()
+        return ytm().personalPodcast(id)
+    }
+
+    override suspend fun setPodcastSaved(id: String, saved: Boolean) {
+        requireSignedIn()
+        ytm().setPodcastSaved(id, saved)
+        // Library and Home (New episodes) change with it.
+        libraries.clear()
+        homes.clear()
+    }
 
     // Thumbs are looked up per song (the one playing) and remembered; changing one updates it.
     private val ratings = TtlCache<String, LikeStatus>(500, 30.minutes, System::currentTimeMillis)

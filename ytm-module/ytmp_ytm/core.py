@@ -63,6 +63,14 @@ _BOT_CHECK = "YouTube is blocking requests from this network for now (bot check)
 
 log = logging.getLogger("ytmp_ytm")
 
+# New episodes on Home: at most this many.
+_NEW_EPISODES = 10
+# The podcast of an episode whose podcast couldn't be looked up: still an episode (no music radio after it).
+_UNKNOWN_PODCAST = {"id": "", "name": "Podcast"}
+# Which podcast an episode is from (video ID -> {id, name}), shared by all accounts: it never changes.
+_podcast_of_episode: dict[str, dict | None] = {}
+_podcast_lock = threading.Lock()
+
 
 def log_to(sink) -> None:
     """Sends this module's log to [sink].log(level, logger name, text): on Android, the app's log (Chaquopy)."""
@@ -361,10 +369,11 @@ class YtmCore:
             "more": following if tracks else None,
         }
 
-    def podcast(self, podcast_id: str) -> dict:
-        """A podcast with its episodes, newest first."""
+    def podcast(self, podcast_id: str, personal: bool = False) -> dict:
+        """A podcast with its episodes, newest first. [personal]: as the signed-in account, so it says whether it's in its library."""
+        ytm = self._signed_in() if personal else self._ytm
         try:
-            p = self._ytm.get_podcast(podcast_id)
+            p = ytm.get_podcast(podcast_id)
         except Exception as e:
             raise NotFound(str(e)) from e
         ref = {"id": podcast_id, "name": p.get("title") or ""}
@@ -380,7 +389,40 @@ class YtmCore:
                 for e in p.get("episodes") or []
                 if (song := parse.episode_song(e, ref))
             ],
+            "saved": bool(p.get("saved")) if personal else None,
         }
+
+    def set_podcast_saved(self, podcast_id: str, saved: bool) -> None:
+        """Subscribes to a podcast (adds it to the account's library), or unsubscribes."""
+        playlist_id = podcast_id.removeprefix("MPSP")
+        self._signed_in().rate_playlist(playlist_id, LikeStatus.LIKE if saved else LikeStatus.INDIFFERENT)
+
+    def new_episodes(self, limit: int = _NEW_EPISODES) -> list[dict]:
+        """The newest episodes of the podcasts in the account's library (YouTube Music's New episodes), as songs."""
+        episodes = (self._signed_in().get_episodes_playlist("RDPN").get("episodes") or [])[:limit]
+        # That list doesn't say which podcast an episode is from; the episode's own page does.
+        with ThreadPoolExecutor(4) as pool:
+            podcasts = list(pool.map(self._podcast_of, [e.get("videoId") for e in episodes]))
+        return [song for e, podcast in zip(episodes, podcasts) if (song := parse.episode_song(e, podcast or _UNKNOWN_PODCAST))]
+
+    def _podcast_of(self, video_id: str | None) -> dict | None:
+        """The podcast an episode is from ({id, name}), looked up once."""
+        if not video_id:
+            return None
+        with _podcast_lock:
+            if video_id in _podcast_of_episode:
+                return _podcast_of_episode[video_id]
+        try:
+            author = self._ytm.get_episode(video_id).get("author") or {}
+        except Exception as e:
+            log.info("No podcast for episode %s: %s", video_id, e)
+            return None
+        podcast = {"id": author["id"], "name": author.get("name") or ""} if author.get("id") else None
+        with _podcast_lock:
+            if len(_podcast_of_episode) > 2000:
+                _podcast_of_episode.clear()
+            _podcast_of_episode[video_id] = podcast
+        return podcast
 
     def lyrics(self, song_id: str) -> dict:
         """The song's lyrics in YouTube Music: {plain, synced: [{timeMs, text}] or None, source}.
@@ -483,6 +525,14 @@ class YtmCore:
         """
         ytm = self._signed_in() if personal else self._ytm
         sections = []
+        if personal:
+            # New episodes of your podcasts first, like YouTube Music shows them to podcast listeners.
+            try:
+                episodes = self.new_episodes()
+                if episodes:
+                    sections.append({"title": "New episodes", "items": [{"kind": "song", "song": s, "video": False} for s in episodes]})
+            except Exception as e:
+                log.info("No new episodes on Home: %s", e)
         for s in ytm.get_home(limit=_HOME_SECTIONS):
             items = [item for c in s.get("contents") or [] if (item := parse.home_item(c))]
             if items:

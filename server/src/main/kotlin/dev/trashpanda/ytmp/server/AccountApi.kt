@@ -371,7 +371,7 @@ class AccountService(
 
     /**
      * A token for one of this server's accounts' YouTube Music only (see [youtubeToken]), and
-     * only for what such a token may do: read, like and dislike, save songs to playlists. Not
+     * only for what such a token may do: read, like and dislike, subscribe to podcasts, save songs to playlists. Not
      * removing, moving, renaming or deleting, changing settings or signing out.
      */
     fun verifyYoutubeToken(token: String, method: HttpMethod, path: String): String? {
@@ -379,7 +379,7 @@ class AccountService(
         if (claims.scope != YOUTUBE_SCOPE) return null
         val allowed = when (method) {
             HttpMethod.Get -> path.startsWith("/api/me/")
-            HttpMethod.Put -> path.startsWith("/api/me/likes/")
+            HttpMethod.Put -> path.startsWith("/api/me/likes/") || (path.startsWith("/api/me/podcasts/") && path.endsWith("/saved"))
             HttpMethod.Post -> path == "/api/me/playlists" || (path.startsWith("/api/me/playlists/") && path.endsWith("/songs"))
             else -> false
         }

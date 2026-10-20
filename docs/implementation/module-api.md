@@ -213,13 +213,15 @@ signed in give `401 not_signed_in`.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/me/account` | `{ name, handle, photoUrl }`: checks the sign-in |
-| GET | `/me/home` | The account's own home page |
+| GET | `/me/home` | The account's own home page, *New episodes* first (YouTube Music's `RDPN` list; each episode's podcast looked up once and kept) |
 | GET | `/me/library` | Playlists (Liked music first) and podcasts, as home sections |
 | GET | `/me/playlists` | The account's own playlists (to save songs to) |
 | POST | `/me/playlists` | Create a private playlist: `{ title, songIds }` → `{ id }` |
 | GET | `/me/playlists/{id}` | A playlist, also private ones (`LM` = Liked music), in parts: the first (~100 songs, YouTube Music's own parts) with `more`, a token; `?more=…` answers with only the next songs (and the next `more`, null after the last) |
 | POST | `/me/playlists/{id}/songs` | Add songs: `{ songIds: [...] }` |
 | GET / PUT | `/me/likes/{songId}` | `{ liked, disliked }` (thumbs up or down, never both) |
+| GET | `/me/podcasts/{id}` | A podcast page as the account: with `saved` (subscribed: in the library) |
+| PUT | `/me/podcasts/{id}/saved` | `{ saved }`: subscribe (add to the library) or unsubscribe |
 | POST | `/me/playlists/{id}/remove` | `{ items: [{ songId, itemId }] }`: remove songs (`itemId`: their place, from `PlaylistPage.itemIds`) |
 | POST | `/me/playlists/{id}/move` | `{ itemId, beforeItemId }`: move one song (null: to the end) |
 | PUT / DELETE | `/me/playlists/{id}` | Rename (`{ title }`) / delete one of your playlists |

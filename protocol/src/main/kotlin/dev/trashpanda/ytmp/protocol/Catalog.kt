@@ -100,7 +100,14 @@ data class PodcastPage(
     val description: String?,
     val thumbnails: List<Thumbnail>,
     val episodes: List<Episode>,
+    /** In your YouTube Music library (subscribed); null: not known (`/api/podcasts`, without your account). */
+    val saved: Boolean? = null,
 )
+
+/** `PUT /api/me/podcasts/{id}/saved`: subscribe to a podcast (add it to your YouTube Music library), or not. */
+@Serializable
+@SerialName("PodcastSavedRequest")
+data class PodcastSavedRequest(val saved: Boolean)
 
 /** An episode on a podcast page: playable like a song, plus what a list of episodes shows. */
 @Serializable

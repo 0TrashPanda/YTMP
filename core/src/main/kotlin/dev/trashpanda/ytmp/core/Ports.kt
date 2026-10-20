@@ -91,6 +91,12 @@ interface PersonalCatalog {
     /** The first part of one of your playlists, or with [more] (its [PlaylistPage.more]) only the next songs. */
     suspend fun playlist(id: String, more: String? = null): PlaylistPage
 
+    /** A podcast page as this account: it says whether you're subscribed ([PodcastPage.saved]); null where that isn't possible. */
+    suspend fun podcast(id: String): PodcastPage? = null
+
+    /** Subscribes to a podcast (adds it to this account's library), or unsubscribes. */
+    suspend fun setPodcastSaved(id: String, saved: Boolean): Unit = throw UnsupportedOperationException("Not here")
+
     /** Thumbs up. */
     suspend fun liked(songId: String): Boolean
 

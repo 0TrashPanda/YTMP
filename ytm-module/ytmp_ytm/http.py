@@ -322,6 +322,15 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         user.set_rating(song_id, "like" if liked else "dislike" if disliked else "none")
         return {"liked": liked, "disliked": disliked and not liked}
 
+    @app.get("/me/podcasts/{podcast_id}", dependencies=[Depends(check_key)])
+    def my_podcast(podcast_id: str, user: core.YtmCore = Depends(me)):
+        return user.podcast(podcast_id, personal=True)
+
+    @app.put("/me/podcasts/{podcast_id}/saved", dependencies=[Depends(check_key)])
+    def my_podcast_saved(podcast_id: str, body: dict, user: core.YtmCore = Depends(me)):
+        user.set_podcast_saved(podcast_id, bool(body.get("saved")))
+        return {"ok": True}
+
     @app.post("/me/history/{song_id}", dependencies=[Depends(check_key)])
     def my_history_add(song_id: str, user: core.YtmCore = Depends(me)):
         user.add_to_history(song_id)

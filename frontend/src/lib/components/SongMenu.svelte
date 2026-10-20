@@ -183,7 +183,7 @@
 			list.push({ icon: 'save', label: 'Save to playlist', run: () => (onSave(current), onClose()) });
 		}
 		list.push(null);
-		if (song.podcast) {
+		if (song.podcast?.id) {
 			const podcast = song.podcast;
 			list.push({ icon: 'podcast', label: `Go to ${podcast.name}`, run: () => (onPodcast(podcast), onClose()) });
 		}

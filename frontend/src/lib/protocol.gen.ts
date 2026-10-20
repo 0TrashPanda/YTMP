@@ -1038,6 +1038,7 @@ export interface PodcastPage {
   description: string | null;
   thumbnails: Thumbnail[];
   episodes: Episode[];
+  saved: boolean | null;
 }
 
 export interface HomeSection {
@@ -1137,6 +1138,10 @@ export interface MovedRoomResponse {
 export interface LikeStatus {
   liked: boolean;
   disliked: boolean;
+}
+
+export interface PodcastSavedRequest {
+  saved: boolean;
 }
 
 export interface PlaylistSummary {

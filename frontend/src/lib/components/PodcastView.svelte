@@ -1,8 +1,9 @@
 <script lang="ts">
 	// A podcast page: what it's about, and its episodes (newest first). Tap an episode =
-	// play next; ⋮ or right-click = the song menu.
+	// play next; ⋮ or right-click = the song menu. With YouTube Music: Subscribe (your library).
 	import { thumbUrl } from '../images.svelte';
-	import { getPodcast } from '../api';
+	import { getMyPodcast, getPodcast, setPodcastSaved } from '../api';
+	import { youtube } from '../youtube.svelte';
 	import { menuAt, playNext, playNow, quoted } from '../songActions';
 	import { formatTime } from '../format';
 	import type { Episode, PodcastPage } from '../protocol.gen';
@@ -37,6 +38,33 @@
 			.then((p) => podcastId === id && (podcast = p))
 			.catch((e) => (error = e instanceof Error ? e.message : "Couldn't load the podcast"));
 	});
+
+	/** In your YouTube Music library; null: not known (signed out, or not loaded yet). */
+	let saved = $state<boolean | null>(null);
+	let saving = $state(false);
+	$effect(() => {
+		const podcastId = id;
+		saved = null;
+		if (!youtube.account) return;
+		getMyPodcast(podcastId)
+			.then((p) => podcastId === id && (saved = p.saved ?? null))
+			.catch(() => {});
+	});
+
+	async function toggleSaved() {
+		if (saved === null || saving) return;
+		saving = true;
+		const want = !saved;
+		try {
+			await setPodcastSaved(id, want);
+			saved = want;
+			onToast(want ? 'Subscribed: new episodes show on Home' : 'Unsubscribed');
+		} catch (e) {
+			onToast(e instanceof Error ? e.message : "Couldn't change that");
+		} finally {
+			saving = false;
+		}
+	}
 
 	async function play(episode: Episode, now: boolean) {
 		if (now) await playNow(room, episode.song, onToast);
@@ -77,13 +105,19 @@
 					{podcast.description}
 				</button>
 			{/if}
-			{#if latest && room.can('play_now')}
-				<div class="mt-3 flex flex-wrap gap-2">
+			<div class="mt-3 flex flex-wrap gap-2">
+				{#if latest && room.can('play_now')}
 					<button class="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-black" onclick={() => play(latest, true)}>
 						<Icon name="play" size={18} /> Latest episode
 					</button>
-				</div>
-			{/if}
+				{/if}
+				{#if saved !== null}
+					<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line disabled:opacity-50" disabled={saving} onclick={toggleSaved}>
+						<Icon name={saved ? 'check' : 'add'} size={18} />
+						{saved ? 'Subscribed' : 'Subscribe'}
+					</button>
+				{/if}
+			</div>
 		</div>
 	</header>
 

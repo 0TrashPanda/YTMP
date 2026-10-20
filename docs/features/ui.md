@@ -141,8 +141,12 @@ YTMP plays YouTube Music's podcasts like YTM does:
 - **Back 10 s / ahead 30 s** buttons while an episode plays (player bar and the
   now-playing screen).
 - **No autoplay radio after an episode**: the room stops, like a podcast app.
-- Not yet: playback speed, subscribing to podcasts / new episodes, marking episodes played,
-  resume across rooms or devices (it's per room for now).
+- **Subscribe** (with a YouTube Music sign-in): the button on a podcast page adds it to your
+  YouTube Music library (*Library → Podcasts*), or takes it out.
+- **New episodes** on Home (with a YouTube Music sign-in): the first row is the newest episodes
+  of the podcasts you're subscribed to, from YouTube Music's own New episodes list.
+- Not yet: playback speed, marking episodes played, resume across rooms or devices (it's per
+  room for now).
 
 ## Search history & recently played
 

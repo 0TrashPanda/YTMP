@@ -501,3 +501,64 @@ def test_lyrics_come_synced_when_youtube_music_has_them_timed():
     ytm._ytm = _LyricsYtm("none")
     with pytest.raises(core.NotFound):
         ytm.lyrics("ytm:abcdefghijk")
+
+
+class FakeAccount:
+    """A signed-in YouTube Music account with two podcasts' new episodes."""
+
+    def __init__(self):
+        self.rated = []
+
+    def get_episodes_playlist(self, playlist_id):
+        assert playlist_id == "RDPN"
+        return {"episodes": [
+            {"videoId": "ep1", "title": "Episode one", "duration": "25 min", "thumbnails": []},
+            {"videoId": "ep2", "title": "Episode two", "duration": "1 hr 5 min", "thumbnails": []},
+        ]}
+
+    def get_home(self, limit):
+        return [{"title": "Quick picks", "contents": [{"videoId": "song1", "title": "A song", "artists": [{"name": "Band", "id": None}], "thumbnails": []}]}]
+
+    def get_podcast(self, podcast_id):
+        return {"title": "My podcast", "author": {"name": "Me"}, "saved": True, "episodes": [], "thumbnails": []}
+
+    def rate_playlist(self, playlist_id, rating):
+        self.rated.append((playlist_id, rating))
+
+
+class FakeAnonymous:
+    lookups = 0
+
+    def get_episode(self, video_id):
+        FakeAnonymous.lookups += 1
+        if video_id == "ep2":
+            raise Exception("gone")
+        return {"author": {"name": "Talk show", "id": "MPSPtalk"}}
+
+
+def test_new_episodes_come_first_on_your_home_with_their_podcast():
+    ytm = core.YtmCore()
+    ytm._user = FakeAccount()
+    ytm._ytm = FakeAnonymous()
+    core._podcast_of_episode.clear()
+    home = ytm.home(personal=True)
+    assert [s["title"] for s in home["sections"]] == ["New episodes", "Quick picks"]
+    one, two = [i["song"] for i in home["sections"][0]["items"]]
+    assert one["podcast"] == {"id": "MPSPtalk", "name": "Talk show"}
+    assert one["durationMs"] == 25 * 60_000
+    # Its podcast couldn't be found: still an episode, so no music radio follows it.
+    assert two["podcast"] == core._UNKNOWN_PODCAST
+    # The podcast of an episode is looked up once.
+    lookups = FakeAnonymous.lookups
+    ytm.new_episodes()
+    assert FakeAnonymous.lookups == lookups + 1  # only the one that failed is tried again
+
+
+def test_subscribing_rates_the_podcasts_playlist():
+    ytm = core.YtmCore()
+    account = FakeAccount()
+    ytm._user = account
+    assert ytm.podcast("MPSPabc", personal=True)["saved"] is True
+    ytm.set_podcast_saved("MPSPabc", True)
+    ytm.set_podcast_saved("MPSPabc", False)
+    assert account.rated == [("abc", core.LikeStatus.LIKE), ("abc", core.LikeStatus.INDIFFERENT)]

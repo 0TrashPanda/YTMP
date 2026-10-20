@@ -163,6 +163,14 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id, true, more)).toString())
     }
 
+    suspend fun personalPodcast(id: String): PodcastPage = python {
+        ProtocolJson.decodeFromString(PodcastPage.serializer(), json.callAttr("dumps", core.callAttr("podcast", id, true)).toString())
+    }
+
+    suspend fun setPodcastSaved(id: String, saved: Boolean) = python {
+        core.callAttr("set_podcast_saved", id, saved); Unit
+    }
+
     suspend fun rating(songId: String): LikeStatus = python {
         val rating = core.callAttr("rating", songId).toString()
         LikeStatus(liked = rating == "like", disliked = rating == "dislike")
