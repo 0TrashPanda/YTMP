@@ -7,6 +7,7 @@ import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.NowPlaying
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import dev.trashpanda.ytmp.protocol.apply
 import dev.trashpanda.ytmp.protocol.RoomState
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import io.ktor.client.HttpClient
@@ -216,7 +217,7 @@ class RoomFollower {
                                 continue
                             }
                             seq = message.seq
-                            state = state?.let { apply(it, message.event) }
+                            state = state?.apply(message.event)
                             publish()
                         }
                         is ServerMessage.Pong -> {
@@ -253,37 +254,6 @@ class RoomFollower {
         private const val TAG = "YtmpFollow"
         private const val PENDING_MAX_AGE_MS = 15_000L
 
-        /** Applies the events playback cares about; the rest only move [seq] along. */
-        fun apply(s: RoomState, e: Event): RoomState = when (e) {
-            is Event.NowPlayingChanged -> s.copy(nowPlaying = e.item?.let { NowPlaying(it, null) })
-            is Event.StreamReady -> {
-                val now = s.nowPlaying
-                if (now?.item?.itemId == e.itemId) s.copy(nowPlaying = now.copy(streamUrl = e.streamUrl)) else s
-            }
-            is Event.PlaybackChanged -> s.copy(playback = e.playback)
-            is Event.OutputsChanged -> s.copy(outputs = e.outputs)
-            is Event.ParticipantJoined, is Event.ParticipantUpdated -> {
-                val p = if (e is Event.ParticipantJoined) e.participant else (e as Event.ParticipantUpdated).participant
-                val index = s.participants.indexOfFirst { it.id == p.id }
-                s.copy(participants = if (index >= 0) s.participants.toMutableList().also { it[index] = p } else s.participants + p)
-            }
-            is Event.ParticipantLeft -> s.copy(participants = s.participants.filter { it.id != e.participantId })
-            // The upcoming songs, so the player can look up the next one ahead of time.
-            is Event.QueueItemsAdded -> s.copy(queue = s.queue.toMutableList().apply { addAll(e.index.coerceIn(0, size), e.items) })
-            is Event.QueueItemRemoved -> s.copy(queue = s.queue.filter { it.itemId != e.itemId })
-            is Event.QueueItemMoved -> {
-                val item = s.queue.firstOrNull { it.itemId == e.itemId }
-                if (item == null) s else s.copy(queue = (s.queue - item).toMutableList().apply { add(e.toIndex.coerceIn(0, size), item) })
-            }
-            is Event.QueueReplaced -> s.copy(queue = e.items)
-            // The last played song, so speakers near the phone can skip back by themselves (NearbySpeakers).
-            is Event.HistoryAppended -> s.copy(history = s.history + e.item)
-            is Event.HistoryItemRemoved -> s.copy(history = s.history.filter { it.itemId != e.itemId })
-            is Event.HistoryReplaced -> s.copy(history = e.items)
-            is Event.AutoplayChanged -> s.copy(autoplay = e.items, autoplaySeed = e.seed)
-            is Event.RepeatChanged -> s.copy(repeat = e.mode)
-            else -> s
-        }
     }
 }
 

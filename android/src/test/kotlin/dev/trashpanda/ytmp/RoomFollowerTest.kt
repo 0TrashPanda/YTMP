@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp
 
+import dev.trashpanda.ytmp.protocol.apply
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.OutputInfo
@@ -27,15 +28,15 @@ class RoomFollowerTest {
 
     @Test
     fun `next song then its stream`() {
-        var s = RoomFollower.apply(empty, Event.NowPlayingChanged(item))
+        var s = empty.apply(Event.NowPlayingChanged(item))
         assertEquals("i1", s.nowPlaying?.item?.itemId)
         assertNull(s.nowPlaying?.streamUrl)
         // A stream for another (old) item is ignored.
-        s = RoomFollower.apply(s, Event.StreamReady("old", "https://old"))
+        s = s.apply(Event.StreamReady("old", "https://old"))
         assertNull(s.nowPlaying?.streamUrl)
-        s = RoomFollower.apply(s, Event.StreamReady("i1", "https://stream"))
+        s = s.apply(Event.StreamReady("i1", "https://stream"))
         assertEquals("https://stream", s.nowPlaying?.streamUrl)
-        s = RoomFollower.apply(s, Event.PlaybackChanged(PlaybackStatus(true, 10, 99)))
+        s = s.apply(Event.PlaybackChanged(PlaybackStatus(true, 10, 99)))
         assertEquals(PlaybackStatus(true, 10, 99), s.playback)
     }
 
@@ -43,14 +44,14 @@ class RoomFollowerTest {
     fun `the queue follows the room, so the next song can be looked up ahead`() {
         val other = item.copy(itemId = "i2")
         val third = item.copy(itemId = "i3")
-        var s = RoomFollower.apply(empty, Event.QueueItemsAdded(listOf(item, other), 0))
-        s = RoomFollower.apply(s, Event.QueueItemsAdded(listOf(third), 1))
+        var s = empty.apply(Event.QueueItemsAdded(listOf(item, other), 0))
+        s = s.apply(Event.QueueItemsAdded(listOf(third), 1))
         assertEquals(listOf("i1", "i3", "i2"), s.queue.map { it.itemId })
-        s = RoomFollower.apply(s, Event.QueueItemMoved("i2", 0))
+        s = s.apply(Event.QueueItemMoved("i2", 0))
         assertEquals(listOf("i2", "i1", "i3"), s.queue.map { it.itemId })
-        s = RoomFollower.apply(s, Event.QueueItemRemoved("i1"))
+        s = s.apply(Event.QueueItemRemoved("i1"))
         assertEquals(listOf("i2", "i3"), s.queue.map { it.itemId })
-        s = RoomFollower.apply(s, Event.QueueReplaced(listOf(third)))
+        s = s.apply(Event.QueueReplaced(listOf(third)))
         assertEquals(listOf("i3"), s.queue.map { it.itemId })
     }
 
@@ -58,11 +59,11 @@ class RoomFollowerTest {
     fun `alone unless someone else listens or a speaker is on`() {
         assertEquals(true, FollowedRoom(link, "p1", empty, 0.0).alone)
         val friend = Participant("p2", "Friend", isOwner = false, online = true, listening = true)
-        val withFriend = RoomFollower.apply(empty, Event.ParticipantJoined(friend))
+        val withFriend = empty.apply(Event.ParticipantJoined(friend))
         assertEquals(false, FollowedRoom(link, "p1", withFriend, 0.0).alone)
-        val friendLeft = RoomFollower.apply(withFriend, Event.ParticipantLeft("p2"))
+        val friendLeft = withFriend.apply(Event.ParticipantLeft("p2"))
         assertEquals(true, FollowedRoom(link, "p1", friendLeft, 0.0).alone)
-        val speaker = RoomFollower.apply(empty, Event.OutputsChanged(listOf(OutputInfo("cast:x", "TV", OutputKind.entries.first(), active = true, volume = null))))
+        val speaker = empty.apply(Event.OutputsChanged(listOf(OutputInfo("cast:x", "TV", OutputKind.entries.first(), active = true, volume = null))))
         assertEquals(false, FollowedRoom(link, "p1", speaker, 0.0).alone)
     }
 

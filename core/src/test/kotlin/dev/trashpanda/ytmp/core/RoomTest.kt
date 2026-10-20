@@ -1,6 +1,10 @@
 package dev.trashpanda.ytmp.core
 
+import dev.trashpanda.ytmp.protocol.apply
 import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.Permission
+import dev.trashpanda.ytmp.protocol.ItemList
+import dev.trashpanda.ytmp.protocol.RepeatMode
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.Event
@@ -39,32 +43,12 @@ class RoomTest {
             messages += message
             when (message) {
                 is ServerMessage.Welcome -> { state = message.state; participantId = message.participantId }
-                is ServerMessage.EventMessage -> state = apply(state, message.event)
+                is ServerMessage.EventMessage -> state = state.apply(message.event)
                 else -> Unit
             }
         }
 
         val events get() = messages.filterIsInstance<ServerMessage.EventMessage>().map { it.event }
-
-        private fun apply(s: RoomState, e: Event): RoomState = when (e) {
-            is Event.QueueItemsAdded -> s.copy(queue = s.queue.toMutableList().apply { addAll(e.index, e.items) })
-            is Event.QueueItemRemoved -> s.copy(queue = s.queue.filter { it.itemId != e.itemId })
-            is Event.QueueItemMoved -> {
-                val q = s.queue.toMutableList()
-                val item = q.first { it.itemId == e.itemId }
-                q.remove(item); q.add(e.toIndex, item)
-                s.copy(queue = q)
-            }
-            is Event.HistoryAppended -> s.copy(history = s.history + e.item)
-            is Event.HistoryItemRemoved -> s.copy(history = s.history.filter { it.itemId != e.itemId })
-            is Event.NowPlayingChanged -> s.copy(nowPlaying = e.item?.let { dev.trashpanda.ytmp.protocol.NowPlaying(it, null) })
-            is Event.StreamReady -> s.copy(nowPlaying = s.nowPlaying?.copy(streamUrl = e.streamUrl))
-            is Event.PlaybackChanged -> s.copy(playback = e.playback)
-            is Event.ParticipantJoined -> s.copy(participants = s.participants.filter { it.id != e.participant.id } + e.participant)
-            is Event.ParticipantUpdated -> s.copy(participants = s.participants.map { if (it.id == e.participant.id) e.participant else it })
-            is Event.ParticipantLeft -> s.copy(participants = s.participants.filter { it.id != e.participantId })
-            else -> s
-        }
     }
 
     private fun TestScope.newRoom(): Room =
@@ -79,6 +63,44 @@ class RoomTest {
 
     private suspend fun Room.run(client: FakeClient, command: Command) =
         handle(client.participantId, ClientMessage.CommandMessage("c", command))
+
+    @Test
+    fun `a client that follows the events has the room the host has`() = runTest {
+        val room = newRoom()
+        val anna = room.connect()
+        val guest = FakeClient()
+        room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Carl", null, null), guest)
+        val songs = (1..6).map { song(it) }
+        room.run(anna, Command.AddSongs(songs.take(4), QueuePosition.END))
+        room.run(guest, Command.AddSongs(songs.drop(4), QueuePosition.NEXT))
+        runCurrent()
+        room.run(anna, Command.MoveQueueItem(anna.state.queue.last().itemId, 0))
+        room.run(anna, Command.RemoveQueueItem(anna.state.queue[1].itemId))
+        room.run(anna, Command.ShuffleQueue)
+        room.run(anna, Command.SetRepeat(RepeatMode.QUEUE))
+        room.run(anna, Command.Skip())
+        room.run(anna, Command.Skip())
+        runCurrent()
+        room.run(anna, Command.JumpTo(anna.state.history.first().itemId))
+        room.run(anna, Command.MoveItem(anna.state.queue.first().itemId, ItemList.HISTORY, 0))
+        room.run(anna, Command.UpdateSettings(name = "Party", fairOrder = true, voteSkip = true, maxSongsPerPerson = 10))
+        room.run(anna, Command.CreateRole("Bouncer", "#ff0000", listOf(Permission.KICK, Permission.ADD_SONGS)))
+        room.run(anna, Command.AssignRole(guest.participantId, anna.state.roles.last().id))
+        room.run(guest, Command.VoteSkip(true))
+        room.run(anna, Command.AutoplaySongs(listOf(song(7), song(8))))
+        room.run(anna, Command.SetPassword("secret"))
+        room.run(anna, Command.Pause)
+        room.run(anna, Command.Kick(guest.participantId))
+        room.run(anna, Command.ClearQueue)
+        runCurrent()
+
+        room.handle(anna.participantId, ClientMessage.RequestSnapshot)
+        val host = (anna.messages.last() as ServerMessage.Snapshot).state
+        assertEquals(host, anna.state.copy(playback = host.playback))
+        // The room did change: this isn't two empty rooms.
+        assertEquals("Party", anna.state.room.name)
+        assertTrue(anna.state.roles.any { it.name == "Bouncer" } && anna.state.history.isNotEmpty() && anna.state.room.hasPassword)
+    }
 
     @Test
     fun `the app's player connection keeps a participant here while its page is frozen`() = runTest {
