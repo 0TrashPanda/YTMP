@@ -8,15 +8,25 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Where the current song is: a position at a moment (the anchor), moving on from there while
- * it plays. Clients follow the same numbers ([dev.trashpanda.ytmp.protocol.PlaybackStatus]).
+ * Where the current song is: a position at a moment (the anchor), moving on from there at
+ * [rate] while it plays. Clients follow the same numbers ([dev.trashpanda.ytmp.protocol.PlaybackStatus]).
  */
 internal class PlaybackClock(private val clock: () -> Long) {
     private var positionAtAnchor = 0L
     private var anchorTime = 0L
 
+    /** How fast it plays (a podcast episode can play faster or slower). */
+    var rate = 1.0
+        private set
+
     /** The position now; it moves on while [moving]. */
-    fun position(moving: Boolean): Long = if (moving) positionAtAnchor + (clock() - anchorTime) else positionAtAnchor
+    fun position(moving: Boolean): Long = if (moving) positionAtAnchor + ((clock() - anchorTime) * rate).toLong() else positionAtAnchor
+
+    /** From now on it plays at [newRate], on from where it is ([moving]: it plays now). */
+    fun setRate(newRate: Double, moving: Boolean) {
+        set(position(moving))
+        rate = newRate
+    }
 
     /** The song is at [positionMs] now. */
     fun set(positionMs: Long) {

@@ -70,6 +70,9 @@ interface DeviceSession {
     /** A song was loaded on the device in this session (another app playing there later took it over). */
     val loadedSomething: Boolean get() = false
 
+    /** It can play faster or slower (a podcast episode at the room's speed); otherwise it sits such an episode out. */
+    val supportsSpeed: Boolean get() = false
+
     /** The room stopped playing here. */
     suspend fun stop()
 
@@ -105,6 +108,8 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
         val sessions = HashMap<String, DeviceSession>()
         // Devices this room has played on: when another app runs there later, it took them over.
         val playedOn = HashSet<String>()
+        // Devices that can't play an episode at the room's speed: they sit it out (paused).
+        val sittingOut = HashSet<String>()
         try {
             while (true) {
                 // React to changes right away, and check the devices regularly anyway.
@@ -116,6 +121,16 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
                 for ((id, volume) in view.activeOutputs) {
                     if (!has(id)) continue
                     val session = sessions.getOrPut(id) { session(id, resuming = id in playedOn) }
+                    if (view.speed != 1.0 && !session.supportsSpeed) {
+                        if (sittingOut.add(id)) {
+                            runCatching { session.stop() }
+                            room.notice("${name(id)} can't play faster or slower, so it sits out this episode")
+                        }
+                        // A new song doesn't wait for it.
+                        if (view.starting) view.current?.let { room.outputReady(id, it.itemId) }
+                        continue
+                    }
+                    sittingOut -= id
                     try {
                         session.sync(view, volume, room, id)
                         if (session.loadedSomething) playedOn += id

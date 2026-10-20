@@ -227,8 +227,10 @@ data class RoomView(
      * ([OutputRoom.outputReady]); [playing] turns true when everyone can start.
      */
     val starting: Boolean = false,
+    /** How fast [current] plays (an episode can play faster or slower; music at 1). */
+    val speed: Double = 1.0,
 ) {
-    fun positionAt(timeMs: Long): Long = if (playing) positionMs + (timeMs - hostTimeMs) else positionMs
+    fun positionAt(timeMs: Long): Long = if (playing) positionMs + ((timeMs - hostTimeMs) * speed).toLong() else positionMs
 }
 
 /** One client connection. [send] must not block: it queues the message for that client. */

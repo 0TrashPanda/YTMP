@@ -67,7 +67,7 @@
 	// Follow the room, like the room page does.
 	$effect(() => {
 		const s = room?.state;
-		void [s?.nowPlaying?.item.itemId, s?.nowPlaying?.streamUrl, s?.playback.playing, s?.playback.positionMs, s?.playback.hostTimeMs, room?.clockOffset];
+		void [s?.nowPlaying?.item.itemId, s?.nowPlaying?.streamUrl, s?.playback.playing, s?.playback.positionMs, s?.playback.hostTimeMs, s?.playback.speed, room?.clockOffset];
 		player?.sync();
 	});
 	$effect(() => {

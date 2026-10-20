@@ -229,6 +229,7 @@ class PlaybackService : MediaSessionService() {
                 positionMs = room.state.playback.positionMs,
                 hostTimeMs = room.state.playback.hostTimeMs,
                 starting = room.state.playback.starting,
+                speed = room.state.playback.speed.toFloat(),
                 clockOffset = room.clockOffset,
                 alone = room.alone,
             )
@@ -305,7 +306,7 @@ class PlaybackService : MediaSessionService() {
                 // A song the room starts once everyone has it: exactly from its start.
                 expectedPosition(target) + if (target.starting) 0 else sync.seekLeadMs,
             )
-            exo.playbackParameters = PlaybackParameters(SyncCorrection.NORMAL)
+            exo.playbackParameters = PlaybackParameters(target.speed)
             exo.prepare()
             sync.onLoaded()
             settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
@@ -431,6 +432,8 @@ class PlaybackService : MediaSessionService() {
         if (SystemClock.elapsedRealtime() < settledAt) return
         val speed = exo.playbackParameters.speed
         val drift = (audioClock.positionMs(speed) ?: return) - expected
+        // Corrections are on top of the room's speed (an episode played faster or slower).
+        val ownSpeed = SyncCorrection.ownSpeed(speed, target.speed)
 
         if (roomSeekTo != null) roomWontFollow = loadedItemId
         if (target.alone && abs(drift) > SyncCorrection.ALONE_ROOM_TOLERANCE_MS && roomSeekTo == null &&
@@ -448,15 +451,15 @@ class PlaybackService : MediaSessionService() {
         }
         roomSeekTo = null
 
-        val fix = sync.onDrift(drift, expected, speed, target.alone)
+        val fix = sync.onDrift(drift, expected, ownSpeed, target.alone)
         if (fix.seekTo != null) {
             Log.d(TAG, "drift $drift ms -> seek (lead ${sync.seekLeadMs} ms)")
-            exo.playbackParameters = PlaybackParameters(fix.speed)
+            exo.playbackParameters = PlaybackParameters(fix.speed * target.speed)
             exo.seekTo(fix.seekTo)
             settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
-        } else if (fix.speed != speed) {
-            Log.d(TAG, "drift $drift ms -> speed ${fix.speed}")
-            exo.playbackParameters = PlaybackParameters(fix.speed)
+        } else if (fix.speed != ownSpeed) {
+            Log.d(TAG, "drift $drift ms -> speed ${fix.speed} (room ${target.speed})")
+            exo.playbackParameters = PlaybackParameters(fix.speed * target.speed)
         }
     }
 

@@ -22,6 +22,8 @@ data class PlaybackTarget(
      * at [positionMs] and say so (`PlayerReady`); [playing] turns true when everyone can start.
      */
     val starting: Boolean = false,
+    /** How fast the room plays it (PlaybackStatus.speed: an episode faster or slower; music at 1). */
+    val speed: Float = 1f,
     /** Host clock minus device clock, in ms. */
     val clockOffset: Double,
     /** This device's sync adjustment; positive plays earlier (for speaker/Bluetooth delay). */

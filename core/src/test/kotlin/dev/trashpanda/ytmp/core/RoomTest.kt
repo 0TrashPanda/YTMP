@@ -100,6 +100,31 @@ class RoomTest {
     }
 
     @Test
+    fun `episodes play at the room's speed, music at 1, and the end comes sooner`() = runTest {
+        val room = newRoom()
+        val anna = room.connect()
+        val episode = Song("ytm:ep", "Episode", emptyList(), null, 60 * 60_000L, emptyList(), podcast = PodcastRef("MPSPp", "Podcast"))
+        room.run(anna, Command.AddSongs(listOf(episode, song(1)), QueuePosition.END))
+        runCurrent()
+        room.run(anna, Command.SetSpeed(1.5))
+        assertEquals(1.5, anna.state.playback.speed)
+        advanceTimeBy(60_000)
+        room.handle(anna.participantId, ClientMessage.RequestSnapshot)
+        val playback = (anna.messages.last() as ServerMessage.Snapshot).state.playback
+        assertEquals(90_000L, playback.positionMs, "a minute at 1.5 is a minute and a half of the episode")
+        room.run(anna, Command.SetSpeed(3.0))
+        assertTrue(anna.messages.filterIsInstance<ServerMessage.Result>().last().error != null, "not a speed episodes play at")
+
+        // The rest of the hour takes 39 minutes at 1.5; then the song plays at 1.
+        advanceTimeBy(39 * 60_000L + 1_000)
+        runCurrent()
+        assertEquals("ytm:song1", anna.state.nowPlaying?.item?.song?.id)
+        assertEquals(1.0, anna.state.playback.speed)
+        // The room keeps the speed for the next episode, also after a restart.
+        assertEquals(1.5, room.save().episodeSpeed)
+    }
+
+    @Test
     fun `a client that follows the events has the room the host has`() = runTest {
         val room = newRoom()
         val anna = room.connect()

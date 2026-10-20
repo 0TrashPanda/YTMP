@@ -83,6 +83,8 @@ class CastOutputs(
         override var loadedSomething = false
             private set
 
+        override val supportsSpeed get() = true
+
         override suspend fun sync(view: RoomView, wantedVolume: Double?, room: OutputRoom, outputId: String) =
             sync(view, wantedVolume, room.code, report = room::notice, skipped = room::outputSkipped, ready = { room.outputReady(outputId, it) }) { actual ->
                 room.reportOutputVolume(outputId, actual)
@@ -163,6 +165,8 @@ class CastOutputs(
             }
             if (failed || status == null) return
             updateNeighbors(player, view, status.currentItemId)
+            // An episode at another speed: the device plays it at that speed too.
+            if (status.playerState != "IDLE" && abs(status.playbackRate - view.speed) > 0.01) player.setPlaybackRate(view.speed)
             when {
                 view.playing && status.playerState == "PAUSED" -> player.play()
                 !view.playing && status.playerState in setOf("PLAYING", "BUFFERING") -> player.pause()
@@ -178,7 +182,7 @@ class CastOutputs(
                 loadedItemId = null
             } else if (view.playing && status.playerState == "PLAYING") {
                 // A Cast device can't be synced closely; only fix clearly audible drift.
-                val drift = status.currentTimeMs + (now - status.receivedAt) - expected
+                val drift = status.currentTimeMs + ((now - status.receivedAt) * view.speed).toLong() - expected
                 if (abs(drift) > MAX_DRIFT_MS) {
                     player.seek(expected + LOAD_LEAD_MS)
                     settledAt = now + SETTLE_MS

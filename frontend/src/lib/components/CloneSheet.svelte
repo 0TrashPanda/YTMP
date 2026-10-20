@@ -2,6 +2,7 @@
 	// "Clone room": a new room with a copy of this one (queue, history, autoplay, roles, where
 	// the song is), here, on this phone or on your server. Optionally everyone is invited or
 	// moved to it, and keeps their role (docs/features/room-lifecycle.md#cloning-a-room).
+	import { positionNow } from '../sync';
 	import { cloneToServer, createRoom } from '../api';
 	import { identity } from '../account';
 	import { nativeBridge } from '../native';
@@ -52,7 +53,7 @@
 	/** The room as this page sees it, as a clone. */
 	function copy(): RoomClone {
 		const playback = s.playback;
-		const position = playback.playing ? playback.positionMs + (room.hostNow() - playback.hostTimeMs) : playback.positionMs;
+		const position = positionNow(playback, room.hostNow());
 		const top = s.roles[0]?.id;
 		return {
 			queue: s.queue,

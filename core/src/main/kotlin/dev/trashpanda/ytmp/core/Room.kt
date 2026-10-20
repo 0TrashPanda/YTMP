@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
+import dev.trashpanda.ytmp.protocol.EPISODE_SPEEDS
 import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.ItemList
@@ -150,6 +151,9 @@ class Room(
 
     /** The first song (item id) of the run of queue songs playing now: what repeat queue plays again. */
     private var runStart: String? = null
+
+    /** The speed podcast episodes play at ([Command.SetSpeed]); music always plays at 1. */
+    private var episodeSpeed = 1.0
 
     private val skipVote = SkipVote()
     private val limits = QueueLimits(clock)
@@ -505,6 +509,7 @@ class Room(
             passwordHash = passwordHash,
             repeat = repeat,
             runStart = runStart,
+            episodeSpeed = episodeSpeed,
         )
     }
 
@@ -531,6 +536,7 @@ class Room(
         passwordHash = saved.passwordHash
         repeat = saved.repeat
         runStart = saved.runStart
+        episodeSpeed = saved.episodeSpeed.takeIf { it in EPISODE_SPEEDS } ?: 1.0
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay.items += saved.autoplay
         autoplay.seed = saved.autoplaySeed
@@ -549,6 +555,7 @@ class Room(
         current = saved.current
         currentStartedAt = now
         playback.set(saved.positionMs)
+        playback.setRate(speedOf(current), moving = false)
         lastActive = saved.lastActive
     }
 
@@ -607,6 +614,7 @@ class Room(
             positionMs = position(),
             hostTimeMs = clock(),
             starting = startGate.waiting,
+            speed = playback.rate,
             activeOutputs = LinkedHashMap(outputs.active),
             screens = outputs.screens.mapNotNull { (output, id) -> members[id]?.let { output to it.token } }.toMap(),
             previous = history.lastOrNull(),
@@ -799,6 +807,16 @@ class Room(
                 need(member, Permission.SEEK)?.let { return it }
                 if (current == null) return invalid("Nothing is playing")
                 seek(command.positionMs)
+            }
+            is Command.SetSpeed -> {
+                need(member, Permission.PLAY_PAUSE)?.let { return it }
+                if (command.speed !in EPISODE_SPEEDS) return invalid("Not a speed episodes can play at")
+                episodeSpeed = command.speed
+                // Only an episode changes speed; music plays at 1 (the speed waits for the next episode).
+                if (current?.song?.podcast != null && playback.rate != episodeSpeed) {
+                    playback.setRate(episodeSpeed, moving = playingNow())
+                    emitPlayback()
+                }
             }
             is Command.SetListening -> {
                 if (command.on) need(member, Permission.LISTEN_LOCALLY)?.let { return it }
@@ -1483,8 +1501,9 @@ class Room(
         streamUrl = null
         startGate.stop()
         currentStartedAt = clock()
-        // An episode that was left halfway goes on from there.
+        // An episode that was left halfway goes on from there, at the room's episode speed.
         playback.set(item?.song?.takeIf { it.podcast != null }?.let { episodePositions[it.id] } ?: 0)
+        playback.setRate(speedOf(item), moving = false)
         if (item == null) wantPlaying = false
         emit(Event.NowPlayingChanged(item))
         emitPlayback()
@@ -1579,7 +1598,8 @@ class Room(
         val item = current ?: return
         // Without a known duration the song can't end on its own; it plays until skipped.
         if (!playingNow() || item.song.durationMs <= 0) return
-        val remaining = item.song.durationMs - position()
+        // At another speed, the rest of the song takes longer or shorter.
+        val remaining = ((item.song.durationMs - position()) / playback.rate).toLong()
         endJob = scope.launch {
             delay(maxOf(0, remaining))
             mutex.withLock {
@@ -1728,7 +1748,11 @@ class Room(
         positionMs = position(),
         hostTimeMs = clock(),
         starting = startGate.waiting,
+        speed = playback.rate,
     )
+
+    /** How fast [item] plays: an episode at the room's episode speed, music at 1. */
+    private fun speedOf(item: QueueItem?) = if (item?.song?.podcast != null) episodeSpeed else 1.0
 
     private fun snapshot() = RoomState(
         room = info,

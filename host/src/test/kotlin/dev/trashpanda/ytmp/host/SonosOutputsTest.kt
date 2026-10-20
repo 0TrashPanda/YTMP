@@ -7,6 +7,7 @@ import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
+import dev.trashpanda.ytmp.protocol.PodcastRef
 import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +25,38 @@ import kotlin.test.assertTrue
 
 class SonosOutputsTest {
     private val song = Song("ytm:abc", "One More Time", listOf(ArtistRef(null, "Daft Punk")), null, 320_000, emptyList())
+
+    @Test
+    fun `a Sonos sits out an episode played faster, and says so`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        FakeSonos().use { speaker ->
+            val sonos = SonosOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
+            sonos.add(SonosAddress("sonos:fake", "Woonkamer", "127.0.0.1", speaker.port))
+            eventually { sonos.devices.value.isNotEmpty() }
+            val rooms = RoomManager({ "https://stream/$it" }, scope, outputs = sonos.devices)
+            sonos.attach(rooms)
+            val room = rooms.create("Party")
+            val notices = java.util.concurrent.CopyOnWriteArrayList<String>()
+            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { m ->
+                if (m is ServerMessage.EventMessage && m.event is Event.Notice) notices += (m.event as Event.Notice).message
+            })!!
+            suspend fun run(command: Command) = room.handle(me, ClientMessage.CommandMessage("c", command))
+
+            val episode = Song("ytm:ep", "Episode", emptyList(), null, 3_600_000, emptyList(), podcast = PodcastRef("MPSPp", "Podcast"))
+            run(Command.AddSongs(listOf(episode), QueuePosition.END))
+            eventually { room.view().current != null }
+            run(Command.SetOutput("sonos:fake", active = true))
+            eventually { speaker.state == "PLAYING" }
+
+            run(Command.SetSpeed(1.5))
+            eventually { speaker.state == "STOPPED" }
+            eventually { notices.any { "Woonkamer can't play faster or slower" in it } }
+            // Back to normal speed: it plays again, where the room is.
+            run(Command.SetSpeed(1.0))
+            eventually { speaker.state == "PLAYING" }
+        }
+        scope.cancel()
+    }
 
     @Test
     fun `a room plays on a Sonos and follows pause, volume and switching off`() = runBlocking {

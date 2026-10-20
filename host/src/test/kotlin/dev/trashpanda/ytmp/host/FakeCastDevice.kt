@@ -26,6 +26,7 @@ class FakeCastDevice : AutoCloseable {
     @Volatile var playerState = "IDLE"
     @Volatile var currentTime = 0.0
     @Volatile var volume = 0.5
+    @Volatile var playbackRate = 1.0
     @Volatile private var appRunning = false
     /** Another app (Spotify, YouTube, …) runs instead of the media player. */
     @Volatile private var otherApp: String? = null
@@ -93,7 +94,7 @@ class FakeCastDevice : AutoCloseable {
     private fun statusJson(id: String?, state: String = playerState, extra: String = ""): String {
         val current = queue.getOrNull(currentIndex)
         val media = current?.second?.toString() ?: "null"
-        return """{"type":"MEDIA_STATUS","requestId":$id,"status":[{"mediaSessionId":1,"playerState":"$state","currentTime":$currentTime,"currentItemId":${current?.first},"media":$media$extra}]}"""
+        return """{"type":"MEDIA_STATUS","requestId":$id,"status":[{"mediaSessionId":1,"playerState":"$state","currentTime":$currentTime,"currentItemId":${current?.first},"playbackRate":$playbackRate,"media":$media$extra}]}"""
     }
 
     private val server: SSLServerSocket = run {
@@ -224,6 +225,7 @@ class FakeCastDevice : AutoCloseable {
                     "PLAY" -> playerState = "PLAYING"
                     "PAUSE" -> playerState = "PAUSED"
                     "SEEK" -> currentTime = request["currentTime"]!!.jsonPrimitive.doubleOrNull ?: 0.0
+                    "SET_PLAYBACK_RATE" -> playbackRate = request["playbackRate"]!!.jsonPrimitive.doubleOrNull ?: 1.0
                 }
                 // Only later status reports drop the stream, like a device losing it mid-song.
                 val dropped = type == "GET_STATUS" && dropUrlsStartingWith?.let { contentId?.startsWith(it) } == true

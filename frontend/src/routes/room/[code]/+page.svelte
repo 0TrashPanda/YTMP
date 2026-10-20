@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { positionNow } from '../../../lib/sync';
 	import { page } from '$app/state';
 	import { goto, pushState, replaceState } from '$app/navigation';
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
@@ -230,7 +231,7 @@
 	// Follow the room: whenever the song or playback changes, re-sync the audio.
 	$effect(() => {
 		const s = room?.state;
-		void [s?.nowPlaying?.item.itemId, s?.nowPlaying?.streamUrl, s?.playback.playing, s?.playback.positionMs, s?.playback.hostTimeMs];
+		void [s?.nowPlaying?.item.itemId, s?.nowPlaying?.streamUrl, s?.playback.playing, s?.playback.positionMs, s?.playback.hostTimeMs, s?.playback.speed];
 		void room?.clockOffset;
 		void room?.listeningAlone;
 		void room?.participantId;
@@ -275,7 +276,7 @@
 		const playback = room?.state?.playback;
 		if (!room || !playback) return 0;
 		void now;
-		return playback.playing ? playback.positionMs + (room.hostNow() - playback.hostTimeMs) : playback.positionMs;
+		return positionNow(playback, room.hostNow());
 	});
 
 	// Phones: hide the header while scrolling down, show it again on any scroll up.

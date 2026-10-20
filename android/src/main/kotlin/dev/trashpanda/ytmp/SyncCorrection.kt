@@ -115,8 +115,12 @@ class SyncCorrection {
          */
         fun targetPosition(target: PlaybackTarget, nowMs: Long): Long {
             val hostNow = nowMs + target.clockOffset.toLong()
-            val position = if (target.playing) target.positionMs + (hostNow - target.hostTimeMs) else target.positionMs
-            return maxOf(0, position + target.syncOffsetMs)
+            // An episode at another speed moves on (and makes up the delay) at that speed.
+            val position = if (target.playing) target.positionMs + ((hostNow - target.hostTimeMs) * target.speed).toLong() else target.positionMs
+            return maxOf(0, position + (target.syncOffsetMs * target.speed).toLong())
         }
+
+        /** The player's speed apart from the room's ([roomSpeed]): what [onDrift] works with. Rounded (1.455 / 1.5 is 0.97). */
+        fun ownSpeed(playerSpeed: Float, roomSpeed: Float): Float = Math.round(playerSpeed / roomSpeed * 1000) / 1000f
     }
 }

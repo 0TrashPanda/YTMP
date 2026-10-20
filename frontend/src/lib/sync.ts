@@ -55,9 +55,24 @@ export function looseCorrection(driftMs: number, settling: boolean): Correction 
 
 /**
  * Where this device's player should be. [syncOffsetMs] is the device's sync adjustment:
- * positive plays earlier, to make up for speaker or Bluetooth delay.
+ * positive plays earlier, to make up for speaker or Bluetooth delay. An episode at another
+ * speed moves on (and makes up the delay) at that speed.
  */
 export function targetPosition(playback: PlaybackStatus, hostNow: number, syncOffsetMs: number): number {
-	const position = playback.playing ? playback.positionMs + (hostNow - playback.hostTimeMs) : playback.positionMs;
-	return Math.max(0, position + syncOffsetMs);
+	const speed = playback.speed ?? 1;
+	const position = playback.playing ? playback.positionMs + (hostNow - playback.hostTimeMs) * speed : playback.positionMs;
+	return Math.max(0, position + syncOffsetMs * speed);
+}
+
+/** Where the room's current song is at [hostNow] (on the host's clock). */
+export function positionNow(playback: PlaybackStatus, hostNow: number): number {
+	return targetPosition(playback, hostNow, 0);
+}
+
+/**
+ * The player's speed apart from the room's ([roomSpeed], an episode played faster or slower):
+ * what [correction] works with. Rounded, so 1.455 / 1.5 is 0.97 and not 0.9700000000000001.
+ */
+export function ownRate(playbackRate: number, roomSpeed: number): number {
+	return Math.round((playbackRate / roomSpeed) * 1000) / 1000;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { correction, looseCorrection, targetPosition } from './sync';
+import { correction, looseCorrection, ownRate, targetPosition } from './sync';
 
 describe('correction', () => {
 	it('jumps when far off, speeds up or slows down when a little off', () => {
@@ -29,10 +29,26 @@ describe('correction', () => {
 
 describe('targetPosition', () => {
 	it('moves on while playing, with the sync adjustment', () => {
-		const playing = { playing: true, positionMs: 10_000, hostTimeMs: 1_000, starting: false };
+		const playing = { playing: true, positionMs: 10_000, hostTimeMs: 1_000, starting: false, speed: 1 };
 		expect(targetPosition(playing, 3_000, 0)).toBe(12_000);
 		expect(targetPosition(playing, 3_000, 200)).toBe(12_200);
 		expect(targetPosition({ ...playing, playing: false }, 3_000, 0)).toBe(10_000);
 		expect(targetPosition({ ...playing, positionMs: 0 }, 1_000, -500)).toBe(0);
+	});
+
+	it('an episode at 1.5 moves on one and a half times as fast', () => {
+		const fast = { playing: true, positionMs: 10_000, hostTimeMs: 1_000, starting: false, speed: 1.5 };
+		expect(targetPosition(fast, 3_000, 0)).toBe(13_000);
+		expect(targetPosition(fast, 3_000, 200)).toBe(13_300);
+	});
+});
+
+describe('ownRate', () => {
+	it('is the player speed apart from the room speed', () => {
+		expect(ownRate(1.455, 1.5)).toBe(0.97);
+		expect(ownRate(1.5, 1.5)).toBe(1);
+		expect(ownRate(1.03, 1)).toBe(1.03);
+		// Corrections at 1.5 work like at 1.
+		expect(correction(60, ownRate(1.5, 1.5)).rate * 1.5).toBeCloseTo(1.455);
 	});
 });

@@ -25,6 +25,7 @@
 	import QueuePanel from './QueuePanel.svelte';
 	import SearchResults from './SearchResults.svelte';
 	import SkipButtons from './SkipButtons.svelte';
+	import SpeedButton from './SpeedButton.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 
 	let {
@@ -362,6 +363,9 @@
 						{#if !song.podcast}
 							<!-- Like YTM: shuffle and repeat on either side of the controls. -->
 							<ShuffleButton {room} {onToast} size={26} class="p-2" />
+						{:else}
+							<!-- Episodes: the speed instead. -->
+							<SpeedButton {room} {onToast} up />
 						{/if}
 						<button class="rounded-full p-2 disabled:opacity-40" aria-label="Previous" disabled={!room.canPrevious} onclick={() => room.run({ kind: 'Previous' })}>
 							<Icon name="previous" size={36} />

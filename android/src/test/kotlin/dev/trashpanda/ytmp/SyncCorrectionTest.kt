@@ -56,6 +56,18 @@ class SyncCorrectionTest {
     }
 
     @Test
+    fun `an episode at 1,5 moves on faster, and corrections work on top of that speed`() {
+        val target = PlaybackTarget(
+            enabled = true, item = null, streamUrl = null, proxyUrl = null,
+            playing = true, positionMs = 10_000, hostTimeMs = 1_000, clockOffset = 0.0,
+            syncOffsetMs = 200, volume = 1f, speed = 1.5f,
+        )
+        assertEquals(10_000 + 750 + 300, SyncCorrection.targetPosition(target, nowMs = 1_500))
+        assertEquals(0.97f, SyncCorrection.ownSpeed(1.455f, 1.5f))
+        assertEquals(NORMAL, SyncCorrection.ownSpeed(1.5f, 1.5f))
+    }
+
+    @Test
     fun `listening alone, small drift is left alone and only big drift is fixed`() {
         val sync = SyncCorrection()
         assertEquals(Fix(NORMAL), sync.onDrift(300, 10_000, faster, alone = true))

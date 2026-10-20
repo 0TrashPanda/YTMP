@@ -120,7 +120,15 @@ data class PlaybackStatus(
      * few seconds passed), then everyone starts it together from [positionMs]. Show it as playing.
      */
     val starting: Boolean = false,
+    /**
+     * How fast it plays: the position moves on [speed] ms per ms. Only a podcast episode plays
+     * at another speed than 1 (the room's episode speed, [Command.SetSpeed]).
+     */
+    val speed: Double = 1.0,
 )
+
+/** The speeds a room can play episodes at ([Command.SetSpeed]). */
+val EPISODE_SPEEDS = listOf(0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0)
 
 @Serializable
 @SerialName("NowPlaying")

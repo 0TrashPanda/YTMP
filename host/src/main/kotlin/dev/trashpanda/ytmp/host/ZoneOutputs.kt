@@ -191,7 +191,13 @@ class ZoneOutputs(
         try {
             while (true) {
                 withTimeoutOrNull(SYNC_INTERVAL_MS) { changed.receive() }
-                val view = room.view()
+                val seen = room.view()
+                // MPD can't play faster or slower: an episode at another speed is sat out (nothing plays here).
+                val view = if (seen.speed != 1.0) seen.copy(current = null, playing = false, starting = false) else seen
+                if (seen.speed != 1.0 && seen.starting) {
+                    val ours = loaded.value.values.flatten().map { it.id }.toSet()
+                    seen.current?.let { item -> for (id in seen.activeOutputs.keys) if (id in ours) room.outputReady(id, item.itemId) }
+                }
                 val now = System.currentTimeMillis()
                 if (view.playing) quietSince = 0 else if (quietSince == 0L) quietSince = now
                 // Paused for a while: the zones get back what they had (the TV), until it plays again.

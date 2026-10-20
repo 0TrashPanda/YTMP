@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
+import dev.trashpanda.ytmp.protocol.PodcastRef
 import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +66,31 @@ class CastOutputsTest {
 
             run(Command.SetOutput("cast:fake", active = false))
             eventually { "STOP" in device.types(CastChannel.NS_RECEIVER) }
+        }
+        scope.cancel()
+    }
+
+    @Test
+    fun `an episode at another speed plays at that speed on a Cast device`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        FakeCastDevice().use { device ->
+            val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
+            casts.add(CastDeviceAddress("cast:fake", "Fake TV", "127.0.0.1", device.port))
+            val rooms = RoomManager({ "https://stream/$it" }, scope, outputs = casts.devices)
+            casts.attach(rooms)
+            val room = rooms.create("Party")
+            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { })!!
+            suspend fun run(command: Command) = room.handle(me, ClientMessage.CommandMessage("c", command))
+
+            val episode = Song("ytm:ep", "Episode", emptyList(), null, 3_600_000, emptyList(), podcast = PodcastRef("MPSPp", "Podcast"))
+            run(Command.AddSongs(listOf(episode), QueuePosition.END))
+            eventually { casts.devices.value.isNotEmpty() }
+            room.turnOn(me, "cast:fake")
+            eventually { device.playerState == "PLAYING" }
+            run(Command.SetSpeed(1.5))
+            eventually { device.playbackRate == 1.5 }
+            run(Command.SetSpeed(1.0))
+            eventually { device.playbackRate == 1.0 }
         }
         scope.cancel()
     }

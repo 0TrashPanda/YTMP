@@ -60,8 +60,9 @@ Music, without Premium, and not tied to a single music service.
 - Radio from a song, autoplay when the queue runs out, find similar. With a YTMP account they
   learn which songs you (and everyone on your server) play after each other, and mix those
   in; local music gets a radio from it too.
-- Podcasts: exact episode lengths, resume where you stopped, back 10 s / ahead 30 s, no
-  music radio after an episode.
+- Podcasts: subscribe, new episodes on Home, played marks and resume where you stopped (in
+  any room, with a YTMP account), playback speed for the room, exact episode lengths, back
+  10 s / ahead 30 s, no music radio after an episode.
 
 **The player**
 - A mini player that opens a full player (tap or swipe up): album art, controls, like,
@@ -110,7 +111,6 @@ Music, without Premium, and not tied to a single music service.
 
 ## What's next
 
-- New podcast episodes on Home, playback speed, played marks
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
 - YTMP playlists, explore page, sleep timer

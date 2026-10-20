@@ -247,6 +247,7 @@ fun RoomState.outputView(clockOffset: Double, activeOutputs: Map<String, Double?
         positionMs = playback.positionMs,
         hostTimeMs = (playback.hostTimeMs - clockOffset).roundToLong(),
         starting = playback.starting && current != null,
+        speed = playback.speed,
         activeOutputs = activeOutputs,
         previous = history.lastOrNull(),
         next = when {

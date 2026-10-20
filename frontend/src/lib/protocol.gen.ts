@@ -243,6 +243,11 @@ export interface CommandSetSpeakers {
   startsTogether: boolean;
 }
 
+export interface CommandSetSpeed {
+  kind: "SetSpeed";
+  speed: number;
+}
+
 export type RoomVisibility = "public" | "private";
 
 export interface CommandSetVisibility {
@@ -339,6 +344,7 @@ export type Command =
   | CommandSetRepeat
   | CommandSetRoomCode
   | CommandSetSpeakers
+  | CommandSetSpeed
   | CommandSetVisibility
   | CommandShuffleQueue
   | CommandSkip
@@ -506,6 +512,7 @@ export interface PlaybackStatus {
   positionMs: number;
   hostTimeMs: number;
   starting: boolean;
+  speed: number;
 }
 
 export interface EventPlaybackChanged {

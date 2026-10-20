@@ -40,6 +40,8 @@ data class MediaStatus(
     val currentItemId: Int? = null,
     /** Our [CastQueueItem.tag] of the current item, when the status includes the media. */
     val tag: String? = null,
+    /** How fast it plays (1 = normal). */
+    val playbackRate: Double = 1.0,
     /** When this status was received (System.currentTimeMillis). */
     val receivedAt: Long,
 )
@@ -207,6 +209,9 @@ class CastMediaPlayer(private val channel: CastChannel) {
 
     suspend fun seek(positionMs: Long) = control("SEEK", "currentTime" to JsonPrimitive(positionMs / 1000.0))
 
+    /** Plays faster or slower (1 = normal). */
+    suspend fun setPlaybackRate(rate: Double) = control("SET_PLAYBACK_RATE", "playbackRate" to JsonPrimitive(rate))
+
     suspend fun status(): MediaStatus? = control("GET_STATUS")
 
     /** Device volume, 0.0–1.0. */
@@ -270,6 +275,7 @@ class CastMediaPlayer(private val channel: CastChannel) {
             receivedAt = System.currentTimeMillis(),
             currentItemId = status["currentItemId"]?.jsonPrimitive?.intOrNull,
             tag = media?.get("customData")?.jsonObject?.get(TAG)?.jsonPrimitive?.content,
+            playbackRate = status["playbackRate"]?.jsonPrimitive?.doubleOrNull ?: 1.0,
         )
     }
 

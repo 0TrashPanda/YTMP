@@ -168,6 +168,14 @@ sealed interface Command {
     @SerialName("Seek")
     data class Seek(val positionMs: Long) : Command
 
+    /**
+     * The speed podcast episodes play at, for everyone in the room (one of [EPISODE_SPEEDS]);
+     * music always plays at 1. Kept for the next episodes. Play/pause.
+     */
+    @Serializable
+    @SerialName("SetSpeed")
+    data class SetSpeed(val speed: Double) : Command
+
     /** Puts the upcoming songs in a random order (with fair order: keeps the rounds). Reorder. */
     @Serializable
     @SerialName("ShuffleQueue")

@@ -18,6 +18,7 @@
 	import OutputsSheet from './OutputsSheet.svelte';
 	import Progress from './Progress.svelte';
 	import SkipButtons from './SkipButtons.svelte';
+	import SpeedButton from './SpeedButton.svelte';
 
 	let {
 		room,
@@ -166,6 +167,9 @@
 					{@render playPause()}
 				{/if}
 				<NextButton {room} class="p-2 hover:bg-raised" />
+				{#if current?.item.song.podcast}
+					<SpeedButton {room} {onToast} up />
+				{/if}
 				<span class="pl-2 text-xs text-muted tabular-nums">
 					{formatTime(Math.min(positionMs, duration))} / {formatTime(duration)}
 				</span>

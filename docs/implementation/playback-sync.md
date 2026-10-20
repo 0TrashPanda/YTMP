@@ -18,8 +18,13 @@ Feature description: [features/playback-and-outputs.md](../features/playback-and
 
 - NTP-style ping/pong over the WebSocket to estimate the **clock offset** and
   round-trip time for each client.
-- Host broadcasts `{songId, positionMs, hostTimeMs, playing}`. A client computes
-  `expectedPos = positionMs + (now + offset − hostTimeMs)`.
+- Host broadcasts `{songId, positionMs, hostTimeMs, playing, speed}`. A client computes
+  `expectedPos = positionMs + (now + offset − hostTimeMs) × speed`.
+- **Speed**: a podcast episode can play faster or slower (`speed`, the room's episode speed;
+  music is always 1). The room's clock moves at that speed (and the song ends sooner or later),
+  players play at it, and their small corrections (±3%) are on top of it (`ownRate` in
+  `sync.ts`, `SyncCorrection.ownSpeed` on Android). Chromecasts get `SET_PLAYBACK_RATE`; Sonos,
+  MPD and amplifier zones can't change speed and sit such an episode out (paused, with a notice).
 - Small drift → nudge playback rate slightly. Large drift → seek.
 
 ## Known risk: IP-bound stream URLs

@@ -5,7 +5,7 @@ import { forgetOwnStream, isYoutubeSong, ownStreamUrl, prefetchOwnStream } from 
 import type { NowPlaying } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 import { saved } from './storage';
-import { correction, looseCorrection, LOOSE_SETTLE_MS, targetPosition } from './sync';
+import { correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
 
 /** Plays the room's audio on this device. */
 export interface RoomPlayer {
@@ -181,9 +181,11 @@ class WebPlayer implements RoomPlayer {
 		}
 
 		const drift = this.audio.currentTime * 1000 - expectedMs;
+		// Corrections are on top of the room's speed (an episode played faster or slower).
+		const speed = playback.speed ?? 1;
 		const fix = this.loose
 			? looseCorrection(drift, performance.now() < this.settledAt)
-			: correction(drift, this.audio.playbackRate, this.room.listeningAlone);
+			: correction(drift, ownRate(this.audio.playbackRate, speed), this.room.listeningAlone);
 		if (fix.seek) {
 			const wasPlaying = !this.audio.paused;
 			this.audio.currentTime = expectedMs / 1000;
@@ -194,7 +196,8 @@ class WebPlayer implements RoomPlayer {
 				if (wasPlaying) reportProblem(`browser jumped ${Math.round(drift)} ms to stay in sync in ${this.room.state?.nowPlaying?.item.song.id} (${SOURCE_NAMES[this.source]})`, this.room.roomCode);
 			}
 		}
-		if (this.audio.playbackRate !== fix.rate) this.audio.playbackRate = fix.rate;
+		const rate = fix.rate * speed;
+		if (Math.abs(this.audio.playbackRate - rate) > 0.0001) this.audio.playbackRate = rate;
 		if (this.audio.paused) {
 			this.audio.play().catch((e: unknown) => {
 				// Only a missing tap blocks it (NotAllowedError); anything else says what it was.
@@ -471,6 +474,7 @@ class NativePlayer implements RoomPlayer {
 				starting: state?.playback.starting ?? false,
 				positionMs: state?.playback.positionMs ?? 0,
 				hostTimeMs: state?.playback.hostTimeMs ?? 0,
+				speed: state?.playback.speed ?? 1,
 				clockOffset: this.room.clockOffset,
 				syncOffsetMs: this.syncOffsetMs,
 				alone: this.room.listeningAlone,
