@@ -11,7 +11,8 @@
 	import { listening } from '../../../lib/listening.svelte';
 	import LocalView from '../../../lib/components/LocalView.svelte';
 	import LocalGroupView from '../../../lib/components/LocalGroupView.svelte';
-	import { local, loadLocal, localPlace, forgetLocalPlace } from '../../../lib/local.svelte';
+	import { local, loadLocal } from '../../../lib/local.svelte';
+	import { PageStack, type Page, type Section } from '../../../lib/pageStack.svelte';
 	import Sidebar from '../../../lib/components/Sidebar.svelte';
 	import AvatarMenu from '../../../lib/components/AvatarMenu.svelte';
 	import SettingsScreen, { type SettingsSection } from '../../../lib/components/settings/SettingsScreen.svelte';
@@ -74,60 +75,36 @@
 	let player = $state<RoomPlayer | null>(null);
 	// The search chip: stays as picked for the next search.
 	let searchType = $state<SearchType>('all');
-	let menu = $state<MenuTarget | null>(null);
+	/** What's open over the page: one sheet, menu or dialog at a time. Back closes it. */
+	type Sheet =
+		| { kind: 'menu'; target: MenuTarget }
+		| { kind: 'save'; song: Song }
+		| { kind: 'roomSettings'; start: 'list' | 'members' }
+		| { kind: 'settings'; start: SettingsSection | null }
+		| { kind: 'avatar' | 'share' | 'clone' | 'leave' | 'playOn' | 'partyScreen' | 'linkTv' };
+	let sheet = $state<Sheet | null>(null);
+	/** Closes [kind] if it's what's open (it may have opened something else on its way out, like the song menu opening Save). */
+	function close(kind: Sheet['kind']) {
+		if (sheet?.kind === kind) sheet = null;
+	}
+	const openMenu = (target: MenuTarget) => (sheet = { kind: 'menu', target });
 
-	// The pages you opened, in order: Home at the bottom, then Library or Local (the bottom bar
-	// starts over from there), then search, find similar, artist, album, playlist, podcast, genre,
-	// folder and history pages. Back (the phone's, or the back arrow) goes to the one before, scrolled as
-	// you left it.
-	type Section = 'home' | 'library' | 'local';
-	type View =
-		| { kind: 'search'; query: string }
-		| { kind: 'similar'; song: Song }
-		| { kind: 'artist'; id: string; name: string }
-		| { kind: 'album'; id: string; title: string }
-		| { kind: 'playlist'; id: string; title: string; personal?: boolean }
-		| { kind: 'podcast'; id: string; title: string }
-		| { kind: 'genre'; library: string; name: string }
-		| { kind: 'folder'; library: string; path: string }
-		| { kind: 'history' };
-	type Page = ({ kind: Section } | View) & { scrollTop?: number };
-	const MAX_PAGES = 50;
-	let pages = $state<Page[]>([{ kind: 'home' }]);
-	const top = $derived(pages.at(-1)!);
-	const isSection = (p: Page): p is Page & { kind: Section } => p.kind === 'home' || p.kind === 'library' || p.kind === 'local';
-	const view = $derived(isSection(top) ? null : top);
-	/** The bottom bar's page under the pages opened from it. */
-	const section = $derived((pages.findLast(isSection)?.kind ?? 'home') as Section);
+	// The pages you opened, in order, and Back through them (lib/pageStack.svelte.ts).
+	const stack = new PageStack({
+		scrollTop: () => scroller?.scrollTop ?? 0,
+		scrollTo: scrollPageTo,
+		toTop: () => scroller?.scrollTo({ top: 0, behavior: 'smooth' }),
+		leaving: closePlayer
+	});
+	const top = $derived(stack.top);
+	const view = $derived(stack.view);
+	const section = $derived(stack.section);
+	const query = $derived(stack.query);
+	const show = (next: Page) => stack.show(next);
+	const back = () => stack.back();
+	const pickSection = (next: Section) => stack.pick(next);
 	/** Counts page changes: a scroll waiting for a page that's no longer shown stops. */
 	let pageChanges = 0;
-
-	/** Opens [next] on top of the page shown now. */
-	function show(next: Page) {
-		closePlayer();
-		leavePage();
-		// A new search replaces the results on top instead of piling up.
-		const below = next.kind === 'search' && top.kind === 'search' ? pages.slice(0, -1) : pages;
-		const kept = [...below, next].slice(-MAX_PAGES);
-		pages = kept[0].kind === 'home' ? kept : [{ kind: 'home' }, ...kept.slice(1)];
-		scrollPageTo(next.scrollTop ?? 0);
-	}
-
-	/** Back to the page before, scrolled as you left it. */
-	function back() {
-		if (pages.length < 2) return;
-		closePlayer();
-		leavePage();
-		pages = pages.slice(0, -1);
-		scrollPageTo(top.scrollTop ?? 0);
-	}
-
-	/** Remembers how far the page shown now is scrolled, for coming back to it. */
-	function leavePage() {
-		const y = scroller?.scrollTop ?? 0;
-		top.scrollTop = y;
-		if (top.kind === 'local') localPlace.scrollTop = y;
-	}
 
 	/** Scrolls the new page to [y] once it's that long (its content may still be loading). */
 	async function scrollPageTo(y: number) {
@@ -142,9 +119,6 @@
 		};
 		attempt();
 	}
-
-	/** The search shown in the search box: the last one. */
-	const query = $derived(pages.findLast((v): v is Extract<View, { kind: 'search' }> => v.kind === 'search')?.query ?? '');
 
 	/** The logo: always Home; on Home already, it loads new suggestions (like pulling down). */
 	function goHome() {
@@ -167,36 +141,8 @@
 	$effect(() => {
 		void loadLocal();
 	});
-	let accountOpen = $state(false);
-	/** Settings, at this section (null: the list). */
-	let settingsAt = $state<SettingsSection | null | undefined>(undefined);
 	let settingsScreen = $state<SettingsScreen>();
 	let roomSettings = $state<RoomSettings>();
-	let leaving = $state(false);
-	/** The party screen on this device, and linking a TV as one. */
-	let partyScreen = $state(false);
-	let linkingTv = $state(false);
-	let playingOn = $state(false);
-	/** Saving this song to one of your YouTube Music playlists. */
-	let saving = $state<Song | null>(null);
-
-	/**
-	 * A page of the bottom bar: the pages start over from it, Home under Library and Local (so
-	 * Back from those goes Home). The one shown already goes back to its top.
-	 */
-	function pickSection(next: Section) {
-		closePlayer();
-		if (top.kind === next) {
-			scroller?.scrollTo({ top: 0, behavior: 'smooth' });
-			return;
-		}
-		leavePage();
-		// Local opens where you were, or (Remember where you were off) at the start.
-		if (next === 'local' && !localPlace.remember) forgetLocalPlace();
-		const scrollTop = next === 'local' ? localPlace.scrollTop : 0;
-		pages = next === 'home' ? [{ kind: 'home' }] : [{ kind: 'home' }, { kind: next, scrollTop }];
-		scrollPageTo(scrollTop);
-	}
 
 	// The full player (album art, controls, Up next) over everything. A history entry, so
 	// the phone's Back button closes it.
@@ -238,7 +184,7 @@
 		const item = room?.state?.nowPlaying?.item;
 		if (!item) return;
 		event.preventDefault();
-		menu = { song: item.song, item, place: 'current', x: event.clientX, y: event.clientY };
+		openMenu({ song: item.song, item, place: 'current', x: event.clientX, y: event.clientY });
 	}
 	let toasts = $state<{ id: number; text: string }[]>([]);
 	let now = $state(Date.now());
@@ -357,12 +303,10 @@
 	function onBack(): 'handled' | 'exit' | 'default' {
 		if (!room || room.status === 'rejected') return 'default';
 		// Settings go back a step first (a section to the list, a role to the roles).
-		if (settings && roomSettings?.back()) return 'handled';
-		if (settingsAt !== undefined && settingsScreen?.back()) return 'handled';
-		if (menu || saving || settings || accountOpen || sharing || cloning || leaving || playingOn || partyScreen || linkingTv || settingsAt !== undefined) {
-			menu = saving = settings = null;
-			accountOpen = sharing = cloning = leaving = playingOn = partyScreen = linkingTv = false;
-			settingsAt = undefined;
+		if (sheet?.kind === 'roomSettings' && roomSettings?.back()) return 'handled';
+		if (sheet?.kind === 'settings' && settingsScreen?.back()) return 'handled';
+		if (sheet) {
+			sheet = null;
 			return 'handled';
 		}
 		// The full player and the phone's search page are history entries.
@@ -370,10 +314,7 @@
 			history.back();
 			return 'handled';
 		}
-		if (pages.length > 1) {
-			back();
-			return 'handled';
-		}
+		if (back()) return 'handled';
 		if (scroller && scroller.scrollTop > 0) {
 			scroller.scrollTo({ top: 0, behavior: 'smooth' });
 			return 'handled';
@@ -444,8 +385,6 @@
 		pull = 0;
 	}
 
-	let sharing = $state(false);
-	let cloning = $state(false);
 	/** The invite to another room was closed here (it stays for the others). */
 	let migrationDismissed = $state<string | null>(null);
 
@@ -455,7 +394,6 @@
 			location.href = room.migrationLink(room.movedTo);
 		}
 	});
-	let settings = $state<'list' | 'members' | null>(null);
 	let host = $state<HostInfo | null>(null);
 	getHost().then((h) => (host = h)).catch(() => {});
 </script>
@@ -596,7 +534,7 @@
 							<!-- Phones: centered in the header. -->
 							<button
 								class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line max-sm:absolute max-sm:left-1/2 max-sm:-translate-x-1/2"
-								onclick={() => (sharing = true)}
+								onclick={() => (sheet = { kind: 'share' })}
 								title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
 							>
 								{#if room.state?.room.visibility === 'private'}
@@ -609,7 +547,7 @@
 								<button
 									class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
 									aria-label="People in this room"
-									onclick={() => (settings = 'members')}
+									onclick={() => (sheet = { kind: 'roomSettings', start: 'members' })}
 									title={room.state?.participants
 										.filter((p: Participant) => p.online && !p.screen)
 										.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : '') + (p.speakers.length ? ` 🔊 ${p.speakers.join(', ')}` : ''))
@@ -620,7 +558,7 @@
 								</button>
 							{/if}
 							<!-- Your account and the settings (YTM keeps them behind the avatar too). -->
-							<button class="shrink-0 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (accountOpen = true)}>
+							<button class="shrink-0 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (sheet = { kind: 'avatar' })}>
 								{#if youtube.account?.photoUrl}
 									<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-7 w-7 rounded-full" />
 								{:else}
@@ -635,7 +573,7 @@
 							{room.status === 'connecting' ? 'Connecting…' : 'Connection lost, reconnecting…'}
 							<!-- The host may be gone (a phone that left): this page still has the queue. -->
 							{#if room.status === 'reconnecting' && room.state && room.can('clone_room')}
-								<button class="ml-1 text-white underline" onclick={() => (cloning = true)}>Keep the queue: clone it</button>
+								<button class="ml-1 text-white underline" onclick={() => (sheet = { kind: 'clone' })}>Keep the queue: clone it</button>
 							{/if}
 						</div>
 					{/if}
@@ -653,7 +591,7 @@
 						<div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-raised px-4 py-2 text-center text-sm">
 							<span>Nobody who runs this room is here.</span>
 							{#if room.can('clone_room')}
-								<button class="underline" onclick={() => (cloning = true)}>Clone it to keep the queue going</button>
+								<button class="underline" onclick={() => (sheet = { kind: 'clone' })}>Clone it to keep the queue going</button>
 							{/if}
 						</div>
 					{/if}
@@ -668,7 +606,7 @@
 					<main class="mx-auto w-full max-w-7xl p-3 sm:p-6">
 						{#key top}
 						{#if view}
-							{#if pages.length > 1 && !isSection(pages.at(-2)!)}
+							{#if stack.hasBackLink}
 								<button class="mb-2 flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted hover:bg-raised hover:text-white" onclick={back}>
 									<Icon name="back" size={20} />
 									Back
@@ -681,32 +619,32 @@
 									type={searchType}
 									onType={(t) => (searchType = t)}
 									onToast={toast}
-									onMenu={(target) => (menu = target)}
+									onMenu={openMenu}
 									onArtist={openArtist}
 									onAlbum={(a) => openAlbum(a)}
 									onPlaylist={openPlaylist}
 									onPodcast={openPodcast}
 								/>
 							{:else if view.kind === 'similar'}
-								<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={(target) => (menu = target)} />
+								<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={openMenu} />
 							{:else if view.kind === 'artist'}
 								<ArtistView
 									{room}
 									id={view.id}
 									name={view.name}
 									onToast={toast}
-									onMenu={(target) => (menu = target)}
+									onMenu={openMenu}
 									onAlbum={(a) => openAlbum({ id: a.id, name: a.title })}
 									onPlaylist={openPlaylist}
 								/>
 							{:else if view.kind === 'album'}
-								<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} onArtist={openArtist} />
+								<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={openMenu} onArtist={openArtist} />
 							{:else if view.kind === 'playlist'}
-								<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={(target) => (menu = target)} onGone={back} />
+								<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={openMenu} onGone={back} />
 							{:else if view.kind === 'podcast'}
-								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={(target) => (menu = target)} />
+								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={openMenu} />
 							{:else if view.kind === 'history'}
-								<HistoryView {room} onToast={toast} onMenu={(target) => (menu = target)} />
+								<HistoryView {room} onToast={toast} onMenu={openMenu} />
 							{:else if view.kind === 'genre' || view.kind === 'folder'}
 								{@const library = view.library}
 								<LocalGroupView
@@ -716,14 +654,14 @@
 									folder={view.kind === 'folder' ? view.path : undefined}
 									onFolder={(path) => show({ kind: 'folder', library, path })}
 									onToast={toast}
-									onMenu={(target) => (menu = target)}
+									onMenu={openMenu}
 								/>
 							{/if}
 						{:else if top.kind === 'local'}
 							<LocalView
 								{room}
 								onToast={toast}
-								onMenu={(target) => (menu = target)}
+								onMenu={openMenu}
 								onArtist={openArtist}
 								onAlbum={(a) => openAlbum(a)}
 								onPlaylist={openPlaylist}
@@ -746,7 +684,7 @@
 								<HomeView
 									{room}
 									onToast={toast}
-									onMenu={(target) => (menu = target)}
+									onMenu={openMenu}
 									onArtist={openArtist}
 									onAlbum={(a) => openAlbum(a)}
 									onPlaylist={openPlaylist}
@@ -765,9 +703,9 @@
 						{positionMs}
 						onClose={closePlayer}
 						onToast={toast}
-						onMenu={(target) => (menu = target)}
+						onMenu={openMenu}
 						onSongMenu={currentMenu}
-						onSave={(song) => (saving = song)}
+						onSave={(song) => (sheet = { kind: 'save', song })}
 						onArtist={openArtist}
 						onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
 						onPodcast={openPodcast}
@@ -804,89 +742,50 @@
 		{/if}
 	</div>
 
-	{#if menu}
+	{#if sheet?.kind === 'menu'}
 		<SongMenu
 			{room}
-			target={menu}
-			onClose={() => (menu = null)}
+			target={sheet.target}
+			onClose={() => close('menu')}
 			onToast={toast}
 			onFindSimilar={(song) => show({ kind: 'similar', song })}
 			onArtist={openArtist}
 			onAlbum={openAlbum}
 			onPodcast={openPodcast}
-			onSave={youtube.account ? (song) => (saving = song) : undefined}
+			onSave={youtube.account ? (song) => (sheet = { kind: 'save', song }) : undefined}
 		/>
-	{/if}
-
-	{#if saving}
-		<SaveSheet song={saving} onClose={() => (saving = null)} onToast={toast} />
-	{/if}
-
-	{#if settings && room.state}
-		<RoomSettings
-			bind:this={roomSettings}
-			{room}
-			{host}
-			start={settings}
-			onClose={() => (settings = null)}
-			onClone={() => {
-				settings = null;
-				cloning = true;
-			}}
-		/>
-	{/if}
-
-	{#if cloning && room.state}
-		<CloneSheet {room} {host} onClose={() => (cloning = false)} onToast={toast} />
-	{/if}
-
-	{#if accountOpen}
+	{:else if sheet?.kind === 'save'}
+		<SaveSheet song={sheet.song} onClose={() => close('save')} onToast={toast} />
+	{:else if sheet?.kind === 'roomSettings' && room.state}
+		<RoomSettings bind:this={roomSettings} {room} {host} start={sheet.start} onClose={() => close('roomSettings')} onClone={() => (sheet = { kind: 'clone' })} />
+	{:else if sheet?.kind === 'clone' && room.state}
+		<CloneSheet {room} {host} onClose={() => close('clone')} onToast={toast} />
+	{:else if sheet?.kind === 'avatar'}
 		<AvatarMenu
 			{host}
 			{room}
-			onClose={() => (accountOpen = false)}
-			onSettings={(section) => (settingsAt = section ?? null)}
-			onShare={() => (sharing = true)}
-			onPlayOn={player ? () => (playingOn = true) : undefined}
-			onClone={() => (cloning = true)}
-			onRoomSettings={room.can('change_settings') || room.can('edit_roles') || room.can('kick') || room.can('ban') ? () => (settings = 'list') : undefined}
-			onPartyScreen={() => (partyScreen = true)}
-			onShowOnTv={() => (linkingTv = true)}
-			onLeave={() => (leaving = true)}
+			onClose={() => close('avatar')}
+			onSettings={(section) => (sheet = { kind: 'settings', start: section ?? null })}
+			onShare={() => (sheet = { kind: 'share' })}
+			onPlayOn={player ? () => (sheet = { kind: 'playOn' }) : undefined}
+			onClone={() => (sheet = { kind: 'clone' })}
+			onRoomSettings={room.can('change_settings') || room.can('edit_roles') || room.can('kick') || room.can('ban') ? () => (sheet = { kind: 'roomSettings', start: 'list' }) : undefined}
+			onPartyScreen={() => (sheet = { kind: 'partyScreen' })}
+			onShowOnTv={() => (sheet = { kind: 'linkTv' })}
+			onLeave={() => (sheet = { kind: 'leave' })}
 		/>
-	{/if}
-
-	{#if settingsAt !== undefined}
-		<SettingsScreen bind:this={settingsScreen} start={settingsAt} onClose={() => (settingsAt = undefined)} onToast={toast} />
-	{/if}
-
-	{#if leaving && room.state}
-		<LeaveRoomDialog {room} onClose={() => (leaving = false)} />
-	{/if}
-	{#if linkingTv}
-		<TvLinkDialog {room} {host} onClose={() => (linkingTv = false)} onToast={toast} />
-	{/if}
-	{#if partyScreen && room.state}
-		<PartyScreen {room} {host} onClose={() => (partyScreen = false)} />
-	{/if}
-
-	{#if playingOn && player}
-		<OutputsSheet {room} {player} onClose={() => (playingOn = false)} onToast={toast} />
-	{/if}
-
-	{#if sharing}
-		<ShareSheet
-			{room}
-			{host}
-			onClose={() => (sharing = false)}
-			onToast={toast}
-			onClone={room.can('clone_room')
-				? () => {
-						sharing = false;
-						cloning = true;
-					}
-				: undefined}
-		/>
+	{:else if sheet?.kind === 'settings'}
+		<SettingsScreen bind:this={settingsScreen} start={sheet.start} onClose={() => close('settings')} onToast={toast} />
+	{:else if sheet?.kind === 'leave' && room.state}
+		<LeaveRoomDialog {room} onClose={() => close('leave')} />
+	{:else if sheet?.kind === 'linkTv'}
+		<TvLinkDialog {room} {host} onClose={() => close('linkTv')} onToast={toast} />
+	{:else if sheet?.kind === 'partyScreen' && room.state}
+		<PartyScreen {room} {host} onClose={() => close('partyScreen')} />
+	{:else if sheet?.kind === 'playOn' && player}
+		<OutputsSheet {room} {player} onClose={() => close('playOn')} onToast={toast} />
+	{:else if sheet?.kind === 'share'}
+		<ShareSheet {room} {host} onClose={() => close('share')} onToast={toast} onClone={room.can('clone_room') ? () => (sheet = { kind: 'clone' }) : undefined} />
 	{/if}
 
 	<div class="pointer-events-none fixed inset-x-0 bottom-28 z-50 flex flex-col items-center gap-2 px-4">
