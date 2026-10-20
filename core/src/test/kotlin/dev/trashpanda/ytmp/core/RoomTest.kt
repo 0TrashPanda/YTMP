@@ -1,6 +1,11 @@
 package dev.trashpanda.ytmp.core
 
 import dev.trashpanda.ytmp.protocol.apply
+import dev.trashpanda.ytmp.protocol.ProtocolJson
+import java.io.File
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.builtins.ListSerializer
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.ItemList
@@ -97,6 +102,17 @@ class RoomTest {
         room.handle(anna.participantId, ClientMessage.RequestSnapshot)
         val host = (anna.messages.last() as ServerMessage.Snapshot).state
         assertEquals(host, anna.state.copy(playback = host.playback))
+        // The web app replays the same events (frontend/src/lib/roomEvents.test.ts). Written
+        // again with YTMP_WRITE_FIXTURES=1 (IDs are random, so not on every run).
+        if (System.getenv("YTMP_WRITE_FIXTURES") == "1") {
+            val start = (anna.messages.first() as ServerMessage.Welcome).state
+            val fixture = buildJsonObject {
+                put("start", ProtocolJson.encodeToJsonElement(RoomState.serializer(), start))
+                put("events", ProtocolJson.encodeToJsonElement(ListSerializer(Event.serializer()), anna.events))
+                put("end", ProtocolJson.encodeToJsonElement(RoomState.serializer(), host))
+            }
+            File("../frontend/src/lib/testdata/room-events.json").apply { parentFile.mkdirs() }.writeText(fixture.toString() + "\n")
+        }
         // The room did change: this isn't two empty rooms.
         assertEquals("Party", anna.state.room.name)
         assertTrue(anna.state.roles.any { it.name == "Bouncer" } && anna.state.history.isNotEmpty() && anna.state.room.hasPassword)

@@ -15,7 +15,8 @@ what's planned is marked there.
 
 ## Commands
 
-- Tests: `./gradlew test` and `cd ytm-module && .venv/bin/python -m pytest -q`.
+- Tests: `./gradlew test`, `cd ytm-module && .venv/bin/python -m pytest -q` and `cd frontend && pnpm test`.
+- Where a new feature goes: `docs/implementation/architecture.md#where-things-are-in-the-code`.
 - Web app: `cd frontend && pnpm check && pnpm build` (the Android build bundles `frontend/build`).
 - Android: `./gradlew :android:assembleDebug`; release lint: `./gradlew :android:lintRelease`.
 - After changing anything in `protocol/`: `./gradlew :protocol:generateTs` (new request types

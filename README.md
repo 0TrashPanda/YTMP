@@ -168,7 +168,7 @@ YouTube Music module on your own computer and enter it under *Settings → Playb
 | Web app (Svelte, pnpm) | `frontend/` | `pnpm install && pnpm dev`, then open http://localhost:5173 |
 | Android app | `android/` | `./gradlew :android:installDebug`, then for the emulator: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080` |
 
-- Tests: `./gradlew test` and `cd ytm-module && .venv/bin/pytest`.
+- Tests: `./gradlew test`, `cd ytm-module && .venv/bin/pytest` and `cd frontend && pnpm test`.
 - Smoke test of a running phone or server (search, pages, radio, streaming; read-only):
   `python3 tools/smoke-test.py URL`. For the app on a phone: `adb forward tcp:8765 tcp:8765`,
   keep the app open, and use `http://127.0.0.1:8765`.

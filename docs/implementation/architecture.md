@@ -59,3 +59,45 @@ YTMP is made for a **small group of friends**, not for the general public.
   linked YouTube accounts and media servers (see [auth](auth.md))
 - **History & graph service** (on the auth server): listening history, recap, song graph,
   radio generation
+
+## Where things are in the code
+
+Where a new feature usually goes, so it lands next to what it's like.
+
+**A room** (`core/`): `Room.kt` is the one entry point: the lock, the commands (`execute`), what
+plays next and the playback. The parts that stand on their own are next to it, each used with
+the room locked: `Member`, `RoomRoles` (permissions, Discord-style ranking, editing roles),
+`FairOrder`, `QueueLimits`, `SkipVote`, `PlaybackClock` and `StartTogether`, `RoomOutputs`
+(speakers and TVs), `Autoplay`. A new command: a `Command` in `protocol/`, a branch in
+`Room.execute` (with its permission check), and the events it emits. `RoomManager` keeps the
+rooms; their radio comes from a `RoomRadio` (YTM's, the owner's, the song graph mixed in by
+`RadioMix.kt`), and the host hears about them through `RoomHooks`.
+
+**Room events** reach clients as `Event`s, applied by `RoomState.apply` (`protocol/.../RoomEvents.kt`,
+for the app) and `applyEvent` (`frontend/src/lib/roomEvents.ts`). A new event goes in both;
+neither compiles until it's handled. Tests check that clients get the host's room
+(`RoomTest`), and that the web app gets the same from the same events (`roomEvents.test.ts`,
+its data written by `YTMP_WRITE_FIXTURES=1 ./gradlew :core:test --tests '*RoomTest*'`).
+
+**The host's HTTP side** (`host/`): `ytmpModule(rooms, sources, options)` in `Application.kt`.
+What a host offers is a `HostSources` (search, pages, lyrics, audio, local music, your YouTube
+Music, the song graph), how it behaves a `HostOptions`. Routes are in files by area:
+`RoomRoutes` (`/api/host`, rooms, `/ws`), `CatalogRoutes` (search, pages, Local, audio),
+`PersonalRoutes` (`/api/me`), `ScreenRoutes` (party screens); what they share (who a request is,
+its YouTube Music) is `HostContext`. The server adds its own routes (accounts, history, room
+sync) through `extraApi`.
+
+**Speakers and TVs** (`host/`): an `OutputDriver` per kind. Devices that each play a room by
+themselves extend `DeviceDriver` and only give a `DeviceSession` (keep one device in step with
+the room); `ZoneOutputs` has its own loop on `RoomFollowingDriver`. A host lists its drivers once
+in `OutputDrivers` (server `Main.kt`, phone `LocalHost.kt`).
+
+**The web app** (`frontend/src/`): the room page (`routes/room/[code]/+page.svelte`) shows one
+page of the stack (`lib/pageStack.svelte.ts`: a new kind of page is a `View`) and at most one
+sheet, menu or dialog (`sheet`). Song lists use `SongList.svelte`; what tap, swipe and hold do
+is `RowGestures` (`lib/gestures.svelte.ts`), and the actions themselves with their messages are
+`lib/songActions.ts`. Calls to the host are in `lib/api.ts`, to your account's server in
+`lib/account.ts` and `lib/listening.svelte.ts`.
+
+**The YouTube Music module** (`ytm-module/ytmp_ytm/`): `core.py` talks to YouTube Music and
+yt-dlp, `parse.py` turns its answers into YTMP's songs and pages, `http.py` is the HTTP API.
