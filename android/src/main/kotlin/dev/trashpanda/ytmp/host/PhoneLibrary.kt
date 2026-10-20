@@ -51,7 +51,10 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
 
     override fun artUrl(key: String, size: Int) = "${baseUrl()}/api/local/art/${encode(LocalMusic.songId(id, key))}?size=$size"
 
-    override suspend fun respond(call: ApplicationCall, key: String, range: String?) {
+    override suspend fun respond(call: ApplicationCall, key: String, range: String?) = respond(call, key, range, types[key])
+
+    /** Sends the media store's file [key], with [range], as [type] (e.g. "audio/mp4"; null: not said). */
+    suspend fun respond(call: ApplicationCall, key: String, range: String?, type: String?) {
         val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, key.toLongOrNull() ?: throw SourceException("Not a song on this phone"))
         val file = withContext(Dispatchers.IO) { context.contentResolver.openFileDescriptor(uri, "r") } ?: throw SourceException("That song isn't on this phone any more")
         val total = file.statSize
@@ -67,15 +70,15 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
         if (range != null) call.response.header(HttpHeaders.ContentRange, "bytes $start-$end/$total")
         // Closed after sending, also when sending never starts (closing twice is fine).
         try {
-            sendFile(call, file, key, range != null, start, end)
+            sendFile(call, file, type, range != null, start, end)
         } finally {
             runCatching { file.close() }
         }
     }
 
-    private suspend fun sendFile(call: ApplicationCall, file: android.os.ParcelFileDescriptor, key: String, partial: Boolean, start: Long, end: Long) {
+    private suspend fun sendFile(call: ApplicationCall, file: android.os.ParcelFileDescriptor, type: String?, partial: Boolean, start: Long, end: Long) {
         call.respondOutputStream(
-            contentType = types[key]?.let { runCatching { ContentType.parse(it) }.getOrNull() },
+            contentType = type?.let { runCatching { ContentType.parse(it) }.getOrNull() },
             status = if (partial) HttpStatusCode.PartialContent else HttpStatusCode.OK,
             contentLength = end - start + 1,
         ) {

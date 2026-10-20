@@ -705,6 +705,9 @@ class PlaybackService : MediaSessionService() {
     /** For the log: where a stream URL points, and when YouTube's link expires; never the whole URL. */
     private fun describe(url: String?): String {
         val uri = url?.let(Uri::parse) ?: return "no link"
+        // A file on the phone: the song cache's, or a download in the media store.
+        if (uri.scheme == "file") return "the song cache"
+        if (uri.scheme == "content") return "a download"
         val expires = uri.getQueryParameter("expire")?.toLongOrNull()?.let { (it - System.currentTimeMillis() / 1000) / 60 }
         return uri.host + (expires?.let { ", expires in $it min" } ?: "")
     }

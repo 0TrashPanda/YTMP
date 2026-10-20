@@ -140,8 +140,8 @@ Implementation details: [implementation/ytm-module.md](../implementation/ytm-mod
 
 ## Song cache
 
-> Built. Implementation: [song-cache](../implementation/song-cache.md). Not tried yet on a real
-> phone (offline, the SD card) or with real YouTube songs on a real server.
+> Built. Implementation: [song-cache](../implementation/song-cache.md). Tried on a phone, offline
+> too, and a test server; not yet with an SD card.
 
 Songs you play are kept, so they start at once next time, need no YouTube lookup, and play
 without internet on the phone. It works by itself: there is nothing to pick.

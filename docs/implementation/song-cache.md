@@ -1,8 +1,12 @@
 # Song cache
 
-> Status: **built** on the server and the phone (`SongCache` in `host/`). Not verified yet on
-> a real phone (with a real SD card, offline in a solo room) or on a real server with real
-> YouTube songs: tested with unit tests and a local server with a stand-in module.
+> Status: **built** on the server and the phone (`SongCache` in `host/`). Verified on a Galaxy
+> A20e (Android 11) with a local server and the real module: kept as the phone plays (its own
+> solo room and a server room, from YouTube's link and from the server's), played again from the
+> phone without a lookup, offline in a solo room with *Cached on this phone*, a download found by
+> its ID tag and played from the Music folder, the server's fetch from the 2nd play and its link
+> after, *Clear cache*, the size setting. Not verified: moving to an SD card (the A20e has none),
+> Chromecast with a cached song, `proxy = "lan"` redirects outside the network (unit-tested).
 
 Feature: [song cache](../features/sources.md#song-cache).
 

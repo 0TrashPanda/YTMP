@@ -64,8 +64,9 @@ class PhoneDownloads(
         list
     }
 
+    // The app's downloads are .m4a files (or kept as YouTube sent them, but then without an ID to find them by).
     override suspend fun respond(call: ApplicationCall, download: DownloadedSong, range: String?) =
-        media.respond(call, Uri.parse(download.uri).lastPathSegment!!, range)
+        media.respond(call, Uri.parse(download.uri).lastPathSegment!!, range, SongFiles.MP4)
 
     override suspend fun respondArt(call: ApplicationCall, download: DownloadedSong, size: Int) =
         media.respondArt(call, Uri.parse(download.uri).lastPathSegment!!, size)

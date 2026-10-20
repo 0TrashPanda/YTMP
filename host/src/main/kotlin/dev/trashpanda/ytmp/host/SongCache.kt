@@ -343,6 +343,7 @@ class SongCache(
                 log.info("Song cache: {} played here isn't audio we know, not kept", song.id)
                 temp.delete()
             } else {
+                log.info("Song cache: {} \"{}\" kept as it played ({} KB)", song.id, song.title, size / 1024)
                 commit(song, temp, type)
             }
         }
