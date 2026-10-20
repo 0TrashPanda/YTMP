@@ -38,6 +38,8 @@
 	import { forgetHome, getHost, getRoom } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
 	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
+	import { sleepTimer } from '../../../lib/sleepTimer.svelte';
+	import SleepTimerSheet from '../../../lib/components/SleepTimerSheet.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
 	import { saved } from '../../../lib/storage';
 	import { nativeBridge } from '../../../lib/native';
@@ -83,7 +85,7 @@
 		| { kind: 'save'; song: Song }
 		| { kind: 'roomSettings'; start: 'list' | 'members' }
 		| { kind: 'settings'; start: SettingsSection | null }
-		| { kind: 'avatar' | 'share' | 'clone' | 'leave' | 'playOn' | 'partyScreen' | 'linkTv' };
+		| { kind: 'avatar' | 'share' | 'clone' | 'leave' | 'playOn' | 'partyScreen' | 'linkTv' | 'sleep' };
 	let sheet = $state<Sheet | null>(null);
 	/** Closes [kind] if it's what's open (it may have opened something else on its way out, like the song menu opening Save). */
 	function close(kind: Sheet['kind']) {
@@ -216,6 +218,7 @@
 		if (!identity.stored) saved.displayName = name.trim();
 		room = new RoomConnection(code, name.trim(), arrivingWithKey, password || null);
 		player = createPlayer(room);
+		sleepTimer.attach(room, player);
 		room.connect();
 		youtube.load();
 		void listening.load();
@@ -236,6 +239,7 @@
 		return () => clearInterval(clock);
 	});
 	onDestroy(() => {
+		sleepTimer.attach(null, null);
 		player?.destroy();
 		room?.close();
 	});
@@ -720,6 +724,7 @@
 						onMenu={openMenu}
 						onSongMenu={currentMenu}
 						onSave={(song) => (sheet = { kind: 'save', song })}
+						onSleepTimer={() => (sheet = { kind: 'sleep' })}
 						onArtist={openArtist}
 						onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
 						onPodcast={openPodcast}
@@ -740,6 +745,7 @@
 				onArtist={openArtist}
 				onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
 				onPodcast={openPodcast}
+				onSleepTimer={() => (sheet = { kind: 'sleep' })}
 			/>
 		{/if}
 		{#if sections.length > 1}
@@ -767,6 +773,7 @@
 			onAlbum={openAlbum}
 			onPodcast={openPodcast}
 			onSave={youtube.account ? (song) => (sheet = { kind: 'save', song }) : undefined}
+			onSleepTimer={() => (sheet = { kind: 'sleep' })}
 		/>
 	{:else if sheet?.kind === 'save'}
 		<SaveSheet song={sheet.song} onClose={() => close('save')} onToast={toast} />
@@ -796,6 +803,8 @@
 		<TvLinkDialog {room} {host} onClose={() => close('linkTv')} onToast={toast} />
 	{:else if sheet?.kind === 'partyScreen' && room.state}
 		<PartyScreen {room} {host} onClose={() => close('partyScreen')} />
+	{:else if sheet?.kind === 'sleep' && room.state}
+		<SleepTimerSheet {room} {player} onClose={() => close('sleep')} onToast={toast} />
 	{:else if sheet?.kind === 'playOn' && player}
 		<OutputsSheet {room} {player} onClose={() => close('playOn')} onToast={toast} />
 	{:else if sheet?.kind === 'share'}

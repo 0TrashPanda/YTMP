@@ -153,6 +153,13 @@ class MainActivity : ComponentActivity() {
 
         PlaybackHub.commandSink = commandSink
         PlaybackHub.statusSink = statusSink
+        // The sleep timer changed (also when it went off in the player): the page shows it.
+        lifecycleScope.launch {
+            PlaybackHub.sleep.collect { setting ->
+                val value = setting?.let { JSONObject.quote(json.encodeToString(SleepSetting.serializer(), it)) } ?: "null"
+                js("window.__ytmpNative && window.__ytmpNative.onSleepTimer && window.__ytmpNative.onSleepTimer($value)")
+            }
+        }
 
         // For development: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080`
         intent.getStringExtra("server")?.let { server = normalize(it) }
@@ -618,6 +625,17 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        /** The sleep timer (bridge version 12): JSON SleepSetting, or null when it's off. */
+        @JavascriptInterface
+        fun sleepTimer(): String? = PlaybackHub.sleep.value?.let { json.encodeToString(SleepSetting.serializer(), it) }
+
+        /** Sets the sleep timer (JSON SleepSetting), or turns it off ("null"). Every page hears as onSleepTimer. */
+        @JavascriptInterface
+        fun setSleepTimer(settingJson: String) {
+            PlaybackHub.sleep.value = runCatching { json.decodeFromString(SleepSetting.serializer(), settingJson) }.getOrNull()
+                ?.takeIf { it.endsAt != null || it.itemId != null }
+        }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -636,7 +654,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 11
+        const val BRIDGE_VERSION = 12
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

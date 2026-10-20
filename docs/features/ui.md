@@ -228,6 +228,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
 | Save to playlist ✅ | YouTube Music playlist; only if a YouTube account is linked |
 | Go to artist | |
 | Go to album | |
+| Sleep timer ✅ | Only for the song that's playing: see [sleep timer](playback-and-outputs.md#sleep-timer) |
 | Download ✅ | Save the song as a plain music file (.m4a with its title, artist, album and cover). In a browser: a normal download. In the app: in the phone's *Music/YTMP* folder, so it shows in Local → *Music on this phone* and in other music apps. Not for local music. |
 | Share (planned) | A YTM link or a YTMP link (you choose) |
 | Open in YouTube Music | For YTM songs |

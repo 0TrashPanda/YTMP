@@ -106,15 +106,20 @@ Implementation: [implementation/playback-sync.md](../implementation/playback-syn
 - **Gapless playback**: no silence between songs (for example live albums or DJ mixes).
 - **Crossfade**: optional fade between songs, with a configurable length. Off by default.
 
-## Sleep timer
+## Sleep timer ✅
 
-> Planned.
+Stops the music automatically, for example when falling asleep. Like YouTube Music's, it's
+in the ⋮ menu of the song that's playing (*Sleep timer*).
 
-Stops the music automatically, for example when falling asleep.
-
-- Stop after a set time (15 / 30 / 60 minutes, or custom), or **at the end of the
-  current song**.
-- The volume fades out over the last few seconds.
-- In a **solo room** it pauses the room.
+- Stop after a set time (5 / 10 / 15 / 30 / 45 minutes, 1 hour, or your own number of
+  minutes), or **at the end of the current song** (*End of episode* for an episode).
+- The volume fades out over the last 10 seconds.
+- In a **solo room** it pauses the room. At the end of the song that means the next song,
+  waiting at its start.
 - In a **shared room** it only stops **your own device's playback**, and the room keeps
-  playing for everyone else.
+  playing for everyone else. So there it needs this device to be playing.
+- One timer per device. While it runs, the full player shows how long is left (a moon on
+  the player bar on computers); tap it to see it, change it or turn it off.
+- In the app it keeps going with the screen off (the app's player runs it). In a browser
+  it runs while the room's page is open.
+- It fades this device's sound; speakers a solo room plays on just pause at the end.

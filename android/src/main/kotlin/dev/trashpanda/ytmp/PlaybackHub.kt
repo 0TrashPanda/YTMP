@@ -37,7 +37,16 @@ data class PlaybackTarget(
     val room: RoomLink? = null,
     /** Next (notification, lock screen) while paused plays the next song (Settings → Playback). */
     val nextPlays: Boolean = false,
+    /** A solo room: the sleep timer pauses it (in a shared room it only stops playing here). */
+    val solo: Boolean = false,
 )
+
+/**
+ * The sleep timer (docs/features/playback-and-outputs.md#sleep-timer): it stops at [endsAt]
+ * (ms since 1970), or at the end of the song [itemId] (the room's queue item).
+ */
+@Serializable
+data class SleepSetting(val endsAt: Long? = null, val itemId: String? = null)
 
 /** Enough to attach to the room as the page's participant (`attach` in the protocol). */
 @Serializable
@@ -81,6 +90,9 @@ data class TargetItem(
  */
 object PlaybackHub {
     val target = MutableStateFlow<PlaybackTarget?>(null)
+
+    /** The sleep timer, set from the page; [PlaybackService] runs it (also with the page frozen) and clears it when it goes off. */
+    val sleep = MutableStateFlow<SleepSetting?>(null)
 
     /** Sends a room command (JSON, e.g. `{"kind":"Skip"}`) to the web app. Set by [MainActivity]. */
     @Volatile

@@ -21,6 +21,8 @@ export interface RoomPlayer {
 	/** [chosen]: you switched it off (not another app taking the audio), so a solo room remembers it. */
 	disable(chosen?: boolean): void;
 	setVolume(value: number): void;
+	/** The sleep timer fades the sound out (0–1, on top of the volume); the app's player does that itself. */
+	setFade?(fraction: number): void;
 	setSyncOffset(ms: number): void;
 	/** Call whenever the room state changes. */
 	sync(): void;
@@ -63,6 +65,8 @@ class WebPlayer implements RoomPlayer {
 	error = $state<string | null>(null);
 
 	private audio = new Audio();
+	/** The sleep timer's fade-out (see [setFade]). */
+	private fade = 1;
 	/** Where songs in this room come from, after what worked so far. */
 	private preferred: Source = 'direct';
 	/** Where the loaded song comes from. */
@@ -129,8 +133,14 @@ class WebPlayer implements RoomPlayer {
 
 	setVolume(value: number): void {
 		this.volume = value;
-		this.audio.volume = value;
+		this.audio.volume = value * this.fade;
 		saved.volume = value;
+	}
+
+	setFade(fraction: number): void {
+		if (fraction === this.fade) return;
+		this.fade = fraction;
+		this.audio.volume = this.volume * fraction;
 	}
 
 	setSyncOffset(ms: number): void {
@@ -483,7 +493,9 @@ class NativePlayer implements RoomPlayer {
 				volume: this.volume,
 				headphones: saved.headphonesAction,
 				// So the app can follow the room itself while this page is frozen in the background.
-				room: this.followableRoom()
+				room: this.followableRoom(),
+				// The sleep timer pauses a solo room (in a shared room it only stops playing here).
+				solo: state?.room.visibility === 'private'
 			})
 		);
 	}

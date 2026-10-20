@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import org.json.JSONObject
 
@@ -136,6 +137,9 @@ class PlaybackService : MediaSessionService() {
     /** The room didn't follow a [roomSeekTo] during this song, so don't keep asking. */
     private var roomWontFollow: String? = null
 
+    /** The sleep timer's fade-out (0–1), on top of the room's volume. */
+    private var sleepFade = 1f
+
     /** When the player started waiting for data (elapsedRealtime), to log long buffering. */
     private var bufferingSince: Long? = null
 
@@ -199,6 +203,20 @@ class PlaybackService : MediaSessionService() {
         }
         scope.launch {
             combine(PlaybackHub.target, follower.room) { target, room -> merge(target, room) }.collect { apply(it) }
+        }
+        // The sleep timer: runs here, so it works with the page frozen (screen off).
+        scope.launch {
+            PlaybackHub.sleep.collectLatest { setting ->
+                if (setting == null) return@collectLatest setFade(1f)
+                Log.i(TAG, "sleep timer: ${setting.endsAt?.let { "in ${(it - System.currentTimeMillis()) / 1000} s" } ?: "at the end of ${current?.item?.songId}"}")
+                while (isActive) {
+                    val left = sleepLeft(setting)
+                    setFade((left.toFloat() / SLEEP_FADE_MS).coerceIn(0f, 1f))
+                    if (left <= 0) return@collectLatest goToSleep()
+                    // Once a second, more often while it fades.
+                    delay(if (left > SLEEP_FADE_MS + 1000) minOf(1000, left - SLEEP_FADE_MS) else 200)
+                }
+            }
         }
         // Drift correction: the host's clock keeps moving, so check regularly, but only while
         // this device plays (a paused or empty player has nothing to correct: [apply] handles it).
@@ -372,7 +390,7 @@ class PlaybackService : MediaSessionService() {
             sync.onLoaded()
             settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
         }
-        exo.volume = target.volume
+        exo.volume = target.volume * sleepFade
         exo.setHandleAudioBecomingNoisy(target.headphones != "keep")
         if (!target.playing || !target.alone) pausingRoom = false
         followRoomJump(target)
@@ -722,6 +740,41 @@ class PlaybackService : MediaSessionService() {
         scope.launch(Dispatchers.IO) { HostReport.send(room.hostUrl, room.code, message) }
     }
 
+    /** How long (ms) until the sleep timer goes off; 0 when it's time (the song it waits for the end of has gone). */
+    private fun sleepLeft(setting: SleepSetting): Long {
+        setting.endsAt?.let { return maxOf(0, it - System.currentTimeMillis()) }
+        val target = current ?: return 0
+        val item = target.item?.takeIf { it.itemId == setting.itemId } ?: return 0
+        // A song without a length can't end by itself.
+        if (item.durationMs <= 0) return Long.MAX_VALUE
+        return maxOf(0, ((item.durationMs - expectedPosition(target)) / target.speed).toLong())
+    }
+
+    private fun setFade(fade: Float) {
+        if (fade == sleepFade) return
+        sleepFade = fade
+        current?.takeIf { it.enabled }?.let { exo.volume = it.volume * fade }
+    }
+
+    /**
+     * The sleep timer went off: a solo room pauses (silent until it has; if it doesn't, this
+     * device stops), in a shared room this device stops playing. Then the timer is off.
+     */
+    private suspend fun goToSleep() {
+        val target = current
+        if (target?.solo == true) {
+            Log.i(TAG, "sleep timer: pausing the room")
+            setFade(0f)
+            PlaybackHub.command("""{"kind":"Pause"}""")
+            withTimeoutOrNull(PAUSE_WAIT_MS) { while (current?.let { it.playing || it.starting } == true) delay(100) }
+            if (current?.playing == true) stopHere()
+        } else if (target?.enabled == true) {
+            Log.i(TAG, "sleep timer: stopping here")
+            stopHere()
+        }
+        PlaybackHub.sleep.value = null
+    }
+
     /** Stops playing on this device (not in the room). */
     private fun stopHere() {
         // Stop right away: the page (which switches "Play here" off) may be frozen for a while.
@@ -802,6 +855,9 @@ class PlaybackService : MediaSessionService() {
 
         /** Use a link this phone looked up only while it has at least this long (s) left. */
         private const val OWN_LINK_MARGIN_S = 600L
+
+        /** The sleep timer fades the sound out over this long (ms) before it goes off. */
+        private const val SLEEP_FADE_MS = 10_000L
 
         /** This close to its end (ms), a song counts as played. */
         private const val END_MARGIN_MS = 5_000L

@@ -15,6 +15,7 @@
 	import type { CommandUpdateSettings, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
+	import { sleepTimer } from '../sleepTimer.svelte';
 	import Icon from './Icon.svelte';
 	import Lyrics from './Lyrics.svelte';
 	import NextButton from './NextButton.svelte';
@@ -37,6 +38,7 @@
 		onMenu,
 		onSongMenu,
 		onSave,
+		onSleepTimer,
 		...open
 	}: {
 		room: RoomConnection;
@@ -49,9 +51,20 @@
 		onSongMenu: (event: MouseEvent) => void;
 		/** Save to one of your YouTube Music playlists. */
 		onSave: (song: Song) => void;
+		/** The sleep timer's sheet (the chip that shows while it runs). */
+		onSleepTimer: () => void;
 	} & Omit<PageHandlers, 'onPlaylist'> = $props();
 
 	const current = $derived(room.state?.nowPlaying ?? null);
+	// Minutes left on the sleep timer: its own clock, only while it runs.
+	let wallNow = $state(Date.now());
+	$effect(() => {
+		if (!sleepTimer.active) return;
+		wallNow = Date.now();
+		const clock = setInterval(() => (wallNow = Date.now()), 10_000);
+		return () => clearInterval(clock);
+	});
+	const sleepMinutes = $derived(sleepTimer.minutesLeft(wallNow));
 	const song = $derived(current?.item.song ?? null);
 	const playback = $derived(room.state?.playback);
 	// A new song that waits for everyone's players to load it counts as playing (and loading).
@@ -258,6 +271,13 @@
 			<Icon name="collapse" size={28} />
 		</button>
 		<div class="min-w-0 flex-1 truncate text-center text-sm text-muted lg:hidden">{room.state?.room.name}</div>
+		{#if sleepTimer.active}
+			<!-- While the sleep timer runs: how long is left (it opens the timer). -->
+			<button class="flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-sm hover:bg-white/20 lg:ml-auto" aria-label="Sleep timer" onclick={onSleepTimer}>
+				<Icon name="sleep" size={16} />
+				{sleepMinutes === null ? 'End of song' : `${sleepMinutes} min`}
+			</button>
+		{/if}
 		<div class="ml-auto flex items-center lg:hidden">
 			<button class="rounded-full p-2 hover:bg-white/10 {activeOutputs.length ? 'text-accent' : ''}" aria-label="Play on" onclick={() => (showOutputs = true)}>
 				<Icon name="cast" />

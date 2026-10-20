@@ -32,6 +32,7 @@
 	import { isYoutubeSong } from '../ownModule';
 	import { canDownload, downloadSong } from '../downloads';
 	import { youtube } from '../youtube.svelte';
+	import { sleepTimer } from '../sleepTimer.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 
 	interface Props {
@@ -45,8 +46,10 @@
 		onPodcast: (podcast: PodcastRef) => void;
 		/** Save to one of your YouTube Music playlists; only when signed in. */
 		onSave?: (song: Song) => void;
+		/** The sleep timer (in the menu of the song that's playing). */
+		onSleepTimer?: () => void;
 	}
-	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave }: Props = $props();
+	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave, onSleepTimer }: Props = $props();
 
 	const song = $derived(target.song);
 	const item = $derived(target.item);
@@ -188,6 +191,9 @@
 		if (canDownload(song)) {
 			const current = song;
 			list.push({ icon: 'download', label: 'Download', run: () => (onClose(), void downloadSong(current, onToast)) });
+		}
+		if (place === 'current' && onSleepTimer) {
+			list.push({ icon: 'sleep', label: sleepTimer.active ? 'Sleep timer (on)' : 'Sleep timer', run: () => (onSleepTimer(), onClose()) });
 		}
 		list.push(null);
 		if (song.podcast?.id) {

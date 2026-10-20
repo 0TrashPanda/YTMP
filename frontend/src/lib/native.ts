@@ -67,6 +67,10 @@ export interface NativeBridge {
 	 * the answer comes as onDownloaded.
 	 */
 	downloadSong?(songJson: string): void;
+	/** The sleep timer, which the app's player runs (bridge version 12): JSON SleepSetting, or null when it's off. */
+	sleepTimer?(): string | null;
+	/** Sets it (JSON SleepSetting) or turns it off ("null"); the app tells every page as onSleepTimer. */
+	setSleepTimer?(json: string): void;
 }
 
 /** Callbacks the app calls on the page. */
@@ -75,6 +79,8 @@ export interface NativeCallbacks {
 	onCommand?(command: Command): void;
 	/** "buffering" | "ready" | "stopped" | "error" */
 	onStatus?(status: string): void;
+	/** The sleep timer changed (set, turned off, or it went off): JSON SleepSetting, or null. */
+	onSleepTimer?(json: string | null): void;
 	/** Back from YouTube Music's sign-in: null when signed in, else why not. */
 	onYoutubeSignIn?(error: string | null): void;
 	/** Back from youtubeCookie: the cookies, or null (with why, or null when you cancelled). */

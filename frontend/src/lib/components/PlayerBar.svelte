@@ -19,6 +19,7 @@
 	import Progress from './Progress.svelte';
 	import SkipButtons from './SkipButtons.svelte';
 	import SpeedButton from './SpeedButton.svelte';
+	import { sleepTimer } from '../sleepTimer.svelte';
 
 	let {
 		room,
@@ -30,7 +31,8 @@
 		onSongMenu,
 		onArtist,
 		onAlbum,
-		onPodcast
+		onPodcast,
+		onSleepTimer
 	}: {
 		room: RoomConnection;
 		player: RoomPlayer;
@@ -45,6 +47,8 @@
 		onArtist: (artist: ArtistRef) => void;
 		onAlbum: (album: AlbumRef) => void;
 		onPodcast: (podcast: PodcastRef) => void;
+		/** The sleep timer's sheet (a moon shows while it runs). */
+		onSleepTimer: () => void;
 	} = $props();
 
 	let showOutputs = $state(false);
@@ -254,6 +258,11 @@
 					/>
 				{/if}
 				<!-- Like YTM: repeat and shuffle next to the volume. -->
+				{#if sleepTimer.active}
+					<button class="hidden rounded-full p-2 text-accent hover:bg-raised md:block" aria-label="Sleep timer" title="Sleep timer" onclick={onSleepTimer}>
+						<Icon name="sleep" size={20} />
+					</button>
+				{/if}
 				<RepeatButton {room} size={20} class="hidden p-2 hover:bg-raised md:block" />
 				<ShuffleButton {room} {onToast} size={20} class="hidden p-2 hover:bg-raised md:block" />
 				<button

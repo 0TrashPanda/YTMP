@@ -75,6 +75,8 @@ Music, without Premium, and not tied to a single music service.
   keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
   speakers near your phone (the phone looks the songs up and serves them).
 - Android: lock screen and notification controls, keeps playing with the screen off.
+- A sleep timer (in the playing song's ⋮ menu): after some minutes or at the end of the
+  song the sound fades out, then a solo room pauses; in a party room only your device stops.
 - Download a song or episode from its menu: a music file with its title, artist, album and
   cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app
@@ -122,7 +124,7 @@ Music, without Premium, and not tied to a single music service.
 
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
-- YTMP playlists, explore page, sleep timer
+- YTMP playlists, explore page
 
 ## Platforms
 

@@ -92,6 +92,12 @@
 - **Local music** (bridge `phoneMusic`, `setPhoneMusic`, version 10): the music on the phone
   in the Local tab (`PhoneLibrary`, Android's media store; asks for `READ_MEDIA_AUDIO` once),
   see [local music](local-music.md).
+- **Sleep timer** (bridge `sleepTimer`, `setSleepTimer`, page callback `onSleepTimer`,
+  version 12): the page sets it (`PlaybackHub.sleep`: a time, or the end of a queue item), and
+  `PlaybackService` runs it, so it keeps going with the page frozen: it fades `exo.volume`
+  over the last 10 s, then pauses a solo room (`PlaybackTarget.solo`, over its own room
+  connection) or stops playing here (`stopHere`) in a shared room, and clears the timer. In a
+  browser the page runs the same rules itself (`lib/sleepTimer.svelte.ts`).
 - **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
   account holders of that server can join its rooms (see [auth](auth.md)). The WebView keeps
   that server's pages in the app, for logging in.
