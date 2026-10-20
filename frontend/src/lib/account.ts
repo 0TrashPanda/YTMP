@@ -5,14 +5,13 @@
 // - On any host's pages: an *identity*, a host token the auth server made for this page's
 //   origin, handed over by /connect in the URL fragment. It goes into the room hello.
 
-import { ApiRequestError } from './api';
+import { answer, ApiRequestError } from './api';
 import { nativeBridge } from './native';
 import type {
 	AccountInfo,
 	AccountSettings,
 	HistoryPage,
 	AccountListResponse,
-	ApiError,
 	AuthServerInfo,
 	AuthServerRef,
 	HostInfo,
@@ -59,11 +58,7 @@ async function call<T>(path: string, body?: unknown, method: string = body === u
 	if (token) headers['Authorization'] = `Bearer ${token}`;
 	const response = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
 	if (response.status === 401 && token && !path.endsWith('/login')) session.current = null;
-	if (!response.ok) {
-		const error = (await response.json().catch(() => null)) as ApiError | null;
-		throw new ApiRequestError(error?.error.message ?? `Request failed (${response.status})`);
-	}
-	return (response.status === 204 ? null : await response.json()) as T;
+	return answer<T>(response);
 }
 
 export const authServer = {

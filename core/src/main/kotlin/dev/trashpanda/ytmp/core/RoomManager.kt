@@ -67,26 +67,10 @@ class RoomManager(
     private val store: RoomStore? = null,
     /** Store calls run here, one at a time and in order. */
     private val storeContext: CoroutineContext = Dispatchers.IO.limitedParallelism(1),
-    /** Songs that finished playing, for the listening history. Must not block. */
-    private val onPlayFinished: (FinishedPlay) -> Unit = {},
-    /** YTM's radio, for Start radio and autoplay. */
-    private val radio: RadioSource? = null,
-    /**
-     * The room owner's own radio (their YouTube Music account), by owner account (null: a room
-     * without one), when they have one and want it ([PersonalCatalog.personalized]). Null: the shared [radio].
-     */
-    private val ownerRadio: suspend (ownerAccount: String?, seedSongId: String) -> List<Song>? = { _, _ -> null },
-    /**
-     * Songs that go with the seed in the song graph (the owner's listening and the server's),
-     * mixed into every radio ([mixRadio]). Empty: none known.
-     */
-    private val graphRadio: suspend (ownerAccount: String?, seedSongId: String) -> List<Song> = { _, _ -> emptyList() },
-    /** A room with an owner account was saved: its copy elsewhere can be updated (see [Room.syncId]). Must not block. */
-    private val onRoomSaved: (SavedRoom) -> Unit = {},
-    /** A room with an owner account was closed or expired here (not moved away). Must not block. */
-    private val onRoomClosed: (Room) -> Unit = {},
-    /** A room is no longer [account]'s (it got another owner): its copy under [syncId] can go. Must not block. */
-    private val onRoomDisowned: (account: String, syncId: String) -> Unit = { _, _ -> },
+    /** Where rooms' radios come from (Start radio, autoplay). Null: no radio. */
+    private val radio: RoomRadio? = null,
+    /** What the host hears about its rooms. */
+    private val hooks: RoomHooks = RoomHooks(),
 ) {
     private val rooms = ConcurrentHashMap<String, Room>()
     /** Rooms by the codes they had before ([Room.formerCodes]): links and QR codes with them still work. */
@@ -116,7 +100,7 @@ class RoomManager(
                 lateinit var room: Room
                 room = Room.restore(
                     s, streams, scope, onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, clock = clock,
-                    radio = radioFor { room.ownerAccount },
+                    radio = radio?.forRoom { room.ownerAccount },
                 )
                 add(room)
             }
@@ -154,7 +138,7 @@ class RoomManager(
             val code = chosen ?: newCode().takeIf { !former.containsKey(it) && it !in moved } ?: continue
             lateinit var room: Room
             room = Room(
-                code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radioFor { room.ownerAccount },
+                code, name, Ids.token(), visibility, streams, scope, ownerAccount, template ?: DefaultRoles.template, radio?.forRoom { room.ownerAccount },
                 onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, clock = clock,
             )
             if (clone != null) room.startFrom(clone)
@@ -172,7 +156,7 @@ class RoomManager(
         for (old in room.formerCodes) if (!rooms.containsKey(old)) former.putIfAbsent(old, room)
         room.claimCode = { code -> claim(room, code) }
         room.addChangeListener { roomChanged(room.code) }
-        room.onPlayFinished = onPlayFinished
+        room.onPlayFinished = hooks.onPlayFinished
         scope.launch { room.setAvailableOutputs(outputs.value) }
         return true
     }
@@ -229,7 +213,7 @@ class RoomManager(
         while (true) {
             lateinit var room: Room
             room = Room.restore(
-                state, streams, scope, onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, radio = radioFor { room.ownerAccount },
+                state, streams, scope, onInfoChanged = { roomChanged(room.code) }, onOwnerChanged = ::disowned, radio = radio?.forRoom { room.ownerAccount },
                 clock = clock, code = code, epoch = epoch,
             )
             if (add(room)) {
@@ -264,7 +248,7 @@ class RoomManager(
 
     private fun remove(room: Room, closedHere: Boolean = true) {
         former.values.removeIf { it === room }
-        if (closedHere && room.syncId != null) onRoomClosed(room)
+        if (closedHere && room.syncId != null) hooks.onRoomClosed(room)
         room.close()
         refreshList()
         if (store != null) scope.launch(storeContext) { runCatching { store.delete(room.code) }.onFailure { log.warn("Couldn't delete room {}", room.code, it) } }
@@ -302,32 +286,12 @@ class RoomManager(
                 if (e is CancellationException) throw e
                 log.warn("Couldn't save room {}", code, e)
             }
-            if (saved.syncId != null) onRoomSaved(saved)
+            if (saved.syncId != null) hooks.onRoomSaved(saved)
         }
     }
 
     private fun disowned(oldAccount: String?, oldSyncId: String?) {
-        if (oldAccount != null && oldSyncId != null) onRoomDisowned(oldAccount, oldSyncId)
-    }
-
-    /**
-     * A room's radio: its owner's own when there is one ([ownerRadio]), else (or when that
-     * fails) the shared one. [owner] is asked each time: the owner can change.
-     */
-    private fun radioFor(owner: () -> String?): RadioSource? {
-        val shared = radio ?: return null
-        val base = RadioSource { seed ->
-            try {
-                ownerRadio(owner(), seed)?.let { return@RadioSource it }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                log.warn("The owner's radio didn't work, using the shared one: {}", e.message)
-            }
-            shared.radio(seed)
-        }
-        // The song graph is mixed in; it's the whole radio when there's no other (or that failed).
-        return RadioSource { seed -> mixedRadio({ base.radio(seed) }, { graphRadio(owner(), seed) }) }
+        if (oldAccount != null && oldSyncId != null) hooks.onRoomDisowned(oldAccount, oldSyncId)
     }
 
     private fun refreshList() {

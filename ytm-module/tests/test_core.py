@@ -1,6 +1,6 @@
 import pytest
 
-from ytmp_ytm import core
+from ytmp_ytm import core, parse
 
 
 def test_video_id_strips_prefix():
@@ -19,7 +19,7 @@ def test_song_from_search_result():
         "isExplicit": False,
         "thumbnails": [{"url": "https://lh3.googleusercontent.com/x=w60-h60-l90-rj", "width": 60, "height": 60}],
     }
-    song = core._song_from_search(result)
+    song = parse.song_from_search(result)
     assert song["id"] == "ytm:wU26xVT_vBU"
     assert song["durationMs"] == 321_000
     assert song["artists"] == [{"id": "UC1", "name": "Daft Punk"}]
@@ -33,7 +33,7 @@ def test_song_from_search_result():
 
 
 def test_results_without_video_are_skipped():
-    assert core._song_from_search({"title": "no video"}) is None
+    assert parse.song_from_search({"title": "no video"}) is None
 
 
 def test_clean_error():
@@ -180,7 +180,7 @@ def test_song_from_watch_track():
         "album": {"id": "MPRE1", "name": "Discovery"},
         "thumbnail": [{"url": "https://lh3/x=w60-h60-l90-rj", "width": 60, "height": 60}],
     }
-    song = core._song_from_watch(track)
+    song = parse.song_from_watch(track)
     assert song["id"] == "ytm:abc"
     assert song["durationMs"] == 298_000
     assert song["album"] == {"id": "MPRE1", "name": "Discovery"}
@@ -188,14 +188,14 @@ def test_song_from_watch_track():
 
 
 def test_parse_length():
-    assert core._parse_length("1:02:03") == 3_723_000
-    assert core._parse_length(None) == 0
-    assert core._parse_length("live") == 0
+    assert parse.parse_length("1:02:03") == 3_723_000
+    assert parse.parse_length(None) == 0
+    assert parse.parse_length("live") == 0
 
 
 def test_album_summary():
     x = {"title": "Discovery", "browseId": "MPRE1", "year": "2001", "thumbnails": [{"url": "https://lh3/x=w226-h226-l90-rj", "width": 226, "height": 226}]}
-    summary = core._album_summary(x, "Album")
+    summary = parse.album_summary(x, "Album")
     assert summary["id"] == "MPRE1"
     assert summary["kind"] == "Album"
     assert summary["year"] == "2001"
@@ -203,18 +203,18 @@ def test_album_summary():
 
 def test_search_items_of_each_kind():
     thumbs = [{"url": "https://lh3/x=w60-h60-l90-rj", "width": 60, "height": 60}]
-    video = core._search_item({"resultType": "video", "videoId": "v1", "title": "Live", "artists": [], "thumbnails": thumbs})
+    video = parse.search_item({"resultType": "video", "videoId": "v1", "title": "Live", "artists": [], "thumbnails": thumbs})
     assert video["kind"] == "song" and video["video"] is True and video["song"]["id"] == "ytm:v1"
-    album = core._search_item({
+    album = parse.search_item({
         "resultType": "album", "browseId": "MPRE1", "title": "Discovery", "type": "Album", "year": "2001",
         "artists": [{"name": "Daft Punk", "id": "UC1"}], "thumbnails": thumbs,
     })
     assert album["album"]["id"] == "MPRE1" and album["artists"] == [{"id": "UC1", "name": "Daft Punk"}]
-    artist = core._search_item({"resultType": "artist", "artist": "Daft Punk", "browseId": "UC1", "thumbnails": thumbs})
+    artist = parse.search_item({"resultType": "artist", "artist": "Daft Punk", "browseId": "UC1", "thumbnails": thumbs})
     assert (artist["id"], artist["name"]) == ("UC1", "Daft Punk")
-    playlist = core._search_item({"resultType": "playlist", "browseId": "VLPL1", "title": "Mix", "author": "Jazzy", "itemCount": "12"})
+    playlist = parse.search_item({"resultType": "playlist", "browseId": "VLPL1", "title": "Mix", "author": "Jazzy", "itemCount": "12"})
     assert (playlist["id"], playlist["author"], playlist["itemCount"]) == ("VLPL1", "Jazzy", 12)
-    assert core._search_item({"resultType": "profile", "browseId": "UC2", "name": "someone"}) is None
+    assert parse.search_item({"resultType": "profile", "browseId": "UC2", "name": "someone"}) is None
 
 
 def test_all_search_is_grouped_like_ytm():
@@ -231,7 +231,7 @@ def test_all_search_is_grouped_like_ytm():
     # The filtered searches have the complete songs (with durations).
     songs = [{"resultType": "song", "videoId": "s2", "title": "Two", "duration_seconds": 200}]
     videos = [{"resultType": "video", "videoId": "v1", "title": "Live", "duration_seconds": 300}]
-    sections = core._sections_from_all(results, songs, videos)
+    sections = parse.sections_from_all(results, songs, videos)
     assert [(s["title"], s["type"]) for s in sections] == [
         ("Top result", None),
         ("Songs", "songs"),
@@ -247,12 +247,12 @@ def test_all_search_is_grouped_like_ytm():
 def test_a_song_as_top_result_gets_the_complete_data():
     results = [{"category": "Top result", "resultType": "song", "videoId": "s1", "title": "One"}]
     songs = [{"resultType": "song", "videoId": "s1", "title": "One", "duration_seconds": 321, "artists": [{"name": "A", "id": "UC1"}]}]
-    top = core._sections_from_all(results, songs, [])[0]["items"][0]["song"]
+    top = parse.sections_from_all(results, songs, [])[0]["items"][0]["song"]
     assert (top["durationMs"], top["artists"]) == (321_000, [{"id": "UC1", "name": "A"}])
 
 
 def test_artist_pictures_get_a_large_version_too():
-    thumbs = core._thumbnails([{"url": "https://yt3/x=w120-c-h120-k-c0x00ffffff-no-l90-rj", "width": 120, "height": 120}])
+    thumbs = parse.thumbnails([{"url": "https://yt3/x=w120-c-h120-k-c0x00ffffff-no-l90-rj", "width": 120, "height": 120}])
     assert thumbs[-1] == {"url": "https://yt3/x=w544-c-h544-k-c0x00ffffff-no-l90-rj", "width": 544, "height": 544}
 
 
@@ -262,37 +262,37 @@ def test_suggestions_for_nothing_ask_nobody():
 
 
 def test_episodes_are_songs_of_a_podcast():
-    item = core._search_item({
+    item = parse.search_item({
         "resultType": "episode", "videoId": "e1", "title": "Episode 1", "date": "Oct 18, 2020",
         "podcast": {"id": "MPSP1", "name": "The Show"},
     })
     assert item["kind"] == "song"
     assert item["song"]["podcast"] == {"id": "MPSP1", "name": "The Show"}
     assert item["song"]["artists"] == []
-    podcast = core._search_item({"resultType": "podcast", "browseId": "MPSP1", "title": "The Show"})
+    podcast = parse.search_item({"resultType": "podcast", "browseId": "MPSP1", "title": "The Show"})
     assert (podcast["kind"], podcast["id"]) == ("podcast", "MPSP1")
 
 
 def test_spoken_lengths():
-    assert core._parse_spoken_length("3 hr 36 min") == (3 * 3600 + 36 * 60) * 1000
-    assert core._parse_spoken_length("29 min") == 29 * 60 * 1000
-    assert core._parse_spoken_length("4:21") == 261_000
-    assert core._parse_spoken_length(None) == 0
+    assert parse.parse_spoken_length("3 hr 36 min") == (3 * 3600 + 36 * 60) * 1000
+    assert parse.parse_spoken_length("29 min") == 29 * 60 * 1000
+    assert parse.parse_spoken_length("4:21") == 261_000
+    assert parse.parse_spoken_length(None) == 0
 
 
 def test_view_counts_are_not_dates():
-    assert core._episode_date("860K views") is None
-    assert core._episode_date("Oct 18, 2020") == "Oct 18, 2020"
+    assert parse.episode_date("860K views") is None
+    assert parse.episode_date("Oct 18, 2020") == "Oct 18, 2020"
 
 
 def test_home_items_of_each_kind():
-    song = core._home_item({"videoId": "abc", "title": "Song", "videoType": "MUSIC_VIDEO_TYPE_ATV", "artists": [{"name": "A", "id": "UC1"}]})
+    song = parse.home_item({"videoId": "abc", "title": "Song", "videoType": "MUSIC_VIDEO_TYPE_ATV", "artists": [{"name": "A", "id": "UC1"}]})
     assert song["kind"] == "song" and song["song"]["id"] == "ytm:abc" and song["video"] is False
-    album = core._home_item({"browseId": "MPREb_x", "title": "Album", "type": "Single", "artists": [{"name": "A", "id": "UC1"}]})
+    album = parse.home_item({"browseId": "MPREb_x", "title": "Album", "type": "Single", "artists": [{"name": "A", "id": "UC1"}]})
     assert album["kind"] == "album" and album["album"]["kind"] == "Single"
-    playlist = core._home_item({"playlistId": "RDCLAK5uy_x", "title": "Pop Gold", "description": "Alicia Keys, Ed Sheeran"})
+    playlist = parse.home_item({"playlistId": "RDCLAK5uy_x", "title": "Pop Gold", "description": "Alicia Keys, Ed Sheeran"})
     assert playlist == {"kind": "playlist", "id": "RDCLAK5uy_x", "title": "Pop Gold", "author": "Alicia Keys, Ed Sheeran", "itemCount": None, "thumbnails": []}
-    assert core._home_item({"title": "Nothing to open"}) is None
+    assert parse.home_item({"title": "Nothing to open"}) is None
 
 
 def test_signing_in_needs_youtube_music_cookies():
@@ -312,11 +312,11 @@ def test_personal_pages_need_an_account():
 
 
 def test_library_items():
-    liked = core._library_playlist({"playlistId": "LM", "title": "Liked music", "count": "1,204"})
+    liked = parse.library_playlist({"playlistId": "LM", "title": "Liked music", "count": "1,204"})
     assert liked["kind"] == "playlist" and liked["itemCount"] == 1204
-    podcast = core._library_podcast({"title": "The Daily", "channel": {"id": "UC1", "name": "NYT"}, "browseId": "MPSPPLx", "podcastId": "PLx"})
+    podcast = parse.library_podcast({"title": "The Daily", "channel": {"id": "UC1", "name": "NYT"}, "browseId": "MPSPPLx", "podcastId": "PLx"})
     assert podcast == {"kind": "podcast", "id": "MPSPPLx", "title": "The Daily", "author": "NYT", "thumbnails": []}
-    new = core._library_podcast({"title": "New Episodes", "channel": {"id": None, "name": "Auto playlist"}, "browseId": "VLRDPN", "podcastId": "RDPN"})
+    new = parse.library_podcast({"title": "New Episodes", "channel": {"id": None, "name": "Auto playlist"}, "browseId": "VLRDPN", "podcastId": "RDPN"})
     assert new["kind"] == "playlist" and new["id"] == "RDPN"
 
 

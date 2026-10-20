@@ -53,14 +53,14 @@ class RadioTest {
     @Test
     fun `a room's radio comes from its owner's account, else the shared one`() = runTest {
         val manager = RoomManager(
-            { "https://s/$it" }, backgroundScope, clock = { testScheduler.currentTime }, radio = radio,
-            ownerRadio = { owner, seed ->
+            { "https://s/$it" }, backgroundScope, clock = { testScheduler.currentTime },
+            radio = RoomRadio(radio, owner = { owner, seed ->
                 when (owner) {
                     "anna@test" -> listOf(song(seed), song("$seed-anna"))
                     "broken@test" -> error("signed out")
                     else -> null
                 }
-            },
+            }),
         )
         suspend fun radioIn(owner: String?): List<String> {
             val room = manager.create("Party", RoomVisibility.PUBLIC, ownerAccount = owner)
@@ -82,8 +82,10 @@ class RadioTest {
     fun `songs from the song graph are mixed into a room's radio, and are the radio when there's no other`() = runTest {
         val manager = RoomManager(
             { "https://s/$it" }, backgroundScope, clock = { testScheduler.currentTime },
-            radio = { seed -> if (seed.startsWith("local")) error("not on YouTube Music") else radio.radio(seed) },
-            graphRadio = { owner, seed -> if (owner == "anna@test") listOf(song("$seed-g1"), song("$seed-g2")) else emptyList() },
+            radio = RoomRadio(
+                { seed -> if (seed.startsWith("local")) error("not on YouTube Music") else radio.radio(seed) },
+                graph = { owner, seed -> if (owner == "anna@test") listOf(song("$seed-g1"), song("$seed-g2")) else emptyList() },
+            ),
         )
         suspend fun radioIn(owner: String?, seed: String): List<String> {
             val room = manager.create("Party", RoomVisibility.PUBLIC, ownerAccount = owner)

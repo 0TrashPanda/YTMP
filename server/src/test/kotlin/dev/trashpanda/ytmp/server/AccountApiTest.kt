@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.server
 
+import dev.trashpanda.ytmp.core.RoomHooks
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.host.AccountTokens
 import dev.trashpanda.ytmp.host.HostOptions
@@ -85,7 +86,7 @@ class AccountApiTest {
         val auth = TrustedAuthServers(isOwnOrigin = { it == origin }, ownTemplates = service::roleTemplate, ownPlays = service::recordPlay).apply { trust(AuthServerRef(null, "test.example"), key.public) }
         application {
             val scope = CoroutineScope(SupervisorJob())
-            val rooms = RoomManager({ id -> "https://stream/$id" }, scope, onPlayFinished = PlayReporter(auth, scope)::report)
+            val rooms = RoomManager({ id -> "https://stream/$id" }, scope, hooks = RoomHooks(onPlayFinished = PlayReporter(auth, scope)::report))
             ytmpModule(rooms, HostSources({ _, _ -> SearchPage(emptyList()) }), HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = { service.routes(this) })
         }
         return service

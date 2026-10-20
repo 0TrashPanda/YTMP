@@ -1,6 +1,8 @@
 package dev.trashpanda.ytmp.server
 
+import dev.trashpanda.ytmp.core.RoomHooks
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.core.RoomRadio
 import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.core.RoomTimeouts
 import dev.trashpanda.ytmp.host.CastOutputs
@@ -130,18 +132,22 @@ fun main(args: Array<String>) {
             // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
             // Party rooms whose admins are all gone for 5 minutes tell the others they can clone them.
             timeouts = RoomTimeouts(guestSoloRoom = 30.days, adminless = 5.minutes),
-            onPlayFinished = { play ->
-                plays.report(play)
-                youtube.report(play, ::localAccount)
-            },
-            radio = local.radio(cached),
-            // A room with an owner account of this server: radio through that account's YouTube Music.
-            ownerRadio = { owner, seed ->
-                if (LocalMusic.isLocal(seed)) null
-                else owner?.let(::localAccount)?.let(youtube::of)?.personalized()?.radio(seed)?.also { graph.learnRadio(seed, it) }
-            },
-            // The song graph: the owner's listening (an account here) and everyone's.
-            graphRadio = { owner, seed -> withContext(Dispatchers.IO) { service.similar(owner?.let(::localUsername), seed) }.filter { local.playable(it.id) } },
+            radio = RoomRadio(
+                local.radio(cached),
+                // A room with an owner account of this server: radio through that account's YouTube Music.
+                owner = { owner, seed ->
+                    if (LocalMusic.isLocal(seed)) null
+                    else owner?.let(::localAccount)?.let(youtube::of)?.personalized()?.radio(seed)?.also { graph.learnRadio(seed, it) }
+                },
+                // The song graph: the owner's listening (an account here) and everyone's.
+                graph = { owner, seed -> withContext(Dispatchers.IO) { service.similar(owner?.let(::localUsername), seed) }.filter { local.playable(it.id) } },
+            ),
+            hooks = RoomHooks(
+                onPlayFinished = { play ->
+                    plays.report(play)
+                    youtube.report(play, ::localAccount)
+                },
+            ),
         )
         rooms.startCleanup()
         val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, defaultPassword = service::roomPassword)

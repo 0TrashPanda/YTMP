@@ -10,7 +10,9 @@ import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.core.FinishedPlay
+import dev.trashpanda.ytmp.core.RoomHooks
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.core.RoomRadio
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.HostKind
@@ -126,20 +128,24 @@ class LocalHost(private val context: Context) {
             override suspend fun resolve(songId: String) = ytm.resolve(songId)
         }),
         scope = scope, outputs = outputs.devices, store = PhoneRoomStore(context),
-        onPlayFinished = { play ->
-            plays.report(play)
-            addToYoutubeHistory(play)
-        },
-        radio = local.radio(cached),
-        // Every room here is the phone owner's, so radio goes through their YouTube Music.
-        ownerRadio = { _, seed -> if (LocalMusic.isLocal(seed)) null else youtube.personalized()?.radio(seed) },
-        // The song graph of the owner's server: their listening, and everyone's there.
-        graphRadio = { owner, seed ->
-            (owner ?: authLink.ownerAccount)?.let(sync::tokenFor)?.let { authLink.auth.similar(it, seed) }.orEmpty().filter { local.playable(it.id) }
-        },
-        onRoomSaved = { sync.saved(it) },
-        onRoomClosed = { sync.closed(it) },
-        onRoomDisowned = { account, syncId -> sync.closed(account, syncId) },
+        radio = RoomRadio(
+            local.radio(cached),
+            // Every room here is the phone owner's, so radio goes through their YouTube Music.
+            owner = { _, seed -> if (LocalMusic.isLocal(seed)) null else youtube.personalized()?.radio(seed) },
+            // The song graph of the owner's server: their listening, and everyone's there.
+            graph = { owner, seed ->
+                (owner ?: authLink.ownerAccount)?.let(sync::tokenFor)?.let { authLink.auth.similar(it, seed) }.orEmpty().filter { local.playable(it.id) }
+            },
+        ),
+        hooks = RoomHooks(
+            onPlayFinished = { play ->
+                plays.report(play)
+                addToYoutubeHistory(play)
+            },
+            onRoomSaved = { sync.saved(it) },
+            onRoomClosed = { sync.closed(it) },
+            onRoomDisowned = { account, syncId -> sync.closed(account, syncId) },
+        ),
     )
 
     /** Your rooms here and on your server (docs/features/room-sync.md). */

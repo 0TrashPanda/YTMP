@@ -24,11 +24,10 @@ from ytmusicapi.helpers import initialize_headers
 from ytmusicapi.navigation import nav
 from ytmusicapi.parsers.playlists import parse_playlist_items
 
-from . import pot
+from . import parse, pot
+from .parse import MODULE_ID
 
-MODULE_ID = "ytm"
 _PREFIXES = ("ytm:", "yt:")
-_LARGE_ART = 544
 _ARTIST_SONGS = 20
 # Public playlists can be huge; your own (Liked music too) come in parts (YouTube's, ~100 songs).
 _PLAYLIST_SONGS = 1000
@@ -46,23 +45,6 @@ SEARCH_TYPES = {
     "podcasts": "podcasts",
     "episodes": "episodes",
 }
-_SECTION_TITLES = {
-    "songs": "Songs",
-    "videos": "Videos",
-    "albums": "Albums",
-    "artists": "Artists",
-    "community_playlists": "Community playlists",
-    "featured_playlists": "Featured playlists",
-    "podcasts": "Podcasts",
-    "episodes": "Episodes",
-}
-# How many of each kind the "all" search shows; the section's chip shows more.
-_ALL_LIMITS = {
-    "songs": 4, "videos": 4, "albums": 6, "artists": 6, "community_playlists": 6, "featured_playlists": 6,
-    "podcasts": 6, "episodes": 4,
-}
-# YouTube Music's own playlists are "featured"; everyone else's are "community".
-_YTM_AUTHOR = "YouTube Music"
 # Re-resolve stream URLs this long before YouTube says they expire.
 _EXPIRY_MARGIN_S = 10 * 60
 # A stream lookup taking longer than this gets yt-dlp's steps in the log, like a failed one.
@@ -215,8 +197,8 @@ class YtmCore:
             playlists = pool.submit(user.get_library_playlists, limit=_LIBRARY_ITEMS)
             podcasts = pool.submit(user.get_library_podcasts, limit=_LIBRARY_ITEMS)
             sections = [
-                {"title": "Playlists", "items": [item for p in playlists.result() if (item := _library_playlist(p))]},
-                {"title": "Podcasts", "items": [item for p in podcasts.result() if (item := _library_podcast(p))]},
+                {"title": "Playlists", "items": [item for p in playlists.result() if (item := parse.library_playlist(p))]},
+                {"title": "Podcasts", "items": [item for p in podcasts.result() if (item := parse.library_podcast(p))]},
             ]
         return {"sections": sections}
 
@@ -232,15 +214,15 @@ class YtmCore:
             # songs and videos come from their own searches, run at the same time.
             with ThreadPoolExecutor(3) as pool:
                 mixed = pool.submit(ytm.search, query)
-                songs = pool.submit(ytm.search, query, filter="songs", limit=_ALL_LIMITS["songs"])
-                videos = pool.submit(ytm.search, query, filter="videos", limit=_ALL_LIMITS["videos"])
-                return {"sections": _sections_from_all(mixed.result(), songs.result(), videos.result())}
+                songs = pool.submit(ytm.search, query, filter="songs", limit=parse.ALL_LIMITS["songs"])
+                videos = pool.submit(ytm.search, query, filter="videos", limit=parse.ALL_LIMITS["videos"])
+                return {"sections": parse.sections_from_all(mixed.result(), songs.result(), videos.result())}
         if type not in SEARCH_TYPES:
             raise NotFound(f"Unknown search type: {type}")
         results = ytm.search(query, filter=SEARCH_TYPES[type], limit=limit)
         # ytmusicapi treats limit as a minimum, so cut the list ourselves.
-        items = [item for r in results if (item := _search_item(r))][:limit]
-        return {"sections": [{"title": _SECTION_TITLES[type], "type": type, "items": items}]}
+        items = [item for r in results if (item := parse.search_item(r))][:limit]
+        return {"sections": [{"title": parse.SECTION_TITLES[type], "type": type, "items": items}]}
 
     def suggestions(self, query: str, personal: bool = False) -> list[str]:
         """What YTM suggests while typing [query], e.g. "daft p" -> "daft punk one more time".
@@ -262,7 +244,7 @@ class YtmCore:
             playlist = ytm.get_watch_playlist(videoId=video_id(seed_id), radio=True, limit=limit)
         except Exception as e:  # ytmusicapi raises plain exceptions for unknown IDs
             raise NotFound(str(e)) from e
-        return [song for t in playlist.get("tracks") or [] if (song := _song_from_watch(t))][:limit]
+        return [song for t in playlist.get("tracks") or [] if (song := parse.song_from_watch(t))][:limit]
 
     def artist(self, artist_id: str) -> dict:
         """An artist page: their top songs, albums and singles."""
@@ -276,19 +258,19 @@ class YtmCore:
         if songs_section.get("browseId"):
             try:
                 playlist = self._ytm.get_playlist(songs_section["browseId"], limit=_ARTIST_SONGS)
-                songs = [s for t in playlist.get("tracks") or [] if (s := _song_from_search(t))]
+                songs = [s for t in playlist.get("tracks") or [] if (s := parse.song_from_search(t))]
             except Exception:
                 songs = []
         if not songs:
-            songs = [s for t in songs_section.get("results") or [] if (s := _song_from_search(t))]
+            songs = [s for t in songs_section.get("results") or [] if (s := parse.song_from_search(t))]
         return {
             "id": artist_id,
             "name": a.get("name") or "",
-            "thumbnails": _thumbnails(a.get("thumbnails") or []),
+            "thumbnails": parse.thumbnails(a.get("thumbnails") or []),
             "description": a.get("description"),
             "songs": songs[:_ARTIST_SONGS],
-            "albums": [_album_summary(x, "Album") for x in (a.get("albums") or {}).get("results") or [] if x.get("browseId")],
-            "singles": [_album_summary(x, "Single") for x in (a.get("singles") or {}).get("results") or [] if x.get("browseId")],
+            "albums": [parse.album_summary(x, "Album") for x in (a.get("albums") or {}).get("results") or [] if x.get("browseId")],
+            "singles": [parse.album_summary(x, "Single") for x in (a.get("singles") or {}).get("results") or [] if x.get("browseId")],
             "songsPlaylistId": (songs_section.get("browseId") or "").removeprefix("VL") or None,
         }
 
@@ -298,7 +280,7 @@ class YtmCore:
             alb = self._ytm.get_album(album_id)
         except Exception as e:
             raise NotFound(str(e)) from e
-        thumbnails = _thumbnails(alb.get("thumbnails") or [])
+        thumbnails = parse.thumbnails(alb.get("thumbnails") or [])
         album_ref = {"id": album_id, "name": alb.get("title") or ""}
         songs = []
         for t in alb.get("tracks") or []:
@@ -309,7 +291,7 @@ class YtmCore:
                 "title": t.get("title") or "",
                 "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in t.get("artists") or []],
                 "album": album_ref,
-                "durationMs": int((t.get("duration_seconds") or 0) * 1000) or _parse_length(t.get("duration")),
+                "durationMs": int((t.get("duration_seconds") or 0) * 1000) or parse.parse_length(t.get("duration")),
                 "thumbnails": thumbnails,
                 "explicit": bool(t.get("isExplicit")),
             })
@@ -351,8 +333,8 @@ class YtmCore:
             "title": p.get("title") or "",
             "author": (author.get("name") if isinstance(author, dict) else author) or None,
             "description": p.get("description"),
-            "thumbnails": _thumbnails(p.get("thumbnails") or []),
-            **_playlist_songs(p.get("tracks") or [], places=personal),
+            "thumbnails": parse.thumbnails(p.get("thumbnails") or []),
+            **parse.playlist_songs(p.get("tracks") or [], places=personal),
             "owned": owned,
             "more": token,
             "songCount": count if isinstance(count, int) else None,
@@ -375,7 +357,7 @@ class YtmCore:
             "author": None,
             "description": None,
             "thumbnails": [],
-            **_playlist_songs(tracks, places=True),
+            **parse.playlist_songs(tracks, places=True),
             "more": following if tracks else None,
         }
 
@@ -392,11 +374,11 @@ class YtmCore:
             "title": ref["name"],
             "author": (author.get("name") if isinstance(author, dict) else author) or None,
             "description": p.get("description"),
-            "thumbnails": _thumbnails(p.get("thumbnails") or []),
+            "thumbnails": parse.thumbnails(p.get("thumbnails") or []),
             "episodes": [
-                {"song": song, "date": _episode_date(e.get("date")), "description": e.get("description")}
+                {"song": song, "date": parse.episode_date(e.get("date")), "description": e.get("description")}
                 for e in p.get("episodes") or []
-                if (song := _episode_song(e, ref))
+                if (song := parse.episode_song(e, ref))
             ],
         }
 
@@ -476,7 +458,7 @@ class YtmCore:
     def own_playlists(self) -> list[dict]:
         """The signed-in account's own playlists (the ones songs can be saved to): {id, title, thumbnails}."""
         return [
-            {"id": p["playlistId"], "title": p.get("title") or "", "thumbnails": _thumbnails(p.get("thumbnails") or [])}
+            {"id": p["playlistId"], "title": p.get("title") or "", "thumbnails": parse.thumbnails(p.get("thumbnails") or [])}
             for p in self._signed_in().get_library_playlists(limit=_LIBRARY_ITEMS)
             if p.get("owned") and p.get("playlistId") not in ("LM", "SE")
         ]
@@ -502,7 +484,7 @@ class YtmCore:
         ytm = self._signed_in() if personal else self._ytm
         sections = []
         for s in ytm.get_home(limit=_HOME_SECTIONS):
-            items = [item for c in s.get("contents") or [] if (item := _home_item(c))]
+            items = [item for c in s.get("contents") or [] if (item := parse.home_item(c))]
             if items:
                 sections.append({"title": s.get("title") or "", "items": items})
         return {"sections": sections}
@@ -628,107 +610,6 @@ def _version(package: str) -> str:
         return "?"
 
 
-def _song_from_search(r: dict) -> dict | None:
-    vid = r.get("videoId")
-    if not vid:
-        return None
-    album = r.get("album")
-    return {
-        "id": f"{MODULE_ID}:{vid}",
-        "title": r.get("title") or "",
-        "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in r.get("artists") or []],
-        "album": {"id": album.get("id"), "name": album.get("name", "")} if album else None,
-        "durationMs": int((r.get("duration_seconds") or 0) * 1000),
-        "thumbnails": _thumbnails(r.get("thumbnails") or []),
-        "explicit": bool(r.get("isExplicit")),
-    }
-
-
-def _search_item(r: dict) -> dict | None:
-    """One search result as a SearchItem (protocol/Catalog.kt), or None for kinds we don't show."""
-    kind = r.get("resultType")
-    if kind in ("song", "video"):
-        song = _song_from_search(r)
-        return {"kind": "song", "song": song, "video": kind == "video"} if song else None
-    if kind == "episode":
-        podcast = r.get("podcast") or {}
-        ref = {"id": podcast["id"], "name": podcast.get("name", "")} if podcast.get("id") else None
-        song = _episode_song(r, ref)
-        return {"kind": "song", "song": song, "video": False} if song else None
-    if kind == "podcast" and r.get("browseId"):
-        return {
-            "kind": "podcast",
-            "id": r["browseId"],
-            "title": r.get("title") or "",
-            "author": r.get("author") or (r.get("artists") or [{}])[0].get("name"),
-            "thumbnails": _thumbnails(r.get("thumbnails") or []),
-        }
-    if kind == "album" and r.get("browseId"):
-        return {
-            "kind": "album",
-            "album": _album_summary(r, "Album"),
-            "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in r.get("artists") or []],
-        }
-    if kind == "artist":
-        # An artist as the top result has its name and ID in "artists" instead.
-        ref = next(iter(r.get("artists") or []), {})
-        artist_id = r.get("browseId") or ref.get("id")
-        if not artist_id:
-            return None
-        return {
-            "kind": "artist",
-            "id": artist_id,
-            "name": r.get("artist") or ref.get("name") or "",
-            "thumbnails": _thumbnails(r.get("thumbnails") or []),
-        }
-    if kind == "playlist" and r.get("browseId"):
-        count = r.get("itemCount")
-        return {
-            "kind": "playlist",
-            "id": r["browseId"],
-            "title": r.get("title") or "",
-            "author": r.get("author"),
-            "itemCount": int(count) if isinstance(count, (int, str)) and str(count).isdigit() else None,
-            "thumbnails": _thumbnails(r.get("thumbnails") or []),
-        }
-    return None  # profiles, …
-
-
-def _home_item(c: dict) -> dict | None:
-    """One item of a home section as a SearchItem: songs and videos lack a length (the stream has it)."""
-    if c.get("videoId"):
-        song = _song_from_search(c)
-        return {"kind": "song", "song": song, "video": c.get("videoType") != "MUSIC_VIDEO_TYPE_ATV"} if song else None
-    browse_id = c.get("browseId") or ""
-    if browse_id.startswith("MPRE"):
-        return {
-            "kind": "album",
-            "album": _album_summary(c, c.get("type") or "Album"),
-            "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in c.get("artists") or []],
-        }
-    if browse_id.startswith("MPSP"):
-        return {"kind": "podcast", "id": browse_id, "title": c.get("title") or "", "author": None, "thumbnails": _thumbnails(c.get("thumbnails") or [])}
-    if browse_id.startswith("UC"):
-        return {"kind": "artist", "id": browse_id, "name": c.get("title") or "", "thumbnails": _thumbnails(c.get("thumbnails") or [])}
-    if c.get("playlistId"):
-        return {
-            "kind": "playlist",
-            "id": c["playlistId"],
-            "title": c.get("title") or "",
-            # e.g. "Alicia Keys, Ed Sheeran, Lewis Capaldi"
-            "author": c.get("description"),
-            "itemCount": None,
-            "thumbnails": _thumbnails(c.get("thumbnails") or []),
-        }
-    return None
-
-
-def _playlist_songs(tracks: list[dict], places: bool) -> dict:
-    """A playlist's songs, and with [places] each one's place in it (your own: for removing and moving it)."""
-    pairs = [(t, s) for t in tracks if (s := _song_from_search(t))]
-    return {"songs": [s for _, s in pairs], "itemIds": [t.get("setVideoId") or "" for t, _ in pairs] if places else []}
-
-
 # Your own playlists in parts: ytmusicapi loads the parts after the first itself (get_playlist's
 # limit), and doesn't say how to ask for the next one. With limit 0 it stops after the first
 # part, and this keeps that part's token (per thread). If a new ytmusicapi works differently,
@@ -757,156 +638,6 @@ def _account(user: YTMusic) -> dict:
     except Exception as e:  # expired or signed out: YouTube answers without an account
         raise NotSignedIn(f"Not signed in to YouTube Music ({e})") from e
     return {"name": info.get("accountName") or "", "handle": info.get("channelHandle"), "photoUrl": info.get("accountPhotoUrl")}
-
-
-def _library_playlist(p: dict) -> dict | None:
-    if not p.get("playlistId"):
-        return None
-    count = p.get("count")
-    return {
-        "kind": "playlist",
-        "id": p["playlistId"],
-        "title": p.get("title") or "",
-        "author": p.get("description") or None,
-        "itemCount": int(count.replace(",", "")) if isinstance(count, str) and count.replace(",", "").isdigit() else None,
-        "thumbnails": _thumbnails(p.get("thumbnails") or []),
-    }
-
-
-def _library_podcast(p: dict) -> dict | None:
-    """A podcast in the library; "New episodes" (an automatic playlist) is a playlist."""
-    browse_id = p.get("browseId") or ""
-    channel = (p.get("channel") or {}).get("name")
-    if browse_id.startswith("MPSP"):
-        return {"kind": "podcast", "id": browse_id, "title": p.get("title") or "", "author": channel, "thumbnails": _thumbnails(p.get("thumbnails") or [])}
-    if p.get("podcastId"):
-        return {"kind": "playlist", "id": p["podcastId"], "title": p.get("title") or "", "author": channel, "itemCount": None, "thumbnails": _thumbnails(p.get("thumbnails") or [])}
-    return None
-
-
-def _search_type(r: dict) -> str | None:
-    """Which search type (chip) a result of the "all" search belongs to."""
-    kind = r.get("resultType")
-    if kind == "playlist":
-        return "featured_playlists" if r.get("author") == _YTM_AUTHOR else "community_playlists"
-    return {
-        "song": "songs", "video": "videos", "album": "albums", "artist": "artists", "podcast": "podcasts", "episode": "episodes",
-    }.get(kind)
-
-
-def _sections_from_all(results: list[dict], songs: list[dict], videos: list[dict]) -> list[dict]:
-    """YTM's unfiltered search: the top result, then a few of each kind, in YTM's order.
-
-    [songs] and [videos] (filtered searches) replace the mixed results' songs and videos,
-    which lack durations.
-    """
-    complete = {r["videoId"]: r for r in songs + videos if r.get("videoId")}
-    sections: list[dict] = []
-    for r in results:
-        if r.get("category") == "Top result":
-            r = complete.get(r.get("videoId"), r) if r.get("videoId") else r
-            if item := _search_item(r):
-                sections.append({"title": "Top result", "type": None, "items": [item]})
-            break
-    by_type: dict[str, list[dict]] = {}
-    for r in results:
-        if r.get("category") != "Top result" and (t := _search_type(r)) and (item := _search_item(r)):
-            by_type.setdefault(t, []).append(item)
-    for t, filtered in (("songs", songs), ("videos", videos)):
-        items = [item for r in filtered if (item := _search_item(r))]
-        if items:
-            by_type[t] = items  # keeps its place if the mixed results had it, else goes last
-        else:
-            by_type.pop(t, None)
-    for t, items in by_type.items():  # dicts keep insertion order: the order YTM gave
-        sections.append({"title": _SECTION_TITLES[t], "type": t, "items": items[:_ALL_LIMITS[t]]})
-    return sections
-
-
-def _episode_song(e: dict, podcast: dict | None) -> dict | None:
-    """A podcast episode as a Song with "podcast" set. Its length may be rounded; the stream has the exact one."""
-    vid = e.get("videoId")
-    if not vid:
-        return None
-    return {
-        "id": f"{MODULE_ID}:{vid}",
-        "title": e.get("title") or "",
-        "artists": [],
-        "album": None,
-        "durationMs": int((e.get("duration_seconds") or 0) * 1000) or _parse_spoken_length(e.get("duration")),
-        "thumbnails": _thumbnails(e.get("thumbnails") or []),
-        "explicit": False,
-        "podcast": podcast,
-    }
-
-
-def _episode_date(value: str | None) -> str | None:
-    """ytmusicapi sometimes puts the view count where the date goes; that's not a date."""
-    return None if not value or "view" in value else value
-
-
-def _parse_spoken_length(length: str | None) -> int:
-    """'3 hr 36 min', '29 min', '45 sec' -> milliseconds; '4:21' too; 0 if unknown."""
-    if not length:
-        return 0
-    if ":" in length:
-        return _parse_length(length)
-    units = {"hr": 3600, "hour": 3600, "min": 60, "sec": 1}
-    seconds = 0
-    for amount, unit in re.findall(r"(\d+)\s*(hr|hour|min|sec)", length):
-        seconds += int(amount) * units[unit]
-    return seconds * 1000
-
-
-def _song_from_watch(t: dict) -> dict | None:
-    """A track of a watch playlist (radio) has slightly different fields than a search result."""
-    vid = t.get("videoId")
-    if not vid:
-        return None
-    album = t.get("album")
-    return {
-        "id": f"{MODULE_ID}:{vid}",
-        "title": t.get("title") or "",
-        "artists": [{"id": a.get("id"), "name": a.get("name", "")} for a in t.get("artists") or []],
-        "album": {"id": album.get("id"), "name": album.get("name", "")} if album else None,
-        "durationMs": _parse_length(t.get("length")),
-        "thumbnails": _thumbnails(t.get("thumbnail") or t.get("thumbnails") or []),
-        "explicit": bool(t.get("isExplicit")),
-    }
-
-
-def _album_summary(x: dict, kind: str) -> dict:
-    return {
-        "id": x["browseId"],
-        "title": x.get("title") or "",
-        "kind": x.get("type") or kind,
-        "year": x.get("year"),
-        "thumbnails": _thumbnails(x.get("thumbnails") or []),
-    }
-
-
-def _parse_length(length: str | None) -> int:
-    """'4:21' or '1:02:03' -> milliseconds; 0 if unknown."""
-    if not length:
-        return 0
-    try:
-        seconds = 0
-        for part in length.split(":"):
-            seconds = seconds * 60 + int(part)
-        return seconds * 1000
-    except ValueError:
-        return 0
-
-
-def _thumbnails(thumbs: list[dict]) -> list[dict]:
-    out = [{"url": t["url"], "width": t.get("width", 0), "height": t.get("height", 0)} for t in thumbs]
-    # YTM only lists small sizes; the same image is available larger by changing the URL.
-    # Artist pictures are cropped ("=w120-c-h120-…"), album art isn't ("=w120-h120-…").
-    size = r"=w\d+-(c-)?h\d+"
-    if thumbs and re.search(size, thumbs[-1]["url"]):
-        large = re.sub(size, lambda m: f"=w{_LARGE_ART}-{m.group(1) or ''}h{_LARGE_ART}", thumbs[-1]["url"])
-        out.append({"url": large, "width": _LARGE_ART, "height": _LARGE_ART})
-    return out
 
 
 # Fetch YouTube audio in pieces this big: requests without a range are throttled.

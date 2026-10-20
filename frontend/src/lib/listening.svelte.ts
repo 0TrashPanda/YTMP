@@ -3,9 +3,9 @@
 // pages with your login; in the phone's app with your login there (a token made for the app's
 // own pages: those only reach your own phone); on another host's pages with a token just for
 // this, from /connect. See docs/implementation/auth.md#your-history-on-other-pages.
-import { ApiRequestError, getHost } from './api';
+import { answer, ApiRequestError, getHost } from './api';
 import { APP_HOME_ORIGIN, identity, session } from './account';
-import type { ApiError, HistoryPage, HostInfo } from './protocol.gen';
+import type { HistoryPage, HostInfo } from './protocol.gen';
 
 interface Access {
 	/** Your server's address. */
@@ -52,11 +52,7 @@ class ListeningHistory {
 		} catch {
 			throw new ApiRequestError(`Can't reach ${new URL(access.server).host}, where your history is`);
 		}
-		if (!response.ok) {
-			const body = (await response.json().catch(() => null)) as ApiError | null;
-			throw new ApiRequestError(body?.error.message ?? `Request failed (${response.status})`, response.status);
-		}
-		return (response.status === 204 ? null : await response.json()) as T;
+		return answer<T>(response);
 	}
 
 	/** Newest first: the songs played before [before] (ms; null: the newest), matching [query]. */

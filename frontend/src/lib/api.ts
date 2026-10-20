@@ -68,12 +68,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	const token = remote ? remote.token : identity.token;
 	if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
 	if (remote && init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-	const response = await fetch(remote ? remote.server + path : path, { ...init, headers });
+	return answer<T>(await fetch(remote ? remote.server + path : path, { ...init, headers }));
+}
+
+/** What a YTMP host or server answered: its JSON (null for "no content"), or an [ApiRequestError] with its message. */
+export async function answer<T>(response: Response): Promise<T> {
 	if (!response.ok) {
 		const body = (await response.json().catch(() => null)) as ApiError | null;
 		throw new ApiRequestError(body?.error.message ?? `Request failed (${response.status})`, response.status);
 	}
-	return (response.status === 204 ? null : response.json()) as Promise<T>;
+	return (response.status === 204 ? null : await response.json()) as T;
 }
 
 // --- party screens on a TV (docs/features/ui.md#party-screen) ---
