@@ -1,6 +1,11 @@
 package dev.trashpanda.ytmp
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.pm.ServiceInfo
+import androidx.core.app.ServiceCompat
 import android.content.Intent
 import android.net.Uri
 import android.net.wifi.WifiManager
@@ -195,6 +200,31 @@ class PlaybackService : MediaSessionService() {
 
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) =
         super.onUpdateNotification(session, startInForegroundRequired || keepForeground)
+
+    /**
+     * A media button (headphones, Bluetooth, lock screen) while nothing plays here: Android starts
+     * this service in the foreground for it, and it must show a notification within seconds or
+     * the app is stopped as not responding, taking a room this phone hosts with it. Media3 only
+     * shows one while a song is loaded here, so a short one is shown and taken away again.
+     */
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val result = super.onStartCommand(intent, flags, startId)
+        if (intent?.action == Intent.ACTION_MEDIA_BUTTON && !keepForeground) {
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(NotificationChannel(BUTTON_CHANNEL, "Media buttons", NotificationManager.IMPORTANCE_MIN))
+            val notification = Notification.Builder(this, BUTTON_CHANNEL)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle("YTMP")
+                .build()
+            try {
+                ServiceCompat.startForeground(this, BUTTON_NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            } catch (e: Exception) {
+                Log.w(TAG, "media button: couldn't come to the foreground", e)
+            }
+        }
+        return result
+    }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         // The web app (and with it the room connection) is gone, so playback can't follow the room anymore.
@@ -690,6 +720,8 @@ class PlaybackService : MediaSessionService() {
 
     companion object {
         private const val TAG = "YtmpSync"
+        private const val BUTTON_CHANNEL = "media_buttons"
+        private const val BUTTON_NOTIFICATION = 7
         private const val PAUSED_TOLERANCE_MS = 250L
         private const val PAUSE_WAIT_MS = 3000L
         /** Buffering this long (ms) is logged, and reported to the host. */
