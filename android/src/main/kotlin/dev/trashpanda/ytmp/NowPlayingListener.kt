@@ -3,6 +3,7 @@ package dev.trashpanda.ytmp
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 
 /**
  * Reads the notification a Pixel posts when Now Playing recognizes a song and keeps it in
