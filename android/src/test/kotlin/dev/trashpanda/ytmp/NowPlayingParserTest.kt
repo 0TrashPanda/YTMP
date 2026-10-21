@@ -21,6 +21,16 @@ class NowPlayingParserTest {
     }
 
     @Test
+    fun `reads a real Now Playing notification`() {
+        assertEquals(DetectedSong("Together We Rise", "Wind Rose", 9L), NowPlayingParser.parse("Together We Rise by Wind Rose", 9L))
+    }
+
+    @Test
+    fun `the history syncing notification is no song`() {
+        assertNull(NowPlayingParser.parse("Your music history is syncing…", 1L))
+    }
+
+    @Test
     fun `other notifications are no songs`() {
         assertNull(NowPlayingParser.parse(null, 1L))
         assertNull(NowPlayingParser.parse("", 1L))
