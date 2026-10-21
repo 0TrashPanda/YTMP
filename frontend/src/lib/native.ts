@@ -71,6 +71,21 @@ export interface NativeBridge {
 	sleepTimer?(): string | null;
 	/** Sets it (JSON SleepSetting) or turns it off ("null"); the app tells every page as onSleepTimer. */
 	setSleepTimer?(json: string): void;
+	/** Whether this phone is a Pixel, which has Now Playing (bridge version 13). */
+	nowPlayingAvailable?(): boolean;
+	/** Whether YTMP may read Now Playing's notifications; that's allowed in Android's settings (bridge version 13). */
+	nowPlayingAccess?(): boolean;
+	/** Opens Android's notification access settings, to allow that (bridge version 13). */
+	openNowPlayingAccess?(): void;
+	/** The songs Now Playing recognized lately, newest first (bridge version 13): JSON list of DetectedSong. */
+	nowPlayingRecent?(): string;
+}
+
+/** A song a Pixel's Now Playing recognized (android/.../NowPlayingParser.kt); [at] is epoch milliseconds. */
+export interface DetectedSong {
+	title: string;
+	artist: string;
+	at: number;
 }
 
 /** Callbacks the app calls on the page. */
@@ -104,6 +119,8 @@ export interface NativeCallbacks {
 	onPhoneMusic?(on: boolean, error: string | null): void;
 	/** Back from downloadSong: null when the song is in the Music folder, else why not. */
 	onDownloaded?(songId: string, error: string | null): void;
+	/** Now Playing recognized a song: the list of recent ones, newest first. */
+	onNowPlaying?(songs: DetectedSong[]): void;
 }
 
 /** Speakers and TVs on the phone's own network (android/.../MainActivity.kt), for a room on another host. */

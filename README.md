@@ -56,6 +56,8 @@ Music, without Premium, and not tied to a single music service.
   artists, playlists, podcasts, episodes.
 - Paste a YouTube Music or YouTube link in the search box to open that song, album,
   playlist, artist or podcast (or a YTMP room link to open the room).
+- On a Pixel, a music-note icon in the search box lists the songs Now Playing recognized
+  lately; tap one to search for it (allow notification access for YTMP once).
 - Artist, album, playlist and podcast pages.
 - Lyrics, synced line by line (from LRCLIB or YouTube Music), and a karaoke mode that shows
   them large on the party screen and in everyone's player.

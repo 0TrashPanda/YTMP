@@ -9,6 +9,7 @@ import android.net.Uri
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
@@ -22,6 +23,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.media3.session.MediaController
@@ -237,6 +239,11 @@ class MainActivity : ComponentActivity() {
                     js("window.__ytmpNative && window.__ytmpNative.onNearby && window.__ytmpNative.onNearby(${json.encodeToString(NearbyState.serializer(), state)})")
                 }
             }
+            launch {
+                app.nowPlaying.recent.collect { songs ->
+                    js("window.__ytmpNative && window.__ytmpNative.onNowPlaying && window.__ytmpNative.onNowPlaying(${json.encodeToString(ListSerializer(DetectedSong.serializer()), songs)})")
+                }
+            }
             app.host.nearby.notices.collect { text ->
                 js("window.__ytmpNative && window.__ytmpNative.onNearbyNotice && window.__ytmpNative.onNearbyNotice(${JSONObject.quote(text)})")
             }
@@ -383,6 +390,22 @@ class MainActivity : ComponentActivity() {
                 else -> musicPermission.launch(LocalHost.MUSIC_PERMISSION)
             }
         }
+
+        /** Whether this phone is a Pixel, which has Now Playing; the search page shows its icon only then (bridge version 13). */
+        @JavascriptInterface
+        fun nowPlayingAvailable(): Boolean = Build.MANUFACTURER.equals("Google", ignoreCase = true)
+
+        /** Whether YTMP may read Now Playing's notifications (allowed in Android's settings; bridge version 13). */
+        @JavascriptInterface
+        fun nowPlayingAccess(): Boolean = NotificationManagerCompat.getEnabledListenerPackages(this@MainActivity).contains(packageName)
+
+        /** Opens Android's notification access settings, where YTMP is allowed to read Now Playing (bridge version 13). */
+        @JavascriptInterface
+        fun openNowPlayingAccess() = runOnUiThread { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+
+        /** JSON list of DetectedSong, newest first (bridge version 13); changes come as onNowPlaying. */
+        @JavascriptInterface
+        fun nowPlayingRecent(): String = json.encodeToString(ListSerializer(DetectedSong.serializer()), app.nowPlaying.recent.value)
 
         @JavascriptInterface
         fun serverUrl(): String = server.orEmpty()
@@ -654,7 +677,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 12
+        const val BRIDGE_VERSION = 13
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

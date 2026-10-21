@@ -22,6 +22,10 @@ class YtmpApp : Application() {
     lateinit var nearby: Nearby
         private set
 
+    /** The songs a Pixel's Now Playing recognized lately (read by [NowPlayingListener]). */
+    lateinit var nowPlaying: NowPlayingHistory
+        private set
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     /** The app is on screen (set by [MainActivity]). */
@@ -53,6 +57,7 @@ class YtmpApp : Application() {
         super.onCreate()
         logCrashes()
         Log.i("YtmpApp", "YTMP ${Updates.installedVersion(this)} starting")
+        nowPlaying = NowPlayingHistory(this)
         host = LocalHost(this).also { it.start() }
         nearby = Nearby(this)
         scope.launch { host.rooms.list.collect { nearby.announce(it) } }
