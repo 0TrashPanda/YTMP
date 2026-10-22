@@ -2,22 +2,29 @@
 
 For the person running a YTMP server.
 
-## Admin page
+## Admin page ✅
 
-> So far: the server admin manages accounts on `/account` (invite links, create accounts,
-> set passwords) and sees the song cache (how full, *Clear cache*). The rest below is still to do.
+*Settings → Server admin*, on the server's own pages, for the server's admins only. A server
+can have several admins; the first account becomes one, and an admin can make others admin.
+There is always at least one.
 
-A web page (for server admins only) to manage the server without editing config files
-by hand:
-
-- **Accounts**: create, invite, disable or delete accounts; account sign-up mode
-  (see [accounts](accounts.md#creating-an-account))
-- **Rooms**: see active rooms, close rooms, manage "always on" rooms
-- **Trusted servers**: which other auth servers this server trusts
-  (see [accounts](accounts.md#auth-servers))
-- **Cache** ✅: usage and clearing of the [song cache](sources.md#song-cache) (its size and
-  folder are in `[cache]` of `ytmp.toml`)
-- **Server settings**: room codes, timeouts, who may create rooms, tracking default, …
+- **Accounts** ✅: every account with when it was last used and on how many devices. Per
+  account: make it server admin (or not), rename it, set a new password, log it out on every
+  device, delete it (with its listening history, settings and rooms). New accounts (also
+  as admin), invite links (once, 7 days), and the open invite links, which can be revoked.
+- **Settings** ✅: who can sign up (anyone, with an invite link, or only admins), guests (people
+  without an account), listening history for new accounts, trusted servers (other servers
+  whose accounts can join, see [accounts](accounts.md#auth-servers)), room codes (letters,
+  digits or both, and their length), streaming audio through the server, the
+  [song cache](sources.md#song-cache) (how full, its size, *Clear cache*) and how much goes
+  in the logs. Numbers are typed. They start as in `ytmp.toml`; a change works right away,
+  wins over `ytmp.toml` and says what `ytmp.toml` has, with *Reset* to go back to it. The
+  server's address, port, database, module key, speakers and log files stay in `ytmp.toml`.
+- **Rooms** ✅: every room with its owner, who's in it now and what plays; *Close* ends one.
+- **About** ✅: the server's version and whether a newer release is out, the YouTube Music
+  module's yt-dlp and ytmusicapi (or that it can't be reached), and how many accounts and
+  rooms there are.
+- Not yet: disabling an account without deleting it, timeouts, who may create rooms.
 
 ## Updates
 
@@ -26,7 +33,7 @@ by hand:
 > ytmusicapi is out). Update right away with `docker compose pull && docker compose up -d`;
 > stay on a version with `YTMP_VERSION` in `.env` (see the
 > [Proxmox guide](../../deploy/proxmox.md#updating)). The module logs its yt-dlp version when
-> it starts (`docker compose logs ytm`). Not built: the admin page showing versions.
+> it starts (`docker compose logs ytm`). The admin page shows the versions (*About*).
 
 - **yt-dlp** is updated **automatically** on the server, because YouTube changes often and
   an outdated yt-dlp breaks playback. The admin page shows the current version and

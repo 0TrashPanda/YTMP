@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.core
 
+import dev.trashpanda.ytmp.protocol.AdminRoomInfo
 import dev.trashpanda.ytmp.protocol.BanInfo
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
@@ -401,6 +402,24 @@ class Room(
     }
 
     /** [guestToken] is a party screen's: it may join without an account. */
+    /** For the server admin's list of rooms: who's here and what plays. */
+    suspend fun adminInfo(): AdminRoomInfo = mutex.withLock {
+        val people = members.values.filter { !it.screen }
+        AdminRoomInfo(
+            code = code,
+            name = name,
+            visibility = visibility,
+            owner = ownerAccount,
+            online = people.count { it.online },
+            members = people.size,
+            playing = isPlaying,
+            current = current?.song?.title,
+            queued = queue.size,
+            alwaysOn = alwaysOn,
+            lastActive = lastActive,
+        )
+    }
+
     suspend fun isScreen(guestToken: String?): Boolean = mutex.withLock {
         guestToken != null && members.values.any { it.screen && it.token == guestToken }
     }

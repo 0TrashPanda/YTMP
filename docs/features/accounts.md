@@ -152,8 +152,9 @@ server, or a server it trusts). Speakers and TVs still get the audio.
 
 Who can create an account on a server is set in the **server config**: open sign-up,
 invite only (the default), or only the server admin creates accounts. The **first account**
-made on a new server becomes the **server admin**, who makes invite links and accounts and
-can set someone's password (there is no e-mail).
+made on a new server becomes the **server admin**, who makes invite links and accounts,
+can set someone's password (there is no e-mail) and can make other accounts server admin
+too (see the [admin page](server-admin.md#admin-page)).
 
 Accounts are a **username and password**, shown as `username@server`. You always log in on
 your own server's page; a room on another host only gets proof of who you are, never your

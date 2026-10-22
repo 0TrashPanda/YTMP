@@ -85,7 +85,9 @@ your YouTube Music, the song graph), how it behaves a `HostOptions`. Routes are 
 `RoomRoutes` (`/api/host`, rooms, `/ws`), `CatalogRoutes` (search, pages, Local, audio),
 `PersonalRoutes` (`/api/me`), `ScreenRoutes` (party screens); what they share (who a request is,
 its YouTube Music) is `HostContext`. The server adds its own routes (accounts, history, room
-sync) through `extraApi`.
+sync, the admin page in `AdminApi.kt`) through `extraApi`. A server setting the admin page can
+change goes in `ServerSettings.kt` (`ServerSettingValues` in `protocol/`) and is put to work
+in `settings.apply` in the server's `Main.kt`.
 
 **Songs' audio** (`host/`): sources are wrapped, in front of YouTube Music: `LocalMusic`
 (`local:` songs) and the song cache `SongCache` (cached and downloaded songs), each with a

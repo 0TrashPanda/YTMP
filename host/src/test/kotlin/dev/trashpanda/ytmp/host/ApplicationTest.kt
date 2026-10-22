@@ -143,7 +143,7 @@ class ApplicationTest {
         }
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = true))
+            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = { true }))
         }
         val client = jsonClient()
         fun io.ktor.client.request.HttpRequestBuilder.asAnna() = header(HttpHeaders.Authorization, "Bearer anna")
@@ -176,7 +176,7 @@ class ApplicationTest {
         }
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = true))
+            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = { true }))
         }
         val client = jsonClient()
         val created = client.post("/api/rooms") {

@@ -96,7 +96,7 @@ Music, without Premium, and not tied to a single music service.
 - A **song cache** on the server and the phone: songs you play are kept, so next time they
   start at once without asking YouTube, and on the phone they play without internet (*Local →
   Cached on this phone*, with your downloads). Songs streamed anyway are kept for free, others
-  from their second play; podcast episodes aren't. 5 GB on a server (`ytmp.toml`), 1 GB on a
+  from their second play; podcast episodes aren't. 5 GB on a server (admin page), 1 GB on a
   phone (*Settings → Playback*, on the phone or its SD card), with *Clear cache*.
 
 **People and accounts**
@@ -119,6 +119,10 @@ Music, without Premium, and not tied to a single music service.
 - Log in once: the server's pages and the app's own pages share the login.
 - Open pages update themselves after a server update: they reload when the sound stops in
   that browser and you're not typing, so you never need to clear your browser's cache.
+- **An admin page** for the server (*Settings → Server admin*): accounts (make someone admin,
+  rename, new password, log out everywhere, delete), invite links, server settings that work
+  right away (sign-up, guests, trusted servers, room codes, audio, song cache, logs), the
+  rooms (close one), and versions.
 
 **The app**
 - Checks for new versions when it starts and installs them; *Check for updates* and *Send

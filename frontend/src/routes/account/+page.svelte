@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Your account on this server: Settings, at Account (logging in or signing up there too,
-	// also with an invite link: /account?invite=…). The server admin's tools are in Settings → Server.
+	// also with an invite link: /account?invite=…). The server admin's tools are in Settings → Server admin.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import SettingsScreen from '../../lib/components/settings/SettingsScreen.svelte';

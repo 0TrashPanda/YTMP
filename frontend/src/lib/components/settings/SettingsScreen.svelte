@@ -71,7 +71,7 @@
 				['local', 'Local music', 'local', true],
 				['look', 'Look', 'palette', true],
 				['app', 'App', 'phone', !!nativeBridge?.appVersion],
-				['server', 'Server', 'server', !!account?.isAdmin && !!info]
+				['server', 'Server admin', 'server', !!account?.isAdmin && !!info]
 			] as [SettingsSection, string, IconName, boolean][]
 		).filter(([, , , shown]) => shown)
 	);
@@ -306,8 +306,8 @@
 					</div>
 					<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => nativeBridge?.shareLogs?.()}>Send logs</button>
 				</div>
-			{:else if section === 'server' && info}
-				<ServerSection {info} {onToast} />
+			{:else if section === 'server' && info && account}
+				<ServerSection {info} me={account} {onToast} />
 			{/if}
 		</div>
 	</div>

@@ -33,6 +33,7 @@ import io.ktor.server.application.Application
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.trashpanda.ytmp.core.RadioSource
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -74,8 +75,6 @@ fun main(args: Array<String>) {
         expectSuccess = false
     }
     val ytm = RemoteSourceModule(http, config.ytm.url.trimEnd('/'), config.ytm.key)
-    val audioProxy = config.audio.proxyMode()
-    log.info("Streaming audio through the server: {}", audioProxy.name.lowercase())
 
     embeddedServer(Netty, port = config.server.port, host = config.server.host) {
         val audioBase = { localAddress: java.net.InetAddress ->
@@ -101,12 +100,17 @@ fun main(args: Array<String>) {
 
         val db = Database.open(config.database)
         val accounts = Accounts(db)
+        // ytmp.toml's settings, with what the admin changed on the admin page over them.
+        val settings = ServerSettings(accounts, config)
+        val live = settings.values
+        if (live.logLevel != config.logs.level.lowercase()) setLogLevel(live.logLevel)
+        log.info("Streaming audio through the server: {}", live.proxyMode().name.lowercase())
         // The song graph learns from YouTube Music's radios too (docs/features/history-and-recommendations.md#song-graph).
         val graph = SongGraph(db)
         graph.buildIfNeeded(accounts)
         val cached = CachedSource(ytm, RadioSource { seed -> ytm.radio(seed).also { graph.learnRadio(seed, it) } }, ytm, ytm)
         // Songs played here, kept so they start at once without a YouTube lookup.
-        val songCache = SongCache(config.cache.folder(config.database), config.cache.bytes(), lookup = ytm, audio = ytm, scope = this)
+        val songCache = SongCache(config.cache.folder(config.database), live.cacheBytes, lookup = ytm, audio = ytm, scope = this)
         log.info("Song cache: {} ({} MB at most)", songCache.dir, songCache.maxBytes / (1024 * 1024))
         val ownUrl = normalizeOrigin(config.accounts.url)
         val issuer = config.accounts.name.ifBlank {
@@ -115,7 +119,7 @@ fun main(args: Array<String>) {
         val key = accounts.signingKey()
         val isOwnOrigin = { origin: String -> origin == ownUrl || origin in localOrigins(config.server.port) }
         val service = AccountService(
-            accounts, issuer, key, config.accounts.signupMode(), History(db), config.accounts.trackingDefault,
+            accounts, issuer, key, live.signup, History(db), live.trackingDefault,
             graph = graph, isOwnOrigin = isOwnOrigin, episodes = Episodes(db),
         )
         val auth = TrustedAuthServers(
@@ -126,9 +130,9 @@ fun main(args: Array<String>) {
             ownEpisodes = TrustedAuthServers.OwnEpisodes(service::episodeProgress, service::reportEpisode),
         )
         auth.trust(AuthServerRef(url = null, issuer = issuer), key.public)
-        trustServers(auth, config.accounts.trusted, ownIssuer = issuer)
+        var trusting = trustServers(auth, live.trusted, ownIssuer = issuer)
         if (ownUrl == null) log.warn("accounts.url (YTMP_URL) is not set: account logins only work on this machine's own addresses")
-        log.info("Accounts: {} (sign-up: {}{})", issuer, config.accounts.signup, if (config.accounts.guests) "" else ", accounts only")
+        log.info("Accounts: {} (sign-up: {}{})", issuer, live.signup.name.lowercase(), if (live.guests) "" else ", accounts only")
 
         val plays = PlayReporter(auth, this)
         val youtube = YoutubeLinks(accounts, config.ytm.key, ytm, this)
@@ -137,7 +141,7 @@ fun main(args: Array<String>) {
         /** One of this server's own accounts, by account ID (`user@issuer`). */
         fun localAccount(accountId: String): String? = localUsername(accountId)?.let(accounts::find)?.id
         val rooms = RoomManager(
-            local.streams(songCache.streams), this, config.rooms.style(), config.rooms.codeLength, outputs = outputs.devices, store = JdbcRoomStore(db),
+            local.streams(songCache.streams), this, live.codeStyle(), live.roomCodeLength, outputs = outputs.devices, store = JdbcRoomStore(db),
             // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
             // Party rooms whose admins are all gone for 5 minutes tell the others they can clone them.
             timeouts = RoomTimeouts(guestSoloRoom = 30.days, adminless = 5.minutes),
@@ -166,6 +170,21 @@ fun main(args: Array<String>) {
         val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, defaultPassword = service::roomPassword)
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
         outputs.attach(rooms)
+        // The admin page changed a setting: put it to work (guests and audio are read on each request).
+        settings.apply = { old, new ->
+            service.signup = new.signup
+            service.trackingDefault = new.trackingDefault
+            rooms.codeStyle = new.codeStyle()
+            rooms.codeLength = new.roomCodeLength
+            if (new.cacheBytes != old.cacheBytes) launch { songCache.setMaxBytes(new.cacheBytes) }
+            if (new.logLevel != old.logLevel) setLogLevel(new.logLevel)
+            if (new.trusted != old.trusted) {
+                trusting.forEach { it.cancel() }
+                auth.retain { it.url == null }
+                trusting = trustServers(auth, new.trusted, ownIssuer = issuer)
+            }
+        }
+        val admin = AdminApi(service, rooms, settings, Versions(http, config.ytm.url.trimEnd('/'), config.ytm.key))
 
         ytmpModule(
             rooms,
@@ -208,16 +227,17 @@ fun main(args: Array<String>) {
                 // No request is "the hosting device" on a server: behind a reverse proxy on the
                 // same machine, every visitor comes from localhost. Solo rooms go by owner.
                 isLocal = { false },
-                mayProxyAudio = audioProxy::allows,
-                accountsOnly = !config.accounts.guests,
+                mayProxyAudio = { call -> settings.values.proxyMode().allows(call) },
+                accountsOnly = { !settings.values.guests },
                 crossOriginPersonal = true,
             ),
             webApp = File(config.server.frontend),
             extraApi = {
                 service.routes(this)
+                admin.routes(this)
                 hub.routes(this)
                 youtube.routes(this) { call -> service.sessionAccount(call)?.id }
-                // Settings → Server: how full the song cache is, Clear cache.
+                // Settings → Server admin: how full the song cache is, Clear cache.
                 songCacheRoutes("/admin/cache", songCache, settings = null) { call -> service.sessionAccount(call)?.isAdmin == true }
             },
         )
@@ -225,8 +245,8 @@ fun main(args: Array<String>) {
 }
 
 /** Fetches the public keys of other auth servers whose accounts may join here; retries until each works. */
-private fun Application.trustServers(auth: TrustedAuthServers, urls: List<String>, ownIssuer: String) {
-    for (url in urls) {
+private fun Application.trustServers(auth: TrustedAuthServers, urls: List<String>, ownIssuer: String): List<Job> =
+    urls.map { url ->
         launch(Dispatchers.IO) {
             while (true) {
                 val info = runCatching { fetchAuthServerInfo(url) }
@@ -241,6 +261,12 @@ private fun Application.trustServers(auth: TrustedAuthServers, urls: List<String
             }
         }
     }
+
+/** info or debug, while running (the admin page). */
+private fun setLogLevel(level: String) {
+    (LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) as? ch.qos.logback.classic.Logger)?.level =
+        ch.qos.logback.classic.Level.toLevel(level.uppercase(), ch.qos.logback.classic.Level.INFO)
+    log.info("Log level: {}", level)
 }
 
 private fun hostName(): String = runCatching { InetAddress.getLocalHost().hostName }.getOrNull()?.lowercase()?.takeIf { it.isNotBlank() } ?: "ytmp"

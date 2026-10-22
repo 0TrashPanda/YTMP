@@ -57,8 +57,8 @@ data class RoomTimeouts(
 class RoomManager(
     private val streams: StreamResolver,
     private val scope: CoroutineScope,
-    private val codeStyle: RoomCodeStyle = RoomCodeStyle.LETTERS,
-    private val codeLength: Int = 4,
+    codeStyle: RoomCodeStyle = RoomCodeStyle.LETTERS,
+    codeLength: Int = 4,
     private val timeouts: RoomTimeouts = RoomTimeouts(),
     private val clock: () -> Long = System::currentTimeMillis,
     /** Speakers and TVs the host found; every room can play on them. */
@@ -74,6 +74,14 @@ class RoomManager(
     /** Where people are in podcast episodes, on their accounts (resume in any room). */
     private val bookmarks: EpisodeBookmarks? = null,
 ) {
+    /** What new rooms' codes are made of; can change while running (a server's admin page). */
+    @Volatile
+    var codeStyle: RoomCodeStyle = codeStyle
+
+    /** How long new rooms' codes are. */
+    @Volatile
+    var codeLength: Int = codeLength
+
     private val rooms = ConcurrentHashMap<String, Room>()
     /** Rooms by the codes they had before ([Room.formerCodes]): links and QR codes with them still work. */
     private val former = ConcurrentHashMap<String, Room>()

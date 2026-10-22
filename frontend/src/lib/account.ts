@@ -18,6 +18,12 @@ import type {
 	HostInfo,
 	HostTokenResponse,
 	InviteResponse,
+	InviteListResponse,
+	UpdateAccountRequest,
+	AdminSettings,
+	ServerSettingOverrides,
+	AdminRoomList,
+	ServerAbout,
 	RoleTemplate,
 	SessionResponse,
 	YoutubeSignInRequest
@@ -131,13 +137,26 @@ export const authServer = {
 		URL.revokeObjectURL(link.href);
 	},
 
+	// The server admin's page (Settings → Server admin).
 	listAccounts: async () => (await call<AccountListResponse>('/api/admin/accounts')).accounts,
-	createAccount: (username: string, password: string, displayName: string) =>
-		call<AccountInfo>('/api/admin/accounts', { username, password, displayName }),
+	createAccount: (username: string, password: string, displayName: string, isAdmin = false) =>
+		call<AccountInfo>('/api/admin/accounts', { username, password, displayName, isAdmin }),
+	/** Renames an account or makes it admin (or not); null leaves that as it is. */
+	updateAccount: (username: string, change: Partial<UpdateAccountRequest>) =>
+		call<AccountInfo>(`/api/admin/accounts/${encodeURIComponent(username)}`, { displayName: null, isAdmin: null, ...change }, 'PUT'),
 	setPassword: (username: string, password: string) =>
 		call<null>(`/api/admin/accounts/${encodeURIComponent(username)}/password`, { password }),
+	logOutEverywhere: (username: string) => call<null>(`/api/admin/accounts/${encodeURIComponent(username)}/logout`, {}),
+	deleteAccount: (username: string) => call<null>(`/api/admin/accounts/${encodeURIComponent(username)}`, undefined, 'DELETE'),
 	createInvite: () => call<InviteResponse>('/api/admin/invites', {}),
-	/** The server's song cache: how full it is, and Clear cache (its size is in ytmp.toml). */
+	listInvites: async () => (await call<InviteListResponse>('/api/admin/invites')).invites,
+	revokeInvite: (id: string) => call<null>(`/api/admin/invites/${encodeURIComponent(id)}`, undefined, 'DELETE'),
+	serverSettings: () => call<AdminSettings>('/api/admin/settings'),
+	saveServerSettings: (overrides: ServerSettingOverrides) => call<AdminSettings>('/api/admin/settings', overrides, 'PUT'),
+	listRooms: async () => (await call<AdminRoomList>('/api/admin/rooms')).rooms,
+	closeRoom: (code: string) => call<null>(`/api/admin/rooms/${encodeURIComponent(code)}`, undefined, 'DELETE'),
+	about: () => call<ServerAbout>('/api/admin/about'),
+	/** The server's song cache: how full it is, and Clear cache (its size is in the server settings). */
 	songCache: () => call<SongCacheStatus>('/api/admin/cache'),
 	clearSongCache: () => call<SongCacheStatus>('/api/admin/cache/clear', {})
 };

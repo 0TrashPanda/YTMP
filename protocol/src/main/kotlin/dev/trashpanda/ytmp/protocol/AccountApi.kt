@@ -80,15 +80,37 @@ data class HostTokenRequest(
 @SerialName("HostTokenResponse")
 data class HostTokenResponse(val token: String, val expiresAt: Long, val account: AccountInfo)
 
+/** An account in the server admin's list. */
+@Serializable
+@SerialName("AdminAccountInfo")
+data class AdminAccountInfo(
+    /** `username@issuer` */
+    val id: String,
+    val username: String,
+    val displayName: String,
+    val isAdmin: Boolean,
+    /** When it was made (ms). */
+    val createdAt: Long,
+    /** The last time one of its logins here was used (ms); null: never logged in, or logged out everywhere. */
+    val lastSeen: Long? = null,
+    /** How many devices are logged in to it here. */
+    val logins: Int = 0,
+)
+
 /** `GET /api/admin/accounts` */
 @Serializable
 @SerialName("AccountListResponse")
-data class AccountListResponse(val accounts: List<AccountInfo>)
+data class AccountListResponse(val accounts: List<AdminAccountInfo>)
 
 /** `POST /api/admin/accounts` */
 @Serializable
 @SerialName("CreateAccountRequest")
-data class CreateAccountRequest(val username: String, val password: String, val displayName: String? = null)
+data class CreateAccountRequest(val username: String, val password: String, val displayName: String? = null, val isAdmin: Boolean = false)
+
+/** `PUT /api/admin/accounts/{username}`: what to change (null: leave it). */
+@Serializable
+@SerialName("UpdateAccountRequest")
+data class UpdateAccountRequest(val displayName: String? = null, val isAdmin: Boolean? = null)
 
 /** `POST /api/admin/accounts/{username}/password` */
 @Serializable
@@ -99,6 +121,111 @@ data class SetPasswordRequest(val password: String)
 @Serializable
 @SerialName("InviteResponse")
 data class InviteResponse(val code: String, val expiresAt: Long)
+
+/** An invite link nobody has used yet. Its code isn't kept, so it can't be shown again; [id] only revokes it. */
+@Serializable
+@SerialName("InviteInfo")
+data class InviteInfo(val id: String, val createdBy: String, val createdAt: Long, val expiresAt: Long)
+
+/** `GET /api/admin/invites` */
+@Serializable
+@SerialName("InviteListResponse")
+data class InviteListResponse(val invites: List<InviteInfo>)
+
+/**
+ * The server settings the admin page changes. `ytmp.toml` (and `YTMP_*` environment variables)
+ * give them first; a value set on the admin page wins.
+ */
+@Serializable
+@SerialName("ServerSettingValues")
+data class ServerSettingValues(
+    val signup: SignupMode,
+    /** People without an account may use the server. */
+    val guests: Boolean,
+    /** New accounts keep a listening history until they turn it off. */
+    val trackingDefault: Boolean,
+    /** Other YTMP servers (URLs) whose accounts may join rooms here. */
+    val trusted: List<String>,
+    /** letters | digits | alnum */
+    val roomCodeStyle: String,
+    val roomCodeLength: Int,
+    /** Who may stream audio through the server: always | lan | never. */
+    val audioProxy: String,
+    /** The song cache's size; 0: off. */
+    val cacheBytes: Long,
+    /** info | debug */
+    val logLevel: String,
+)
+
+/** The same settings as [ServerSettingValues], as set on the admin page: null means "as in ytmp.toml". */
+@Serializable
+@SerialName("ServerSettingOverrides")
+data class ServerSettingOverrides(
+    val signup: SignupMode? = null,
+    val guests: Boolean? = null,
+    val trackingDefault: Boolean? = null,
+    val trusted: List<String>? = null,
+    val roomCodeStyle: String? = null,
+    val roomCodeLength: Int? = null,
+    val audioProxy: String? = null,
+    val cacheBytes: Long? = null,
+    val logLevel: String? = null,
+)
+
+/** `GET`/`PUT /api/admin/settings` (`PUT` sends [ServerSettingOverrides]). */
+@Serializable
+@SerialName("AdminSettings")
+data class AdminSettings(
+    /** What's in use now. */
+    val values: ServerSettingValues,
+    /** What ytmp.toml (and environment variables) say. */
+    val file: ServerSettingValues,
+    /** What's set on the admin page. */
+    val overrides: ServerSettingOverrides,
+)
+
+/** A room on the server, in the admin's list (`GET /api/admin/rooms`). */
+@Serializable
+@SerialName("AdminRoomInfo")
+data class AdminRoomInfo(
+    val code: String,
+    val name: String,
+    val visibility: RoomVisibility,
+    /** The owner's account ID, or null: a guest's room. */
+    val owner: String? = null,
+    /** People connected now (not party screens). */
+    val online: Int,
+    /** People in the room, connected or not. */
+    val members: Int,
+    val playing: Boolean,
+    /** The song playing or paused now. */
+    val current: String? = null,
+    val queued: Int,
+    val alwaysOn: Boolean,
+    /** Last time someone was connected (ms). */
+    val lastActive: Long,
+)
+
+@Serializable
+@SerialName("AdminRoomList")
+data class AdminRoomList(val rooms: List<AdminRoomInfo>)
+
+/** `GET /api/admin/about`: versions. */
+@Serializable
+@SerialName("ServerAbout")
+data class ServerAbout(
+    /** This server's version, or null: a build of its own (not a release). */
+    val version: String? = null,
+    /** The newest release on GitHub, or null: unknown (not looked up yet, or no internet). */
+    val latestVersion: String? = null,
+    /** The YouTube Music module's yt-dlp, or null: the module can't be reached. */
+    val ytDlp: String? = null,
+    val ytmusicapi: String? = null,
+    /** The module answers. */
+    val moduleOnline: Boolean = false,
+    val accounts: Int = 0,
+    val rooms: Int = 0,
+)
 
 /** An auth server whose accounts can join rooms on a host. */
 @Serializable

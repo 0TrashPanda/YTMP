@@ -68,6 +68,9 @@ def test_a_page_may_ask_with_the_key(monkeypatch):
     answer = client.get("/info", headers=page | {"Authorization": "Bearer k"})
     assert answer.status_code == 200
     assert answer.headers["access-control-allow-origin"] == "https://ytmp.example.com"
+    # The server's admin page shows these.
+    assert answer.json()["ytDlp"]
+    assert answer.json()["ytmusicapi"]
 
 
 def test_without_a_key_pages_cant_use_it():

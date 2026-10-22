@@ -1,7 +1,7 @@
 <script lang="ts">
 	// The song cache in the settings: how full it is and Clear cache. On a phone also its size
-	// and where it's kept (Settings → Playback); a server's admin sees it under Server (its size
-	// is in ytmp.toml).
+	// and where it's kept (Settings → Playback); a server's admin sees it under Server admin →
+	// Settings, with its size next to it.
 	import { onDestroy } from 'svelte';
 	import type { SongCacheSettings, SongCacheStatus } from '../../protocol.gen';
 	import NumberField from '../NumberField.svelte';
@@ -17,7 +17,7 @@
 		load: () => Promise<SongCacheStatus>;
 		clear: () => Promise<SongCacheStatus>;
 		change?: (settings: SongCacheSettings) => Promise<SongCacheStatus>;
-		/** In a card of its own (Settings → Server): a heading like the other cards'. */
+		/** In a card of its own (Settings → Server admin): a heading like the other cards'. */
 		card?: boolean;
 		onToast: (text: string) => void;
 	} = $props();
@@ -82,7 +82,7 @@
 			{#if status?.settable}
 				Songs you play are kept on this phone, so they start at once and play without internet (in Local → Cached on this phone). Podcast episodes aren't kept.
 			{:else}
-				Songs played on this server are kept, so they start at once without asking YouTube. Podcast episodes aren't kept. Its size and folder are under [cache] in ytmp.toml.
+				Songs played on this server are kept, so they start at once without asking YouTube. Podcast episodes aren't kept.
 			{/if}
 		</p>
 	</div>

@@ -870,14 +870,25 @@ export interface HostTokenResponse {
   account: AccountInfo;
 }
 
+export interface AdminAccountInfo {
+  id: string;
+  username: string;
+  displayName: string;
+  isAdmin: boolean;
+  createdAt: number;
+  lastSeen: number | null;
+  logins: number;
+}
+
 export interface AccountListResponse {
-  accounts: AccountInfo[];
+  accounts: AdminAccountInfo[];
 }
 
 export interface CreateAccountRequest {
   username: string;
   password: string;
   displayName: string | null;
+  isAdmin: boolean;
 }
 
 export interface SetPasswordRequest {
@@ -887,6 +898,80 @@ export interface SetPasswordRequest {
 export interface InviteResponse {
   code: string;
   expiresAt: number;
+}
+
+export interface UpdateAccountRequest {
+  displayName: string | null;
+  isAdmin: boolean | null;
+}
+
+export interface InviteInfo {
+  id: string;
+  createdBy: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface InviteListResponse {
+  invites: InviteInfo[];
+}
+
+export interface ServerSettingValues {
+  signup: SignupMode;
+  guests: boolean;
+  trackingDefault: boolean;
+  trusted: string[];
+  roomCodeStyle: string;
+  roomCodeLength: number;
+  audioProxy: string;
+  cacheBytes: number;
+  logLevel: string;
+}
+
+export interface ServerSettingOverrides {
+  signup: SignupMode | null;
+  guests: boolean | null;
+  trackingDefault: boolean | null;
+  trusted: string[] | null;
+  roomCodeStyle: string | null;
+  roomCodeLength: number | null;
+  audioProxy: string | null;
+  cacheBytes: number | null;
+  logLevel: string | null;
+}
+
+export interface AdminSettings {
+  values: ServerSettingValues;
+  file: ServerSettingValues;
+  overrides: ServerSettingOverrides;
+}
+
+export interface AdminRoomInfo {
+  code: string;
+  name: string;
+  visibility: RoomVisibility;
+  owner: string | null;
+  online: number;
+  members: number;
+  playing: boolean;
+  current: string | null;
+  queued: number;
+  alwaysOn: boolean;
+  lastActive: number;
+}
+
+export interface AdminRoomList {
+  rooms: AdminRoomInfo[];
+}
+
+export interface ServerAbout {
+  version: string | null;
+  latestVersion: string | null;
+  ytDlp: string | null;
+  ytmusicapi: string | null;
+  moduleOnline: boolean;
+  accounts: number;
+  rooms: number;
 }
 
 export interface LinkAuthServerRequest {

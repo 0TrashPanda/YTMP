@@ -23,6 +23,12 @@ import dev.trashpanda.ytmp.protocol.HostTokenRequest
 import dev.trashpanda.ytmp.protocol.HostTokenResponse
 import dev.trashpanda.ytmp.protocol.AccountListResponse
 import dev.trashpanda.ytmp.protocol.CreateAccountRequest
+import dev.trashpanda.ytmp.protocol.UpdateAccountRequest
+import dev.trashpanda.ytmp.protocol.InviteListResponse
+import dev.trashpanda.ytmp.protocol.AdminSettings
+import dev.trashpanda.ytmp.protocol.ServerSettingOverrides
+import dev.trashpanda.ytmp.protocol.AdminRoomList
+import dev.trashpanda.ytmp.protocol.ServerAbout
 import dev.trashpanda.ytmp.protocol.SetPasswordRequest
 import dev.trashpanda.ytmp.protocol.InviteResponse
 import dev.trashpanda.ytmp.protocol.LinkAuthServerRequest
@@ -200,6 +206,12 @@ fun main(args: Array<String>) {
     generator.addRoot(CreateAccountRequest.serializer().descriptor)
     generator.addRoot(SetPasswordRequest.serializer().descriptor)
     generator.addRoot(InviteResponse.serializer().descriptor)
+    generator.addRoot(UpdateAccountRequest.serializer().descriptor)
+    generator.addRoot(InviteListResponse.serializer().descriptor)
+    generator.addRoot(AdminSettings.serializer().descriptor)
+    generator.addRoot(ServerSettingOverrides.serializer().descriptor)
+    generator.addRoot(AdminRoomList.serializer().descriptor)
+    generator.addRoot(ServerAbout.serializer().descriptor)
     generator.addRoot(LinkAuthServerRequest.serializer().descriptor)
     generator.addRoot(RoleTemplate.serializer().descriptor)
     generator.addRoot(HistoryPage.serializer().descriptor)

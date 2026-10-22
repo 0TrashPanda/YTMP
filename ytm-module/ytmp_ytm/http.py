@@ -113,6 +113,9 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
             "name": "YouTube Music",
             "version": VERSION,
             "apiVersion": API_VERSION,
+            # For the server's admin page.
+            "ytDlp": core.yt_dlp.version.__version__,
+            "ytmusicapi": core._version("ytmusicapi"),
             "capabilities": ["search", "suggestions", "stream", "audio", "radio", "artist", "album", "playlist", "podcast", "home", "personal", "lyrics"],
         }
 
