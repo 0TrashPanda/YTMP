@@ -4,6 +4,7 @@
 	// is in ytmp.toml).
 	import { onDestroy } from 'svelte';
 	import type { SongCacheSettings, SongCacheStatus } from '../../protocol.gen';
+	import NumberField from '../NumberField.svelte';
 	import Choice from './Choice.svelte';
 
 	let {
@@ -47,6 +48,8 @@
 	}
 	refresh();
 	onDestroy(() => clearTimeout(timer));
+
+	const setSize = (maxBytes: number) => attempt(() => change!({ maxBytes, place: status?.place ?? null }));
 
 	async function attempt(action: () => Promise<SongCacheStatus>, done?: string) {
 		busy = true;
@@ -107,8 +110,10 @@
 				hint="When it's full, the songs you haven't played for the longest time go first (songs you play often stay longer)."
 				options={sizes}
 				value={String(status.maxBytes)}
-				onchange={(v) => attempt(() => change({ maxBytes: Number(v), place: status?.place ?? null }))}
-			/>
+				onchange={(v) => setSize(Number(v))}
+			>
+				<NumberField value={status.maxBytes / GB} min={0} max={1000} step={0.1} unit="GB" label="Size in GB (0: off)" onchange={(v) => setSize(Math.round(v * GB))} />
+			</Choice>
 			{#if status.places.length > 1}
 				<Choice
 					label="Kept on"

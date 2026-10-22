@@ -171,7 +171,7 @@ sealed interface Command {
     data class Seek(val positionMs: Long) : Command
 
     /**
-     * The speed podcast episodes play at, for everyone in the room (one of [EPISODE_SPEEDS]);
+     * The speed podcast episodes play at, for everyone in the room ([isEpisodeSpeed]: 0.5–2 in steps of 0.05);
      * music always plays at 1. Kept for the next episodes. Play/pause.
      */
     @Serializable

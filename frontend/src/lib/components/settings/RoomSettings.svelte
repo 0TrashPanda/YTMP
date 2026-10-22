@@ -6,6 +6,7 @@
 	import type { Command, HostInfo, Participant, Permission, Role, RoomOpenMode } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
 	import LeaveRoomDialog from '../LeaveRoomDialog.svelte';
+	import NumberField from '../NumberField.svelte';
 	import MemberPermissions from './MemberPermissions.svelte';
 	import RoleEditor from './RoleEditor.svelte';
 	import SaveBar from './SaveBar.svelte';
@@ -159,6 +160,9 @@
 		await run({ kind: 'UpdateSettings', name: null, defaultGuestRole: null, defaultAccountRole: null, autoplay: null, alwaysOn: null, startWaitSeconds: null, karaoke: null, fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes });
 		queueBusy = false;
 	}
+	/** The highest a limit can be (Permissions.MAX_LIMIT) and the longest wait for the players (MAX_START_WAIT_SECONDS). */
+	const MAX_LIMIT = 1000;
+	const MAX_START_WAIT_SECONDS = 10;
 	/** Choices for a limit, with the current value even when it isn't one of them (set elsewhere). */
 	const choices = (values: number[], current: number) => [...new Set([0, ...values, current])].sort((a, b) => a - b);
 	const minutes = (m: number) => (m % 60 === 0 && m >= 60 ? `${m / 60} hour${m === 60 ? '' : 's'}` : `${m} min`);
@@ -312,11 +316,14 @@
 					<p class="mb-3 text-sm text-d-muted">
 						A new song waits until every phone, browser, TV and speaker playing the room has loaded it, so they all start it together. A slow one joins late after this.
 					</p>
-					<select class={input} bind:value={startWaitSeconds} aria-label="Starting a song">
-						{#each choices([1, 2, 3, 5, 10], startWaitSeconds) as seconds (seconds)}
-							<option value={seconds}>{seconds === 0 ? "Don't wait (some miss the start)" : `Wait at most ${seconds} s`}</option>
-						{/each}
-					</select>
+					<div class="flex items-center gap-3">
+						<select class="{input} min-w-0 flex-1" bind:value={startWaitSeconds} aria-label="Starting a song">
+							{#each choices([1, 2, 3, 5, 10], startWaitSeconds) as seconds (seconds)}
+								<option value={seconds}>{seconds === 0 ? "Don't wait (some miss the start)" : `Wait at most ${seconds} s`}</option>
+							{/each}
+						</select>
+						<NumberField value={startWaitSeconds} min={0} max={MAX_START_WAIT_SECONDS} unit="s" label="Seconds to wait at most (0: don't wait)" class="bg-d-deep py-2.5 text-d-text" onchange={(v) => (startWaitSeconds = v)} />
+					</div>
 					<div class="my-6 h-px bg-d-line"></div>
 					<h3 class="mb-1 text-base font-semibold text-d-head">Password</h3>
 					<p class="mb-3 text-sm text-d-muted">
@@ -397,42 +404,54 @@
 						<Switch checked={voteSkip} label="Vote to skip" onchange={(on) => (voteSkip = on)} />
 					</div>
 					{#if voteSkip}
-						<label class="mt-4 block">
+						<div class="mt-4">
 							<span class={label}>Votes needed</span>
-							<select class={input} bind:value={voteSkipPercent}>
-								{#each choices([25, 33, 50, 66, 75, 100], voteSkipPercent).filter((p) => p > 0) as percent (percent)}
-									<option value={percent}>{percent === 100 ? 'Everyone' : `${percent}% of the people here`}</option>
-								{/each}
-							</select>
-						</label>
+							<div class="flex items-center gap-3">
+								<select class="{input} min-w-0 flex-1" bind:value={voteSkipPercent} aria-label="Votes needed">
+									{#each choices([25, 33, 50, 66, 75, 100], voteSkipPercent).filter((p) => p > 0) as percent (percent)}
+										<option value={percent}>{percent === 100 ? 'Everyone' : `${percent}% of the people here`}</option>
+									{/each}
+								</select>
+								<NumberField value={voteSkipPercent} min={1} max={100} unit="%" label="Votes needed, in percent of the people here" class="bg-d-deep py-2.5 text-d-text" onchange={(v) => (voteSkipPercent = v)} />
+							</div>
+						</div>
 					{/if}
 					<div class="my-6 h-px bg-d-line"></div>
 					<h3 class="mb-1 text-base font-semibold text-d-head">Limits</h3>
 					<p class="mb-4 text-sm text-d-muted">For everyone who can't change the room's settings. Songs over a limit aren't added, and they're told why.</p>
-					<label class="mb-5 block">
+					<div class="mb-5">
 						<span class={label}>Songs per person in the queue</span>
-						<select class={input} bind:value={maxSongsPerPerson}>
-							{#each choices([1, 2, 3, 5, 10, 20], maxSongsPerPerson) as count (count)}
-								<option value={count}>{count === 0 ? 'No limit' : `At most ${count}`}</option>
-							{/each}
-						</select>
-					</label>
-					<label class="mb-5 block">
+						<div class="flex items-center gap-3">
+							<select class="{input} min-w-0 flex-1" bind:value={maxSongsPerPerson} aria-label="Songs per person in the queue">
+								{#each choices([1, 2, 3, 5, 10, 20], maxSongsPerPerson) as count (count)}
+									<option value={count}>{count === 0 ? 'No limit' : `At most ${count}`}</option>
+								{/each}
+							</select>
+							<NumberField value={maxSongsPerPerson} min={0} max={MAX_LIMIT} unit="songs" label="Songs per person in the queue (0: no limit)" class="bg-d-deep py-2.5 text-d-text" onchange={(v) => (maxSongsPerPerson = v)} />
+						</div>
+					</div>
+					<div class="mb-5">
 						<span class={label}>Song length</span>
-						<select class={input} bind:value={maxSongMinutes}>
-							{#each choices([5, 7, 10, 15, 20, 30, 60], maxSongMinutes) as m (m)}
-								<option value={m}>{m === 0 ? 'No limit' : `At most ${minutes(m)}`}</option>
-							{/each}
-						</select>
-					</label>
-					<label class="mb-5 block">
+						<div class="flex items-center gap-3">
+							<select class="{input} min-w-0 flex-1" bind:value={maxSongMinutes} aria-label="Song length">
+								{#each choices([5, 7, 10, 15, 20, 30, 60], maxSongMinutes) as m (m)}
+									<option value={m}>{m === 0 ? 'No limit' : `At most ${minutes(m)}`}</option>
+								{/each}
+							</select>
+							<NumberField value={maxSongMinutes} min={0} max={MAX_LIMIT} unit="min" label="Longest song in minutes (0: no limit)" class="bg-d-deep py-2.5 text-d-text" onchange={(v) => (maxSongMinutes = v)} />
+						</div>
+					</div>
+					<div class="mb-5">
 						<span class={label}>Played again</span>
-						<select class={input} bind:value={noRepeatMinutes}>
-							{#each choices([30, 60, 120, 240, 480], noRepeatMinutes) as m (m)}
-								<option value={m}>{m === 0 ? 'Any time' : `Not within ${minutes(m)} of the last time`}</option>
-							{/each}
-						</select>
-					</label>
+						<div class="flex items-center gap-3">
+							<select class="{input} min-w-0 flex-1" bind:value={noRepeatMinutes} aria-label="Played again">
+								{#each choices([30, 60, 120, 240, 480], noRepeatMinutes) as m (m)}
+									<option value={m}>{m === 0 ? 'Any time' : `Not within ${minutes(m)} of the last time`}</option>
+								{/each}
+							</select>
+							<NumberField value={noRepeatMinutes} min={0} max={MAX_LIMIT} unit="min" label="Minutes before a song can play again (0: any time)" class="bg-d-deep py-2.5 text-d-text" onchange={(v) => (noRepeatMinutes = v)} />
+						</div>
+					</div>
 					<p class="text-sm text-d-muted">Shuffle and repeat are next to the controls in the player.</p>
 				</div>
 				{#if queueDirty}

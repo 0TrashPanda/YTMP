@@ -136,7 +136,7 @@ by the same rule; *Off* (`0`) empties it.
 ## Settings
 
 - **Phone**: *Settings → Playback → Song cache*, on the phone's own pages (the room list and
-  rooms on the phone): how full it is, *Size* (Off, 500 MB, 1 GB, 2 GB, 5 GB), *Kept on*
+  rooms on the phone): how full it is, *Size* (Off, 500 MB, 1 GB, 2 GB, 5 GB, or typed in GB), *Kept on*
   (this phone or the SD card, with their free space), *Clear cache*. `GET/PUT /api/cache`,
   `POST /api/cache/clear`, only from the phone itself (`HostOptions.cacheSettings`).
 - **Server**: *Settings → Server → Song cache* for the server admin: how full it is and

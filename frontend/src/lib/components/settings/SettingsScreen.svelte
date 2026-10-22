@@ -12,9 +12,10 @@
 	import { images, setDislikeButton, setImageQuality, setSwipeOpens, setTabOrder, setVideoArt } from '../../images.svelte';
 	import { nativeBridge } from '../../native';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
-	import { saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type PageSize, type TabOrder, type VideoArt } from '../../storage';
+	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type VideoArt } from '../../storage';
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
+	import NumberField from '../NumberField.svelte';
 	import AccountSection from './AccountSection.svelte';
 	import CacheSection from './CacheSection.svelte';
 	import Choice from './Choice.svelte';
@@ -102,7 +103,11 @@
 	let soloBack = $state(saved.backLimit(true));
 	let partyBack = $state(saved.backLimit(false));
 	let headphones = $state(saved.headphonesAction);
-	let pageSize = $state(String(saved.pageSize) as `${PageSize}`);
+	let pageSize = $state(saved.pageSize);
+	function setPageSize(size: number) {
+		pageSize = size;
+		saved.pageSize = size;
+	}
 	let nextPlays = $state(saved.nextPlays);
 	const qualityOptions: [ImageQuality, string][] = [
 		['high', 'High'],
@@ -248,13 +253,12 @@
 						['100', '100'],
 						['300', '300'],
 						['1000', '1000']
-					] as [`${PageSize}`, string][]}
-					value={pageSize}
-					onchange={(v) => {
-						pageSize = v;
-						saved.pageSize = Number(v) as PageSize;
-					}}
-				/>
+					]}
+					value={String(pageSize)}
+					onchange={(v) => setPageSize(Number(v))}
+				>
+					<NumberField value={pageSize} min={PAGE_SIZES.min} max={PAGE_SIZES.max} unit="songs" label="Songs per page" onchange={setPageSize} />
+				</Choice>
 				<Choice
 					label="Dislike button in the player bar"
 					hint="Thumbs down next to thumbs up at the bottom (computers). Dimmed: still there, but darker, so you don't hit it by accident."

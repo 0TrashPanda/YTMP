@@ -1,12 +1,16 @@
 <script lang="ts" generics="T extends string">
 	// A setting with a few options side by side (like YouTube Music's), with its name and what it does.
+	// Under them can come more (a number to type, for one that isn't among the options).
+	import type { Snippet } from 'svelte';
+
 	let {
 		label,
 		hint,
 		options,
 		value,
-		onchange
-	}: { label: string; hint?: string; options: [T, string][]; value: T; onchange: (value: T) => void } = $props();
+		onchange,
+		children
+	}: { label: string; hint?: string; options: [T, string][]; value: T; onchange: (value: T) => void; children?: Snippet } = $props();
 </script>
 
 <div class="flex flex-col gap-2">
@@ -24,4 +28,5 @@
 			>
 		{/each}
 	</div>
+	{@render children?.()}
 </div>

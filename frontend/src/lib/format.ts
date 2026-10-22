@@ -92,3 +92,19 @@ export function fuzzyFind<T>(items: T[], query: string, text: (item: T) => strin
 	}
 	return scored.sort((a, b) => b[1] - a[1]).map(([item]) => item);
 }
+
+/** Shows a number with as many decimals as [step] has (0.1 → one), without trailing zeros. */
+export function formatStep(n: number, step: number): string {
+	const decimals = (String(step).split('.')[1] ?? '').length;
+	return String(Number(n.toFixed(decimals)));
+}
+
+/**
+ * A number typed into a setting: within [min]–[max], rounded to [step] ("1,5" is 1.5 too).
+ * Null when it isn't a number, so the box shows the old value again.
+ */
+export function typedNumber(text: string, min: number, max: number, step = 1): number | null {
+	const n = Number(text.trim().replace(',', '.'));
+	if (!text.trim() || !Number.isFinite(n)) return null;
+	return Number(formatStep(Math.min(max, Math.max(min, Math.round(n / step) * step)), step));
+}

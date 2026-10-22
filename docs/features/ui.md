@@ -165,7 +165,7 @@ YTMP plays YouTube Music's podcasts like YTM does:
 - **New episodes** on Home (with a YouTube Music sign-in): the first row is the newest episodes
   of the podcasts you're subscribed to, from YouTube Music's own New episodes list.
 - **Playback speed**: the speed button next to the controls while an episode plays (0.5× to
-  2×), for **everyone in the room**, kept for the next episodes; music always plays at 1×.
+  2×: the usual speeds, or one typed in steps of 0.05), for **everyone in the room**, kept for the next episodes; music always plays at 1×.
   Chromecasts play along at that speed; Sonos speakers, MPDs and amplifier zones can't, so
   they pause during an episode played faster or slower (the room says so).
 
@@ -282,11 +282,16 @@ Open it with the **⋮** button or by **right-clicking** the song.
   bottom), **Playback** (equalizer; app: headphones, Back button), **Look** (image quality, video
   pictures, songs per page), **Local music**, **App** (version, updates, logs) and **Server** (the admin: invites, accounts).
   Desktop: the sections on the left; phones: the list, then a section.
+- **Numbers you can type** ✅: every setting that is a number has a box to type it in, next to
+  its slider or its choices: the volumes and the sync adjustment in *Play on*, the room's
+  waiting and limits and the votes needed to skip (*Room settings*), songs per page, the song
+  cache's size and the playback speed. Enter (or leaving the box) takes it, kept within what
+  the setting allows.
 - **Pull Home down** to load new suggestions (only a pull down: swiping a row sideways never
   refreshes). Rows that scroll sideways have **page dots**.
 - **Long lists** come in pages: Liked music and your own playlists load more as you scroll
-  down; songs in Local have **Load more**. How many songs a page has (100, 300 or 1000) is a
-  setting in *Settings → Look* (on the device).
+  down; songs in Local have **Load more**. How many songs a page has (100, 300 or 1000, or a
+  number from 10 to 5000 typed in) is a setting in *Settings → Look* (on the device).
 - Phones: the mini player's progress line is at its **bottom**, between it and the bottom bar.
 - Actions that need a room permission (for example adding songs) are **disabled** when you
   don't have that permission.

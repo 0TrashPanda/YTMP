@@ -8,6 +8,7 @@
 	import type { RoomConnection } from '../room.svelte';
 	import { saved } from '../storage';
 	import Icon from './Icon.svelte';
+	import NumberField from './NumberField.svelte';
 
 	let {
 		room,
@@ -173,17 +174,20 @@
 			</label>
 			{#if player.enabled}
 				{#if !phone.current}
-					<input
-						type="range"
-						class="w-full accent-white"
-						min="0"
-						max="1"
-						step="0.01"
-						value={player.volume}
-						aria-label="Volume"
-						use:wheelAdjust
-						oninput={(e) => player.setVolume(Number(e.currentTarget.value))}
-					/>
+					<div class="flex items-center gap-3">
+						<input
+							type="range"
+							class="min-w-0 flex-1 accent-white"
+							min="0"
+							max="1"
+							step="0.01"
+							value={player.volume}
+							aria-label="Volume"
+							use:wheelAdjust
+							oninput={(e) => player.setVolume(Number(e.currentTarget.value))}
+						/>
+						<NumberField value={Math.round(player.volume * 100)} min={0} max={100} unit="%" label="Volume in percent" class="bg-surface py-1.5" onchange={(v) => player.setVolume(v / 100)} />
+					</div>
 				{/if}
 				<button class="flex items-center gap-2 self-start text-sm text-muted hover:text-white" onclick={() => (showSync = !showSync)}>
 					<Icon name="tune" size={16} />
@@ -204,6 +208,18 @@
 							oninput={(e) => player.setSyncOffset(Number(e.currentTarget.value))}
 						/>
 						<button class="rounded-full bg-surface px-3 py-1 hover:bg-line" onclick={() => nudgeSync(10)}>Earlier</button>
+					</div>
+					<div class="flex items-center gap-2 text-sm text-muted">
+						<NumberField
+							value={player.syncOffsetMs}
+							min={-SYNC_RANGE_MS}
+							max={SYNC_RANGE_MS}
+							unit="ms"
+							label="Sync adjustment in milliseconds (more is earlier)"
+							class="bg-surface py-1.5 text-white"
+							onchange={(v) => player.setSyncOffset(v)}
+						/>
+						<span>earlier (a minus makes it later)</span>
 					</div>
 					<p class="text-xs text-muted">
 						Is this device behind the others (for example on Bluetooth)? Move it to <em>earlier</em>. Saved on this device.
@@ -270,18 +286,30 @@
 					</label>
 				{/if}
 				{#if output.active && output.volume !== null}
-					<input
-						type="range"
-						class="w-full accent-white"
-						min="0"
-						max="1"
-						step="0.02"
-						value={output.volume}
-						disabled={!room.can('output_volume')}
-						aria-label="Volume of {output.name}"
-						use:wheelAdjust
-						onchange={(e) => setVolume(output.id, Number(e.currentTarget.value))}
-					/>
+					<div class="flex items-center gap-3">
+						<input
+							type="range"
+							class="min-w-0 flex-1 accent-white"
+							min="0"
+							max="1"
+							step="0.02"
+							value={output.volume}
+							disabled={!room.can('output_volume')}
+							aria-label="Volume of {output.name}"
+							use:wheelAdjust
+							onchange={(e) => setVolume(output.id, Number(e.currentTarget.value))}
+						/>
+						<NumberField
+							value={Math.round(output.volume * 100)}
+							min={0}
+							max={100}
+							unit="%"
+							label="Volume of {output.name} in percent"
+							disabled={!room.can('output_volume')}
+							class="bg-surface py-1.5"
+							onchange={(v) => setVolume(output.id, v / 100)}
+						/>
+					</div>
 				{/if}
 			</div>
 		{/each}
@@ -322,17 +350,28 @@
 					</label>
 				{/if}
 				{#if plays?.here && plays.volume !== null}
-					<input
-						type="range"
-						class="w-full accent-white"
-						min="0"
-						max="1"
-						step="0.02"
-						value={plays.volume}
-						aria-label="Volume of {device.name}"
-						use:wheelAdjust
-						onchange={(e) => nativeBridge?.setNearbyVolume?.(device.id, Number(e.currentTarget.value))}
-					/>
+					<div class="flex items-center gap-3">
+						<input
+							type="range"
+							class="min-w-0 flex-1 accent-white"
+							min="0"
+							max="1"
+							step="0.02"
+							value={plays.volume}
+							aria-label="Volume of {device.name}"
+							use:wheelAdjust
+							onchange={(e) => nativeBridge?.setNearbyVolume?.(device.id, Number(e.currentTarget.value))}
+						/>
+						<NumberField
+							value={Math.round(plays.volume * 100)}
+							min={0}
+							max={100}
+							unit="%"
+							label="Volume of {device.name} in percent"
+							class="bg-surface py-1.5"
+							onchange={(v) => nativeBridge?.setNearbyVolume?.(device.id, v / 100)}
+						/>
+					</div>
 				{/if}
 				{#if starting === device.id}
 					<p class="pl-8 text-xs text-muted">Starting on the TV…</p>

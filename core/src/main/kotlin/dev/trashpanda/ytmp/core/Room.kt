@@ -5,7 +5,6 @@ import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
-import dev.trashpanda.ytmp.protocol.EPISODE_SPEEDS
 import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.ItemList
@@ -34,6 +33,7 @@ import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.SkipVotes
 import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.protocol.isEpisodeSpeed
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -541,7 +541,7 @@ class Room(
         passwordHash = saved.passwordHash
         repeat = saved.repeat
         runStart = saved.runStart
-        episodeSpeed = saved.episodeSpeed.takeIf { it in EPISODE_SPEEDS } ?: 1.0
+        episodeSpeed = saved.episodeSpeed.takeIf { isEpisodeSpeed(it) } ?: 1.0
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay.items += saved.autoplay
         autoplay.seed = saved.autoplaySeed
@@ -815,7 +815,7 @@ class Room(
             }
             is Command.SetSpeed -> {
                 need(member, Permission.PLAY_PAUSE)?.let { return it }
-                if (command.speed !in EPISODE_SPEEDS) return invalid("Not a speed episodes can play at")
+                if (!isEpisodeSpeed(command.speed)) return invalid("Episodes play at 0.5× to 2×, in steps of 0.05")
                 episodeSpeed = command.speed
                 // Only an episode changes speed; music plays at 1 (the speed waits for the next episode).
                 if (current?.song?.podcast != null && playback.rate != episodeSpeed) {
