@@ -10,6 +10,7 @@ import {
 	type ServerMessage
 } from './protocol.gen';
 import { identity } from './account';
+import { appUpdate } from './appUpdate.svelte';
 import { effectivePermissions } from './permissions';
 import { saved } from './storage';
 import { applyEvent } from './roomEvents';
@@ -170,6 +171,8 @@ export class RoomConnection {
 
 		socket.onopen = () => {
 			this.retryDelay = 1000;
+			// Back after the host restarted, maybe for an update: a newer version of this page?
+			if (this.status === 'reconnecting') appUpdate.check();
 			const accountToken = identity.token;
 			this.sentAccountToken = !!accountToken;
 			this.sendRaw({

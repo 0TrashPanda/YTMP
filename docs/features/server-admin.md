@@ -32,6 +32,11 @@ by hand:
   an outdated yt-dlp breaks playback. The admin page shows the current version and
   allows a manual update.
 - The admin page shows when a new YTMP release is available on GitHub.
+- **Open pages** ✅ get the new version by themselves: a browser that still shows the old
+  page reloads it soon after the update (when it comes back into view, when it reconnects to
+  the restarted server, or within 10 minutes). Not while sound plays in that browser (it
+  would need a tap to play again) or while you're typing: then it waits, and says a tap
+  reloads it now. Nobody has to clear their browser's cache.
 
 ## Logs ✅
 

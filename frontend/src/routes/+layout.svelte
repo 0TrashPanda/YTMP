@@ -3,6 +3,7 @@
 	import favicon from '../lib/assets/favicon.svg';
 	import { connectQuietly, identity } from '../lib/account';
 	import { getHost } from '../lib/api';
+	import { appUpdate, reloadOnUpdate } from '../lib/appUpdate.svelte';
 	import { appLink, webLink } from '../lib/openInApp';
 
 	// Coming back from logging in on an auth server (/connect), or (the app) logged in on your server's pages?
@@ -26,6 +27,9 @@
 	}
 
 	let { children } = $props();
+
+	// The host has a newer version of this page (the server was updated): reload to get it.
+	reloadOnUpdate();
 
 	const CONTROLS = 'button, a[href], [role="button"], [role="radio"], [role="switch"], [role="tab"], input[type="checkbox"], input[type="radio"], input[type="range"]';
 
@@ -56,4 +60,14 @@
 	</main>
 {:else if ready}
 	{@render children()}
+{/if}
+
+{#if appUpdate.waiting && !location.pathname.startsWith('/tv')}
+	<!-- It reloads by itself once the sound stops here; or now, with a tap (and a tap to play again).
+	     A TV can't be tapped: it just waits. -->
+	<div class="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4">
+		<button class="pointer-events-auto rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg" onclick={appUpdate.reload}>
+			A new version of YTMP is ready. Tap to reload
+		</button>
+	</div>
 {/if}

@@ -18,7 +18,10 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			// A single-page app: the host serves index.html for every unknown path.
-			adapter: adapter({ fallback: 'index.html' })
+			adapter: adapter({ fallback: 'index.html' }),
+			// An open page looks for a newer version every 10 minutes, besides when it comes back
+			// into view and after the host restarted (src/lib/appUpdate.svelte.ts reloads it).
+			version: { pollInterval: 10 * 60_000 }
 		})
 	],
 	// Also older Chromecasts (Chrome 90) showing the party screen: newer syntax is rewritten, and

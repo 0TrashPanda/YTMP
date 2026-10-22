@@ -103,6 +103,10 @@ sheet, menu or dialog (`sheet`). Song lists use `SongList.svelte`; what tap, swi
 is `RowGestures` (`lib/gestures.svelte.ts`), and the actions themselves with their messages are
 `lib/songActions.ts`. Calls to the host are in `lib/api.ts`, to your account's server in
 `lib/account.ts` and `lib/listening.svelte.ts`.
+A new version on the host: SvelteKit sees that `_app/version.json` changed (on focus, every
+10 minutes, and when the room's WebSocket reconnects), and `lib/appUpdate.svelte.ts` reloads
+the page at a calm moment. The host serves `index.html` and `version.json` with `no-cache`
+and the hashed files under `_app/immutable/` for a year (`webApp` in `host/.../Application.kt`).
 
 **The YouTube Music module** (`ytm-module/ytmp_ytm/`): `core.py` talks to YouTube Music and
 yt-dlp, `parse.py` turns its answers into YTMP's songs and pages, `http.py` is the HTTP API.

@@ -1,4 +1,5 @@
 import { proxiedAudioUrl, reportProblem } from './api';
+import { appUpdate } from './appUpdate.svelte';
 import { artUrl, artistNames } from './format';
 import { nativeBridge, type NativeBridge } from './native';
 import { forgetOwnStream, isYoutubeSong, ownStreamUrl, prefetchOwnStream } from './ownModule';
@@ -101,6 +102,9 @@ class WebPlayer implements RoomPlayer {
 		});
 		// Paused while waiting: that time isn't buffering.
 		this.audio.addEventListener('pause', () => (this.waitingSince = null));
+		// A new version of the page waits while sound plays here.
+		this.audio.addEventListener('play', () => (appUpdate.soundHere = true));
+		for (const stopped of ['pause', 'ended', 'emptied']) this.audio.addEventListener(stopped, () => (appUpdate.soundHere = false));
 		this.audio.addEventListener('canplay', () => this.sync());
 		this.audio.addEventListener('error', () => this.onError());
 	}

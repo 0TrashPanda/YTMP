@@ -111,6 +111,8 @@ Music, without Premium, and not tied to a single music service.
 - **Your rooms on all your devices:** rooms on your phone show up on your server and the
   other way round; open one there or move it (with an account).
 - Log in once: the server's pages and the app's own pages share the login.
+- Open pages update themselves after a server update: they reload when the sound stops in
+  that browser and you're not typing, so you never need to clear your browser's cache.
 
 **The app**
 - Checks for new versions when it starts and installs them; *Check for updates* and *Send
