@@ -29,6 +29,8 @@ sealed interface ClientMessage {
         val migrationKey: String? = null,
         /** The room's password, when it has one ([RoomInfo.hasPassword]). */
         val password: String? = null,
+        /** Which device this is ([Participant.device]), so you can tell your own devices apart. */
+        val device: String? = null,
     ) : ClientMessage
 
     /**
@@ -229,6 +231,15 @@ sealed interface Command {
     @Serializable
     @SerialName("SetOutputVolume")
     data class SetOutputVolume(val outputId: String, val volume: Double) : Command
+
+    /**
+     * The volume (0–1) of a device: your own ([participantId] null, or yours), which a device
+     * says whenever its volume changes, or another device of yours (someone here with the same
+     * account), which then turns its volume to it ([Participant.volumeChanges]).
+     */
+    @Serializable
+    @SerialName("SetDeviceVolume")
+    data class SetDeviceVolume(val volume: Double, val participantId: String? = null) : Command
 
     /** Owner only. Makes a solo room public, or a public room solo again. */
     @Serializable

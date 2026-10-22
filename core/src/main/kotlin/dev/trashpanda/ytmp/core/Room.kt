@@ -288,6 +288,7 @@ class Room(
         member.outbox = outbox
         if (!member.screen) member.name = account?.displayName ?: name
         member.accountId = account?.id.takeUnless { member.screen }
+        hello.device?.trim()?.take(MAX_NAME_LENGTH)?.let { member.device = it }
         member.accountToken = hello.accountToken.takeIf { account != null }
         member.hideFromHistory = hello.hideFromHistory || account?.hideFromHistory == true
         // Logging in later (same guest token, now with the owner's account) makes you the owner.
@@ -859,6 +860,22 @@ class Room(
                 if (command.outputId !in outputs.active) return ErrorInfo(ErrorCode.NOT_FOUND, "Not playing on that speaker")
                 outputs.active[command.outputId] = command.volume.coerceIn(0.0, 1.0)
                 emit(Event.OutputsChanged(outputs.infos()))
+            }
+            is Command.SetDeviceVolume -> {
+                if (!command.volume.isFinite()) return invalid("Not a volume")
+                val volume = command.volume.coerceIn(0.0, 1.0)
+                val target = command.participantId?.let { members[it] ?: return notFoundPerson() } ?: member
+                if (target !== member) {
+                    // Only your own devices: someone here with the same account.
+                    if (member.accountId == null || target.accountId != member.accountId || target.screen) {
+                        return ErrorInfo(ErrorCode.PERMISSION_DENIED, "That's not one of your devices")
+                    }
+                    target.volumeChanges++
+                } else if (target.volume == volume) {
+                    return null
+                }
+                target.volume = volume
+                emit(Event.ParticipantUpdated(target.toParticipant()))
             }
             is Command.SetOpenElsewhere -> {
                 if (!member.isOwner) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "Only the owner can change this")

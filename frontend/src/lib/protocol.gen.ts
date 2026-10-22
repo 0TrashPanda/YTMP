@@ -187,6 +187,12 @@ export interface CommandSendMigration {
   mode: MigrationMode;
 }
 
+export interface CommandSetDeviceVolume {
+  kind: "SetDeviceVolume";
+  volume: number;
+  participantId: string | null;
+}
+
 export interface CommandSetListening {
   kind: "SetListening";
   on: boolean;
@@ -335,6 +341,7 @@ export type Command =
   | CommandRemoveQueueItem
   | CommandSeek
   | CommandSendMigration
+  | CommandSetDeviceVolume
   | CommandSetListening
   | CommandSetOpenElsewhere
   | CommandSetOutput
@@ -371,6 +378,7 @@ export interface ClientMessageHello {
   hideFromHistory: boolean;
   migrationKey: string | null;
   password: string | null;
+  device: string | null;
 }
 
 export interface ClientMessagePing {
@@ -490,6 +498,9 @@ export interface Participant {
   tag: string;
   screen: boolean;
   speakers: string[];
+  device: string;
+  volume: number | null;
+  volumeChanges: number;
 }
 
 export interface EventParticipantJoined {

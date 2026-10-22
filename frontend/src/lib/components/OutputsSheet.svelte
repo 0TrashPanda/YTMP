@@ -28,6 +28,19 @@
 		room.run({ kind: 'SetOutputVolume', outputId, volume });
 	}
 
+	// Your other devices (the same account) that play this room: their volume, from here
+	// (docs/features/playback-and-outputs.md#your-devices).
+	const myDevices = $derived.by(() => {
+		const me = room.me;
+		if (!me?.accountId) return [];
+		return (room.state?.participants ?? []).filter((p) => p.id !== me.id && p.accountId === me.accountId && !p.screen && p.online && p.listening);
+	});
+
+	async function setDeviceVolume(participantId: string, volume: number) {
+		const error = await room.run({ kind: 'SetDeviceVolume', volume, participantId });
+		if (error) onToast(error.message);
+	}
+
 	// Speakers and TVs on this phone's own network that the host can't reach (a room on a
 	// server): the app plays the room there itself, getting the audio from the phone, and a TV
 	// can show the party screen instead (docs/features/playback-and-outputs.md#host-outputs).
@@ -201,6 +214,34 @@
 				{/if}
 			{/if}
 		</div>
+
+		{#if myDevices.length > 0}
+			<p class="-mb-1 mt-1 text-xs font-medium text-muted">Your other devices</p>
+		{/if}
+		{#each myDevices as device (device.id)}
+			{@const name = device.device || 'Another device'}
+			<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">
+				<div class="flex items-center gap-3">
+					<Icon name={/ on (Windows|Mac|Linux|ChromeOS)$/.test(name) ? 'computer' : 'phone'} size={20} class="text-accent" />
+					<span class="min-w-0 flex-1 truncate">{name}</span>
+				</div>
+				{#if device.volume !== null}
+					<input
+						type="range"
+						class="w-full accent-white"
+						min="0"
+						max="1"
+						step="0.02"
+						value={device.volume}
+						aria-label="Volume of {name}"
+						use:wheelAdjust
+						onchange={(e) => setDeviceVolume(device.id, Number(e.currentTarget.value))}
+					/>
+				{:else}
+					<p class="pl-8 text-xs text-muted">Its volume can only be changed there (update YTMP on it).</p>
+				{/if}
+			</div>
+		{/each}
 
 		{#each outputs as output (output.id)}
 			<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">

@@ -384,6 +384,11 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun bridgeVersion(): Int = BRIDGE_VERSION
 
+        /** The phone's name, to tell your devices apart in a room (bridge version 15). */
+        @JavascriptInterface
+        fun deviceName(): String =
+            Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)?.takeIf { it.isNotBlank() } ?: Build.MODEL
+
         /** The music on this phone shows in the Local tab (bridge version 10). */
         @JavascriptInterface
         fun phoneMusic(): Boolean = app.host.phoneMusicOn
@@ -694,7 +699,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 14
+        const val BRIDGE_VERSION = 15
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

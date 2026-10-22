@@ -106,6 +106,15 @@ data class Participant(
     val screen: Boolean = false,
     /** Speakers near their phone that they play the room on ([Command.SetSpeakers]). */
     val speakers: List<String> = emptyList(),
+    /** Which device this is, e.g. "Pixel 8" or "Firefox on Windows" ([ClientMessage.Hello.device]); empty: it didn't say. */
+    val device: String = "",
+    /** This device's own volume (0–1), as it last said ([Command.SetDeviceVolume]); null: it didn't say. */
+    val volume: Double? = null,
+    /**
+     * Counts the times [volume] was set from another device of the same account: the device
+     * turns its volume to [volume] when this goes up.
+     */
+    val volumeChanges: Int = 0,
 )
 
 @Serializable

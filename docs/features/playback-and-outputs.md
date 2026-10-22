@@ -30,6 +30,7 @@ permissions say otherwise (permission: *Play audio locally*).
 - Listening **alone**, a device that starts a song late (buffering) doesn't jump ahead: the
   room moves to where the device is, so there's no audible skip.
 - Other rooms remember your last choice in the app.
+- **Your devices** ✅: see [below](#your-devices).
 - **Where the audio comes from** ✅: straight from YouTube when possible. YouTube's links
   only work on the internet connection of the host that asked for them, so elsewhere:
   - **the app** looks songs up itself, on the phone, and plays them straight from YouTube;
@@ -39,6 +40,19 @@ permissions say otherwise (permission: *Play audio locally*).
     that on your network, see [server admin](server-admin.md)).
   - When YouTube won't send a song for a while, the app tries it again a few times and the
     player says so, instead of staying quiet.
+
+### Your devices
+
+Signed in with your account on more than one device (a phone, a laptop) in the same room?
+*Play on* lists your **other devices that play the room** under *Your other devices*, by
+their name ("Pixel 8", "Firefox on Windows"), each with its own **volume slider**. Turn the
+laptop down from your phone, like Spotify Connect.
+
+- On a phone with the app, it's the phone's **media volume**, the one its volume buttons
+  change; the slider moves along when someone presses them.
+- In a browser it's the page's own volume slider.
+- Only your own devices: someone else's, or a guest's, isn't listed. It needs no permission.
+- Only devices in the same room. A device on an older version of YTMP shows without a slider.
 
 ## Host outputs
 

@@ -30,6 +30,11 @@ internal class Member(
     val joinedAt: Long = 0,
     /** A party screen: no role (it only watches), and not a person (votes, "listened with"). */
     val screen: Boolean = false,
+    /** Which device this is (Participant.device). */
+    var device: String = "",
+    /** The device's volume and how often another device of theirs set it (Participant.volume, volumeChanges). */
+    var volume: Double? = null,
+    var volumeChanges: Int = 0,
 ) {
     /** Only for them: proves who they were in a clone of this room ([dev.trashpanda.ytmp.protocol.Migrant]). */
     val migrationKey: String by lazy { Ids.sha256("ytmp-migrate:$token") }
@@ -70,6 +75,7 @@ internal class Member(
     fun toParticipant() = Participant(
         id, name, isOwner, online = online, listening = listening, accountId = accountId,
         roleId = roleId, allow = allow.sorted(), deny = deny.sorted(), tag = tag, screen = screen, speakers = speakers,
+        device = device, volume = volume, volumeChanges = volumeChanges,
     )
 }
 

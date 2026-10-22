@@ -144,6 +144,12 @@ inside the WebView.
   - headphone / Bluetooth / car buttons
 - ExoPlayer can do **gapless** playback, **crossfade** (two players) and loudness
   normalisation. Not built yet: crossfade and loudness normalisation.
+- **Your devices** ✅ ([feature](../features/playback-and-outputs.md#your-devices)): while
+  it plays a room, `PlaybackService` tells the room the phone's **media volume** (a
+  `ContentObserver` on the system settings sees the volume buttons) over the player's own
+  connection, and turns the media volume to what another device of yours set (`RemoteVolume`,
+  watching `Participant.volumeChanges`), also with the page frozen. The page tells the room
+  the phone's name (bridge `deviceName`, version 15: Android's device name, or the model).
 - The **sync logic** (clock offset, drift correction, see
   [playback-sync](playback-sync.md)) is implemented twice: in TypeScript for browsers, and in
   Kotlin for the native player.

@@ -1,5 +1,6 @@
 import { proxiedAudioUrl, reportProblem } from './api';
 import { appUpdate } from './appUpdate.svelte';
+import { DeviceVolume } from './deviceVolume';
 import { artUrl, artistNames } from './format';
 import { EQ_BANDS, EQ_Q, eqHeadroom, equalizer, type EqSettings } from './equalizer.svelte';
 import { nativeBridge, type NativeBridge } from './native';
@@ -76,6 +77,9 @@ class WebPlayer implements RoomPlayer {
 	private audio = new Audio();
 	/** The sleep timer's fade-out (see [setFade]). */
 	private fade = 1;
+	/** This device's volume in the room, for your other devices (see [followVolume]). */
+	private deviceVolume = new DeviceVolume();
+	private volumeReport: ReturnType<typeof setTimeout> | undefined;
 	/** Where songs in this room come from, after what worked so far. */
 	private preferred: Source = 'direct';
 	/** Where the loaded song comes from. */
@@ -154,9 +158,29 @@ class WebPlayer implements RoomPlayer {
 	}
 
 	setVolume(value: number): void {
+		this.turnTo(value);
+		this.reportVolume();
+	}
+
+	private turnTo(value: number): void {
 		this.volume = value;
 		this.audio.volume = value * this.fade;
 		saved.volume = value;
+	}
+
+	/** Tells the room this device's volume, or turns to the one another device of yours set. */
+	private followVolume(): void {
+		const action = this.deviceVolume.update(this.room.me, this.volume);
+		if (action && 'apply' in action) this.turnTo(action.apply);
+		else if (action) this.reportVolume();
+	}
+
+	/** Once the slider rests a moment: it moves in small steps. */
+	private reportVolume(): void {
+		clearTimeout(this.volumeReport);
+		this.volumeReport = setTimeout(() => {
+			if (this.room.me?.accountId) this.room.run({ kind: 'SetDeviceVolume', volume: this.volume, participantId: null });
+		}, 300);
 	}
 
 	setFade(fraction: number): void {
@@ -175,6 +199,7 @@ class WebPlayer implements RoomPlayer {
 		clearInterval(this.timer);
 		this.stopEqualizer();
 		this.eq?.context.close().catch(() => {});
+		clearTimeout(this.volumeReport);
 		this.setMediaKeys(false);
 		this.audio.pause();
 		this.audio.removeAttribute('src');
@@ -183,6 +208,7 @@ class WebPlayer implements RoomPlayer {
 
 	/** Brings the audio element in line with the room. Called on every state change and every second. */
 	sync(): void {
+		this.followVolume();
 		if (!this.enabled) return;
 		if (this.loose) this.reportStalls();
 		const state = this.room.state;

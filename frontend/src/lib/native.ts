@@ -86,6 +86,8 @@ export interface NativeBridge {
 	equalizer?(): string;
 	/** Sets the equalizer (JSON EqSettings) for what the phone plays on now; every page hears as onEqualizer. */
 	setEqualizer?(json: string): void;
+	/** The phone's name, as in Android's settings (bridge version 15), to tell your devices apart in a room. */
+	deviceName?(): string;
 }
 
 /** A song a Pixel's Now Playing recognized (android/.../NowPlayingParser.kt); [at] is epoch milliseconds. */

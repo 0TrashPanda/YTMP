@@ -77,6 +77,8 @@ Music, without Premium, and not tied to a single music service.
   keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
   speakers near your phone (the phone looks the songs up and serves them).
 - Android: lock screen and notification controls, keeps playing with the screen off.
+- Your other devices in the room (signed in to your account) show in *Play on* with their
+  own volume slider: turn the laptop down from your phone. On a phone it's the media volume.
 - A sleep timer (in the playing song's ⋮ menu): after some minutes or at the end of the
   song the sound fades out, then a solo room pauses; in a party room only your device stops.
 - An equalizer (*Settings → Playback*): ten bands and presets (Bass boost, Spoken word, …).
