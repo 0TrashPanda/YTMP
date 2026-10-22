@@ -22,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.jupiter.api.Assumptions.assumeFalse
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.io.path.createTempDirectory
@@ -232,6 +233,9 @@ class SongCacheTest {
 
     @Test
     fun `the audio route keeps what it streams, and answers from the file after`() = testApplication {
+        // Keeping it renames the file while it's still being read, which Windows refuses
+        // (the server and the phone don't run there).
+        assumeFalse(System.getProperty("os.name").startsWith("Windows"))
         val youtube = FakeYoutube(pieceDelayMs = 30)
         val cache = cache(youtube)
         val inner = AudioProxy { call, _, _ -> call.respondText("from youtube") }
