@@ -162,6 +162,13 @@ class MainActivity : ComponentActivity() {
                 js("window.__ytmpNative && window.__ytmpNative.onSleepTimer && window.__ytmpNative.onSleepTimer($value)")
             }
         }
+        // The equalizer changed, or the phone plays on other headphones now (with their setting).
+        lifecycleScope.launch {
+            Equalizers.state.collect { state ->
+                val value = JSONObject.quote(json.encodeToString(EqualizerState.serializer(), state))
+                js("window.__ytmpNative && window.__ytmpNative.onEqualizer && window.__ytmpNative.onEqualizer($value)")
+            }
+        }
 
         // For development: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080`
         intent.getStringExtra("server")?.let { server = normalize(it) }
@@ -659,6 +666,16 @@ class MainActivity : ComponentActivity() {
                 ?.takeIf { it.endsAt != null || it.itemId != null }
         }
 
+        /** The equalizer for what the phone plays on now (bridge version 14): JSON EqualizerState. */
+        @JavascriptInterface
+        fun equalizer(): String = json.encodeToString(EqualizerState.serializer(), Equalizers.state.value)
+
+        /** Sets the equalizer (JSON EqSettings) for what the phone plays on now. Every page hears as onEqualizer. */
+        @JavascriptInterface
+        fun setEqualizer(settingsJson: String) {
+            runCatching { json.decodeFromString(EqSettings.serializer(), settingsJson) }.getOrNull()?.let(Equalizers::set)
+        }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -677,7 +694,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 13
+        const val BRIDGE_VERSION = 14
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

@@ -79,6 +79,13 @@ export interface NativeBridge {
 	openNowPlayingAccess?(): void;
 	/** The songs Now Playing recognized lately, newest first (bridge version 13): JSON list of DetectedSong. */
 	nowPlayingRecent?(): string;
+	/**
+	 * The equalizer, which the app's player runs (bridge version 14): JSON { output, settings },
+	 * the settings (EqSettings) for what the phone plays on now (output: { id, name }).
+	 */
+	equalizer?(): string;
+	/** Sets the equalizer (JSON EqSettings) for what the phone plays on now; every page hears as onEqualizer. */
+	setEqualizer?(json: string): void;
 }
 
 /** A song a Pixel's Now Playing recognized (android/.../NowPlayingParser.kt); [at] is epoch milliseconds. */
@@ -96,6 +103,8 @@ export interface NativeCallbacks {
 	onStatus?(status: string): void;
 	/** The sleep timer changed (set, turned off, or it went off): JSON SleepSetting, or null. */
 	onSleepTimer?(json: string | null): void;
+	/** The equalizer changed, or the phone plays on something else now (other headphones): JSON as from equalizer(). */
+	onEqualizer?(json: string): void;
 	/** Back from YouTube Music's sign-in: null when signed in, else why not. */
 	onYoutubeSignIn?(error: string | null): void;
 	/** Back from youtubeCookie: the cookies, or null (with why, or null when you cancelled). */

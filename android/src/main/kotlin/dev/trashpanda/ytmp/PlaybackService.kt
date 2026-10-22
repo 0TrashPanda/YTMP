@@ -20,6 +20,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
@@ -164,11 +165,17 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         // The speed is set on the AudioTrack, so a correction is heard at once (not only after
-        // the audio already buffered), and [AudioClock] reads where the audio really is.
+        // the audio already buffered), and [AudioClock] reads where the audio really is. The
+        // equalizer for what the phone plays on now goes over the sound on its way there.
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(context: android.content.Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
-                AudioClock(DefaultAudioSink.Builder(context).setEnableFloatOutput(enableFloatOutput).setEnableAudioTrackPlaybackParams(true).build())
-                    .also { audioClock = it }
+                AudioClock(
+                    DefaultAudioSink.Builder(context)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioTrackPlaybackParams(true)
+                        .setAudioProcessors(arrayOf<AudioProcessor>(EqualizerProcessor { Equalizers.settings }))
+                        .build()
+                ).also { audioClock = it }
         }
         exo = ExoPlayer.Builder(this, renderers)
             .setAudioAttributes(

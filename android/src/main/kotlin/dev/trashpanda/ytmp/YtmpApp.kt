@@ -58,6 +58,7 @@ class YtmpApp : Application() {
         logCrashes()
         Log.i("YtmpApp", "YTMP ${Updates.installedVersion(this)} starting")
         nowPlaying = NowPlayingHistory(this)
+        Equalizers.start(this)
         host = LocalHost(this).also { it.start() }
         nearby = Nearby(this)
         scope.launch { host.rooms.list.collect { nearby.announce(it) } }

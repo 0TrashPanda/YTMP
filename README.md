@@ -79,6 +79,8 @@ Music, without Premium, and not tied to a single music service.
 - Android: lock screen and notification controls, keeps playing with the screen off.
 - A sleep timer (in the playing song's ⋮ menu): after some minutes or at the end of the
   song the sound fades out, then a solo room pauses; in a party room only your device stops.
+- An equalizer (*Settings → Playback*): ten bands and presets (Bass boost, Spoken word, …).
+  In the app the phone's speaker, wired headphones and each Bluetooth device keep their own.
 - Download a song or episode from its menu: a music file with its title, artist, album and
   cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app

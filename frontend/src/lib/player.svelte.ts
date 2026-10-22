@@ -1,6 +1,7 @@
 import { proxiedAudioUrl, reportProblem } from './api';
 import { appUpdate } from './appUpdate.svelte';
 import { artUrl, artistNames } from './format';
+import { EQ_BANDS, EQ_Q, eqHeadroom, equalizer, type EqSettings } from './equalizer.svelte';
 import { nativeBridge, type NativeBridge } from './native';
 import { forgetOwnStream, isYoutubeSong, ownStreamUrl, prefetchOwnStream } from './ownModule';
 import type { NowPlaying } from './protocol.gen';
@@ -39,6 +40,13 @@ const LONG_BUFFERING_MS = 3000;
 /** How often a Chromecast sums up its short buffering pauses for the host's log. */
 const STALL_REPORT_MS = 30_000;
 const MEDIA_ERRORS: Record<number, string> = { 1: 'aborted', 2: 'network error', 3: 'decode error', 4: 'not supported (link refused?)' };
+
+/** The equalizer's sound path in a browser: the audio element through a filter per band, then a gain. */
+interface EqGraph {
+	context: AudioContext;
+	filters: BiquadFilterNode[];
+	gain: GainNode;
+}
 
 /** Where the audio comes from: the room's link, a link from your own module, or the host streaming it. */
 type Source = 'direct' | 'own' | 'host';
@@ -84,6 +92,13 @@ class WebPlayer implements RoomPlayer {
 	/** Loose sync only: no jump before this (performance.now()). */
 	private settledAt = 0;
 
+	/**
+	 * The equalizer's sound path, made the first time it's switched on and kept from then on (an
+	 * audio element can't leave it again); switched off, it's flat.
+	 */
+	private eq: EqGraph | null = null;
+	private stopEqualizer = () => {};
+
 	constructor(
 		private readonly room: RoomConnection,
 		private readonly loose = false
@@ -107,6 +122,8 @@ class WebPlayer implements RoomPlayer {
 		for (const stopped of ['pause', 'ended', 'emptied']) this.audio.addEventListener(stopped, () => (appUpdate.soundHere = false));
 		this.audio.addEventListener('canplay', () => this.sync());
 		this.audio.addEventListener('error', () => this.onError());
+		// Not on a Chromecast (the TV's party screen).
+		if (!loose) this.stopEqualizer = equalizer.listen((settings) => this.setEqualizer(settings));
 	}
 
 	/** Must be called from a click: browsers only allow audio after a user gesture. */
@@ -117,6 +134,7 @@ class WebPlayer implements RoomPlayer {
 		this.error = null;
 		// Unlock audio right away, inside the gesture.
 		this.audio.play().catch(() => {});
+		this.eq?.context.resume().catch(() => {});
 		this.setMediaKeys(true);
 		this.sync();
 		clearInterval(this.timer);
@@ -155,6 +173,8 @@ class WebPlayer implements RoomPlayer {
 
 	destroy(): void {
 		clearInterval(this.timer);
+		this.stopEqualizer();
+		this.eq?.context.close().catch(() => {});
 		this.setMediaKeys(false);
 		this.audio.pause();
 		this.audio.removeAttribute('src');
@@ -174,6 +194,8 @@ class WebPlayer implements RoomPlayer {
 		}
 
 		if (navigator.mediaSession) navigator.mediaSession.playbackState = state.playback.playing ? 'playing' : 'paused';
+		// Made without a tap, the equalizer's sound path waits for one (browsers allow sound after a tap).
+		if (this.eq?.context.state === 'suspended' && state.playback.playing) this.eq.context.resume().catch(() => {});
 		if (this.loadedItemId !== now.item.itemId) {
 			this.loadedItemId = now.item.itemId;
 			this.error = null;
@@ -220,6 +242,47 @@ class WebPlayer implements RoomPlayer {
 				else if (name !== 'AbortError') this.error = `Couldn't play this song (${name || String(e)}).`;
 			});
 		}
+	}
+
+	private setEqualizer(settings: EqSettings): void {
+		if (!settings.on && !this.eq) return;
+		const graph = (this.eq ??= this.eqGraph());
+		if (!graph) return;
+		const at = graph.context.currentTime;
+		// Glides there in a few ms, so moving a slider doesn't click.
+		graph.filters.forEach((filter, i) => filter.gain.setTargetAtTime(settings.on ? settings.gains[i] : 0, at, 0.02));
+		graph.gain.gain.setTargetAtTime(settings.on ? 10 ** (eqHeadroom(settings.gains) / 20) : 1, at, 0.02);
+	}
+
+	private eqGraph(): EqGraph | null {
+		let context: AudioContext;
+		try {
+			context = new AudioContext();
+		} catch {
+			return null;
+		}
+		// Web Audio hears audio from another site only when that site allows it (CORS), and
+		// otherwise plays silence. Asking for that, a link that doesn't allow it fails to load,
+		// and the player goes on to your own module or the host (see onError), which do.
+		this.audio.crossOrigin = 'anonymous';
+		const filters = EQ_BANDS.map((frequency) => {
+			const filter = context.createBiquadFilter();
+			filter.type = 'peaking';
+			filter.frequency.value = frequency;
+			filter.Q.value = EQ_Q;
+			filter.gain.value = 0;
+			return filter;
+		});
+		const gain = context.createGain();
+		let node: AudioNode = context.createMediaElementSource(this.audio);
+		for (const filter of filters) node = node.connect(filter);
+		node.connect(gain).connect(context.destination);
+		// A song loaded without asking would play silently from now on: load it again.
+		if (this.loadedItemId !== null) {
+			this.loadedItemId = null;
+			this.sync();
+		}
+		return { context, filters, gain };
 	}
 
 	private sourceFor(now: NowPlaying): Source {
@@ -329,7 +392,13 @@ class WebPlayer implements RoomPlayer {
 	}
 
 	get sounding(): boolean {
-		return !this.audio.paused && this.audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && this.audio.volume > 0 && !this.audio.muted;
+		return (
+			!this.audio.paused &&
+			this.audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA &&
+			this.audio.volume > 0 &&
+			!this.audio.muted &&
+			(this.eq?.context.state ?? 'running') === 'running'
+		);
 	}
 
 	describe(): string {
@@ -337,7 +406,8 @@ class WebPlayer implements RoomPlayer {
 		const error = a.error ? `, error ${a.error.code} (${MEDIA_ERRORS[a.error.code] ?? '?'}${a.error.message ? `: ${a.error.message}` : ''})` : '';
 		return (
 			`${a.paused ? 'paused' : 'playing'} at ${a.currentTime.toFixed(1)} s, ready ${a.readyState}/4, network ${a.networkState}, ` +
-			`volume ${a.volume}${a.muted ? ' muted' : ''}, from ${SOURCE_NAMES[this.source]}${error}${this.error ? `, says "${this.error}"` : ''}`
+			`volume ${a.volume}${a.muted ? ' muted' : ''}, from ${SOURCE_NAMES[this.source]}${error}${this.error ? `, says "${this.error}"` : ''}` +
+			(this.eq ? `, equalizer ${equalizer.settings.on ? 'on' : 'off'} (${this.eq.context.state})` : '')
 		);
 	}
 
@@ -371,6 +441,7 @@ class WebPlayer implements RoomPlayer {
 		reportProblem(
 			`browser can't play ${songId} from ${SOURCE_NAMES[from]}: ` +
 				`${MEDIA_ERRORS[error?.code ?? 0] ?? 'unknown error'}${error?.message ? ` (${error.message})` : ''} at ${Math.round(this.audio.currentTime)} s` +
+				(this.eq ? ' with the equalizer (CORS)' : '') +
 				(from === 'host' ? '' : `, switching to ${SOURCE_NAMES[next]}`),
 			this.room.roomCode
 		);

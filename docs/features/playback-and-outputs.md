@@ -106,6 +106,24 @@ Implementation: [implementation/playback-sync.md](../implementation/playback-syn
 - **Gapless playback**: no silence between songs (for example live albums or DJ mixes).
 - **Crossfade**: optional fade between songs, with a configurable length. Off by default.
 
+## Equalizer ✅
+
+Changes the sound of **your own device's playback**, like a phone's or a car's equalizer. In
+*Settings → Playback*, where YouTube Music has it.
+
+- **Ten bands** (31 Hz to 16 kHz), each 12 dB up or down, and **presets**: Flat, Bass boost,
+  Less bass, Treble boost, Less treble, Spoken word (for podcasts), Loudness, Pop, Rock,
+  Hip-hop, Electronic, Acoustic, Classical. Moving a slider makes it *Custom*.
+- Boosting turns the whole sound down by the biggest boost, so it doesn't distort.
+- **Per device**: in the app, the phone's speaker, wired headphones and **each Bluetooth
+  device** (headphones, the car, a Bluetooth speaker) have their own setting. Connecting other
+  headphones switches to theirs at once; settings shows which one you're changing. A device
+  you haven't set has it off. In a browser it's one setting for that browser.
+- It doesn't change the room or anyone else's sound, and not the speakers and TVs under
+  *Play on* (Sonos, Chromecast, MPD, zones): only what plays on this device.
+- In a browser, with the equalizer on, songs whose own link doesn't allow it come from your
+  own module or through the host instead (see [implementation](../implementation/playback-sync.md#equalizer-in-a-browser)).
+
 ## Sleep timer ✅
 
 Stops the music automatically, for example when falling asleep. Like YouTube Music's, it's

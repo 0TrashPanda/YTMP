@@ -85,6 +85,18 @@ for that device.
 
 Local files, media server songs and cached songs are always served by the host.
 
+### Equalizer in a browser
+
+✅ `WebPlayer` sends the audio element through Web Audio (`createMediaElementSource`, a
+`BiquadFilterNode` per band, a gain) once the equalizer is first switched on, and keeps it
+there (switched off it's flat). Web Audio only gets the sound of a file from another site when
+that site allows it (CORS), and plays silence otherwise, so the element then asks for that
+(`crossOrigin = "anonymous"`). A link that doesn't allow it fails to load and goes down the
+same steps as above: your own module (which allows any page with the key) or the host's
+`/api/audio` (same site). A song already loaded when it's switched on is loaded again. The
+`AudioContext` starts with the tap that turns on *this device*. The app's player does the
+same in native code (see [Android app](android-app.md)).
+
 ## Sync accuracy
 
 Where small desyncs between devices come from, and what addresses them:

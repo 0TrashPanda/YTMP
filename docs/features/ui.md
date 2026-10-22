@@ -279,7 +279,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
   `/account`: **Account** (logging in; on your server: listening history, your rooms on other
   devices, your roles, password, log out; on other hosts: who you're logged in as there),
   **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
-  bottom), **Playback** (app: headphones, Back button), **Look** (image quality, video
+  bottom), **Playback** (equalizer; app: headphones, Back button), **Look** (image quality, video
   pictures, songs per page), **Local music**, **App** (version, updates, logs) and **Server** (the admin: invites, accounts).
   Desktop: the sections on the left; phones: the list, then a section.
 - **Pull Home down** to load new suggestions (only a pull down: swiping a row sideways never

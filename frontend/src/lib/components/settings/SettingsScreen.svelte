@@ -7,6 +7,7 @@
 	// server's /account). Sections on the left (phones: a list first), the section on the right.
 	import { onDestroy, onMount } from 'svelte';
 	import { authServer } from '../../account';
+	import { equalizer } from '../../equalizer.svelte';
 	import { clearSongCache, getHost, getSongCache, setSongCache } from '../../api';
 	import { images, setDislikeButton, setImageQuality, setSwipeOpens, setTabOrder, setVideoArt } from '../../images.svelte';
 	import { nativeBridge } from '../../native';
@@ -17,6 +18,7 @@
 	import AccountSection from './AccountSection.svelte';
 	import CacheSection from './CacheSection.svelte';
 	import Choice from './Choice.svelte';
+	import EqualizerSection from './EqualizerSection.svelte';
 	import GesturesSection from './GesturesSection.svelte';
 	import LocalSection from './LocalSection.svelte';
 	import OwnModuleSection from './OwnModuleSection.svelte';
@@ -176,6 +178,9 @@
 						window.dispatchEvent(new Event('ytmp:settings'));
 					}}
 				/>
+				{#if equalizer.available}
+					<EqualizerSection />
+				{/if}
 				{#if !inApp}
 					<OwnModuleSection {onToast} />
 				{:else}
