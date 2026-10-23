@@ -81,6 +81,60 @@ class StartTogetherTest {
     }
 
     @Test
+    fun `the only player stalling mid-song makes the room wait there until it has data again`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        room.run(owner, Command.SetListening(true, startsTogether = true))
+        room.run(owner, Command.PlayNow(song(1)))
+        runCurrent()
+        val item = room.currentItem(owner)
+        assertNull(room.run(owner, Command.PlayerReady(item)))
+        advanceTimeBy(10_000)
+
+        // It ran dry at 9.5 s: the room waits there, shown as playing and loading.
+        assertNull(room.run(owner, Command.PlayerStalled(item, 9_500)))
+        var playback = room.playback(owner)
+        assertTrue(playback.starting)
+        assertFalse(playback.playing)
+        assertEquals(9_500, playback.positionMs)
+        advanceTimeBy(8_000)
+        assertEquals(9_500, room.playback(owner).positionMs, "the clock stands still while it loads")
+
+        // Data again: it goes on from the same spot.
+        assertNull(room.run(owner, Command.PlayerReady(item)))
+        playback = room.playback(owner)
+        assertFalse(playback.starting)
+        assertTrue(playback.playing)
+        advanceTimeBy(2_000)
+        assertEquals(11_500, room.playback(owner).let { it.positionMs + (testScheduler.currentTime - it.hostTimeMs) })
+    }
+
+    @Test
+    fun `a stall with other players listening changes nothing, and a stall that never ends is waited for only so long`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        val guest = room.connect("Guest")
+        room.run(owner, Command.SetListening(true, startsTogether = true))
+        room.run(owner, Command.PlayNow(song(1)))
+        runCurrent()
+        val item = room.currentItem(owner)
+        room.run(owner, Command.PlayerReady(item))
+        room.run(guest, Command.SetListening(true, startsTogether = true))
+        advanceTimeBy(5_000)
+        room.run(guest, Command.PlayerStalled(item, 4_000))
+        assertTrue(room.playback(owner).playing, "the others keep playing")
+
+        // Only the owner left: now a stall of theirs is waited for, up to 30 s.
+        room.run(guest, Command.SetListening(false))
+        room.run(owner, Command.PlayerStalled(item, 5_000))
+        assertTrue(room.playback(owner).starting)
+        advanceTimeBy(Room.STALL_WAIT_MS + 500)
+        val playback = room.playback(owner)
+        assertTrue(playback.playing)
+        assertTrue(playback.positionMs in 5_000..5_600, "it goes on from where it stood: ${playback.positionMs}")
+    }
+
+    @Test
     fun `a new song waits for the players, then starts for everyone from the start`() = runTest {
         val room = newRoom()
         val owner = room.connect("Owner", owner = true)

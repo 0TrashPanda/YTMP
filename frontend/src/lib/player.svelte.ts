@@ -38,6 +38,9 @@ export interface RoomPlayer {
 
 /** Buffering this long (ms) is reported to the host. */
 const LONG_BUFFERING_MS = 3000;
+/** Without data this long (ms) in the middle of a song, and alone, the room waits for this player. */
+const ROOM_WAITS_AFTER_MS = 600;
+
 /** How often a Chromecast sums up its short buffering pauses for the host's log. */
 const STALL_REPORT_MS = 30_000;
 const MEDIA_ERRORS: Record<number, string> = { 1: 'aborted', 2: 'network error', 3: 'decode error', 4: 'not supported (link refused?)' };
@@ -112,9 +115,11 @@ class WebPlayer implements RoomPlayer {
 		this.audio.addEventListener('waiting', () => {
 			this.buffering = true;
 			this.waitingSince ??= performance.now();
+			this.watchStall();
 		});
 		this.audio.addEventListener('playing', () => {
 			this.buffering = false;
+			clearTimeout(this.stallTimer);
 			// It plays after all (e.g. after a tap): the "tap to allow audio" is done.
 			if (this.error?.startsWith('Tap')) this.error = null;
 			this.reportBuffering();
@@ -439,6 +444,25 @@ class WebPlayer implements RoomPlayer {
 
 	/** The song this player told the room it has loaded. */
 	private readySent: string | null = null;
+
+	private stallTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/** The player ran out of data: if it still has none a moment later, and it plays alone, the room waits for it. */
+	private watchStall(): void {
+		clearTimeout(this.stallTimer);
+		if (!this.loose) this.stallTimer = setTimeout(() => this.reportStall(), ROOM_WAITS_AFTER_MS);
+	}
+
+	private reportStall(): void {
+		const state = this.room.state;
+		const now = state?.nowPlaying;
+		if (!this.enabled || !state || !now || this.loadedItemId !== now.item.itemId) return;
+		if (!state.playback.playing || state.playback.starting || !this.room.listeningAlone) return;
+		if (this.audio.paused || this.audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) return;
+		// Ready again (`PlayerReady`) when it has data: the room goes on from here.
+		this.readySent = null;
+		this.room.run({ kind: 'PlayerStalled', itemId: now.item.itemId, positionMs: Math.max(0, Math.round(this.audio.currentTime * 1000 - this.syncOffsetMs)) });
+	}
 
 	/** The room waits for its players to load a new song (`playback.starting`): this one has it (or can't play it). */
 	private reportReady(itemId: string): void {

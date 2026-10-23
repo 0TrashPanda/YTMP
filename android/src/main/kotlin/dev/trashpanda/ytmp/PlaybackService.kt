@@ -460,6 +460,24 @@ class PlaybackService : MediaSessionService() {
         if (exo.playbackState == Player.STATE_READY) reportReady()
     }
 
+    private var stallJob: Job? = null
+
+    /**
+     * The player ran out of data in the middle of a song and still has none: if it plays alone,
+     * the room waits at this position ([PlayerReady] follows when there is data again), so
+     * nothing of the song is skipped.
+     */
+    private fun reportStall() {
+        val target = current ?: return
+        val itemId = loadedItemId ?: return
+        if (!target.enabled || !target.playing || target.starting || !target.alone || target.item?.itemId != itemId) return
+        if (exo.playbackState != Player.STATE_BUFFERING || !exo.playWhenReady) return
+        readySent = null
+        val position = maxOf(0L, exo.currentPosition - target.syncOffsetMs)
+        Log.d(TAG, "ran out of data at $position ms -> the room waits")
+        PlaybackHub.command("""{"kind":"PlayerStalled","itemId":${JSONObject.quote(itemId)},"positionMs":$position}""")
+    }
+
     /** The room waits for its players to load a new song ([PlaybackTarget.starting]): this phone has it. */
     private fun reportReady() {
         val target = current ?: return
@@ -766,8 +784,13 @@ class PlaybackService : MediaSessionService() {
             PlaybackHub.status(if (playbackState == Player.STATE_BUFFERING) "buffering" else "ready")
             if (playbackState == Player.STATE_READY) reportReady()
             val now = SystemClock.elapsedRealtime()
+            stallJob?.cancel()
             if (playbackState == Player.STATE_BUFFERING) {
                 if (bufferingSince == null) bufferingSince = now
+                stallJob = scope.launch {
+                    delay(STALL_REPORT_MS)
+                    reportStall()
+                }
                 return
             }
             val since = bufferingSince ?: return
@@ -906,6 +929,9 @@ class PlaybackService : MediaSessionService() {
         private const val BUTTON_NOTIFICATION = 7
         private const val PAUSED_TOLERANCE_MS = 250L
         private const val PAUSE_WAIT_MS = 3000L
+        /** Without data this long (ms) in the middle of a song, and alone, the room waits for this phone. */
+        private const val STALL_REPORT_MS = 600L
+
         /** Buffering this long (ms) is logged, and reported to the host. */
         private const val LONG_BUFFERING_MS = 3000L
 

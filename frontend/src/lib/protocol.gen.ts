@@ -159,6 +159,12 @@ export interface CommandPlayerReady {
   speakers: boolean;
 }
 
+export interface CommandPlayerStalled {
+  kind: "PlayerStalled";
+  itemId: string;
+  positionMs: number;
+}
+
 export interface CommandPrevious {
   kind: "Previous";
 }
@@ -344,6 +350,7 @@ export type Command =
   | CommandPlay
   | CommandPlayNow
   | CommandPlayerReady
+  | CommandPlayerStalled
   | CommandPrevious
   | CommandRemoveQueueItem
   | CommandRestoreSongs

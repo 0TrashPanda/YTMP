@@ -903,6 +903,7 @@ class Room(
                 if (names.isNotEmpty()) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
             is Command.PlayerReady -> ready(command.itemId, if (command.speakers) "${member.id}:speakers" else member.id)
+            is Command.PlayerStalled -> stalled(member, command.itemId, command.positionMs)
             is Command.SetOutput -> {
                 need(member, Permission.CHANGE_OUTPUTS)?.let { return it }
                 val device = outputs.device(command.outputId) ?: return ErrorInfo(ErrorCode.NOT_FOUND, "That speaker isn't available")
@@ -1466,18 +1467,35 @@ class Room(
         emitPlayback()
     }
 
+    /** Players and outputs that load a starting song and say when they have it. */
+    private fun players(): List<String> = buildList {
+        for (m in members.values) {
+            if (!m.online) continue
+            if (m.listening && m.startsTogether) add(m.id)
+            if (m.speakers.isNotEmpty() && m.speakersStartTogether) add("${m.id}:speakers")
+        }
+        // A TV showing the party screen plays through its page, a participant.
+        for (id in outputs.active.keys) if (id !in outputs.screens) add("o:$id")
+    }
+
     /** Players and outputs that should load a starting song and haven't said so yet. */
-    private fun notReady(): List<String> = startGate.missing(
-        buildList {
-            for (m in members.values) {
-                if (!m.online) continue
-                if (m.listening && m.startsTogether) add(m.id)
-                if (m.speakers.isNotEmpty() && m.speakersStartTogether) add("${m.id}:speakers")
-            }
-            // A TV showing the party screen plays through its page, a participant.
-            for (id in outputs.active.keys) if (id !in outputs.screens) add("o:$id")
-        },
-    )
+    private fun notReady(): List<String> = startGate.missing(players())
+
+    /**
+     * The only player stalled in the middle of a song (it ran out of data): the room waits there,
+     * like for a new song, until it has data again ([Command.PlayerReady]) or [STALL_WAIT_MS] is up.
+     * With other players the song goes on for them and the stalled one catches up as usual.
+     */
+    private fun stalled(member: Member, itemId: String, positionMs: Long) {
+        val item = current ?: return
+        if (item.itemId != itemId || !playingNow() || players() != listOf(member.id)) return
+        playback.set(positionMs.coerceIn(0, maxOf(0, item.song.durationMs)))
+        startGate.reset()
+        startGate.wait(scope, mutex) {
+            if (startGate.waiting && (notReady().isEmpty() || startGate.waitedMs >= STALL_WAIT_MS)) startTogether(notReady())
+        }
+        emitPlayback()
+    }
 
     /** The new song's stream is ready: wait for the players to load it, if any will say so. */
     private fun waitForPlayers() {
@@ -1894,6 +1912,8 @@ class Room(
         const val MAX_CLONE_QUEUE = 1000
         /** How many podcasts' speeds a room remembers. */
         const val MAX_PODCAST_SPEEDS = 100
+        /** The room waits at most this long for its only player to get data again after a stall. */
+        const val STALL_WAIT_MS = 30_000L
         const val MAX_MIGRANTS = 200
         /** Party screens one room can have. */
         const val MAX_SCREENS = 5

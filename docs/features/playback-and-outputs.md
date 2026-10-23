@@ -138,6 +138,13 @@ Changes the sound of **your own device's playback**, like a phone's or a car's e
 - In a browser, with the equalizer on, songs whose own link doesn't allow it come from your
   own module or through the host instead (see [implementation](../implementation/playback-sync.md#equalizer-in-a-browser)).
 
+## Buffering ✅
+
+When the only device or speaker playing a room runs out of data in the middle of a song, the
+room waits there (the progress bar stops and shows *buffering…*) and goes on from the same spot
+when the data is back: nothing is skipped. With several outputs on, they keep playing and the
+slow one catches up, as before.
+
 ## Skip silence in podcasts ✅
 
 *Settings → Playback → Skip silence in podcasts* (the app, off by default) skips the quiet

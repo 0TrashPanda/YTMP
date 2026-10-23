@@ -168,6 +168,19 @@ skipped, most on a TV. Now a new song waits for the players, like Sonos or Spoti
   start, without the usual 1 s lead); Sonos after `SetAVTransportURI`, playing when the room
   starts.
 
+### A stall in the middle of a song
+
+A player that runs out of data mid-song used to leave the room's clock running: the progress
+bar moved on, and the phone caught up afterwards (the room followed it for up to 10 s, else the
+phone jumped ahead and skipped what it hadn't heard). Now, when it is the **only player**
+(`players() == [its id]`; the browser and the app also check `listeningAlone` first) and still
+has no data 600 ms after it ran dry, it sends `PlayerStalled(itemId, positionMs)`. The room sets
+its clock to that position and waits like for a new song (`starting`, so pages show playing and
+loading); the player pauses there and says `PlayerReady` when it has data (the same code path as
+a new song: `reportReady` / `reportStall` in `PlaybackService`, `reportStall` in `player.svelte.ts`).
+The wait ends after `Room.STALL_WAIT_MS` (30 s) if the player never answers. With other players,
+nothing changes: they go on and the stalled one catches up as before.
+
 For sub-millisecond multi-room sync, the plan is a [Snapcast output](../features/future-ideas.md#snapcast-output)
 rather than building it into YTMP.
 

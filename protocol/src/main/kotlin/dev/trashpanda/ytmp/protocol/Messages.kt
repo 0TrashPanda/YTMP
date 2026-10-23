@@ -226,6 +226,16 @@ sealed interface Command {
     data class PlayerReady(val itemId: String, val speakers: Boolean = false) : Command
 
     /**
+     * This participant's player ran out of data in the middle of [itemId], at [positionMs] of the
+     * song. When it is the only player, the room waits there ([PlaybackStatus.starting]) until it
+     * says [PlayerReady] again, so nothing of the song is skipped. With other players, nothing
+     * happens: they go on and this one catches up.
+     */
+    @Serializable
+    @SerialName("PlayerStalled")
+    data class PlayerStalled(val itemId: String, val positionMs: Long) : Command
+
+    /**
      * Plays the room on a speaker or TV, or stops playing on it. [screen]: a TV or display
      * with Chromecast shows the party screen too, which plays the music itself.
      */
