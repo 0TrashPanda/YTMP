@@ -231,8 +231,8 @@ Open it with the **⋮** button or by **right-clicking** the song.
 > the start), Start radio, Autoplay from here, Find similar, Go to artist / album / podcast
 > (their pages; a search when the source gives no ID), Like and Save to playlist (with a
 > linked YouTube Music account), Open in YouTube Music, and Remove (from the queue, the
-> history or the autoplay queue; in *Library → History*: from your listening history). Download ✅ (YouTube Music songs and episodes). Planned: YTMP playlists, Share, and a
-> customisable menu. The current song has the menu too: right-click
+> history or the autoplay queue; in *Library → History*: from your listening history). Download ✅ (YouTube Music songs and episodes). Planned: YTMP playlists and Share. The
+> menu is customisable ✅ (below). The current song has the menu too: right-click
 > the album art in the full player or the player bar, or its ⋮.
 >
 > **Artist pages** show the artist's top songs, albums and singles, with *Radio* and
@@ -314,9 +314,21 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - Phones: the mini player's progress line is at its **bottom**, between it and the bottom bar.
 - Actions that need a room permission (for example adding songs) are **disabled** when you
   don't have that permission.
-- Planned: the menu is **customisable**: you can change the **order** of the actions and
-  **show or hide** each one. Your layout is saved to your **account**, and can be
-  overridden **per device**.
+### On a phone ✅
+
+On a phone (a narrow screen) the menu slides up from the bottom, like YouTube Music's: a
+handle, the song's picture, title and artist, a row of **three big buttons** (by default
+*Play next*, *Add to queue* and *Save to playlist*), then the other actions. Swipe it down,
+tap outside it or press Back to close it. Wider screens show the menu where you opened it.
+
+### Customisable ✅
+
+*Settings → Song menu*: move each action **up or down**, **show or hide** it, and add,
+move or remove **dividers**; pick the phone's **big buttons** (or none in a place). A big
+button isn't repeated in the list under it. An action still only shows where it can be used
+(*Like* needs YouTube Music, *Remove from this playlist* your own playlist, and so on).
+*Defaults* puts it all back. Saved **on this device** (saving it to your account comes with
+account preferences, planned).
 
 ### Share links
 
@@ -344,7 +356,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - **Room switcher** for multiple solo rooms ✅ (the room list)
 - **Output picker** ✅ (host outputs) and a "play on this device" toggle
 - **Recap** pages from your listening history (planned)
-- **Song menu** settings (order, show/hide) (planned)
+- **Song menu** settings (order, show/hide, dividers, big buttons) ✅
 - **Party screen** ✅ for a TV, laptop or tablet (see [below](#party-screen))
 
 ## Keyboard shortcuts ✅

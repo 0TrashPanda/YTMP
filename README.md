@@ -88,6 +88,9 @@ Music, without Premium, and not tied to a single music service.
   song the sound fades out, then a solo room pauses; in a party room only your device stops.
 - An equalizer (*Settings → Playback*): ten bands and presets (Bass boost, Spoken word, …).
   In the app the phone's speaker, wired headphones and each Bluetooth device keep their own.
+- A song menu (⋮, right-click or hold) you can arrange yourself (*Settings → Song menu*):
+  order, hide actions, dividers. On a phone it slides up from the bottom like YouTube
+  Music's, with three big buttons at the top that you pick.
 - Download a song or episode from its menu: a music file with its title, artist, album and
   cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app

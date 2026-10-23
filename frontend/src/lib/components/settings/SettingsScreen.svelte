@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	export type SettingsSection = 'account' | 'youtube' | 'playback' | 'gestures' | 'home' | 'local' | 'look' | 'app' | 'server';
+	export type SettingsSection = 'account' | 'youtube' | 'playback' | 'gestures' | 'menu' | 'home' | 'local' | 'look' | 'app' | 'server';
 </script>
 
 <script lang="ts">
@@ -26,6 +26,7 @@
 	import LocalSection from './LocalSection.svelte';
 	import OwnModuleSection from './OwnModuleSection.svelte';
 	import ServerSection from './ServerSection.svelte';
+	import SongMenuSection from './SongMenuSection.svelte';
 	import YoutubeSection from './YoutubeSection.svelte';
 
 	let {
@@ -70,6 +71,7 @@
 				['youtube', 'YouTube Music', 'library', true],
 				['playback', 'Playback', 'headphones', true],
 				['gestures', 'Taps and swipes', 'tune', true],
+				['menu', 'Song menu', 'more', true],
 				['home', 'Home', 'home', true],
 				['local', 'Local music', 'local', true],
 				['look', 'Look', 'palette', true],
@@ -251,6 +253,8 @@
 				{/if}
 			{:else if section === 'gestures'}
 				<GesturesSection />
+			{:else if section === 'menu'}
+				<SongMenuSection />
 			{:else if section === 'local'}
 				<LocalSection {onToast} />
 			{:else if section === 'home'}
