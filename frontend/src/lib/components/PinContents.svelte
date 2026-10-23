@@ -5,7 +5,9 @@
 	import type { Layout, Pin } from '../home.svelte';
 	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
+	import { songTiles } from '../dial';
 	import SongCarousel from './SongCarousel.svelte';
+	import SpeedDial from './SpeedDial.svelte';
 	import SongList from './SongList.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 
@@ -17,8 +19,8 @@
 		onMenu
 	}: { room: RoomConnection; pin: Pin; layout: Layout; onToast: (text: string) => void; onMenu: (target: MenuTarget) => void } = $props();
 
-	/** A carousel holds five pages of four; a list stays short (More shows the rest). */
-	const SHOWN: Record<Layout, number> = { carousel: 20, list: 10 };
+	/** A carousel holds five pages of four, a speed dial two of nine; a list stays short (More shows the rest). */
+	const SHOWN: Record<Layout, number> = { carousel: 20, list: 10, dial: 18 };
 
 	let songs = $state<Song[] | null>(null);
 	let error = $state(false);
@@ -54,6 +56,8 @@
 	</div>
 {:else if !songs.length}
 	<p class="px-2 text-sm text-muted">Nothing in it yet.</p>
+{:else if layout === 'dial'}
+	<SpeedDial tiles={songTiles(songs.slice(0, SHOWN.dial), room, onToast, onMenu)} />
 {:else if layout === 'list'}
 	<SongList {room} songs={songs.slice(0, SHOWN.list)} {onToast} {onMenu} />
 {:else}

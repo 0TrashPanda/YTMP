@@ -30,7 +30,7 @@ describe('home sections', () => {
 			...loadPrefs(null),
 			order: ['Listen again', 'Quick picks'],
 			hidden: ['Mixed for you'],
-			lists: ['Quick picks']
+			layouts: { 'Quick picks': 'list' as const }
 		};
 		const shown = arrange([section('Quick picks'), section('Mixed for you'), section('Listen again'), section('New')], prefs);
 		expect(shown.map((s) => [s.title, s.layout])).toEqual([
@@ -85,5 +85,18 @@ describe('pinned sections', () => {
 
 	it('forgets the place of a pin that is gone', () => {
 		expect(withPins(['ytmp:pin:playlist:old', 'Quick picks'], { ...loadPrefs(null), pins: [pin('a')] })).toEqual([PINNED, 'Quick picks']);
+	});
+});
+
+describe('speed dial', () => {
+	it('is how Pinned and YTM’s own Speed dial show, unless set otherwise', () => {
+		const pins: Pin[] = [{ kind: 'album', id: 'a', title: 'A' }];
+		const shown = arrange([section('Speed dial'), section('Quick picks')], { ...loadPrefs(null), pins, layouts: { 'Quick picks': 'dial' } });
+		expect(shown.map((b) => [b.key, b.layout])).toEqual([
+			[PINNED, 'dial'],
+			['Speed dial', 'dial'],
+			['Quick picks', 'dial']
+		]);
+		expect(loadPrefs('{"layouts":{"A":"list","B":"wobbly"}}').layouts).toEqual({ A: 'list' });
 	});
 });

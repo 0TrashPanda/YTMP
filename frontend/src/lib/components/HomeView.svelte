@@ -3,12 +3,14 @@
 	// that scrolls sideways (tap = play next, ⋮ or right-click = song menu); albums,
 	// playlists, artists and podcasts are cards that open their page. Each section's ⋮ hides it,
 	// moves it, or shows it as a list (songs then tap and swipe like any song list); Settings → Home
-	// has all of that for every section (home.svelte.ts). Your pins: tiles in the Pinned section,
+	// has all of that for every section (home.svelte.ts), and a speed dial (YTM's 3×3 covers).
+	// Your pins: tiles in the Pinned section (a speed dial),
 	// or each its own section with its songs. They show at once: nothing to wait for.
 	import { getHome } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
+	import { cardTiles, songTiles } from '../dial';
 	import { hideIfBroken } from '../pictures';
-	import { arrange, home as prefs, nudge, seen, setHidden, setLayout, setPinContents, togglePin, type Block, type Pin } from '../home.svelte';
+	import { arrange, home as prefs, nudge, seen, setHidden, setLayout, setPinContents, togglePin, type Block, type Layout, type Pin } from '../home.svelte';
 	import type { HomePage, SearchItem, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import CardGrid from './CardGrid.svelte';
@@ -16,6 +18,7 @@
 	import PinContents from './PinContents.svelte';
 	import SongCarousel from './SongCarousel.svelte';
 	import SongList from './SongList.svelte';
+	import SpeedDial from './SpeedDial.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 
 	let {
@@ -56,15 +59,19 @@
 		else open.onPodcast({ id: pin.id, name: pin.title });
 	}
 
-	type Action = 'up' | 'down' | 'layout' | 'tile' | 'unpin' | 'hide';
+	type Action = 'up' | 'down' | Layout | 'tile' | 'unpin' | 'hide';
 
 	/** What a section's ⋮ offers. */
 	function actions(block: Block, i: number): [Action, string][] {
-		const other = block.kind === 'pinned' ? 'tiles' : 'carousel';
+		const layouts: [Layout, string][] = [
+			['dial', 'Show as speed dial'],
+			['carousel', block.kind === 'pinned' ? 'Show as tiles' : 'Show as carousel'],
+			['list', 'Show as list']
+		];
 		return [
 			...(i > 0 ? [['up', 'Move up'] as [Action, string]] : []),
 			...(i < sections.length - 1 ? [['down', 'Move down'] as [Action, string]] : []),
-			['layout', block.layout === 'list' ? `Show as ${other}` : 'Show as list'],
+			...layouts.filter(([l]) => l !== block.layout),
 			...(block.kind === 'pin'
 				? [
 						['tile', 'Show as a tile in Pinned'] as [Action, string],
@@ -79,7 +86,7 @@
 		sectionMenu = null;
 		const shown = sections.map((s) => s.key);
 		if (action === 'up' || action === 'down') nudge(block.key, action === 'up' ? -1 : 1, shown);
-		else if (action === 'layout') setLayout(block.key, block.layout === 'list' ? 'carousel' : 'list');
+		else if (action === 'dial' || action === 'carousel' || action === 'list') setLayout(block.key, action);
 		else if (block.kind === 'pin' && action === 'tile') setPinContents(block.pin, false);
 		else if (block.kind === 'pin' && action === 'unpin') togglePin(block.pin);
 		else {
@@ -136,7 +143,17 @@
 	{#each sections as block, i (block.key)}
 		<section class="flex flex-col gap-3">
 			{@render header(block, i)}
-			{#if block.kind === 'pinned'}
+			{#if block.kind === 'pinned' && block.layout === 'dial'}
+				<SpeedDial
+					tiles={block.pins.map((pin) => ({
+						key: pin.kind + pin.id,
+						title: pin.title,
+						art: pin.art,
+						icon: pin.kind === 'artist' ? 'person' : pin.kind === 'podcast' ? 'podcast' : 'note',
+						open: () => openPin(pin)
+					}))}
+				/>
+			{:else if block.kind === 'pinned'}
 				<div class={block.layout === 'list' ? 'flex flex-col' : 'grid grid-cols-2 gap-2 px-2 sm:grid-cols-3 lg:grid-cols-4'}>
 					{#each block.pins as pin (pin.kind + pin.id)}
 						{@render tile(pin, block.layout === 'list')}
@@ -147,12 +164,14 @@
 			{:else}
 				{@const list = songs(block.section.items)}
 				{@const others = cards(block.section.items)}
-				{#if list.length && block.layout === 'list'}
+				{#if block.layout === 'dial'}
+					<SpeedDial tiles={[...songTiles(list, room, onToast, onMenu), ...cardTiles(others)]} />
+				{:else if list.length && block.layout === 'list'}
 					<SongList {room} songs={list} {onToast} {onMenu} />
 				{:else if list.length}
 					<SongCarousel {room} songs={list} {onToast} {onMenu} />
 				{/if}
-				{#if others.length}
+				{#if others.length && block.layout !== 'dial'}
 					<CardGrid cards={others} row={block.layout === 'carousel'} list={block.layout === 'list'} />
 				{/if}
 			{/if}

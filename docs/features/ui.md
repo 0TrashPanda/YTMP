@@ -34,11 +34,13 @@ Like YTM:
   your own (see [accounts](accounts.md#linked-youtube-account)).
 - **Your own Home** ✅ (*Settings → Home*, saved on the device): **pin** a playlist (Liked
   music too), album, artist or podcast with *Pin to Home* on its page. A pin is a **tile** in
-  the **Pinned** section, or a **section of its own with its songs** (the first 20, a
+  the **Pinned** section (a **speed dial** like YTM's: covers in a 3×3 grid, the next nine a
+  swipe to the side), or a **section of its own with its songs** (the first 20, a
   podcast's newest episodes; *More* opens its page). Pins show at once, before the
   suggestions load. Every section, Pinned and pins included, can be **hidden**, **moved**
-  and shown as a **carousel** (like YTM; Pinned: tiles) or a **list**: songs one under the
-  other that tap and swipe like any song list, albums and playlists as rows. *Podcast
+  and shown as a **carousel** (like YTM; Pinned: tiles), a **list** (songs one under the
+  other that tap and swipe like any song list, albums and playlists as rows) or a **speed
+  dial** (YTM's own *Speed dial* section is one by default). *Podcast
   sections* hides YTM's sections of podcasts and episodes. A section's **⋮** on Home does the
   same in place. YTM picks and names its sections, so they're known by name; a new one shows
   where YTM puts it.

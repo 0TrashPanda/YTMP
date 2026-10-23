@@ -2,12 +2,15 @@
 	// Settings → Home: your pins (a tile in Pinned, or a section with their songs) and which
 	// sections Home shows, in which order, and each as a carousel or a list (see home.svelte.ts).
 	// YouTube Music's sections are listed once Home has shown them.
-	import { home, movePin, moveSection, PINNED, resetHome, sectionList, setHidden, setHidePodcasts, setLayout, setPinContents, togglePin } from '../../home.svelte';
+	import { home, layoutOf, movePin, moveSection, PINNED, resetHome, sectionList, setHidden, setHidePodcasts, setLayout, setPinContents, togglePin, type Layout } from '../../home.svelte';
 	import Icon from '../Icon.svelte';
 	import Choice from './Choice.svelte';
 
-	type Look = 'carousel' | 'list' | 'hidden';
-	const look = (key: string): Look => (home.hidden.includes(key) ? 'hidden' : home.lists.includes(key) ? 'list' : 'carousel');
+	type Look = Layout | 'hidden';
+	const look = (key: string): Look => {
+		void home.layouts;
+		return home.hidden.includes(key) ? 'hidden' : layoutOf(key);
+	};
 	function setLook(key: string, value: Look) {
 		setHidden(key, value === 'hidden');
 		if (value !== 'hidden') setLayout(key, value);
@@ -17,7 +20,7 @@
 		void [home.order, home.pins];
 		return sectionList();
 	});
-	const changed = $derived(home.hidden.length > 0 || home.lists.length > 0 || home.hidePodcasts);
+	const changed = $derived(home.hidden.length > 0 || Object.keys(home.layouts).length > 0 || home.hidePodcasts);
 	const iconButton = 'rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-30';
 	const select = 'rounded-lg bg-raised px-2 py-1.5 text-sm outline-none';
 </script>
@@ -76,7 +79,7 @@
 			<div class="min-w-0 flex-1">
 				<p class="text-sm font-medium">Sections</p>
 				<p class="text-xs text-muted">
-					In the order Home shows them. A list shows the songs one under the other, where tapping and swiping do what Taps and swipes says.
+					In the order Home shows them. A list shows the songs one under the other, where tapping and swiping do what Taps and swipes says; a speed dial shows covers, nine at a time, like YouTube Music's.
 				</p>
 			</div>
 			{#if changed}
@@ -98,6 +101,7 @@
 				<select class={select} aria-label="How Home shows {title}" {value} onchange={(e) => setLook(key, e.currentTarget.value as Look)}>
 					<option value="carousel">{key === PINNED ? 'Tiles' : 'Carousel'}</option>
 					<option value="list">List</option>
+					<option value="dial">Speed dial</option>
 					<option value="hidden">Hidden</option>
 				</select>
 			</div>

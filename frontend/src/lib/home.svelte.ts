@@ -1,19 +1,21 @@
 // How Home looks, as set in Settings → Home (or a section's ⋮ on Home): which sections show, in
-// which order, and each as a sideways carousel (like YTM) or a list. The sections are YTM's own,
+// which order, and each as a sideways carousel (like YTM), a list or a speed dial (YTM's 3×3 grid of
+// covers, paging sideways). The sections are YTM's own,
 // your Pinned section (tiles of what you pinned) and the pins shown with their songs, each its
 // own section. YTM names its sections itself ("Quick picks", "Listen again"…), so they're known
 // by name; a name not seen before goes after the section YTM shows it after. Saved on this device.
 import type { HomeSection } from './protocol.gen';
 import { read, write } from './storage';
 
-export type Layout = 'carousel' | 'list';
+export type Layout = 'carousel' | 'list' | 'dial';
+const LAYOUTS: string[] = ['carousel', 'list', 'dial'];
 
 export interface HomePrefs {
 	/** Every section seen (its key), in the order they show. */
 	order: string[];
 	hidden: string[];
-	/** Sections shown as a list (the others are carousels). */
-	lists: string[];
+	/** Sections not shown their usual way (see [defaultLayout]). */
+	layouts: Record<string, Layout>;
 	/** YTM's sections that are (mostly) podcasts and episodes don't show. */
 	hidePodcasts: boolean;
 	pins: Pin[];
@@ -65,6 +67,14 @@ function pins(value: unknown): Pin[] {
 
 const KEY = 'ytmp.home';
 
+function layouts(value: unknown): Record<string, Layout> {
+	if (!value || typeof value !== 'object') return {};
+	return Object.fromEntries(Object.entries(value).filter(([, l]) => LAYOUTS.includes(l as string))) as Record<string, Layout>;
+}
+
+/** Pinned and YTM's own Speed dial are a speed dial, like on YTM; the rest carousels. */
+export const defaultLayout = (key: string): Layout => (key === PINNED || key === 'Speed dial' ? 'dial' : 'carousel');
+
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
 
 export function loadPrefs(text: string | null): HomePrefs {
@@ -73,12 +83,12 @@ export function loadPrefs(text: string | null): HomePrefs {
 		return {
 			order: [...new Set(strings(stored.order))],
 			hidden: strings(stored.hidden),
-			lists: strings(stored.lists),
+			layouts: layouts(stored.layouts),
 			hidePodcasts: stored.hidePodcasts === true,
 			pins: pins(stored.pins)
 		};
 	} catch {
-		return { order: [], hidden: [], lists: [], hidePodcasts: false, pins: [] };
+		return { order: [], hidden: [], layouts: {}, hidePodcasts: false, pins: [] };
 	}
 }
 
@@ -104,7 +114,7 @@ export function isPodcasts(section: HomeSection): boolean {
  * with their songs, then YTM's ([sections], null while loading).
  */
 function allBlocks(sections: HomeSection[] | null, prefs: HomePrefs): Block[] {
-	const layout = (key: string): Layout => (prefs.lists.includes(key) ? 'list' : 'carousel');
+	const layout = (key: string): Layout => prefs.layouts[key] ?? defaultLayout(key);
 	const tiles = prefs.pins.filter((p) => !p.contents);
 	return [
 		...(tiles.length ? [{ key: PINNED, title: 'Pinned', layout: layout(PINNED), kind: 'pinned' as const, pins: tiles }] : []),
@@ -135,8 +145,8 @@ export const home = $state<HomePrefs & { podcastSections: string[] }>({
 });
 
 function save() {
-	const { order, hidden, lists, hidePodcasts, pins } = home;
-	write(KEY, JSON.stringify({ order, hidden, lists, hidePodcasts, pins }));
+	const { order, hidden, layouts, hidePodcasts, pins } = home;
+	write(KEY, JSON.stringify({ order, hidden, layouts, hidePodcasts, pins }));
 }
 
 /** [order] with the sections of [prefs]' pins in it, without those of pins that are gone. */
@@ -175,9 +185,12 @@ export function setHidden(key: string, hidden: boolean): void {
 }
 
 export function setLayout(key: string, layout: Layout): void {
-	home.lists = toggle(home.lists, key, layout === 'list');
+	const { [key]: _, ...others } = home.layouts;
+	home.layouts = layout === defaultLayout(key) ? others : { ...others, [key]: layout };
 	save();
 }
+
+export const layoutOf = (key: string): Layout => home.layouts[key] ?? defaultLayout(key);
 
 export function setHidePodcasts(on: boolean): void {
 	home.hidePodcasts = on;
@@ -237,7 +250,7 @@ export function nudge(key: string, step: -1 | 1, shown: string[]): void {
 export function resetHome(): void {
 	home.order = [];
 	home.hidden = [];
-	home.lists = [];
+	home.layouts = {};
 	home.hidePodcasts = false;
 	save();
 }
