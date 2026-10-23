@@ -46,7 +46,7 @@
 		// While it moves to another place, look again in a moment.
 		clearTimeout(timer);
 		if (status.moving) timer = setTimeout(refresh, 2000);
-		else if (status.checking) timer = setTimeout(refresh, 10000);
+		else if (status.checking || filling(status)) timer = setTimeout(refresh, 10000);
 	}
 	refresh();
 	onDestroy(() => clearTimeout(timer));
@@ -77,6 +77,8 @@
 			downloadsWifiOnly: null,
 			localWifiOnly: null,
 			localCharging: null,
+			keepLiked: null,
+			fromHistory: null,
 			...changes
 		});
 	}
@@ -86,6 +88,33 @@
 		if (bytes >= GB) return `${(bytes / GB).toFixed(bytes >= 10 * GB ? 0 : 1).replace(/\.0$/, '')} GB`;
 		if (bytes < 1024 ** 2) return `${Math.ceil(bytes / 1024)} KB`;
 		return `${Math.round(bytes / 1024 ** 2)} MB`;
+	}
+
+	const likedSizes: [string, string][] = [
+		['0', 'Off'],
+		['50', '50'],
+		['100', '100'],
+		['250', '250'],
+		['500', '500']
+	];
+
+	/** Liked songs are still coming in. */
+	const filling = (s: SongCacheStatus) => !!s.keepLiked && s.likedCached < s.likedOf && !s.fromYoutubeWaiting;
+
+	/** Why songs from YouTube Music aren't coming in now, in plain words. */
+	function fromYoutubeNote(s: SongCacheStatus): string | null {
+		switch (s.fromYoutubeWaiting) {
+			case 'Wi-Fi':
+				return 'Waiting for Wi-Fi.';
+			case 'full':
+				return 'The cache is full: a bigger size keeps more.';
+			case 'signed out':
+				return 'Sign in to YouTube Music first.';
+			case 'error':
+				return "Couldn't reach YouTube Music; trying again later.";
+			default:
+				return null;
+		}
 	}
 
 	const full = $derived(status && status.maxBytes > 0 ? Math.min(100, (status.bytes / status.maxBytes) * 100) : 0);
@@ -148,6 +177,27 @@
 				value={status.downloadsWifiOnly ? '1' : '0'}
 				onchange={(v) => attempt(() => patch({ downloadsWifiOnly: v === '1' }))}
 			/>
+			{#if status.keepLiked != null}
+				<Choice
+					label="Keep your recent likes"
+					hint={`The songs you liked last on YouTube Music are downloaded to keep, one at a time, while there's room. They're cached like any other song.${status.keepLiked && status.likedOf ? ` ${status.likedCached} of ${status.likedOf} are kept.` : ''}`}
+					options={likedSizes}
+					value={String(status.keepLiked)}
+					onchange={(v) => attempt(() => patch({ keepLiked: Number(v) }))}
+				>
+					<NumberField value={status.keepLiked} min={0} max={5000} step={1} unit="songs" label="Number of liked songs (0: off)" onchange={(v) => attempt(() => patch({ keepLiked: Math.round(v) }))} />
+				</Choice>
+				<Choice
+					label="Songs from your YouTube Music history"
+					hint="Songs YouTube Music says you played more than once (also on other devices) are downloaded to keep. It looks at your history a few times a day."
+					options={[['0', 'Off'], ['1', 'On']]}
+					value={status.fromHistory ? '1' : '0'}
+					onchange={(v) => attempt(() => patch({ fromHistory: v === '1' }))}
+				/>
+				{#if (status.keepLiked || status.fromHistory) && fromYoutubeNote(status)}
+					<p class="-mt-1 text-xs text-muted">{fromYoutubeNote(status)}</p>
+				{/if}
+			{/if}
 			{#if status.localSongs != null}
 				<LocalSongsSection {status} {busy} {patch} {attempt} {onToast} />
 			{/if}

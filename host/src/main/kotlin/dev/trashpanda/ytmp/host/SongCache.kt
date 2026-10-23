@@ -34,6 +34,8 @@ import java.io.IOException
 import java.io.OutputStream
 import java.io.RandomAccessFile
 import java.net.URLEncoder
+import java.time.Instant
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -92,6 +94,8 @@ class SongCache(
     private val clock: () -> Long = System::currentTimeMillis,
     /** A song worth fetching waits this long first (ms): it may come in for free, or be skipped. */
     private val fetchDelayMs: Long = FETCH_DELAY_MS,
+    /** Where plays are counted per day ([importPlays]). */
+    private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
     @Volatile
     var dir: File = dir
@@ -130,6 +134,7 @@ class SongCache(
     private val queued = ConcurrentHashMap.newKeySet<String>()
     private val saveSignal = Channel<Unit>(Channel.CONFLATED)
     private val trimming = Mutex()
+    private val fetching = Mutex()
     /** Links looked up for devices that may not stream through the host ([directLink]). */
     private val links = ConcurrentHashMap<String, Pair<String, Long>>()
 
@@ -407,31 +412,85 @@ class SongCache(
 
     /** One song at a time, in the background. */
     private suspend fun fetchLoop() {
-        val audio = audio ?: return
+        if (audio == null) return
         for (song in fetches) {
             try {
-                if (!takes(song) || has(song.id) || fills.containsKey(song.id) || copies.containsKey(song.id) || downloads?.find(song.id) != null) continue
+                if (!wanted(song)) continue
                 fetchGate()
-                // It may have come in for free meanwhile.
-                if (has(song.id) || fills.containsKey(song.id) || copies.containsKey(song.id)) continue
-                val temp = File(dir, key(song.id) + ".part")
-                val started = System.nanoTime()
-                try {
-                    val type = audio.download(song.id, temp)
-                    log.info("Song cache: fetched {} \"{}\" ({} KB in {} ms)", song.id, song.title, temp.length() / 1024, (System.nanoTime() - started) / 1_000_000)
-                    commit(song, temp, type)
-                } catch (e: CancellationException) {
-                    temp.delete()
-                    throw e
-                } catch (e: Exception) {
-                    temp.delete()
-                    log.info("Song cache: couldn't fetch {}: {}", song.id, e.message)
-                }
+                fetch(song)
             } finally {
                 queued.remove(song.id)
             }
         }
     }
+
+    /** [song] may be kept and isn't here, coming in, or downloaded. */
+    fun wanted(song: Song): Boolean =
+        takes(song) && !has(song.id) && !fills.containsKey(song.id) && !copies.containsKey(song.id) && downloads?.find(song.id) == null
+
+    /**
+     * Fetches [song] whole and keeps it, now (the caller waited for [fetchGate]); false when it
+     * isn't wanted any more or the fetch failed. One at a time with the background fetches.
+     */
+    suspend fun fetch(song: Song): Boolean = fetching.withLock {
+        val audio = audio ?: return@withLock false
+        // It may have come in for free meanwhile.
+        if (!wanted(song)) return@withLock false
+        synchronized(lock) { known[song.id] = song }
+        val temp = File(dir, key(song.id) + ".part")
+        val started = System.nanoTime()
+        try {
+            val type = audio.download(song.id, temp)
+            log.info("Song cache: fetched {} \"{}\" ({} KB in {} ms)", song.id, song.title, temp.length() / 1024, (System.nanoTime() - started) / 1_000_000)
+            commit(song, temp, type)
+            true
+        } catch (e: CancellationException) {
+            temp.delete()
+            throw e
+        } catch (e: Exception) {
+            temp.delete()
+            log.info("Song cache: couldn't fetch {}: {}", song.id, e.message)
+            false
+        }
+    }
+
+    /**
+     * There's room for another song nobody played here yet (liked songs, say): with a song of
+     * the usual size it stays under 90 % of its size, so it doesn't push others out.
+     */
+    fun hasRoom(): Boolean {
+        if (maxBytes <= 0 || moving) return false
+        val (total, count) = synchronized(lock) { entries.values.sumOf { it.size } to entries.size }
+        val usual = if (count > 0) total / count else USUAL_SONG_BYTES
+        return total + usual <= maxBytes / 10 * 9
+    }
+
+    /**
+     * Plays heard elsewhere (the account's YouTube Music history): [song] at about [at]. A day
+     * that already has a play of the song isn't counted again (plays here go into that history
+     * too, and the history is read again later). They count like plays here: from the 2nd in
+     * [WORTH_WINDOW_MS] a song is [worth] keeping, and they keep songs longer.
+     */
+    fun importPlays(heard: List<Pair<Song, Long>>): Int {
+        val now = clock()
+        var added = 0
+        synchronized(lock) {
+            for ((song, at) in heard) {
+                if (!takes(song) || at < now - PLAYS_KEPT_MS) continue
+                val times = plays.getOrPut(song.id) { mutableListOf() }
+                val day = dayOf(at)
+                if (times.any { dayOf(it) == day }) continue
+                times += minOf(at, now)
+                times.sort()
+                known[song.id] = song
+                added++
+            }
+        }
+        if (added > 0) saveSoon()
+        return added
+    }
+
+    private fun dayOf(time: Long) = Instant.ofEpochMilli(time).atZone(zone).toLocalDate()
 
     /**
      * A song fetched once for the host's audio route and kept: every request for it (any
@@ -878,6 +937,8 @@ class SongCache(
         /** YouTube's links last hours; one is looked up again after this. */
         private const val LINK_KEPT_MS = 30L * 60 * 1000
         private const val KNOWN_SONGS = 500
+        /** About the size of a song (4 minutes as YouTube sends it), until there are songs to tell. */
+        private const val USUAL_SONG_BYTES = 4L * MB
         /** A skipped song counts as played after this long. */
         const val COUNTS_AFTER_MS = 30_000L
         private const val COVER_SIZE = 544

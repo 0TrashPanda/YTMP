@@ -190,6 +190,26 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         return ytm().createPlaylist(title, songIds).also { libraries.clear() }
     }
 
+    /** The [count] songs liked last (Liked music, newest first), in as many parts as that takes. */
+    suspend fun recentLikes(count: Int): List<Song> {
+        requireSignedIn()
+        val songs = mutableListOf<Song>()
+        var page = ytm().personalPlaylist(LIKED_MUSIC, null)
+        while (true) {
+            songs += page.songs
+            val more = page.more ?: break
+            if (songs.size >= count) break
+            page = ytm().personalPlaylist(LIKED_MUSIC, more)
+        }
+        return songs.take(count)
+    }
+
+    /** The account's YouTube Music history: each song and about how many days ago. */
+    suspend fun history(): List<Pair<Song, Int?>> {
+        requireSignedIn()
+        return ytm().history()
+    }
+
     private suspend fun requireSignedIn() {
         lock.withLock { ensureSignedIn() } ?: throw SourceException("Not signed in to YouTube Music")
     }
@@ -224,5 +244,6 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
 
     private companion object {
         const val TAG = "YtmpYoutube"
+        const val LIKED_MUSIC = "LM"
     }
 }

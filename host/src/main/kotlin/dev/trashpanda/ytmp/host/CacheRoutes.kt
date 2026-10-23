@@ -28,7 +28,10 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
         val status = cache?.status() ?: SongCacheStatus(songs = 0, bytes = 0, maxBytes = 0)
         return if (settings == null) status else status.copy(places = settings.places(), place = settings.place(), settable = true, localSongs = settings.localSongs(), checking = settings.checking(), checkingOf = settings.checkingOf(), localParallel = settings.localParallel(),
             fetchWifiOnly = settings.fetchWifiOnly(), downloadsWifiOnly = settings.downloadsWifiOnly(),
-            localWifiOnly = settings.localWifiOnly(), localCharging = settings.localCharging(), localWaiting = settings.localWaiting())
+            localWifiOnly = settings.localWifiOnly(), localCharging = settings.localCharging(), localWaiting = settings.localWaiting()).let { s ->
+                val youtube = settings.fromYoutube() ?: return@let s
+                s.copy(keepLiked = youtube.liked, likedOf = youtube.likedOf, likedCached = youtube.likedCached, fromHistory = youtube.fromHistory, fromYoutubeWaiting = youtube.waiting)
+            }
     }
     get { call.respond(call.status()) }
     put {

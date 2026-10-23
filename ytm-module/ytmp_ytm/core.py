@@ -519,6 +519,27 @@ class YtmCore:
         if status != 204:
             raise Unavailable(f"YouTube Music didn't take the play ({status})")
 
+    def history(self) -> list[dict]:
+        """The signed-in account's YouTube Music history, newest first: {song, daysAgo}.
+
+        YouTube Music lists about the last 200 songs, in groups by day ("Today", "Yesterday",
+        "Monday", "Last week", "March 2026"); daysAgo is about how long ago that was (None: unknown).
+        """
+        try:
+            tracks = self._signed_in().get_history()
+        except NotSignedIn:
+            raise
+        except Exception as e:
+            log.info("history: %s", e)
+            raise Unavailable("Couldn't load your YouTube Music history") from e
+        today = time.localtime()
+        out = []
+        for t in tracks:
+            song = parse.song_from_search(t)
+            if song:
+                out.append({"song": song, "daysAgo": parse.days_ago(t.get("played"), today)})
+        return out
+
     def own_playlists(self) -> list[dict]:
         """The signed-in account's own playlists (the ones songs can be saved to): {id, title, thumbnails}."""
         return [

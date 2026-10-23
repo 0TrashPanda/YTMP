@@ -156,6 +156,19 @@ without internet on the phone. It works by itself: there is nothing to pick.
 - **Songs played elsewhere are fetched only once they're played again**: from the 2nd play
   in 30 days. So one-off radio and autoplay songs don't cost an extra download each (and
   extra YouTube traffic), but your favourites end up cached.
+- **From your YouTube Music** (on the phone, signed in; both off by default, in *Settings →
+  Playback → Song cache*):
+  - **Keep your recent likes**: the songs you liked last (Off, 50, 100, 250, 500 or a number you
+    type) are downloaded to keep, so they start at once and play offline.
+  - **Songs from your YouTube Music history**: plays in that history count like plays here, also
+    the ones on other devices, so a song you played on more than one day in 30 days is downloaded
+    to keep. YouTube Music lists only about the last 200 songs, each once, so the app reads it a
+    few times a day and counts what it sees over time. (A Google Takeout import is a
+    [future idea](future-ideas.md#song-cache-from-a-google-takeout-history).)
+  - They're **ordinary cached songs**: they go like any other when the cache is full. Only free
+    room is filled, nothing is pushed out for them; the setting says when the cache is full. They
+    come in one at a time with a pause between (so YouTube doesn't block the network), and follow
+    *Keep songs in the background* (Wi-Fi only by default).
 - **Music only**: podcast episodes are never cached (they're big and mostly heard once), and
   neither are "songs" over an hour (mixes, whole concerts).
 - A cached song **stays the same YouTube Music song** (likes, radio, lyrics and history work

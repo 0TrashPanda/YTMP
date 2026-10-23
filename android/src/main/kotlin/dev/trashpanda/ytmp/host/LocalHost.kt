@@ -168,6 +168,18 @@ class LocalHost(private val context: Context) {
         scope = scope,
     )
 
+    /** Songs from the owner's YouTube Music: recent likes, and from its history (Settings → Playback → Song cache). */
+    private val prefill = CachePrefill(
+        cache,
+        likes = { count -> youtube.recentLikes(count) },
+        history = { youtube.history() },
+        signedIn = { youtube.account() != null },
+        hold = { if (dataRules.fetchWifiOnly && !dataRules.onWifi()) "Wi-Fi" else null },
+        scope = scope,
+    )
+
+    private fun applyFromYoutube() = prefill.set(cacheSettings.getInt(CACHE_LIKED, 0), cacheSettings.getBoolean(CACHE_HISTORY, false))
+
     /** The setting is on and Android lets us read the music. */
     private fun localSongsOn() = cacheSettings.getBoolean(CACHE_LOCAL, false) && phoneMusicOn
 
@@ -263,6 +275,8 @@ class LocalHost(private val context: Context) {
 
         override fun localWaiting() = matcher.waiting
 
+        override fun fromYoutube() = prefill
+
         override suspend fun unmatched() = matcher.unmatched()
 
         override suspend fun recheck() = matcher.recheck()
@@ -280,6 +294,8 @@ class LocalHost(private val context: Context) {
                 putString(CACHE_PLACE, place)
                 settings.localSongs?.let { putBoolean(CACHE_LOCAL, it) }
                 settings.localParallel?.let { putInt(CACHE_PARALLEL, it.coerceIn(1, LocalMatcher.MAX_PARALLEL)) }
+                settings.keepLiked?.let { putInt(CACHE_LIKED, it.coerceIn(0, CachePrefill.MAX_LIKED)) }
+                settings.fromHistory?.let { putBoolean(CACHE_HISTORY, it) }
             }
             settings.fetchWifiOnly?.let { dataRules.fetchWifiOnly = it }
             settings.downloadsWifiOnly?.let { dataRules.downloadsWifiOnly = it }
@@ -290,6 +306,7 @@ class LocalHost(private val context: Context) {
             cache.setMaxBytes(settings.maxBytes)
             cache.moveTo(cacheDir(place))
             showCacheLibrary()
+            if (settings.keepLiked != null || settings.fromHistory != null) applyFromYoutube()
         }
     }
 
@@ -335,6 +352,7 @@ class LocalHost(private val context: Context) {
         downloads.restore()
         showCacheLibrary()
         applyLocalSongs()
+        applyFromYoutube()
         // So downloads play from the Music folder from the first song on.
         scope.launch { runCatching { downloads.all() } }
         wifi.start()
@@ -457,6 +475,8 @@ class LocalHost(private val context: Context) {
         private const val CACHE_PLACE = "place"
         private const val CACHE_LOCAL = "localSongs"
         private const val CACHE_PARALLEL = "localParallel"
+        private const val CACHE_LIKED = "keepLiked"
+        private const val CACHE_HISTORY = "fromHistory"
         private const val PLACE_PHONE = "phone"
         private const val PLACE_SD = "sd"
         /** About 250 songs. */

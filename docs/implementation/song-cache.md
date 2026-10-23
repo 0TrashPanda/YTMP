@@ -74,6 +74,31 @@ is worth an extra download and which songs stay.
   app's own player (`PlaybackService`) is the one playing, and fetches go through the phone's
   own YouTube lookup.
 
+## From your YouTube Music
+
+Phone only, with the owner's account (`PhoneYoutubeAccount`). `CachePrefill` (`host/`) looks at
+the account when a setting changes, at app start and every 6 hours (after an error 30 minutes):
+
+- **Recent likes** (pref `keepLiked`, 0–5000; `SongCacheSettings.keepLiked`): the first X songs
+  of Liked music (`LM`, newest liked first), read in parts (`PhoneYoutubeAccount.recentLikes`).
+- **History** (pref `fromHistory`): `YtmCore.history()` (ytmusicapi `get_history`), each song with
+  about how many days ago (`parse.days_ago` from the day group's title: Today, Yesterday, a
+  weekday, This week, Last week, a month; another language: unknown, counted as 31 days ago). Each
+  becomes a play at noon that day in the index's play counts (`SongCache.importPlays`), unless
+  the song already has a play that day: plays here go into that history too
+  ([`addToHistory`](../features/accounts.md)), and the history is read again. YouTube Music lists
+  a song once (its last play), so repeated reads build up the count. A history song that is then
+  [worth an extra download](#filling-it) (2 plays in 30 days) is fetched; the imported plays
+  also count in the keep score.
+
+Both go through `SongCache.fetch` (one song at a time, together with the background fetches),
+20 s apart, behind `fetchGate` (*Keep songs in the background*). They're ordinary entries: no
+pinning. To not push songs out for songs nobody played here, it only fills free room
+(`SongCache.hasRoom`: a song of the cache's average size, 4 MB when it's empty, still fits under
+90 %), else it stops the round and says `full`. The status has `keepLiked`, `likedOf`,
+`likedCached` (of the liked songs that can be cached, how many are here, downloads included),
+`fromHistory` and `fromYoutubeWaiting` (`Wi-Fi`, `full`, `signed out`, `error`).
+
 ## Using it
 
 - **The host's audio route** (`/api/audio/{songId}`) answers from the cache when it has the

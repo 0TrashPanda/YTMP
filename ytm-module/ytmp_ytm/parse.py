@@ -284,3 +284,41 @@ def thumbnails(thumbs: list[dict]) -> list[dict]:
         large = re.sub(size, lambda m: f"=w{_LARGE_ART}-{m.group(1) or ''}h{_LARGE_ART}", thumbs[-1]["url"])
         out.append({"url": large, "width": _LARGE_ART, "height": _LARGE_ART})
     return out
+
+
+_WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+_MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+
+
+def days_ago(label: str | None, today) -> int | None:
+    """About how many days ago a group of YouTube Music's history is ("Today", "Yesterday",
+    "Monday", "This week", "Last week", "March", "March 2025"), from [today] (a time.struct_time);
+    None when the label is something else (another language, say)."""
+    words = (label or "").strip().lower().split()
+    if not words:
+        return None
+    text = " ".join(words)
+    if text == "today":
+        return 0
+    if text == "yesterday":
+        return 1
+    if text == "this week":
+        return min(3, today.tm_wday)
+    if text == "last week":
+        return today.tm_wday + 4
+    if text in _WEEKDAYS:
+        return (today.tm_wday - _WEEKDAYS.index(text)) % 7 or 7
+    if words[0] in _MONTHS and len(words) <= 2:
+        month = _MONTHS.index(words[0]) + 1
+        if len(words) == 2:
+            if not words[1].isdigit():
+                return None
+            year = int(words[1])
+        else:
+            year = today.tm_year if month <= today.tm_mon else today.tm_year - 1
+        # The middle of that month, or today when that's earlier.
+        months = (today.tm_year - year) * 12 + today.tm_mon - month
+        if months < 0:
+            return None
+        return max(0, months * 30 + today.tm_mday - 15) if months else max(0, today.tm_mday - 15)
+    return None

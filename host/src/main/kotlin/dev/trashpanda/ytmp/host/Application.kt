@@ -182,6 +182,9 @@ interface CacheSettings {
     /** Why phone songs aren't being looked up right now, or null. */
     fun localWaiting(): String? = null
 
+    /** Songs from the owner's YouTube Music (recent likes, songs from its history played more than once); null: not a setting here. */
+    fun fromYoutube(): CachePrefill? = null
+
     /** The phone's downloads that wait, go or failed. */
     fun downloadQueue(): List<DownloadItem> = emptyList()
 

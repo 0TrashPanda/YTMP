@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from ytmp_ytm import core, parse
@@ -609,3 +611,35 @@ def test_an_album_by_its_playlist_id():
     album = ytm.album("OLAK5uy_abc")
     assert album["id"] == "MPREb_fromlink"
     assert album["title"] == "Album MPREb_fromlink"
+
+
+def test_history_says_about_when_each_song_was_played(monkeypatch):
+    ytm, user = _signed_in_core(monkeypatch)
+
+    def get_history():
+        return [
+            {"videoId": "aaaaaaaaaaa", "title": "A", "artists": [], "duration_seconds": 100, "played": "Today"},
+            {"videoId": "bbbbbbbbbbb", "title": "B", "artists": [], "duration_seconds": 100, "played": "Yesterday"},
+            {"videoId": "ccccccccccc", "title": "C", "artists": [], "duration_seconds": 100, "played": "Hier"},
+        ]
+
+    monkeypatch.setattr(user, "get_history", get_history, raising=False)
+    played = ytm.history()
+    assert [(p["song"]["id"], p["daysAgo"]) for p in played] == [("ytm:aaaaaaaaaaa", 0), ("ytm:bbbbbbbbbbb", 1), ("ytm:ccccccccccc", None)]
+
+
+def test_history_labels_become_days():
+    # Thursday 23 October 2025 (tm_wday 3).
+    today = time.strptime("2025-10-23", "%Y-%m-%d")
+    assert parse.days_ago("Today", today) == 0
+    assert parse.days_ago("Yesterday", today) == 1
+    assert parse.days_ago("Monday", today) == 3
+    assert parse.days_ago("Thursday", today) == 7
+    assert parse.days_ago("This week", today) == 3
+    assert parse.days_ago("Last week", today) == 7
+    assert parse.days_ago("October", today) == 8
+    assert parse.days_ago("September", today) == 38
+    assert parse.days_ago("November", today) == 11 * 30 + 8
+    assert parse.days_ago("March 2024", today) == 19 * 30 + 8
+    assert parse.days_ago("Vandaag", today) is None
+    assert parse.days_ago(None, today) is None

@@ -1241,6 +1241,11 @@ export interface SongCacheStatus {
   localWifiOnly: boolean;
   localCharging: boolean;
   localWaiting: string | null;
+  keepLiked: number | null;
+  likedOf: number;
+  likedCached: number;
+  fromHistory: boolean | null;
+  fromYoutubeWaiting: string | null;
   places: SongCachePlace[];
   place: string | null;
   settable: boolean;
@@ -1256,6 +1261,8 @@ export interface SongCacheSettings {
   downloadsWifiOnly: boolean | null;
   localWifiOnly: boolean | null;
   localCharging: boolean | null;
+  keepLiked: number | null;
+  fromHistory: boolean | null;
 }
 
 export interface UnmatchedSong {

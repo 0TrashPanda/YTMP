@@ -31,6 +31,7 @@ import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import org.slf4j.LoggerFactory
 
@@ -200,6 +201,15 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
     suspend fun deletePlaylist(playlistId: String) = python { core.callAttr("delete_playlist", playlistId); Unit }
 
     suspend fun addToHistory(songId: String) = python { core.callAttr("add_to_history", songId); Unit }
+
+    /** The account's YouTube Music history, newest first: each song and about how many days ago (null: not known). */
+    suspend fun history(): List<Pair<Song, Int?>> = python {
+        ProtocolJson.decodeFromString(ListSerializer(HistoryEntry.serializer()), json.callAttr("dumps", core.callAttr("history")).toString())
+            .map { it.song to it.daysAgo }
+    }
+
+    @Serializable
+    private class HistoryEntry(val song: Song, val daysAgo: Int? = null)
 
     suspend fun ownPlaylists(): List<PlaylistSummary> = python {
         ProtocolJson.decodeFromString(ListSerializer(PlaylistSummary.serializer()), json.callAttr("dumps", core.callAttr("own_playlists")).toString())

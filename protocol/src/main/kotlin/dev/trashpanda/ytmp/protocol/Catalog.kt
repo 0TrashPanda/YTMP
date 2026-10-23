@@ -372,6 +372,15 @@ data class SongCacheStatus(
     val localCharging: Boolean = false,
     /** Why the lookups are waiting right now ("Wi-Fi", "charging"), or null. */
     val localWaiting: String? = null,
+    /** How many of the songs you liked last on YouTube Music are kept (0: none); null where that isn't a setting (a server). */
+    val keepLiked: Int? = null,
+    /** Of those (the ones that can be kept): how many there are, and how many are here. */
+    val likedOf: Int = 0,
+    val likedCached: Int = 0,
+    /** Songs your YouTube Music history says you played more than once are kept; null where that isn't a setting. */
+    val fromHistory: Boolean? = null,
+    /** Why songs from YouTube Music aren't coming in right now: "Wi-Fi", "full", "signed out", "error"; or null. */
+    val fromYoutubeWaiting: String? = null,
     /** Where it can be kept (a phone: its own storage, an SD card); empty where that isn't a setting. */
     val places: List<SongCachePlace> = emptyList(),
     val place: String? = null,
@@ -396,6 +405,8 @@ data class SongCacheSettings(
     val downloadsWifiOnly: Boolean? = null,
     val localWifiOnly: Boolean? = null,
     val localCharging: Boolean? = null,
+    val keepLiked: Int? = null,
+    val fromHistory: Boolean? = null,
 )
 
 /** A phone song that has no YouTube Music match (`GET /api/cache/local/unmatched`), and why. */

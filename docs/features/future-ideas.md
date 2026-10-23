@@ -51,6 +51,13 @@ This could be a permission: *Add songs (needs approval)*.
 
 Emoji reactions on the current song, and/or a small text chat in the room.
 
+## Song cache from a Google Takeout history
+
+YouTube Music's own history (what the [song cache](sources.md#song-cache) reads now) only goes
+back about 200 songs and lists each song once. Google Takeout's `watch-history.json` has every
+play, years back: picking that file in *Settings → Playback → Song cache* could count the plays
+per song and keep the ones played most, from the first day.
+
 ## YTMP likes
 
 Liking songs without a linked YouTube account. These likes would be saved to the YTMP
