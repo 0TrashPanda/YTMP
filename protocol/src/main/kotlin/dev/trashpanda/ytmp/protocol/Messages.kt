@@ -444,6 +444,9 @@ enum class RejectReason {
     @SerialName("password_required") PASSWORD_REQUIRED,
 
     @SerialName("wrong_password") WRONG_PASSWORD,
+
+    /** Too many wrong passwords lately: nobody new gets in with one for a few minutes. */
+    @SerialName("too_many_attempts") TOO_MANY_ATTEMPTS,
 }
 
 @Serializable

@@ -34,7 +34,8 @@ const REJECT_MESSAGES: Record<RejectReason, string> = {
 	left: 'You left this room.',
 	migrated: 'Everyone moved to another room.',
 	password_required: 'This room has a password.',
-	wrong_password: "That's not the room's password."
+	wrong_password: "That's not the room's password.",
+	too_many_attempts: 'Too many wrong passwords. Try again in a few minutes.'
 };
 
 /**

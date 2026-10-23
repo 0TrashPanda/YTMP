@@ -403,6 +403,20 @@ class RoomLifecycleTest {
     private fun Client.rejection() = messages.filterIsInstance<ServerMessage.Rejected>().singleOrNull()?.reason
 
     @Test
+    fun `guessing a room's password locks tries for a while`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.SetPassword("party time"))
+        repeat(Room.PASSWORD_MAX_FAILURES) { assertEquals(RejectReason.WRONG_PASSWORD, room.joinWith("Ben", "guess$it").rejection()) }
+        // Locked: even the right password waits.
+        assertEquals(RejectReason.TOO_MANY_ATTEMPTS, room.joinWith("Ben", "party time").rejection())
+        // The owner and who's inside aren't kept out.
+        assertNull(room.join("Anna", owner = true).rejection())
+        advanceTimeBy(Room.PASSWORD_LOCK_MS + 1)
+        assertNull(room.joinWith("Ben", "party time").rejection())
+    }
+
+    @Test
     fun `a room with a password lets in who knows it`() = runTest {
         val room = newRoom()
         val anna = room.join("Anna", owner = true)

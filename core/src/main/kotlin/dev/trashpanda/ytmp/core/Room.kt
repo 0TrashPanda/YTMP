@@ -158,6 +158,9 @@ class Room(
 
     private val skipVote = SkipVote()
     private val limits = QueueLimits(clock)
+    /** When wrong passwords were tried lately, and until when no more are tried. */
+    private val passwordFailures = ArrayList<Long>()
+    private var passwordLockedUntil = 0L
 
     private val roles: RoomRoles
     @Volatile
@@ -262,7 +265,21 @@ class Room(
         val hash = passwordHash
         if (hash != null && returning == null && migrant == null && !isOwner && !local) {
             val password = hello.password
+            val now = clock()
+            // Guessing: after a few wrong passwords nobody new tries one for a while (people who know it are inside already).
+            if (password != null && now < passwordLockedUntil) {
+                outbox.send(ServerMessage.Rejected(RejectReason.TOO_MANY_ATTEMPTS))
+                return null
+            }
             if (password == null || !RoomPasswords.verify(password, hash)) {
+                if (password != null) {
+                    passwordFailures.removeAll { now - it > PASSWORD_WINDOW_MS }
+                    passwordFailures += now
+                    if (passwordFailures.size >= PASSWORD_MAX_FAILURES) {
+                        passwordLockedUntil = now + PASSWORD_LOCK_MS
+                        passwordFailures.clear()
+                    }
+                }
                 outbox.send(ServerMessage.Rejected(if (password == null) RejectReason.PASSWORD_REQUIRED else RejectReason.WRONG_PASSWORD))
                 return null
             }
@@ -1833,6 +1850,10 @@ class Room(
 
     companion object {
         private val log = LoggerFactory.getLogger(Room::class.java)
+        /** This many wrong passwords within [PASSWORD_WINDOW_MS] lock new tries for [PASSWORD_LOCK_MS]. */
+        const val PASSWORD_MAX_FAILURES = 5
+        const val PASSWORD_WINDOW_MS = 10 * 60_000L
+        const val PASSWORD_LOCK_MS = 10 * 60_000L
         const val MAX_NAME_LENGTH = 32
         const val MAX_URL_LENGTH = 300
         /** A clone's queue (and autoplay queue) keeps at most this many songs. */

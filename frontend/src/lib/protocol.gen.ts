@@ -655,7 +655,7 @@ export interface ServerMessagePong {
   hostTime: number;
 }
 
-export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "room_moved" | "private_room" | "kicked" | "banned" | "account_required" | "left" | "migrated" | "password_required" | "wrong_password";
+export type RejectReason = "room_not_found" | "version_mismatch" | "invalid_name" | "replaced" | "room_moved" | "private_room" | "kicked" | "banned" | "account_required" | "left" | "migrated" | "password_required" | "wrong_password" | "too_many_attempts";
 
 export interface ServerMessageRejected {
   type: "rejected";

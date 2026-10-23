@@ -478,7 +478,7 @@
 {:else if room.status === 'rejected'}
 	<main class="mx-auto flex min-h-full max-w-sm flex-col items-center justify-center gap-4 px-4 text-center">
 		<p class="text-lg">{room.rejectMessage}</p>
-		{#if room.rejectReason === 'password_required' || room.rejectReason === 'wrong_password'}
+		{#if room.rejectReason === 'password_required' || room.rejectReason === 'wrong_password' || room.rejectReason === 'too_many_attempts'}
 			<form
 				class="flex w-full flex-col gap-3"
 				onsubmit={(e) => {

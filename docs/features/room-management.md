@@ -15,7 +15,8 @@ An admin chooses who can join the room:
 - **Password** ✅: people need the room's password to join (the join form asks). Not needed by
   the owner, people already in the room, the hosting phone itself, or people moved over from a
   clone. Set, changed or removed in Room settings → Overview (*Manage room*); the share sheet
-  says a room has one. Kept hashed, so nobody can read it back. **Default password** on your
+  says a room has one. Kept hashed, so nobody can read it back. After 5 wrong passwords within
+  10 minutes nobody new can try one for 10 minutes ("Too many wrong passwords"), so it can't be guessed. **Default password** on your
   account (Settings → Account → *Room password*): every room you make starts with it, also
   rooms on your phone (with your account) and rooms cloned onto your server.
 
