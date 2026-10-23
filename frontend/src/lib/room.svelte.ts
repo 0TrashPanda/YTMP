@@ -7,6 +7,7 @@ import {
 	type Permission,
 	type RejectReason,
 	type RoomState,
+	type Song,
 	type ServerMessage
 } from './protocol.gen';
 import { identity } from './account';
@@ -210,8 +211,34 @@ export class RoomConnection {
 		this.socket = null;
 	}
 
+	/** Something that was just removed from the queue and can be put back (shown for a few seconds). */
+	undo = $state<{ text: string; songs: Song[]; index: number } | null>(null);
+	private undoTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/** What [command] takes out of the queue, to put back: a song, or all of them. */
+	private undoFor(command: Command): { text: string; songs: Song[]; index: number } | null {
+		const queue = this.state?.queue ?? [];
+		if (command.kind === 'RemoveQueueItem') {
+			const index = queue.findIndex((item) => item.itemId === command.itemId);
+			return index < 0 ? null : { text: `Removed "${queue[index].song.title}"`, songs: [queue[index].song], index };
+		}
+		if (command.kind === 'ClearQueue' && queue.length) {
+			return { text: `Cleared the queue (${queue.length} ${queue.length === 1 ? 'song' : 'songs'})`, songs: queue.map((item) => item.song), index: 0 };
+		}
+		return null;
+	}
+
+	/** Puts back what was just removed. */
+	undoRemove(): void {
+		const undo = this.undo;
+		this.undo = null;
+		clearTimeout(this.undoTimer);
+		if (undo) void this.run({ kind: 'RestoreSongs', songs: undo.songs, index: undo.index });
+	}
+
 	/** Sends a command. Resolves with the host's error, or null when it worked. */
 	run(command: Command): Promise<ErrorInfo | null> {
+		const undo = this.undoFor(command);
 		const id = `c${this.nextCommandId++}`;
 		if (this.socket?.readyState !== WebSocket.OPEN) {
 			return Promise.resolve({ code: 'invalid', message: 'Not connected' });
@@ -220,6 +247,11 @@ export class RoomConnection {
 			this.pending.set(id, (error) => {
 				// Not allowed: say so wherever the command came from.
 				if (error?.code === 'permission_denied') this.addNotice(error.message);
+				if (!error && undo) {
+					this.undo = undo;
+					clearTimeout(this.undoTimer);
+					this.undoTimer = setTimeout(() => (this.undo = null), 8000);
+				}
 				resolve(error);
 			});
 			this.sendRaw({ type: 'command', id, command });

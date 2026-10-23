@@ -717,6 +717,23 @@ class Room(
                 }
                 return leftOut
             }
+            is Command.RestoreSongs -> {
+                need(member, Permission.ADD_SONGS)?.let { return it }
+                if (command.songs.isEmpty()) return invalid("No songs")
+                // Songs that were here a moment ago: not counted against what one person may add.
+                val (songs, leftOut) = withinLimits(member, command.songs, countPerPerson = false)
+                if (songs.isEmpty()) return leftOut
+                autoplay.dismissed = false
+                val items = songs.map { newItem(it, member) }
+                val index = command.index.coerceIn(0, queue.size)
+                queue.addAll(index, items)
+                emit(Event.QueueItemsAdded(items, index))
+                if (current == null) {
+                    wantPlaying = true
+                    playNextFromQueue()
+                }
+                return leftOut
+            }
             is Command.PlayNow -> {
                 need(member, Permission.PLAY_NOW)?.let { return it }
                 val (songs, leftOut) = withinLimits(member, listOf(command.song), countPerPerson = false)

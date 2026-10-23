@@ -25,6 +25,13 @@ Permissions are set by room admins. See [room management](room-management.md#per
 Songs can come from any enabled [source](sources.md), so one queue can mix, for
 example, YouTube Music tracks and local files.
 
+## Undo ✅
+
+Removing a song from the queue, or clearing the queue, shows *Removed "…" · **Undo*** for 8
+seconds. Undo puts the songs back where they were (they count as added by whoever undoes
+it, and need the same *add songs* permission). It's for the queue; history and autoplay
+removals aren't undoable.
+
 ## Autoplay queue
 
 Next to the queue, a room has a second **autoplay queue**, a backup for when the

@@ -168,6 +168,12 @@ export interface CommandRemoveQueueItem {
   itemId: string;
 }
 
+export interface CommandRestoreSongs {
+  kind: "RestoreSongs";
+  songs: Song[];
+  index: number;
+}
+
 export interface CommandSeek {
   kind: "Seek";
   positionMs: number;
@@ -339,6 +345,7 @@ export type Command =
   | CommandPlayerReady
   | CommandPrevious
   | CommandRemoveQueueItem
+  | CommandRestoreSongs
   | CommandSeek
   | CommandSendMigration
   | CommandSetDeviceVolume

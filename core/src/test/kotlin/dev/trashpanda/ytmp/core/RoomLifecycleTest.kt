@@ -191,6 +191,22 @@ class RoomLifecycleTest {
     }
 
     @Test
+    fun `removed songs can be put back where they were`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.AddSongs(listOf(song(1), song(2), song(3), song(4)), QueuePosition.END))
+        runCurrent()
+        // song1 plays; the queue is 2, 3, 4. Take 3 out and put it back at index 1.
+        room.run(anna, Command.RestoreSongs(listOf(song(9)), 1))
+        assertEquals(listOf("ytm:song2", "ytm:song9", "ytm:song3", "ytm:song4"), room.save().queue.map { it.song.id })
+        // An index past the end puts it last; nothing to restore is refused.
+        room.run(anna, Command.RestoreSongs(listOf(song(8)), 99))
+        assertEquals("ytm:song8", room.save().queue.last().song.id)
+        room.run(anna, Command.RestoreSongs(emptyList(), 0))
+        assertEquals(5, room.save().queue.size)
+    }
+
+    @Test
     fun `a clone starts with the queue, roles and position, paused`() = runTest {
         val old = newRoom()
         val anna = old.join("Anna", owner = true)

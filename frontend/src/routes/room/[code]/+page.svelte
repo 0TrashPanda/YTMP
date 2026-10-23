@@ -812,6 +812,12 @@
 	{/if}
 
 	<div class="pointer-events-none fixed inset-x-0 bottom-28 z-50 flex flex-col items-center gap-2 px-4">
+		{#if room.undo}
+			<div class="pointer-events-auto flex items-center gap-3 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">
+				<span class="min-w-0 truncate">{room.undo.text}</span>
+				<button class="shrink-0 font-bold" onclick={() => room?.undoRemove()}>Undo</button>
+			</div>
+		{/if}
 		{#each [...room.notices, ...toasts] as message (message.id + message.text)}
 			<button
 				class="pointer-events-auto rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg"

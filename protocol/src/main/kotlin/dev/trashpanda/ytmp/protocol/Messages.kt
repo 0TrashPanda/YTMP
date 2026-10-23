@@ -87,6 +87,11 @@ sealed interface Command {
     @SerialName("AddSongs")
     data class AddSongs(val songs: List<Song>, val position: QueuePosition) : Command
 
+    /** Puts [songs] back in the queue at [index] (Undo after removing songs or clearing the queue). */
+    @Serializable
+    @SerialName("RestoreSongs")
+    data class RestoreSongs(val songs: List<Song>, val index: Int) : Command
+
     @Serializable
     @SerialName("PlayNow")
     data class PlayNow(val song: Song) : Command
