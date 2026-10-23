@@ -145,7 +145,8 @@ of **song connections**:
 A radio is an endless list of songs similar to a starting point. There are two ways to use
 it from the [song menu](ui.md#song-menu):
 
-- **Start radio**: **replaces the queue** with a radio from this song.
+- **Start radio**: **replaces the queue** with a radio from this song. The song starts right
+  away; the radio is loaded while it plays.
 - **Autoplay from here**: **replaces the autoplay queue**, the backup that plays when the
   queue is empty, without touching the queue (see [autoplay queue](queue.md#autoplay-queue)).
 

@@ -51,8 +51,8 @@ internal class Autoplay(private val clock: () -> Long) {
         items += songs.distinctBy { it.id }.map { item(it, origin) }
     }
 
-    fun add(songs: List<Song>) {
-        items += songs.map { item(it, QueueItemOrigin.AUTOPLAY) }
+    fun add(songs: List<Song>, origin: QueueItemOrigin = QueueItemOrigin.AUTOPLAY) {
+        items += songs.map { item(it, origin) }
     }
 
     private fun item(song: Song, origin: QueueItemOrigin) =

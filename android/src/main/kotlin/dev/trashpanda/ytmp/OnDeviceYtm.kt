@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp
 
 import android.content.Context
 import com.chaquo.python.PyException
+import dev.trashpanda.ytmp.core.PlaybackFirst
 import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.CatalogSource
 import dev.trashpanda.ytmp.protocol.AlbumPage
@@ -219,7 +220,7 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
 
     override suspend fun resolve(songId: String): ResolvedStream = stream(songId).let { ResolvedStream(it.url, it.durationMs) }
 
-    suspend fun stream(songId: String, fresh: Boolean = false): Stream = python {
+    suspend fun stream(songId: String, fresh: Boolean = false): Stream = python(playback = true) {
         botGuard
         val info = core.callAttr("stream", songId, fresh)
         val headers = info["http_headers"]!!.asMap().entries.associate { (k, v) -> k.toString() to v.toString() }
@@ -227,8 +228,20 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         Stream(info["url"].toString(), headers, info["duration_ms"]?.toLong())
     }
 
-    /** Runs Python off the main thread, and turns Python errors into [SourceException]s. */
-    private suspend fun <T> python(block: () -> T): T = withContext(Dispatchers.IO) {
+    /**
+     * Python runs one thing at a time, so a stream lookup goes first: everything else waits while
+     * one runs (a song that has to start shouldn't wait for a radio, lyrics or a page).
+     */
+    private val playbackFirst = PlaybackFirst()
+
+    /**
+     * Runs Python off the main thread, and turns Python errors into [SourceException]s.
+     * [playback]: a stream lookup, which goes before the rest.
+     */
+    private suspend fun <T> python(playback: Boolean = false, block: () -> T): T =
+        if (playback) playbackFirst.playback { runPython(block) } else playbackFirst.other { runPython(block) }
+
+    private suspend fun <T> runPython(block: () -> T): T = withContext(Dispatchers.IO) {
         try {
             block()
         } catch (e: PyException) {
