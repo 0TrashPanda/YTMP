@@ -122,7 +122,6 @@
 						<p class="text-xs text-muted">
 							Lists the music stored on this phone that is also on YouTube Music (same title, artist and length) under Cached on this phone, and plays it from the file, also offline. Each song is looked up once, slowly.
 							{#if !local.phone}Needs <em>Music on this phone</em> in Settings → Local music.{/if}
-							{#if status.checking}Looking up {status.checking} more…{/if}
 						</p>
 					</div>
 					<Switch
@@ -132,6 +131,16 @@
 						onchange={(on) => attempt(() => change({ maxBytes: status!.maxBytes, place: status?.place ?? null, localSongs: on }))}
 					/>
 				</div>
+				{#if status.localSongs && status.checkingOf}
+					<div class="flex flex-col gap-1.5">
+						<div class="h-1.5 overflow-hidden rounded-full bg-raised">
+							<div class="h-full rounded-full bg-white" style="width: {((status.checkingOf - status.checking) / status.checkingOf) * 100}%"></div>
+						</div>
+						<p class="text-xs text-muted">
+							{status.checkingOf - status.checking} of {status.checkingOf} phone songs looked up · {status.local} found on YouTube Music{status.checking ? '' : ' · done'}
+						</p>
+					</div>
+				{/if}
 			{/if}
 			{#if status.places.length > 1}
 				<Choice

@@ -44,6 +44,11 @@ class LocalMatcher(
     var pending = 0
         private set
 
+    /** Files that are looked at in all (the ones with an answer already, and the ones to do). */
+    @Volatile
+    var total = 0
+        private set
+
     val enabled: Boolean get() = job != null
 
     fun start() {
@@ -69,6 +74,7 @@ class LocalMatcher(
         job?.cancel()
         job = null
         pending = 0
+        total = 0
         current = emptyMap()
         byId = emptyMap()
     }
@@ -88,6 +94,7 @@ class LocalMatcher(
         val files = tracks().filter(::eligible)
         val valid = files.associateBy { it.key }
         current = valid
+        total = files.size
         publish(valid)
         val todo = files.filter { cache.localMatch(it.key)?.sig != signature(it) }
         pending = todo.size

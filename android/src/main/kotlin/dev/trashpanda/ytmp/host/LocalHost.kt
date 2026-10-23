@@ -238,6 +238,8 @@ class LocalHost(private val context: Context) {
 
         override fun checking() = if (matcher.enabled) matcher.pending else 0
 
+        override fun checkingOf() = if (matcher.enabled) matcher.total else 0
+
         override suspend fun change(settings: SongCacheSettings) {
             val place = settings.place?.takeIf { wanted -> cachePlaces().any { it.id == wanted } } ?: place()!!
             cacheSettings.edit {

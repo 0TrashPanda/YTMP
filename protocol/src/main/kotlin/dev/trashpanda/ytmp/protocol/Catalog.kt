@@ -359,6 +359,8 @@ data class SongCacheStatus(
     val localSongs: Boolean? = null,
     /** Phone songs still to be looked up on YouTube Music. */
     val checking: Int = 0,
+    /** Phone songs that are looked up in all (done and still to do). */
+    val checkingOf: Int = 0,
     /** Where it can be kept (a phone: its own storage, an SD card); empty where that isn't a setting. */
     val places: List<SongCachePlace> = emptyList(),
     val place: String? = null,

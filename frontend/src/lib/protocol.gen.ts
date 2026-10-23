@@ -1115,6 +1115,7 @@ export interface SongCacheStatus {
   local: number;
   localSongs: boolean | null;
   checking: number;
+  checkingOf: number;
   places: SongCachePlace[];
   place: string | null;
   settable: boolean;

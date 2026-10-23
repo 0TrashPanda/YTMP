@@ -161,6 +161,9 @@ interface CacheSettings {
     /** Phone songs still to look up. */
     fun checking(): Int = 0
 
+    /** Phone songs looked at in all. */
+    fun checkingOf(): Int = 0
+
     /** Saves [settings] and applies them (a new place moves what's cached). */
     suspend fun change(settings: SongCacheSettings)
 }
