@@ -707,6 +707,7 @@
 									onAlbum={(a) => openAlbum(a)}
 									onPlaylist={openPlaylist}
 									onPodcast={openPodcast}
+									onSettings={() => (sheet = { kind: 'settings', start: 'home' })}
 								/>
 							{/key}
 						{/if}

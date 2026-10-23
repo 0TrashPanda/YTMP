@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	export type SettingsSection = 'account' | 'youtube' | 'playback' | 'gestures' | 'local' | 'look' | 'app' | 'server';
+	export type SettingsSection = 'account' | 'youtube' | 'playback' | 'gestures' | 'home' | 'local' | 'look' | 'app' | 'server';
 </script>
 
 <script lang="ts">
@@ -22,6 +22,7 @@
 	import Choice from './Choice.svelte';
 	import EqualizerSection from './EqualizerSection.svelte';
 	import GesturesSection from './GesturesSection.svelte';
+	import HomeSection from './HomeSection.svelte';
 	import LocalSection from './LocalSection.svelte';
 	import OwnModuleSection from './OwnModuleSection.svelte';
 	import ServerSection from './ServerSection.svelte';
@@ -69,6 +70,7 @@
 				['youtube', 'YouTube Music', 'library', true],
 				['playback', 'Playback', 'headphones', true],
 				['gestures', 'Taps and swipes', 'tune', true],
+				['home', 'Home', 'home', true],
 				['local', 'Local music', 'local', true],
 				['look', 'Look', 'palette', true],
 				['app', 'App', 'phone', !!nativeBridge?.appVersion],
@@ -251,6 +253,8 @@
 				<GesturesSection />
 			{:else if section === 'local'}
 				<LocalSection {onToast} />
+			{:else if section === 'home'}
+				<HomeSection />
 			{:else if section === 'look'}
 				<Choice
 					label="Image quality"

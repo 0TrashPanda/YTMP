@@ -16,15 +16,33 @@
 <script lang="ts">
 	import { hideIfBroken } from '../pictures';
 	import Icon from './Icon.svelte';
-	/** [row]: one row that scrolls sideways (the home page), instead of a grid. */
 	import PageDots from './PageDots.svelte';
 
-	let { cards, row = false }: { cards: Card[]; row?: boolean } = $props();
+	/** [row]: one row that scrolls sideways (the home page), instead of a grid; [list]: one card under the other. */
+	let { cards, row = false, list = false }: { cards: Card[]; row?: boolean; list?: boolean } = $props();
 	// YouTube Music can list the same album or playlist twice: show it once.
 	const unique = $derived(cards.filter((c, i) => cards.findIndex((d) => d.key === c.key) === i));
 	let scroller = $state<HTMLElement>();
 </script>
 
+{#if list}
+	<div class="flex flex-col">
+		{#each unique as card (card.key)}
+			<button class="flex min-w-0 items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-raised" onclick={card.open} onpointerenter={card.prefetch} ontouchstart={card.prefetch}>
+				<div class="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden bg-raised text-muted {card.round ? 'rounded-full' : 'rounded'}">
+					<Icon name={card.round ? 'person' : 'note'} size={24} class="absolute" />
+					{#if card.art}
+						<img src={card.art} alt="" use:hideIfBroken loading="lazy" referrerpolicy="no-referrer" class="relative h-full w-full object-cover" />
+					{/if}
+				</div>
+				<div class="min-w-0 flex-1">
+					<p class="truncate font-medium">{card.title}</p>
+					<p class="truncate text-sm text-muted">{card.subtitle}</p>
+				</div>
+			</button>
+		{/each}
+	</div>
+{:else}
 <div
 	bind:this={scroller}
 	class={row
@@ -49,4 +67,5 @@
 </div>
 {#if row}
 	<PageDots target={scroller} />
+{/if}
 {/if}
