@@ -1,6 +1,7 @@
 <script lang="ts">
 	// Play, Play next and Add to queue for a whole album or playlist. A playlist goes into
 	// autoplay instead of the queue ([toAutoplay]): it plays when the queue is empty.
+	import type { Snippet } from 'svelte';
 	import type { Song } from '../protocol.gen';
 	import { addToQueue, playNext } from '../songActions';
 	import type { RoomConnection } from '../room.svelte';
@@ -12,7 +13,8 @@
 		name,
 		toAutoplay = false,
 		whole,
-		onToast
+		onToast,
+		children
 	}: {
 		room: RoomConnection;
 		/** Null while loading. */
@@ -24,6 +26,8 @@
 		/** "Add to autoplay" instead of "Add to queue" (playlists). */
 		toAutoplay?: boolean;
 		onToast: (text: string) => void;
+		/** More buttons at the end of the row. */
+		children?: Snippet;
 	} = $props();
 
 	const all = async () => (whole ? await whole() : songs) ?? [];
@@ -72,4 +76,5 @@
 			<Icon name="autoplay" size={18} /> Add to autoplay
 		</button>
 	{/if}
+	{@render children?.()}
 </div>

@@ -57,3 +57,12 @@ describe('home sections', () => {
 		expect(loadPrefs('{"order":["A","A",3],"hidePodcasts":true}')).toMatchObject({ order: ['A'], hidePodcasts: true });
 	});
 });
+
+describe('pins', () => {
+	it('keeps the pins that make sense', () => {
+		const prefs = loadPrefs(
+			JSON.stringify({ pins: [{ kind: 'playlist', id: 'LM', title: 'Liked music', personal: true }, { kind: 'song', id: 'x', title: 'X' }, { kind: 'album', id: 'a' }] })
+		);
+		expect(prefs.pins).toEqual([{ kind: 'playlist', id: 'LM', title: 'Liked music', art: undefined, personal: true }]);
+	});
+});

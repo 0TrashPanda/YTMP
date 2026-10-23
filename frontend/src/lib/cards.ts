@@ -7,7 +7,8 @@ import type { AlbumRef, ArtistRef, PodcastRef, SearchItem } from './protocol.gen
 export interface PageHandlers {
 	onArtist: (artist: ArtistRef) => void;
 	onAlbum: (album: AlbumRef) => void;
-	onPlaylist: (playlist: { id: string; title: string }) => void;
+	/** [personal]: one of your own playlists. */
+	onPlaylist: (playlist: { id: string; title: string }, personal?: boolean) => void;
 	onPodcast: (podcast: PodcastRef) => void;
 }
 

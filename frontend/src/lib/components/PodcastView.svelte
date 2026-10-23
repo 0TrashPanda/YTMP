@@ -11,6 +11,7 @@
 	import type { Episode, EpisodeProgress, PodcastPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
+	import PinButton from './PinButton.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 
 	let {
@@ -139,6 +140,7 @@
 						{saved ? 'Subscribed' : 'Subscribe'}
 					</button>
 				{/if}
+				<PinButton pin={podcast ? { kind: 'podcast', id, title: podcast.title, art: thumbUrl(podcast.thumbnails, 120) } : null} {onToast} />
 			</div>
 		</div>
 	</header>

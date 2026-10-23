@@ -1,7 +1,8 @@
 // How Home looks, as set in Settings → Home (or a section's ⋮ on Home): which of YouTube
 // Music's sections show, in which order, and each as a sideways carousel (like YTM) or a list.
 // YTM names its sections itself ("Quick picks", "Listen again"…), so they're known by name;
-// a name not seen before goes after the section YTM shows it after. Saved on this device.
+// a name not seen before goes after the section YTM shows it after. Above them come your pins:
+// playlists (Liked music too), albums, artists and podcasts pinned from their page. Saved on this device.
 import type { HomeSection } from './protocol.gen';
 import { read, write } from './storage';
 
@@ -15,6 +16,29 @@ export interface HomePrefs {
 	lists: string[];
 	/** Sections that are (mostly) podcasts and episodes don't show. */
 	hidePodcasts: boolean;
+	pins: Pin[];
+}
+
+/** A page pinned to the top of Home. */
+export interface Pin {
+	kind: 'playlist' | 'album' | 'artist' | 'podcast';
+	id: string;
+	title: string;
+	/** The picture's URL, when pinned. */
+	art?: string;
+	/** One of your own playlists (it opens like from your library). */
+	personal?: boolean;
+}
+
+const PIN_KINDS: string[] = ['playlist', 'album', 'artist', 'podcast'];
+
+function pins(value: unknown): Pin[] {
+	if (!Array.isArray(value)) return [];
+	return value.flatMap((p) =>
+		p && PIN_KINDS.includes(p.kind) && typeof p.id === 'string' && typeof p.title === 'string'
+			? [{ kind: p.kind, id: p.id, title: p.title, art: typeof p.art === 'string' ? p.art : undefined, personal: p.personal === true || undefined }]
+			: []
+	);
 }
 
 const KEY = 'ytmp.home';
@@ -28,10 +52,11 @@ export function loadPrefs(text: string | null): HomePrefs {
 			order: [...new Set(strings(stored.order))],
 			hidden: strings(stored.hidden),
 			lists: strings(stored.lists),
-			hidePodcasts: stored.hidePodcasts === true
+			hidePodcasts: stored.hidePodcasts === true,
+			pins: pins(stored.pins)
 		};
 	} catch {
-		return { order: [], hidden: [], lists: [], hidePodcasts: false };
+		return { order: [], hidden: [], lists: [], hidePodcasts: false, pins: [] };
 	}
 }
 
@@ -76,8 +101,8 @@ export const home = $state<HomePrefs & { podcastSections: string[] }>({
 });
 
 function save() {
-	const { order, hidden, lists, hidePodcasts } = home;
-	write(KEY, JSON.stringify({ order, hidden, lists, hidePodcasts }));
+	const { order, hidden, lists, hidePodcasts, pins } = home;
+	write(KEY, JSON.stringify({ order, hidden, lists, hidePodcasts, pins }));
 }
 
 /** Home loaded these sections: new names are remembered, for Settings → Home. */
@@ -109,13 +134,29 @@ export function setHidePodcasts(on: boolean): void {
 	save();
 }
 
+function moved<T>(list: T[], from: number, to: number): T[] {
+	const out = [...list];
+	const [item] = out.splice(from, 1);
+	if (item !== undefined) out.splice(Math.max(0, Math.min(to, out.length)), 0, item);
+	return out;
+}
+
 /** Moves a section from one place in the order to another. */
 export function moveSection(from: number, to: number): void {
-	const order = [...home.order];
-	const [title] = order.splice(from, 1);
-	if (title === undefined) return;
-	order.splice(Math.max(0, Math.min(to, order.length)), 0, title);
-	home.order = order;
+	home.order = moved(home.order, from, to);
+	save();
+}
+
+export const isPinned = (kind: Pin['kind'], id: string) => home.pins.some((p) => p.kind === kind && p.id === id);
+
+/** Pins it (at the end) or unpins it. */
+export function togglePin(pin: Pin): void {
+	home.pins = isPinned(pin.kind, pin.id) ? home.pins.filter((p) => !(p.kind === pin.kind && p.id === pin.id)) : [...home.pins, pin];
+	save();
+}
+
+export function movePin(from: number, to: number): void {
+	home.pins = moved(home.pins, from, to);
 	save();
 }
 
@@ -127,13 +168,7 @@ export function nudge(title: string, step: -1 | 1, shown: string[]): void {
 	moveSection(home.order.indexOf(title), home.order.indexOf(other));
 }
 
-export function forget(title: string): void {
-	home.order = home.order.filter((t) => t !== title);
-	home.hidden = home.hidden.filter((t) => t !== title);
-	home.lists = home.lists.filter((t) => t !== title);
-	save();
-}
-
+/** The sections as YTM has them (your pins stay). */
 export function resetHome(): void {
 	home.order = [];
 	home.hidden = [];

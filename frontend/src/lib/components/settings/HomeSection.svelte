@@ -1,7 +1,8 @@
 <script lang="ts">
 	// Settings → Home: which of YouTube Music's sections Home shows, in which order, and each as a
 	// carousel or a list (see home.svelte.ts). Sections are listed once Home has shown them.
-	import { home, moveSection, resetHome, setHidden, setHidePodcasts, setLayout } from '../../home.svelte';
+	// And your pins: their order, and unpinning.
+	import { home, movePin, moveSection, resetHome, setHidden, setHidePodcasts, setLayout, togglePin } from '../../home.svelte';
 	import Icon from '../Icon.svelte';
 	import Choice from './Choice.svelte';
 
@@ -11,10 +12,39 @@
 		setHidden(title, value === 'hidden');
 		if (value !== 'hidden') setLayout(title, value);
 	}
+	const KINDS = { playlist: 'Playlist', album: 'Album', artist: 'Artist', podcast: 'Podcast' };
 	const changed = $derived(home.hidden.length > 0 || home.lists.length > 0 || home.hidePodcasts);
 </script>
 
 <div class="flex flex-col gap-8">
+	<section class="flex flex-col gap-3">
+		<div>
+			<p class="text-sm font-medium">Pinned</p>
+			<p class="text-xs text-muted">At the top of Home. Pin a playlist (Liked music too), album, artist or podcast with Pin to Home on its page.</p>
+		</div>
+		{#each home.pins as pin, i (pin.kind + pin.id)}
+			<div class="flex items-center gap-1">
+				<span class="min-w-0 flex-1 truncate text-sm">{pin.title} <span class="text-muted">· {KINDS[pin.kind]}</span></span>
+				<button class="rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-30" aria-label="Move {pin.title} up" disabled={i === 0} onclick={() => movePin(i, i - 1)}>
+					<Icon name="expand" size={20} />
+				</button>
+				<button
+					class="rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-30"
+					aria-label="Move {pin.title} down"
+					disabled={i === home.pins.length - 1}
+					onclick={() => movePin(i, i + 1)}
+				>
+					<Icon name="collapse" size={20} />
+				</button>
+				<button class="rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label="Unpin {pin.title}" onclick={() => togglePin(pin)}>
+					<Icon name="close" size={20} />
+				</button>
+			</div>
+		{:else}
+			<p class="text-sm text-muted">Nothing pinned yet.</p>
+		{/each}
+	</section>
+
 	<Choice
 		label="Podcast sections"
 		hint="Sections of podcasts and episodes that YouTube Music suggests."

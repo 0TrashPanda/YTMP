@@ -3,12 +3,13 @@
 	// that scrolls sideways (tap = play next, ⋮ or right-click = song menu); albums,
 	// playlists, artists and podcasts are cards that open their page. Each section's ⋮ hides it,
 	// moves it, or shows it as a list (songs then tap and swipe like any song list); Settings → Home
-	// has all of that for every section (home.svelte.ts).
+	// has all of that for every section (home.svelte.ts). Above them: your pins, as tiles.
 	import { getHome } from '../api';
 	import { menuAt, playNext, quoted } from '../songActions';
 	import { itemCard, type PageHandlers } from '../cards';
 	import { artistNames } from '../format';
-	import { arrange, home as prefs, nudge, seen, setHidden, setLayout } from '../home.svelte';
+	import { hideIfBroken } from '../pictures';
+	import { arrange, home as prefs, nudge, seen, setHidden, setLayout, type Pin } from '../home.svelte';
 	import type { HomePage, SearchItem, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -53,6 +54,13 @@
 
 	const playSongNext = (song: Song) => playNext(room, [song], quoted(song), onToast);
 
+	function openPin(pin: Pin) {
+		if (pin.kind === 'playlist') open.onPlaylist({ id: pin.id, title: pin.title }, pin.personal);
+		else if (pin.kind === 'album') open.onAlbum({ id: pin.id, name: pin.title });
+		else if (pin.kind === 'artist') open.onArtist({ id: pin.id, name: pin.title });
+		else open.onPodcast({ id: pin.id, name: pin.title });
+	}
+
 	function sectionAction(title: string, action: 'up' | 'down' | 'layout' | 'hide') {
 		sectionMenu = null;
 		const shown = sections.map((s) => s.title);
@@ -72,6 +80,22 @@
 </script>
 
 <div class="flex flex-col gap-8 pb-4">
+	{#if prefs.pins.length}
+		<!-- Shown at once: they're saved here, nothing to wait for. -->
+		<div class="grid grid-cols-2 gap-2 px-2 sm:grid-cols-3 lg:grid-cols-4">
+			{#each prefs.pins as pin (pin.kind + pin.id)}
+				<button class="flex min-w-0 items-center gap-3 overflow-hidden rounded-md bg-raised text-left hover:bg-line" onclick={() => openPin(pin)}>
+					<div class="relative grid h-12 w-12 shrink-0 place-items-center bg-line text-muted {pin.kind === 'artist' ? 'rounded-full' : ''}">
+						<Icon name={pin.kind === 'artist' ? 'person' : pin.kind === 'podcast' ? 'podcast' : 'note'} size={24} class="absolute" />
+						{#if pin.art}
+							<img src={pin.art} alt="" use:hideIfBroken referrerpolicy="no-referrer" class="relative h-full w-full object-cover {pin.kind === 'artist' ? 'rounded-full' : ''}" />
+						{/if}
+					</div>
+					<span class="line-clamp-2 min-w-0 flex-1 pr-2 text-sm font-medium">{pin.title}</span>
+				</button>
+			{/each}
+		</div>
+	{/if}
 	{#if error}
 		<div class="flex flex-col items-center gap-2 py-16 text-center text-muted">
 			<Icon name="search" size={48} />

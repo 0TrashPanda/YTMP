@@ -6,6 +6,7 @@
 	import { formatTime } from '../format';
 	import type { AlbumPage, ArtistRef } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
+	import PinButton from './PinButton.svelte';
 	import PlayAllButtons from './PlayAllButtons.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import SongList from './SongList.svelte';
@@ -63,7 +64,9 @@
 					{#if album.year} • {album.year}{/if} • {album.songs.length} songs • {formatTime(total)}
 				</p>
 			{/if}
-			<PlayAllButtons {room} songs={album?.songs ?? null} name={album?.title ?? title} {onToast} />
+			<PlayAllButtons {room} songs={album?.songs ?? null} name={album?.title ?? title} {onToast}>
+				<PinButton pin={album ? { kind: 'album', id, title: album.title, art: thumbUrl(album.thumbnails, 120) } : null} {onToast} />
+			</PlayAllButtons>
 		</div>
 	</header>
 

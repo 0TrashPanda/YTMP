@@ -8,6 +8,7 @@
 	import type { RoomConnection } from '../room.svelte';
 	import AlbumGrid from './AlbumGrid.svelte';
 	import Icon from './Icon.svelte';
+	import PinButton from './PinButton.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import SongList from './SongList.svelte';
 
@@ -79,6 +80,7 @@
 						<Icon name="playlistAdd" size={18} /> Add top songs
 					</button>
 				{/if}
+				<PinButton pin={artist ? { kind: 'artist', id, title: artist.name, art: thumbUrl(artist.thumbnails, 120) } : null} {onToast} />
 			</div>
 		</div>
 	</header>

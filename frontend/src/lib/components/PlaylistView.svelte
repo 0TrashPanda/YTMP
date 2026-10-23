@@ -9,6 +9,7 @@
 	import { formatTime } from '../format';
 	import type { PlaylistPage, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
+	import PinButton from './PinButton.svelte';
 	import PlayAllButtons from './PlayAllButtons.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import SongList from './SongList.svelte';
@@ -229,7 +230,9 @@
 					</button>
 				{/if}
 			{/if}
-			<PlayAllButtons {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay whole={playlist?.more ? whole : undefined} {onToast} />
+			<PlayAllButtons {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay whole={playlist?.more ? whole : undefined} {onToast}>
+				<PinButton pin={playlist ? { kind: 'playlist', id, title: playlist.title, art: thumbUrl(playlist.thumbnails, 120), personal: personal || undefined } : null} {onToast} />
+			</PlayAllButtons>
 		</div>
 	</header>
 
