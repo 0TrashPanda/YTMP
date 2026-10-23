@@ -16,6 +16,7 @@ import { deviceName } from './deviceVolume';
 import { effectivePermissions } from './permissions';
 import { saved } from './storage';
 import { applyEvent } from './roomEvents';
+import { predict, type Sender } from './optimistic';
 
 /** How long a host notice (e.g. "Couldn't play …") stays on screen. */
 const NOTICE_MS = 8000;
@@ -69,6 +70,12 @@ export class RoomConnection {
 	private waitingForSnapshot = false;
 	private nextCommandId = 1;
 	private pending = new Map<string, (error: ErrorInfo | null) => void>();
+	/** The room as the host has it: [state] is this with my commands that wait for an answer on top. */
+	private hostState: RoomState | null = null;
+	/** My commands the host hasn't answered yet, already shown in [state] (optimistic.ts). */
+	private guesses: { id: string; command: Command; by: Sender }[] = [];
+	/** Errors already shown as a notice, so whoever ran the command doesn't say it again. */
+	private noticed = new WeakSet<ErrorInfo>();
 	private bestRtt = Infinity;
 	private pingTimer: ReturnType<typeof setInterval> | undefined;
 	private retryDelay = 1000;
@@ -238,24 +245,92 @@ export class RoomConnection {
 
 	/** Sends a command. Resolves with the host's error, or null when it worked. */
 	run(command: Command): Promise<ErrorInfo | null> {
+		return this.send(command).done;
+	}
+
+	/**
+	 * Sends a command, and shows what it will most likely do right away ([shown]) instead of
+	 * waiting for the host. When the host says no, that's undone and a notice says why.
+	 */
+	send(command: Command): { shown: boolean; done: Promise<ErrorInfo | null> } {
 		const undo = this.undoFor(command);
 		const id = `c${this.nextCommandId++}`;
 		if (this.socket?.readyState !== WebSocket.OPEN) {
-			return Promise.resolve({ code: 'invalid', message: 'Not connected' });
+			return { shown: false, done: Promise.resolve({ code: 'invalid', message: 'Not connected' }) };
 		}
-		return new Promise((resolve) => {
+		const shown = this.guess(id, command);
+		if (shown && undo) this.showUndo(undo, id);
+		const done = new Promise<ErrorInfo | null>((resolve) => {
 			this.pending.set(id, (error) => {
-				// Not allowed: say so wherever the command came from.
-				if (error?.code === 'permission_denied') this.addNotice(error.message);
-				if (!error && undo) {
-					this.undo = undo;
-					clearTimeout(this.undoTimer);
-					this.undoTimer = setTimeout(() => (this.undo = null), 8000);
+				const guessed = this.guesses.some((g) => g.id === id);
+				if (guessed) {
+					this.guesses = this.guesses.filter((g) => g.id !== id);
+					this.show();
 				}
+				// Not allowed, or what was shown is undone: say so wherever the command came from.
+				if (error && (error.code === 'permission_denied' || guessed)) {
+					this.addNotice(error.message);
+					this.noticed.add(error);
+				}
+				if (error && this.undoCommand === id) this.undo = null;
+				if (!error && undo && !shown) this.showUndo(undo, id);
 				resolve(error);
 			});
 			this.sendRaw({ type: 'command', id, command });
 		});
+		return { shown, done };
+	}
+
+	/** [error] was already shown as a notice. */
+	wasNoticed(error: ErrorInfo): boolean {
+		return this.noticed.has(error);
+	}
+
+	/** The command whose removal [undo] puts back. */
+	private undoCommand: string | null = null;
+
+	private showUndo(undo: { text: string; songs: Song[]; index: number }, commandId: string): void {
+		this.undo = undo;
+		this.undoCommand = commandId;
+		clearTimeout(this.undoTimer);
+		this.undoTimer = setTimeout(() => (this.undo = null), 8000);
+	}
+
+	/** Shows what [command] will most likely do, until the host answers. False when that can't be told. */
+	private guess(id: string, command: Command): boolean {
+		const me = this.me;
+		if (!this.state || !this.hostState || !me) return false;
+		const permissions = this.permissions;
+		const by: Sender = {
+			id: me.id,
+			name: me.name,
+			can: (permission) => permissions.has(permission),
+			// The host runs it about half a round trip from now.
+			at: Math.round(this.hostNow() + (Number.isFinite(this.bestRtt) ? this.bestRtt / 2 : 0)),
+			itemId: (index) => `${id}.${index}`
+		};
+		if (!predict(structuredClone(this.hostState), command, by)) return false;
+		this.guesses.push({ id, command, by });
+		this.show();
+		return true;
+	}
+
+	/**
+	 * Shows the host's room with my unanswered commands on top. Only what differs is replaced,
+	 * so the page redraws just that.
+	 */
+	private show(): void {
+		if (!this.hostState) return;
+		const next = structuredClone(this.hostState);
+		for (const g of this.guesses) predict(next, g.command, g.by);
+		const state = this.state;
+		if (!state) {
+			this.state = next;
+			return;
+		}
+		for (const key of Object.keys(next) as (keyof RoomState)[]) {
+			if (JSON.stringify(state[key]) !== JSON.stringify(next[key])) (state as Record<keyof RoomState, unknown>)[key] = next[key];
+		}
 	}
 
 	dismissNotice(id: number): void {
@@ -281,7 +356,8 @@ export class RoomConnection {
 				this.arrivingWithKey = null;
 				this.migrationKey = message.migrationKey;
 				this.participantId = message.participantId;
-				this.state = message.state;
+				this.hostState = message.state;
+				this.state = structuredClone(message.state);
 				this.followCode(message.state);
 				if (this.sentAccountToken && !message.accountId) {
 					// Expired, or from an auth server this host doesn't trust (any more).
@@ -294,7 +370,9 @@ export class RoomConnection {
 				this.startClockSync();
 				break;
 			case 'snapshot':
-				this.state = message.state;
+				this.hostState = message.state;
+				if (this.guesses.length) this.show();
+				else this.state = structuredClone(message.state);
 				this.followCode(message.state);
 				this.seq = message.seq;
 				this.waitingForSnapshot = false;
@@ -308,7 +386,7 @@ export class RoomConnection {
 					return;
 				}
 				this.seq = message.seq;
-				if (this.state) this.apply(this.state, message.event);
+				if (this.hostState) this.apply(this.hostState, message.event);
 				break;
 			case 'result':
 				this.pending.get(message.id)?.(message.error);
@@ -332,6 +410,9 @@ export class RoomConnection {
 
 	private apply(s: RoomState, e: Event): void {
 		applyEvent(s, e);
+		// With my commands on top (when there are any), or the same change to what's shown.
+		if (this.guesses.length) this.show();
+		else if (this.state) applyEvent(this.state, structuredClone(e));
 		if (e.kind === 'RoomUpdated') this.followCode(s);
 		else if (e.kind === 'Notice') this.addNotice(e.message);
 	}
@@ -370,6 +451,9 @@ export class RoomConnection {
 	}
 
 	private failPending(): void {
+		// What they'd do isn't shown any more: the host's room comes back on reconnecting.
+		this.guesses = [];
+		this.show();
 		for (const resolve of this.pending.values()) resolve({ code: 'invalid', message: 'Disconnected' });
 		this.pending.clear();
 	}

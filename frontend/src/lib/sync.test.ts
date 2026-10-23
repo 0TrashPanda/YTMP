@@ -29,7 +29,7 @@ describe('correction', () => {
 
 describe('targetPosition', () => {
 	it('moves on while playing, with the sync adjustment', () => {
-		const playing = { playing: true, positionMs: 10_000, hostTimeMs: 1_000, starting: false, speed: 1 };
+		const playing = { playing: true, positionMs: 10_000, hostTimeMs: 1_000, starting: false, speed: 1, loading: false };
 		expect(targetPosition(playing, 3_000, 0)).toBe(12_000);
 		expect(targetPosition(playing, 3_000, 200)).toBe(12_200);
 		expect(targetPosition({ ...playing, playing: false }, 3_000, 0)).toBe(10_000);
@@ -37,7 +37,7 @@ describe('targetPosition', () => {
 	});
 
 	it('an episode at 1.5 moves on one and a half times as fast', () => {
-		const fast = { playing: true, positionMs: 10_000, hostTimeMs: 1_000, starting: false, speed: 1.5 };
+		const fast = { playing: true, positionMs: 10_000, hostTimeMs: 1_000, starting: false, speed: 1.5, loading: false };
 		expect(targetPosition(fast, 3_000, 0)).toBe(13_000);
 		expect(targetPosition(fast, 3_000, 200)).toBe(13_300);
 	});

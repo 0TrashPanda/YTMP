@@ -17,7 +17,7 @@
 		open = false;
 		if (s === speed) return;
 		const error = await room.run({ kind: 'SetSpeed', speed: s });
-		if (error) onToast(error.message);
+		if (error && !room.wasNoticed(error)) onToast(error.message);
 	}
 </script>
 

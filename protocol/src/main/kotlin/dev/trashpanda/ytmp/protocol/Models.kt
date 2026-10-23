@@ -136,6 +136,11 @@ data class PlaybackStatus(
      * at another speed than 1 (the room's episode speed, [Command.SetSpeed]).
      */
     val speed: Double = 1.0,
+    /**
+     * The song should play, but its stream is still being looked up: [playing] is false until
+     * it's there. Show it as playing (and loading), not as paused.
+     */
+    val loading: Boolean = false,
 )
 
 /** The speeds to pick from for episodes ([Command.SetSpeed]); one in between can be typed. */

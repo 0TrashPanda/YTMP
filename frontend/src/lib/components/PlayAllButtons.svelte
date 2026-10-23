@@ -47,7 +47,7 @@
 		const [first, ...rest] = list;
 		let e = await room.run({ kind: 'PlayNow', song: first });
 		if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
-		if (e) onToast(e.message);
+		if (e && !room.wasNoticed(e)) onToast(e.message);
 	}
 </script>
 

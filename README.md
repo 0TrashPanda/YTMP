@@ -73,6 +73,8 @@ Music, without Premium, and not tied to a single music service.
 **The player**
 - A mini player that opens a full player (tap or swipe up): album art, controls, like,
   save to playlist, and Up next / Related tabs.
+- Buttons and queue changes respond right away, without waiting for the room; if the room
+  says no, it goes back with a message saying why.
 - Play on this device, on Chromecasts (including speakers with Chromecast built in), on
   Sonos speakers and on MPD (a Raspberry Pi on a speaker or amplifier), with their volume.
   The rooms of a multi-room amplifier show up as speakers of their own, from a file the house

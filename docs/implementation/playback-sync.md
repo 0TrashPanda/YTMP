@@ -162,7 +162,8 @@ skipped, most on a TV. Now a new song waits for the players, like Sonos or Spoti
   stops listening while the room waits isn't waited for either (checked every 100 ms).
 - Pausing or seeking while it waits ends the wait. The song ends by its length counted from
   when it started, not from when its stream was ready. Pages show a starting song as playing
-  (and loading).
+  (and loading), and so a song whose stream is still being looked up
+  (`PlaybackStatus.loading`).
 - The browser loads it paused and reports at `canplay`; Android (`PlaybackService.reportReady`)
   at `STATE_READY`, over its own room connection; a Chromecast after `LOAD` (exactly at the
   start, without the usual 1 s lead); Sonos after `SetAVTransportURI`, playing when the room

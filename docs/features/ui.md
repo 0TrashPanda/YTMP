@@ -43,6 +43,11 @@ Like YTM:
 
 Like YTM:
 
+- **Everything responds right away** ✅: play, pause, next, previous, seeking, playing a
+  song, starting a radio and changing the queue show at once, without waiting for the room.
+  When the room says no after all (not allowed, a song that's too long), it goes back and a
+  message says why. A new song shows as loading while it's looked up, not as paused.
+
 - **Mini player** ✅ (phones): at the bottom of every page. The song, play/pause and
   next, and a thin progress line. **Tap it or swipe it up** to open the full player.
 - **Full player** ✅: the album art (with its blurred colours behind it), the song (the

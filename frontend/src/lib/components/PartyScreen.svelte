@@ -167,7 +167,7 @@
 			<Art {song} size={1200} class="aspect-square h-[min(52vh,40vw)] rounded-[1.5vmin] shadow-2xl portrait:h-auto portrait:max-h-[40vh] portrait:min-h-0 portrait:flex-1" />
 			<div class="flex min-w-0 flex-1 flex-col gap-[1.2vh] portrait:w-full portrait:flex-none portrait:text-center">
 				<p class="text-[max(13px,1.9vh)] font-medium tracking-[0.2em] text-white/55 uppercase">
-					{s?.playback.playing || s?.playback.starting ? 'Now playing' : 'Paused'} · Added by {addedBy(current)}
+					{s?.playback.playing || s?.playback.starting || s?.playback.loading ? 'Now playing' : 'Paused'} · Added by {addedBy(current)}
 				</p>
 				<h1 class="line-clamp-2 text-[min(7vh,5vw)] leading-tight font-bold portrait:text-[min(4.5vh,7vw)]">{song.title}</h1>
 				<p class="truncate text-[min(3.6vh,2.6vw)] text-white/75 portrait:text-[min(2.6vh,4.5vw)]">{artistNames(song)}</p>

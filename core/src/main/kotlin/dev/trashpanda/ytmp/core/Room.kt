@@ -1859,6 +1859,7 @@ class Room(
         hostTimeMs = clock(),
         starting = startGate.waiting,
         speed = playback.rate,
+        loading = wantPlaying && current != null && streamUrl == null,
     )
 
     /** How fast [item] plays: an episode at the room's episode speed, music at 1. */

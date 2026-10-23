@@ -67,6 +67,30 @@ JS for the frontend.
 ➕ Small messages, a clear permission check per command, and events can feed the history.
 ➖ Client must apply events correctly (a bug means drifted state until the next snapshot).
 
+#### Commands show right away ✅
+
+The page doesn't wait for the host to see what a command did. It keeps two copies of the room:
+the host's (`RoomConnection.hostState`, from its events) and the one shown (`state`), which is
+the host's with my unanswered commands on top. `optimistic.ts` (`predict`) knows what each
+command will most likely do, like `Room.execute`: play, pause, seek, skip, previous, jump,
+play now, start radio, add, remove, move, clear, repeat, speed, votes, listening and output
+volume. A command it can't tell (shuffle, fair order, repeat queue running out, moving the
+current song, settings, roles) or that the page's permissions say isn't allowed waits for the
+host as before.
+
+- Every event from the host goes into its copy; the shown room is then made again from it
+  with the commands still on top. Only parts of the room that differ are replaced, so the page
+  redraws just those.
+- The host sends a command's events before its `result`. At the result the command is taken
+  off: the shown room is now the host's. Songs added this way have an ID of their own until
+  then (`c12.0`), and an episode's position and speed are a guess, until the host's events.
+- A refused command is undone that way, and a notice says why (`RoomConnection.send`; whoever
+  ran it doesn't say it again, `wasNoticed`). Toasts like "Playing … next" and the undo bar
+  show right away when the command does.
+- On a lost connection the guesses go; the snapshot on reconnecting has the host's room.
+- `PlaybackStatus.loading`: a new song whose stream is being looked up shows as playing and
+  loading (not as paused, with a Play button), also for everyone else.
+
 ### 2. Full state on every change
 
 - Clients send commands, and the host sends the **entire room state** after every change.

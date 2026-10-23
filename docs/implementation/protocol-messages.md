@@ -58,7 +58,7 @@ aren't built yet. Repeat (`repeat`) and the skip vote (`skipVotes`) are built, a
   "autoplay":    { "seed": Song | Artist | Album | Playlist, "items": [ QueueItem ] },
   "history":     [ QueueItem ],          // the last N items; older ones via LoadHistory
   "nowPlaying":  QueueItem | null,
-  "playback":    { "playing", "positionMs", "hostTimeMs", "starting", "speed" },
+  "playback":    { "playing", "positionMs", "hostTimeMs", "starting", "speed", "loading" },
   "repeat":      "off" | "queue" | "one",                       // ✅
   "outputs":     [ { "id", "name", "active", "volume" } ],
   "skipVotes":   { "voters": [participantId], "needed" } | null   // ✅ null: the room doesn't vote
@@ -188,7 +188,7 @@ network) gets its screen from `POST /api/screens/cast` instead, and leaves with
 | `HistoryAppended` ✅ | `item` (with `result: played/skipped`) | everyone |
 | `HistoryItemRemoved` ✅ | `itemId` (when jumping back) | everyone |
 | `HistoryReplaced` ✅ | `items` (a song moved in or out of the history) | everyone |
-| `PlaybackChanged` ✅ | `playback: { playing, positionMs, hostTimeMs, starting, speed }` (on every change; `starting`: a new song waits for the players; `speed`: an episode played faster or slower, else 1) | everyone |
+| `PlaybackChanged` ✅ | `playback: { playing, positionMs, hostTimeMs, starting, speed, loading }` (on every change; `starting`: a new song waits for the players; `speed`: an episode played faster or slower, else 1; `loading`: it should play, but its stream is still being looked up) | everyone |
 | `Notice` ✅ | `message` (for example a song that can't be played) | everyone |
 | `RepeatChanged` ✅ | `mode` | everyone |
 | `SkipVotesChanged` ✅ | `skipVotes` (`voters`, `needed`, or null): after a vote, when people come or go, or the settings change | everyone |

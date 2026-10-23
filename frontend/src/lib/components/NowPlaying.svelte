@@ -67,8 +67,8 @@
 	const sleepMinutes = $derived(sleepTimer.minutesLeft(wallNow));
 	const song = $derived(current?.item.song ?? null);
 	const playback = $derived(room.state?.playback);
-	// A new song that waits for everyone's players to load it counts as playing (and loading).
-	const playing = $derived(!!playback?.playing || !!playback?.starting);
+	// A new song whose stream is being looked up, or that waits for everyone's players to load it, counts as playing (and loading).
+	const playing = $derived(!!playback?.playing || !!playback?.starting || !!playback?.loading);
 	// A paused room may not have the stream yet (a restored room gets it on play): only loading while playing.
 	const loading = $derived(current !== null && (current.streamUrl === null || !!playback?.starting) && playing);
 

@@ -539,6 +539,7 @@ export interface PlaybackStatus {
   hostTimeMs: number;
   starting: boolean;
   speed: number;
+  loading: boolean;
 }
 
 export interface EventPlaybackChanged {

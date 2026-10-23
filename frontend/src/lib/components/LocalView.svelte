@@ -110,7 +110,7 @@
 		if (!first) return;
 		let e = await room.run({ kind: 'PlayNow', song: first });
 		if (!e && rest.length) e = await room.run({ kind: 'AutoplaySongs', songs: rest.slice(0, 200) });
-		if (e) onToast(e.message);
+		if (e && !room.wasNoticed(e)) onToast(e.message);
 	}
 </script>
 

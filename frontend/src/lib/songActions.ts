@@ -9,11 +9,16 @@ export type Toast = (text: string) => void;
 /** How a message names one song. */
 export const quoted = (song: Song) => `"${song.title}"`;
 
-/** Runs [command] in [room]: says what went wrong, or [done] when it worked (if given). Returns whether it worked. */
+/**
+ * Runs [command] in [room]: says [done] (if given) when it worked, right away when the room shows
+ * it right away, or what went wrong (unless the room said so already). Returns whether it worked.
+ */
 export async function runCommand(room: RoomConnection, command: Command, onToast: Toast, done?: string): Promise<boolean> {
-	const error = await room.run(command);
-	if (error) onToast(error.message);
-	else if (done) onToast(done);
+	const sent = room.send(command);
+	if (sent.shown && done) onToast(done);
+	const error = await sent.done;
+	if (error && !room.wasNoticed(error)) onToast(error.message);
+	else if (!error && !sent.shown && done) onToast(done);
 	return !error;
 }
 
