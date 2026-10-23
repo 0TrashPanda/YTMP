@@ -11,17 +11,21 @@ import dev.trashpanda.ytmp.protocol.AlbumRef
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.Song
 import io.ktor.server.application.ApplicationCall
+import dev.trashpanda.ytmp.protocol.DownloadItem
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+
+enum class DownloadState(val wire: String) { WAITING("waiting"), DOWNLOADING("downloading"), FAILED("failed") }
 
 /**
  * Download in the song menu, in the app: the song as a tagged file in the phone's Music/YTMP
@@ -36,10 +40,22 @@ class PhoneDownloads(
     val files: SongFiles,
     private val scope: CoroutineScope,
     private val media: PhoneLibrary,
-    /** Waits until a download may start (on Wi-Fi, if the owner wants that). */
-    private val gate: suspend () -> Unit = {},
+    /** Waits until a download may start (on Wi-Fi, if the owner wants that), or [now] says it may anyway. */
+    private val gate: suspend (now: () -> Boolean) -> Unit = {},
 ) : DownloadedSongs {
-    private val running = ConcurrentHashMap<String, Deferred<Unit>>()
+    /** A song being downloaded, waiting to be, or that failed: what Settings → Downloads lists. */
+    private class Job(val song: Song) {
+        @Volatile var state = DownloadState.WAITING
+        @Volatile var error: String? = null
+        /** Start even though the owner wants Wi-Fi (this once). */
+        @Volatile var now = false
+        val listeners = CopyOnWriteArrayList<(String?) -> Unit>()
+        var work: kotlinx.coroutines.Job? = null
+    }
+
+    private val jobs = LinkedHashMap<String, Job>()
+    private val queueFile = File(context.filesDir, "download-queue.json")
+    private val queueJson = Json { ignoreUnknownKeys = true }
 
     /** A download was saved (the song cache drops its own copy). Set by the host. */
     @Volatile
@@ -116,29 +132,85 @@ class PhoneDownloads(
 
     /** Saves [song]; [done] hears null when it's there (or already was), else why not. Tapping twice downloads once. */
     fun save(song: Song, done: (error: String?) -> Unit) {
-        val job = running.computeIfAbsent(song.id) {
-            // Started once it's in [running], so it can't take itself out before it's there.
-            scope.async(start = CoroutineStart.LAZY) {
+        val job = synchronized(jobs) { jobs.getOrPut(song.id) { Job(song) } }
+        job.listeners += done
+        start(job)
+    }
+
+    private fun start(job: Job) {
+        synchronized(job) {
+            if (job.work?.isActive == true) return
+            job.state = DownloadState.WAITING
+            job.error = null
+            job.now = false
+            job.work = scope.launch {
                 try {
-                    gate()
-                    saveNow(song)
-                } finally {
-                    running.remove(song.id)
+                    gate { job.now }
+                    job.state = DownloadState.DOWNLOADING
+                    saveNow(job.song)
+                    synchronized(jobs) { jobs.remove(job.song.id) }
+                    finish(job, null)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "download ${job.song.id}: ${e.message}", e)
+                    job.state = DownloadState.FAILED
+                    job.error = e.message ?: "Couldn't download it"
+                    finish(job, job.error)
                 }
             }
         }
-        job.start()
-        scope.launch {
-            val error = try {
-                job.await()
-                null
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w(TAG, "download ${song.id}: ${e.message}", e)
-                e.message ?: "Couldn't download it"
+        persist()
+    }
+
+    private fun finish(job: Job, error: String?) {
+        val listeners = job.listeners.toList()
+        job.listeners.clear()
+        listeners.forEach { it(error) }
+        persist()
+    }
+
+    /** The downloads waiting, going or failed, oldest first. */
+    fun queue(): List<DownloadItem> = synchronized(jobs) {
+        jobs.values.map { DownloadItem(it.song, it.state.wire, it.error) }
+    }
+
+    /** Gives up on [songId] (waiting, going or failed). */
+    fun cancel(songId: String) {
+        val job = synchronized(jobs) { jobs.remove(songId) } ?: return
+        job.work?.cancel()
+        finish(job, "Cancelled")
+    }
+
+    /** Tries a failed download again. */
+    fun retry(songId: String) {
+        val job = synchronized(jobs) { jobs[songId] } ?: return
+        if (job.state == DownloadState.FAILED) start(job)
+    }
+
+    /** Starts a waiting download now, also on mobile data. */
+    fun now(songId: String) {
+        synchronized(jobs) { jobs[songId] }?.now = true
+    }
+
+    /** Takes up the queue saved before the app closed. */
+    fun restore() {
+        val saved = runCatching { queueJson.decodeFromString(ListSerializer(DownloadItem.serializer()), queueFile.readText()) }.getOrNull() ?: return
+        for (item in saved) {
+            val job = synchronized(jobs) { jobs.getOrPut(item.song.id) { Job(item.song) } }
+            if (item.state == DownloadState.FAILED.wire) {
+                job.state = DownloadState.FAILED
+                job.error = item.error
+            } else {
+                start(job)
             }
-            done(error)
+        }
+    }
+
+    private fun persist() {
+        val items = queue()
+        runCatching {
+            if (items.isEmpty()) queueFile.delete() else queueFile.writeText(queueJson.encodeToString(ListSerializer(DownloadItem.serializer()), items))
         }
     }
 

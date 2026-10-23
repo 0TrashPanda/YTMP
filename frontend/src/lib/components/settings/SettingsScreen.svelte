@@ -16,6 +16,7 @@
 	import Icon, { type IconName } from '../Icon.svelte';
 	import AccountSection from './AccountSection.svelte';
 	import CacheSection from './CacheSection.svelte';
+	import DownloadsSection from './DownloadsSection.svelte';
 	import Choice from './Choice.svelte';
 	import GesturesSection from './GesturesSection.svelte';
 	import LocalSection from './LocalSection.svelte';
@@ -212,6 +213,7 @@
 				/>
 				<p class="text-xs text-muted">The sync adjustment for Bluetooth is under <em>Play on</em> in a room.</p>
 				{#if onThisPhone}
+					<DownloadsSection {onToast} />
 					<CacheSection load={getSongCache} clear={clearSongCache} change={setSongCache} {onToast} />
 				{:else}
 					<p class="text-xs text-muted">The song cache's settings are on this phone's own pages (the room list, rooms on this phone).</p>

@@ -245,6 +245,14 @@ class LocalHost(private val context: Context) {
 
         override fun localParallel() = cacheSettings.getInt(CACHE_PARALLEL, 1)
 
+        override fun downloadQueue() = downloads.queue()
+
+        override fun cancelDownload(songId: String) = downloads.cancel(songId)
+
+        override fun retryDownload(songId: String) = downloads.retry(songId)
+
+        override fun downloadNow(songId: String) = downloads.now(songId)
+
         override fun fetchWifiOnly() = dataRules.fetchWifiOnly
 
         override fun downloadsWifiOnly() = dataRules.downloadsWifiOnly
@@ -324,6 +332,7 @@ class LocalHost(private val context: Context) {
         cache.inUse = { rooms.songsInUse() }
         cache.fetchGate = dataRules::awaitFetch
         downloads.onSaved = cache::downloaded
+        downloads.restore()
         showCacheLibrary()
         applyLocalSongs()
         // So downloads play from the Music folder from the first song on.

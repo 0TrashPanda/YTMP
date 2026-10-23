@@ -411,3 +411,17 @@ data class UnmatchedSongs(val songs: List<UnmatchedSong>)
 @Serializable
 @SerialName("LocalLinkRequest")
 data class LocalLinkRequest(val key: String, val link: String)
+
+/** A download of the phone (Settings → Downloads): [state] is "waiting" (for Wi-Fi, say), "downloading" or "failed" with [error]. */
+@Serializable
+@SerialName("DownloadItem")
+data class DownloadItem(val song: Song, val state: String, val error: String? = null)
+
+@Serializable
+@SerialName("DownloadItems")
+data class DownloadItems(val items: List<DownloadItem>)
+
+/** `POST /api/cache/downloads/{cancel,retry,now}`: which song. */
+@Serializable
+@SerialName("DownloadRequest")
+data class DownloadRequest(val songId: String)

@@ -1,6 +1,8 @@
 package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.protocol.ErrorCode
+import dev.trashpanda.ytmp.protocol.DownloadItems
+import dev.trashpanda.ytmp.protocol.DownloadRequest
 import dev.trashpanda.ytmp.protocol.LocalLinkRequest
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.UnmatchedSongs
@@ -35,6 +37,16 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
         settings ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "The song cache is set in ytmp.toml here")
         settings.change(wanted)
         call.respond(call.status())
+    }
+    route("/downloads") {
+        suspend fun ApplicationCall.phone(): CacheSettings {
+            status()
+            return settings ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Only on a phone")
+        }
+        get { call.respond(DownloadItems(call.phone().downloadQueue())) }
+        post("/cancel") { val phone = call.phone(); phone.cancelDownload(call.receive<DownloadRequest>().songId); call.respond(DownloadItems(phone.downloadQueue())) }
+        post("/retry") { val phone = call.phone(); phone.retryDownload(call.receive<DownloadRequest>().songId); call.respond(DownloadItems(phone.downloadQueue())) }
+        post("/now") { val phone = call.phone(); phone.downloadNow(call.receive<DownloadRequest>().songId); call.respond(DownloadItems(phone.downloadQueue())) }
     }
     route("/local") {
         suspend fun ApplicationCall.phone(): CacheSettings {

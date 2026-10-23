@@ -1151,6 +1151,20 @@ export interface UnmatchedSongs {
   songs: UnmatchedSong[];
 }
 
+export interface DownloadItem {
+  song: Song;
+  state: string;
+  error: string | null;
+}
+
+export interface DownloadItems {
+  items: DownloadItem[];
+}
+
+export interface DownloadRequest {
+  songId: string;
+}
+
 export interface LocalLinkRequest {
   key: string;
   link: string;

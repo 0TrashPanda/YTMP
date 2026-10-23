@@ -188,7 +188,9 @@ without internet on the phone. It works by itself: there is nothing to pick.
   you chose yourself stays when matches are forgotten.
 - **Mobile data:** songs kept in the background (from their 2nd play) wait for Wi-Fi by default
   (*Keep songs in the background*); *Downloads* can wait for Wi-Fi too (the page says
-  "downloads when you're on Wi-Fi"); the app's update dialog warns when you're on mobile data. Each file is looked up once and slowly (so YouTube doesn't block the
+  "downloads when you're on Wi-Fi"); the app's update dialog warns when you're on mobile data. *Settings → Playback → Downloads* lists
+  the phone's downloads that are going, waiting (for Wi-Fi) or failed, with **Download now** (this
+  once, on mobile data), **Retry** and **Cancel**. The waiting ones carry on after the app is closed. Each file is looked up once and slowly (so YouTube doesn't block the
   network), and the answer is kept. *Lookups at once* (1, 2, 4 or 8; 1 by default) makes it faster, with more risk of YouTube's bot check. The setting shows how far it is ("120 of 800 phone songs looked up · 95 found on YouTube Music"). They don't count toward the cache's size and are never removed.
 - Only songs from online sources (YouTube Music, later YouTube) are cached. Local music and
   media servers are already files.

@@ -60,8 +60,9 @@ class DataRules(private val context: Context) {
         while (fetchWifiOnly && !onWifi()) delay(POLL_MS)
     }
 
-    suspend fun awaitDownload() {
-        while (downloadsWifiOnly && !onWifi()) delay(POLL_MS)
+    /** Returns when a download may start: on Wi-Fi, or when it isn't limited, or [now]. */
+    suspend fun awaitDownload(now: () -> Boolean) {
+        while (downloadsWifiOnly && !onWifi() && !now()) delay(DOWNLOAD_POLL_MS)
     }
 
     /** A download would have to wait for Wi-Fi right now. */
@@ -69,6 +70,7 @@ class DataRules(private val context: Context) {
 
     private companion object {
         const val POLL_MS = 15_000L
+        const val DOWNLOAD_POLL_MS = 1_000L
         const val FETCH_WIFI = "fetchWifiOnly"
         const val DOWNLOADS_WIFI = "downloadsWifiOnly"
         const val LOCAL_WIFI = "localWifiOnly"

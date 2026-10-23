@@ -18,6 +18,7 @@ import dev.trashpanda.ytmp.protocol.ShareAddress
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.SongCachePlace
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
+import dev.trashpanda.ytmp.protocol.DownloadItem
 import dev.trashpanda.ytmp.protocol.UnmatchedSong
 import io.ktor.http.CacheControl
 import io.ktor.http.HttpHeaders
@@ -178,6 +179,16 @@ interface CacheSettings {
 
     /** Why phone songs aren't being looked up right now, or null. */
     fun localWaiting(): String? = null
+
+    /** The phone's downloads that wait, go or failed. */
+    fun downloadQueue(): List<DownloadItem> = emptyList()
+
+    fun cancelDownload(songId: String) {}
+
+    fun retryDownload(songId: String) {}
+
+    /** Starts a waiting download now, also on mobile data. */
+    fun downloadNow(songId: String) {}
 
     /** The phone songs without a match, and why. */
     suspend fun unmatched(): List<UnmatchedSong> = emptyList()

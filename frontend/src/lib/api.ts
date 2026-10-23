@@ -1,4 +1,5 @@
 import type {
+	DownloadItems,
 	LocalLinkRequest,
 	SongCacheSettings,
 	SongCacheStatus,
@@ -511,6 +512,14 @@ export function setSongCache(settings: SongCacheSettings): Promise<SongCacheStat
 
 export function clearSongCache(): Promise<SongCacheStatus> {
 	return request('/api/cache/clear', { method: 'POST' });
+}
+
+export function getDownloadQueue(): Promise<DownloadItems> {
+	return request('/api/cache/downloads');
+}
+
+export function downloadAction(action: 'cancel' | 'retry' | 'now', songId: string): Promise<DownloadItems> {
+	return request(`/api/cache/downloads/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ songId }) });
 }
 
 export function getUnmatchedSongs(): Promise<UnmatchedSongs> {

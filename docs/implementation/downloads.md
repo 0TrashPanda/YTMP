@@ -54,6 +54,14 @@ Local tab's *Music on this phone*. A song that is already there (the same file n
 by the app) isn't downloaded again; tapping twice downloads once. The page hears back
 through `onDownloaded(songId, error)` and shows a message.
 
+## The queue in the app
+
+`PhoneDownloads` keeps a job per song (`waiting`, `downloading`, `failed`), saved in
+`files/download-queue.json` and taken up again at start (`restore()`). A job waits in `gate`
+(`DataRules.awaitDownload`: Wi-Fi, if the owner wants that; checked every second, so *Download now*,
+which sets the job's `now`, starts it at once). The settings page lists them through
+`GET /api/cache/downloads` and `POST …/{cancel,retry,now}` (`CacheSettings`, phone only).
+
 ## Why not in the browser?
 
 A browser can save a file, but adding tags to `.m4a` files in JavaScript is poorly supported
