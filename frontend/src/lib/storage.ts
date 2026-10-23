@@ -40,7 +40,8 @@ export type SwipeOpens = 'tab' | 'upnext';
 export type TabOrder = 'upnext' | 'related';
 export type ImageQuality = 'high' | 'low';
 export type VideoArt = 'crop' | 'fit';
-export type PageSize = 100 | 300 | 1000;
+/** The songs a long list shows at a time: 100, 300 or 1000, or a number typed in between these. */
+export const PAGE_SIZES = { min: 10, max: 5000 };
 /** A YouTube Music module on this computer, to get stream links from your own internet connection. */
 export type OwnModule = { url: string; key: string };
 
@@ -186,10 +187,11 @@ export const saved = {
 		write('ytmp.videoArt', value);
 	},
 	/** How many songs a long list (Liked music, Local songs) shows at first, and adds each time for more. */
-	get pageSize(): PageSize {
-		return Number(pick('ytmp.pageSize', ['100', '300', '1000'], '300')) as PageSize;
+	get pageSize(): number {
+		const size = Math.round(Number(read('ytmp.pageSize')));
+		return size >= PAGE_SIZES.min && size <= PAGE_SIZES.max ? size : 300;
 	},
-	set pageSize(size: PageSize) {
+	set pageSize(size: number) {
 		write('ytmp.pageSize', String(size));
 	},
 	/** Your own YouTube Music module (see ownModule.ts), or null. */

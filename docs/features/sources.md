@@ -162,7 +162,7 @@ without internet on the phone. It works by itself: there is nothing to pick.
   as before); only its audio comes from the cache.
 - **A maximum size**, on by default: **5 GB on a server** (`ytmp.toml`), **1 GB on a phone**
   (*Settings → Playback*; about 250 songs). Both show how full the cache is and have
-  **Clear cache** (on a server for the admin, under *Settings → Server*; see
+  **Clear cache** (on a server for the admin, under *Settings → Server admin*; see
   [server admin](server-admin.md)).
 - **Where it's kept is a setting**: a folder of your choice on a server (`ytmp.toml`), the
   phone's own storage or its SD card on a phone.

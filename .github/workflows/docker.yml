@@ -78,6 +78,8 @@ jobs:
           context: .
           file: server/Dockerfile
           push: true
+          build-args: |
+            YTMP_VERSION=${{ steps.release.outputs.version }}
           tags: |
             ${{ env.REGISTRY }}/ytmp-server:${{ steps.release.outputs.version }}
             ${{ env.REGISTRY }}/ytmp-server:latest

@@ -50,7 +50,7 @@ internal fun Route.roomRoutes(host: HostContext) = with(host) {
                 canCreateRooms = call.mayManageRooms(),
                 supportsPrivateRooms = options.supportsPrivateRooms,
                 authServers = options.auth.servers(),
-                accountsOnly = options.accountsOnly,
+                accountsOnly = options.accountsOnly(),
                 shareAddresses = options.shareAddresses(),
             ),
         )
@@ -128,13 +128,13 @@ internal fun Route.roomSocket(host: HostContext) = with(host) {
             return@webSocket
         }
         val participantId = if (first is ClientMessage.Attach) {
-            room.attach(first, outbox, local = options.isLocal(call), accountsOnly = options.accountsOnly)
+            room.attach(first, outbox, local = options.isLocal(call), accountsOnly = options.accountsOnly())
         } else {
             val hello = first as ClientMessage.Hello
             val account = hello.accountToken?.let { token -> options.auth.verify(token)?.also { options.onAccountToken(token, it) } }
             if (hello.accountToken != null && account == null) log.info("Room {}: account token not accepted, joining as a guest", room.code)
             // A party screen someone in the room linked comes without an account.
-            if (account == null && options.accountsOnly && !room.isScreen(hello.guestToken)) {
+            if (account == null && options.accountsOnly() && !room.isScreen(hello.guestToken)) {
                 outbox.send(ServerMessage.Rejected(RejectReason.ACCOUNT_REQUIRED))
                 null
             } else {

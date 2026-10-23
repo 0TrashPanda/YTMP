@@ -9,6 +9,7 @@ import android.net.Uri
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
@@ -22,6 +23,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.media3.session.MediaController
@@ -179,6 +181,13 @@ class MainActivity : ComponentActivity() {
                 js("window.__ytmpNative && window.__ytmpNative.onSleepTimer && window.__ytmpNative.onSleepTimer($value)")
             }
         }
+        // The equalizer changed, or the phone plays on other headphones now (with their setting).
+        lifecycleScope.launch {
+            Equalizers.state.collect { state ->
+                val value = JSONObject.quote(json.encodeToString(EqualizerState.serializer(), state))
+                js("window.__ytmpNative && window.__ytmpNative.onEqualizer && window.__ytmpNative.onEqualizer($value)")
+            }
+        }
 
         // For development: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080`
         intent.getStringExtra("server")?.let { server = normalize(it) }
@@ -254,6 +263,11 @@ class MainActivity : ComponentActivity() {
             launch {
                 nearbyState().collect { state ->
                     js("window.__ytmpNative && window.__ytmpNative.onNearby && window.__ytmpNative.onNearby(${json.encodeToString(NearbyState.serializer(), state)})")
+                }
+            }
+            launch {
+                app.nowPlaying.recent.collect { songs ->
+                    js("window.__ytmpNative && window.__ytmpNative.onNowPlaying && window.__ytmpNative.onNowPlaying(${json.encodeToString(ListSerializer(DetectedSong.serializer()), songs)})")
                 }
             }
             app.host.nearby.notices.collect { text ->
@@ -389,6 +403,11 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun bridgeVersion(): Int = BRIDGE_VERSION
 
+        /** The phone's name, to tell your devices apart in a room (bridge version 15). */
+        @JavascriptInterface
+        fun deviceName(): String =
+            Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)?.takeIf { it.isNotBlank() } ?: Build.MODEL
+
         /** The music on this phone shows in the Local tab (bridge version 10). */
         @JavascriptInterface
         fun phoneMusic(): Boolean = app.host.phoneMusicOn
@@ -403,11 +422,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        /** The folders picked as music, JSON [{id, name}] (bridge version 13). */
+        /** The folders picked as music, JSON [{id, name}] (bridge version 16). */
         @JavascriptInterface
         fun musicFolders(): String = Json.encodeToString(ListSerializer(MusicFolder.serializer()), app.host.musicFolders.all())
 
-        /** Opens Android's folder picker; the answer comes as onMusicFolders (bridge version 13). */
+        /** Opens Android's folder picker; the answer comes as onMusicFolders (bridge version 16). */
         @JavascriptInterface
         fun addMusicFolder() = runOnUiThread { musicFolderPicker.launch(null) }
 
@@ -417,11 +436,11 @@ class MainActivity : ComponentActivity() {
             musicFoldersAnswer()
         }
 
-        /** Android's own music scan is used for the music on this phone (bridge version 13). */
+        /** Android's own music scan is used for the music on this phone (bridge version 16). */
         @JavascriptInterface
         fun mediaScan(): Boolean = app.host.mediaScanSetting() && app.host.canReadMusic()
 
-        /** Switches it (asking Android once to read the music); the answer comes as onMusicFolders (bridge version 13). */
+        /** Switches it (asking Android once to read the music); the answer comes as onMusicFolders (bridge version 16). */
         @JavascriptInterface
         fun setMediaScan(on: Boolean) = runOnUiThread {
             if (on && !app.host.canReadMusic()) {
@@ -432,6 +451,22 @@ class MainActivity : ComponentActivity() {
                 musicFoldersAnswer()
             }
         }
+
+        /** Whether this phone is a Pixel, which has Now Playing; the search page shows its icon only then (bridge version 13). */
+        @JavascriptInterface
+        fun nowPlayingAvailable(): Boolean = Build.MANUFACTURER.equals("Google", ignoreCase = true)
+
+        /** Whether YTMP may read Now Playing's notifications (allowed in Android's settings; bridge version 13). */
+        @JavascriptInterface
+        fun nowPlayingAccess(): Boolean = NotificationManagerCompat.getEnabledListenerPackages(this@MainActivity).contains(packageName)
+
+        /** Opens Android's notification access settings, where YTMP is allowed to read Now Playing (bridge version 13). */
+        @JavascriptInterface
+        fun openNowPlayingAccess() = runOnUiThread { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+
+        /** JSON list of DetectedSong, newest first (bridge version 13); changes come as onNowPlaying. */
+        @JavascriptInterface
+        fun nowPlayingRecent(): String = json.encodeToString(ListSerializer(DetectedSong.serializer()), app.nowPlaying.recent.value)
 
         @JavascriptInterface
         fun serverUrl(): String = server.orEmpty()
@@ -688,6 +723,16 @@ class MainActivity : ComponentActivity() {
                 ?.takeIf { it.endsAt != null || it.itemId != null }
         }
 
+        /** The equalizer for what the phone plays on now (bridge version 14): JSON EqualizerState. */
+        @JavascriptInterface
+        fun equalizer(): String = json.encodeToString(EqualizerState.serializer(), Equalizers.state.value)
+
+        /** Sets the equalizer (JSON EqSettings) for what the phone plays on now. Every page hears as onEqualizer. */
+        @JavascriptInterface
+        fun setEqualizer(settingsJson: String) {
+            runCatching { json.decodeFromString(EqSettings.serializer(), settingsJson) }.getOrNull()?.let(Equalizers::set)
+        }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -706,7 +751,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 13
+        const val BRIDGE_VERSION = 16
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

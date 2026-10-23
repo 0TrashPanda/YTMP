@@ -91,7 +91,7 @@ class AccountApiTest {
         application {
             val scope = CoroutineScope(SupervisorJob())
             val rooms = RoomManager({ id -> "https://stream/$id" }, scope, hooks = RoomHooks(onPlayFinished = PlayReporter(auth, scope)::report))
-            ytmpModule(rooms, HostSources({ _, _ -> SearchPage(emptyList()) }), HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = { service.routes(this) })
+            ytmpModule(rooms, HostSources({ _, _ -> SearchPage(emptyList()) }), HostOptions(kind = HostKind.SERVER, auth = auth), extraApi = { service.routes(this); AdminApi(service, rooms).routes(this) })
         }
         return service
     }

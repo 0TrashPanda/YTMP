@@ -98,6 +98,16 @@
   over the last 10 s, then pauses a solo room (`PlaybackTarget.solo`, over its own room
   connection) or stops playing here (`stopHere`) in a shared room, and clears the timer. In a
   browser the page runs the same rules itself (`lib/sleepTimer.svelte.ts`).
+- **Equalizer** (bridge `equalizer`, `setEqualizer`, page callback `onEqualizer`, version 14):
+  `EqualizerProcessor` is an audio processor in ExoPlayer's `DefaultAudioSink`, running an
+  `Equalizer` (a peaking biquad per band, the same filters as the browser's Web Audio ones,
+  then the headroom gain) over the decoded 16-bit or float sound; switched off, it copies the
+  sound as it is. `Equalizers` keeps one `EqSettings` per output in the `equalizer` shared
+  preferences (`speaker`, `wired`, `bluetooth:<name>`, `usb:<name>`, …) and follows what media
+  plays on (`AudioDeviceCallback`; Android 13+ `getAudioDevicesForAttributes`, before that
+  Bluetooth before USB before wired before the speaker). The processor reads the current
+  setting for every buffer, so a change, or other headphones, is heard at once. The page only
+  shows and sets the setting for the current output (`lib/equalizer.svelte.ts`).
 - **Accounts** (`AuthLink`): the phone can be linked to a YTMP server on its home screen; then
   account holders of that server can join its rooms (see [auth](auth.md)). The WebView keeps
   that server's pages in the app, for logging in.
@@ -134,6 +144,12 @@ inside the WebView.
   - headphone / Bluetooth / car buttons
 - ExoPlayer can do **gapless** playback, **crossfade** (two players) and loudness
   normalisation. Not built yet: crossfade and loudness normalisation.
+- **Your devices** ✅ ([feature](../features/playback-and-outputs.md#your-devices)): while
+  it plays a room, `PlaybackService` tells the room the phone's **media volume** (a
+  `ContentObserver` on the system settings sees the volume buttons) over the player's own
+  connection, and turns the media volume to what another device of yours set (`RemoteVolume`,
+  watching `Participant.volumeChanges`), also with the page frozen. The page tells the room
+  the phone's name (bridge `deviceName`, version 15: Android's device name, or the model).
 - The **sync logic** (clock offset, drift correction, see
   [playback-sync](playback-sync.md)) is implemented twice: in TypeScript for browsers, and in
   Kotlin for the native player.

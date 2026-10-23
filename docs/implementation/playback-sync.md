@@ -20,8 +20,8 @@ Feature description: [features/playback-and-outputs.md](../features/playback-and
   round-trip time for each client.
 - Host broadcasts `{songId, positionMs, hostTimeMs, playing, speed}`. A client computes
   `expectedPos = positionMs + (now + offset − hostTimeMs) × speed`.
-- **Speed**: a podcast episode can play faster or slower (`speed`, the room's episode speed;
-  music is always 1). The room's clock moves at that speed (and the song ends sooner or later),
+- **Speed**: a podcast episode can play faster or slower (`speed`, the room's episode speed,
+  0.5–2 in steps of 0.05, `isEpisodeSpeed`; music is always 1). The room's clock moves at that speed (and the song ends sooner or later),
   players play at it, and their small corrections (±3%) are on top of it (`ownRate` in
   `sync.ts`, `SyncCorrection.ownSpeed` on Android). Chromecasts get `SET_PLAYBACK_RATE`; Sonos,
   MPD and amplifier zones can't change speed and sit such an episode out (paused, with a notice).
@@ -84,6 +84,18 @@ player says so ("Trying again…", then that it can't play the song); the room d
 for that device.
 
 Local files, media server songs and cached songs are always served by the host.
+
+### Equalizer in a browser
+
+✅ `WebPlayer` sends the audio element through Web Audio (`createMediaElementSource`, a
+`BiquadFilterNode` per band, a gain) once the equalizer is first switched on, and keeps it
+there (switched off it's flat). Web Audio only gets the sound of a file from another site when
+that site allows it (CORS), and plays silence otherwise, so the element then asks for that
+(`crossOrigin = "anonymous"`). A link that doesn't allow it fails to load and goes down the
+same steps as above: your own module (which allows any page with the key) or the host's
+`/api/audio` (same site). A song already loaded when it's switched on is loaded again. The
+`AudioContext` starts with the tap that turns on *this device*. The app's player does the
+same in native code (see [Android app](android-app.md)).
 
 ## Sync accuracy
 

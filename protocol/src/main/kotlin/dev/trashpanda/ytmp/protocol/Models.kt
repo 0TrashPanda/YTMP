@@ -1,5 +1,7 @@
 package dev.trashpanda.ytmp.protocol
 
+import kotlin.math.abs
+import kotlin.math.round
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -106,6 +108,15 @@ data class Participant(
     val screen: Boolean = false,
     /** Speakers near their phone that they play the room on ([Command.SetSpeakers]). */
     val speakers: List<String> = emptyList(),
+    /** Which device this is, e.g. "Pixel 8" or "Firefox on Windows" ([ClientMessage.Hello.device]); empty: it didn't say. */
+    val device: String = "",
+    /** This device's own volume (0–1), as it last said ([Command.SetDeviceVolume]); null: it didn't say. */
+    val volume: Double? = null,
+    /**
+     * Counts the times [volume] was set from another device of the same account: the device
+     * turns its volume to [volume] when this goes up.
+     */
+    val volumeChanges: Int = 0,
 )
 
 @Serializable
@@ -127,8 +138,19 @@ data class PlaybackStatus(
     val speed: Double = 1.0,
 )
 
-/** The speeds a room can play episodes at ([Command.SetSpeed]). */
+/** The speeds to pick from for episodes ([Command.SetSpeed]); one in between can be typed. */
 val EPISODE_SPEEDS = listOf(0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0)
+
+/** The slowest and fastest an episode can play (what Chromecasts can), in steps of [EPISODE_SPEED_STEP]. */
+const val MIN_EPISODE_SPEED = 0.5
+const val MAX_EPISODE_SPEED = 2.0
+const val EPISODE_SPEED_STEP = 0.05
+
+/** [speed] is one a room can play episodes at: [MIN_EPISODE_SPEED]–[MAX_EPISODE_SPEED], a whole number of steps. */
+fun isEpisodeSpeed(speed: Double): Boolean {
+    val steps = speed / EPISODE_SPEED_STEP
+    return speed in MIN_EPISODE_SPEED..MAX_EPISODE_SPEED && abs(steps - round(steps)) < 1e-6
+}
 
 @Serializable
 @SerialName("NowPlaying")

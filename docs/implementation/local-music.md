@@ -77,7 +77,7 @@ changes. The phone serves the files (`/api/audio/…`, from a file descriptor, w
 covers (`ContentResolver.loadThumbnail`) itself, at its address on the network, so speakers and
 friends reach them too.
 
-**Picked folders** (`PhoneFolders`, bridge version 13: `musicFolders`, `addMusicFolder`,
+**Picked folders** (`PhoneFolders`, bridge version 16: `musicFolders`, `addMusicFolder`,
 `removeMusicFolder`, `onMusicFolders`): `ACTION_OPEN_DOCUMENT_TREE` with a persisted read grant
 (prefs `ytmp.local` `musicFolders`). The tree is walked with `DocumentsContract` every 2 minutes
 (and when the list changes); tags come from `MediaMetadataRetriever` once per file (its

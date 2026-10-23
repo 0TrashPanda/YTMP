@@ -67,18 +67,42 @@ export interface NativeBridge {
 	 * the answer comes as onDownloaded.
 	 */
 	downloadSong?(songJson: string): void;
-	/** The folders picked as music, JSON [{ id, name }] (bridge version 13). */
+	/** The folders picked as music, JSON [{ id, name }] (bridge version 16). */
 	musicFolders?(): string;
-	/** Opens Android's folder picker; the new list comes as onMusicFolders (bridge version 13). */
+	/** Opens Android's folder picker; the new list comes as onMusicFolders (bridge version 16). */
 	addMusicFolder?(): void;
 	removeMusicFolder?(id: string): void;
-	/** Android's own music scan is used (bridge version 13); setMediaScan answers with onMusicFolders. */
+	/** Android's own music scan is used (bridge version 16); setMediaScan answers with onMusicFolders. */
 	mediaScan?(): boolean;
 	setMediaScan?(on: boolean): void;
 	/** The sleep timer, which the app's player runs (bridge version 12): JSON SleepSetting, or null when it's off. */
 	sleepTimer?(): string | null;
 	/** Sets it (JSON SleepSetting) or turns it off ("null"); the app tells every page as onSleepTimer. */
 	setSleepTimer?(json: string): void;
+	/** Whether this phone is a Pixel, which has Now Playing (bridge version 13). */
+	nowPlayingAvailable?(): boolean;
+	/** Whether YTMP may read Now Playing's notifications; that's allowed in Android's settings (bridge version 13). */
+	nowPlayingAccess?(): boolean;
+	/** Opens Android's notification access settings, to allow that (bridge version 13). */
+	openNowPlayingAccess?(): void;
+	/** The songs Now Playing recognized lately, newest first (bridge version 13): JSON list of DetectedSong. */
+	nowPlayingRecent?(): string;
+	/**
+	 * The equalizer, which the app's player runs (bridge version 14): JSON { output, settings },
+	 * the settings (EqSettings) for what the phone plays on now (output: { id, name }).
+	 */
+	equalizer?(): string;
+	/** Sets the equalizer (JSON EqSettings) for what the phone plays on now; every page hears as onEqualizer. */
+	setEqualizer?(json: string): void;
+	/** The phone's name, as in Android's settings (bridge version 15), to tell your devices apart in a room. */
+	deviceName?(): string;
+}
+
+/** A song a Pixel's Now Playing recognized (android/.../NowPlayingParser.kt); [at] is epoch milliseconds. */
+export interface DetectedSong {
+	title: string;
+	artist: string;
+	at: number;
 }
 
 /** Callbacks the app calls on the page. */
@@ -89,6 +113,8 @@ export interface NativeCallbacks {
 	onStatus?(status: string): void;
 	/** The sleep timer changed (set, turned off, or it went off): JSON SleepSetting, or null. */
 	onSleepTimer?(json: string | null): void;
+	/** The equalizer changed, or the phone plays on something else now (other headphones): JSON as from equalizer(). */
+	onEqualizer?(json: string): void;
 	/** Back from YouTube Music's sign-in: null when signed in, else why not. */
 	onYoutubeSignIn?(error: string | null): void;
 	/** Back from youtubeCookie: the cookies, or null (with why, or null when you cancelled). */
@@ -116,6 +142,8 @@ export interface NativeCallbacks {
 	onDownloadWaiting?(songId: string): void;
 	/** Back from downloadSong: null when the song is in the Music folder, else why not. */
 	onDownloaded?(songId: string, error: string | null): void;
+	/** Now Playing recognized a song: the list of recent ones, newest first. */
+	onNowPlaying?(songs: DetectedSong[]): void;
 }
 
 /** Speakers and TVs on the phone's own network (android/.../MainActivity.kt), for a room on another host. */

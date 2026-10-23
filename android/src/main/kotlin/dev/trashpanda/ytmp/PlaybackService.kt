@@ -7,10 +7,15 @@ import android.app.PendingIntent
 import android.content.pm.ServiceInfo
 import androidx.core.app.ServiceCompat
 import android.content.Intent
+import android.database.ContentObserver
+import android.media.AudioManager
 import android.net.Uri
 import android.net.wifi.WifiManager
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
+import android.provider.Settings
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -20,12 +25,15 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.TeeDataSource
 import dev.trashpanda.ytmp.host.LocalHost
 import dev.trashpanda.ytmp.host.SongCache
+import dev.trashpanda.ytmp.protocol.Command
+import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.Song
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -36,6 +44,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -47,6 +56,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import org.json.JSONObject
 
 /**
@@ -140,6 +150,16 @@ class PlaybackService : MediaSessionService() {
     /** The sleep timer's fade-out (0–1), on top of the room's volume. */
     private var sleepFade = 1f
 
+    /** The phone's media volume in the room, which your other devices can set ([RemoteVolume]). */
+    private val remoteVolume = RemoteVolume()
+    private lateinit var audioManager: AudioManager
+    private var volumeReport: Job? = null
+
+    /** The volume buttons (or anything else) changed the media volume: tell the room. */
+    private val volumeObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) = reportVolume()
+    }
+
     /** When the player started waiting for data (elapsedRealtime), to log long buffering. */
     private var bufferingSince: Long? = null
 
@@ -164,11 +184,17 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         // The speed is set on the AudioTrack, so a correction is heard at once (not only after
-        // the audio already buffered), and [AudioClock] reads where the audio really is.
+        // the audio already buffered), and [AudioClock] reads where the audio really is. The
+        // equalizer for what the phone plays on now goes over the sound on its way there.
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(context: android.content.Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
-                AudioClock(DefaultAudioSink.Builder(context).setEnableFloatOutput(enableFloatOutput).setEnableAudioTrackPlaybackParams(true).build())
-                    .also { audioClock = it }
+                AudioClock(
+                    DefaultAudioSink.Builder(context)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioTrackPlaybackParams(true)
+                        .setAudioProcessors(arrayOf<AudioProcessor>(EqualizerProcessor { Equalizers.settings }))
+                        .build()
+                ).also { audioClock = it }
         }
         exo = ExoPlayer.Builder(this, renderers)
             .setAudioAttributes(
@@ -195,6 +221,23 @@ class PlaybackService : MediaSessionService() {
         session = MediaSession.Builder(this, RoomPlayer(exo)).setSessionActivity(openApp).build()
 
         PlaybackHub.followerCommands = follower::command
+        audioManager = getSystemService(AudioManager::class.java)
+        contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, volumeObserver)
+        scope.launch {
+            follower.room.collect { room ->
+                when (val action = room?.let { remoteVolume.update(it, mediaVolume()) }) {
+                    is RemoteVolume.Action.Apply -> {
+                        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                        Log.i(TAG, "volume ${(action.volume * 100).roundToInt()}%, set from another device")
+                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, (action.volume * max).roundToInt(), 0)
+                        // The phone has fewer steps: the room hears the one it got.
+                        reportVolume()
+                    }
+                    RemoteVolume.Action.Report -> reportVolume()
+                    null -> Unit
+                }
+            }
+        }
         scope.launch {
             PlaybackHub.target.collect { target ->
                 if (target?.enabled != true) stoppedHere = false
@@ -275,12 +318,29 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         if (PlaybackHub.followerCommands == follower::command) PlaybackHub.followerCommands = null
+        contentResolver.unregisterContentObserver(volumeObserver)
         holdLocks(false)
         follower.close()
         scope.cancel()
         session.release()
         exo.release()
         super.onDestroy()
+    }
+
+    /** The media volume (what the volume buttons change), 0–1. */
+    private fun mediaVolume(): Double =
+        audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toDouble() / audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+
+    /** Tells the room the media volume, once it rests a moment (the buttons move it in steps). */
+    private fun reportVolume() {
+        volumeReport?.cancel()
+        volumeReport = scope.launch {
+            delay(VOLUME_REPORT_DELAY_MS)
+            val room = follower.room.value ?: return@launch
+            val volume = mediaVolume()
+            if (room.state.participants.firstOrNull { it.id == room.participantId }?.let { it.accountId != null && it.volume != volume } != true) return@launch
+            follower.command(ProtocolJson.encodeToString(Command.serializer(), Command.SetDeviceVolume(volume)))
+        }
     }
 
     /** The page's [target], with the room's song, stream and clock from [live] when it's the same room. */
@@ -858,6 +918,7 @@ class PlaybackService : MediaSessionService() {
 
         /** The sleep timer fades the sound out over this long (ms) before it goes off. */
         private const val SLEEP_FADE_MS = 10_000L
+        private const val VOLUME_REPORT_DELAY_MS = 300L
 
         /** This close to its end (ms), a song counts as played. */
         private const val END_MARGIN_MS = 5_000L

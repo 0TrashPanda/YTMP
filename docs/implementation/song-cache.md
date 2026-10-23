@@ -19,7 +19,7 @@ is played and serves the audio for speakers and proxied players.
 
 | | Folder | Default size | Set in |
 |---|---|---|---|
-| Server | `[cache] dir` in `ytmp.toml` (`YTMP_CACHE_DIR`); default `cache/` next to the SQLite database, so in Docker the existing data volume | 5 GB | `[cache] size = "5GB"` (`YTMP_CACHE_SIZE`; `"0"` turns it off) |
+| Server | `[cache] dir` in `ytmp.toml` (`YTMP_CACHE_DIR`); default `cache/` next to the SQLite database, so in Docker the existing data volume | 5 GB | `[cache] size = "5GB"` (`YTMP_CACHE_SIZE`; `"0"` turns it off), or the admin page |
 | Phone | *Settings → Playback*: the app's own storage (`files/song-cache`, default) or its folder on the SD card (`getExternalFilesDirs`, no permission needed). Not the Music folder: these aren't the user's files | 1 GB | *Settings → Playback* (prefs `ytmp.cache`) |
 
 Changing the place moves what's cached, in the background (the settings show *Moving…*);
@@ -162,11 +162,12 @@ by the same rule; *Off* (`0`) empties it.
 ## Settings
 
 - **Phone**: *Settings → Playback → Song cache*, on the phone's own pages (the room list and
-  rooms on the phone): how full it is, *Size* (Off, 500 MB, 1 GB, 2 GB, 5 GB), *Kept on*
+  rooms on the phone): how full it is, *Size* (Off, 500 MB, 1 GB, 2 GB, 5 GB, or typed in GB), *Kept on*
   (this phone or the SD card, with their free space), *Clear cache*. `GET/PUT /api/cache`,
   `POST /api/cache/clear`, only from the phone itself (`HostOptions.cacheSettings`).
-- **Server**: *Settings → Server → Song cache* for the server admin: how full it is and
-  *Clear cache* (`/api/admin/cache`); size and folder in `ytmp.toml`.
+- **Server**: *Settings → Server admin → Settings* for the server admin: how full it is,
+  *Clear cache* (`/api/admin/cache`) and its size (`/api/admin/settings`, over `ytmp.toml`);
+  its folder in `ytmp.toml`.
 
 ## Open points
 

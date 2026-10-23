@@ -8,6 +8,18 @@ export function formatTime(ms: number): string {
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+/** How long ago [ms] was, roughly: "just now", "5 min ago", "3 h ago", "2 days ago", or the date. */
+export function timeAgo(ms: number, now: number = Date.now()): string {
+	const minutes = Math.floor((now - ms) / 60_000);
+	if (minutes < 1) return 'just now';
+	if (minutes < 60) return `${minutes} min ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours} h ago`;
+	const days = Math.floor(hours / 24);
+	if (days < 30) return days === 1 ? 'yesterday' : `${days} days ago`;
+	return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 /** The artists, or for a podcast episode the podcast. */
 export function artistNames(song: Song): string {
 	return song.artists.map((a) => a.name).join(', ') || song.podcast?.name || '';
@@ -91,4 +103,20 @@ export function fuzzyFind<T>(items: T[], query: string, text: (item: T) => strin
 		if (total >= 0) scored.push([item, total]);
 	}
 	return scored.sort((a, b) => b[1] - a[1]).map(([item]) => item);
+}
+
+/** Shows a number with as many decimals as [step] has (0.1 → one), without trailing zeros. */
+export function formatStep(n: number, step: number): string {
+	const decimals = (String(step).split('.')[1] ?? '').length;
+	return String(Number(n.toFixed(decimals)));
+}
+
+/**
+ * A number typed into a setting: within [min]–[max], rounded to [step] ("1,5" is 1.5 too).
+ * Null when it isn't a number, so the box shows the old value again.
+ */
+export function typedNumber(text: string, min: number, max: number, step = 1): number | null {
+	const n = Number(text.trim().replace(',', '.'));
+	if (!text.trim() || !Number.isFinite(n)) return null;
+	return Number(formatStep(Math.min(max, Math.max(min, Math.round(n / step) * step)), step));
 }

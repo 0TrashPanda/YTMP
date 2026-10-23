@@ -85,7 +85,9 @@ your YouTube Music, the song graph), how it behaves a `HostOptions`. Routes are 
 `RoomRoutes` (`/api/host`, rooms, `/ws`), `CatalogRoutes` (search, pages, Local, audio),
 `PersonalRoutes` (`/api/me`), `ScreenRoutes` (party screens); what they share (who a request is,
 its YouTube Music) is `HostContext`. The server adds its own routes (accounts, history, room
-sync) through `extraApi`.
+sync, the admin page in `AdminApi.kt`) through `extraApi`. A server setting the admin page can
+change goes in `ServerSettings.kt` (`ServerSettingValues` in `protocol/`) and is put to work
+in `settings.apply` in the server's `Main.kt`.
 
 **Songs' audio** (`host/`): sources are wrapped, in front of YouTube Music: `LocalMusic`
 (`local:` songs) and the song cache `SongCache` (cached and downloaded songs), each with a
@@ -103,6 +105,10 @@ sheet, menu or dialog (`sheet`). Song lists use `SongList.svelte`; what tap, swi
 is `RowGestures` (`lib/gestures.svelte.ts`), and the actions themselves with their messages are
 `lib/songActions.ts`. Calls to the host are in `lib/api.ts`, to your account's server in
 `lib/account.ts` and `lib/listening.svelte.ts`.
+A new version on the host: SvelteKit sees that `_app/version.json` changed (on focus, every
+10 minutes, and when the room's WebSocket reconnects), and `lib/appUpdate.svelte.ts` reloads
+the page at a calm moment. The host serves `index.html` and `version.json` with `no-cache`
+and the hashed files under `_app/immutable/` for a year (`webApp` in `host/.../Application.kt`).
 
 **The YouTube Music module** (`ytm-module/ytmp_ytm/`): `core.py` talks to YouTube Music and
 yt-dlp, `parse.py` turns its answers into YTMP's songs and pages, `http.py` is the HTTP API.

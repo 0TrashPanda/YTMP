@@ -5,17 +5,13 @@ import dev.trashpanda.ytmp.host.ApiException
 import dev.trashpanda.ytmp.host.bearerToken
 import dev.trashpanda.ytmp.host.normalizeOrigin
 import dev.trashpanda.ytmp.protocol.AccountInfo
-import dev.trashpanda.ytmp.protocol.AccountListResponse
 import dev.trashpanda.ytmp.protocol.AuthServerInfo
 import dev.trashpanda.ytmp.protocol.ChangePasswordRequest
-import dev.trashpanda.ytmp.protocol.CreateAccountRequest
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.HostTokenRequest
 import dev.trashpanda.ytmp.protocol.HostTokenResponse
-import dev.trashpanda.ytmp.protocol.InviteResponse
 import dev.trashpanda.ytmp.protocol.LoginRequest
 import dev.trashpanda.ytmp.protocol.SessionResponse
-import dev.trashpanda.ytmp.protocol.SetPasswordRequest
 import dev.trashpanda.ytmp.protocol.SignupMode
 import dev.trashpanda.ytmp.protocol.SignupRequest
 import io.ktor.http.HttpMethod
@@ -69,10 +65,10 @@ class AccountService(
     val accounts: Accounts,
     val issuer: String,
     private val key: KeyPair,
-    private val signup: SignupMode,
+    signup: SignupMode,
     private val history: History,
     /** Whether new accounts keep a listening history until they change it. */
-    private val trackingDefault: Boolean = false,
+    trackingDefault: Boolean = false,
     private val clock: () -> Long = System::currentTimeMillis,
     /** The song graph, learned from the history. */
     private val graph: SongGraph? = null,
@@ -82,6 +78,14 @@ class AccountService(
     private val episodes: Episodes? = null,
 ) {
     private val throttle = LoginThrottle(clock)
+
+    /** Who may create accounts; can change while running (the admin page). */
+    @Volatile
+    var signup: SignupMode = signup
+
+    /** Whether new accounts keep a listening history until they change it. */
+    @Volatile
+    var trackingDefault: Boolean = trackingDefault
 
     val info: AuthServerInfo get() = AuthServerInfo(issuer, AccountTokens.encodeKey(key.public), signup, needsAdmin = accounts.count() == 0)
 
@@ -147,6 +151,13 @@ class AccountService(
         val graph = graph ?: return emptyList()
         val account = username?.let(accounts::find)?.takeIf { personal }
         return graph.similar(seedSongId, account?.id, account?.let(::settings)?.historyRadio ?: HistoryRadio.ALL)
+    }
+
+    /** Deletes [account] and everything kept for it (the admin page). */
+    fun delete(account: Accounts.Account) {
+        accounts.delete(account.id, toInfo(account).id)
+        graph?.rebuildSoon()
+        log.info("Account {} deleted", account.username)
     }
 
     /** For a host checking a token of ours: the template of [username]. */
@@ -358,34 +369,6 @@ class AccountService(
                 ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Not a web address")
             call.respond(hostToken(account, origin))
         }
-
-        get("/admin/accounts") {
-            call.admin()
-            call.respond(AccountListResponse(io { accounts.list() }.map(::toInfo)))
-        }
-
-        post("/admin/accounts") {
-            call.admin()
-            val request = call.receive<CreateAccountRequest>()
-            val account = io { accountCall { accounts.create(request.username, request.password, request.displayName, admin = false) } }
-            call.respond(toInfo(account))
-        }
-
-        post("/admin/accounts/{username}/password") {
-            call.admin()
-            val request = call.receive<SetPasswordRequest>()
-            io {
-                val account = accounts.find(call.parameters["username"]!!) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No such account")
-                accountCall { accounts.setPassword(account.id, request.password) }
-            }
-            call.respond(HttpStatusCode.NoContent)
-        }
-
-        post("/admin/invites") {
-            val admin = call.admin()
-            val (code, expires) = io { accounts.newInvite(admin.id, INVITE_LIFETIME.inWholeMilliseconds) }
-            call.respond(InviteResponse(code, expires))
-        }
     }
 
     /** The account of the login session in `Authorization: Bearer` (this server's own pages), if any. Not a host token. */
@@ -455,10 +438,11 @@ class AccountService(
     /** The account's setting for opening its rooms on another host. */
     fun openElsewhere(username: String): RoomOpenMode = accounts.find(username)?.let(::settings)?.openElsewhere ?: RoomOpenMode.ASK
 
-    private suspend fun ApplicationCall.admin(): Accounts.Account =
-        account().takeIf { it.isAdmin } ?: throw forbidden("Only the server admin can do this")
+    /** The server admin logged in here, or throws. */
+    suspend fun admin(call: ApplicationCall): Accounts.Account =
+        call.account().takeIf { it.isAdmin } ?: throw forbidden("Only the server admin can do this")
 
-    private fun <T> accountCall(block: () -> T): T = try {
+    fun <T> accountCall(block: () -> T): T = try {
         block()
     } catch (e: Accounts.AccountException) {
         throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "Invalid")

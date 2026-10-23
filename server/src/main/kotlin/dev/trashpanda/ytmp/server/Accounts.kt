@@ -27,6 +27,8 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
 
     fun find(username: String): Account? = db.use { c -> c.findBy("username", username.trim().lowercase()) }
 
+    fun byId(id: String): Account? = db.use { c -> c.findBy("id", id) }
+
     fun list(): List<Account> = db.use { c ->
         c.createStatement().use { s -> s.executeQuery("SELECT * FROM accounts ORDER BY username").use { rows -> buildList { while (rows.next()) add(rows.toAccount()) } } }
     }
@@ -78,6 +80,57 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
         }
     }
 
+    /** Changes the name others see. */
+    fun rename(accountId: String, displayName: String) {
+        val display = displayName.trim()
+        if (display.isEmpty() || display.length > 32) throw AccountException("Display names are 1–32 characters")
+        db.use { c ->
+            c.prepareStatement("UPDATE accounts SET display_name = ? WHERE id = ?").use { it.setString(1, display); it.setString(2, accountId); it.executeUpdate() }
+        }
+    }
+
+    /** Makes an account a server admin, or not. There's always at least one admin. */
+    fun setAdmin(accountId: String, admin: Boolean) = db.transaction { c ->
+        if (!admin && c.isLastAdmin(accountId)) throw AccountException("This is the only server admin. Make someone else admin first.")
+        c.prepareStatement("UPDATE accounts SET is_admin = ? WHERE id = ?").use { it.setBoolean(1, admin); it.setString(2, accountId); it.executeUpdate() }
+        Unit
+    }
+
+    /**
+     * Deletes an account and everything kept for it: logins, settings, listening history,
+     * podcast progress, its rooms' copies ([globalId] is `username@issuer`). Not the last admin.
+     */
+    fun delete(accountId: String, globalId: String) = db.transaction { c ->
+        if (c.isLastAdmin(accountId)) throw AccountException("This is the only server admin. Make someone else admin first.")
+        for (table in listOf("sessions", "account_data", "plays", "episode_progress", "song_edges")) {
+            c.prepareStatement("DELETE FROM $table WHERE account_id = ?").use { it.setString(1, accountId); it.executeUpdate() }
+        }
+        c.prepareStatement("DELETE FROM invites WHERE created_by = ? AND used_by IS NULL").use { it.setString(1, accountId); it.executeUpdate() }
+        c.prepareStatement("DELETE FROM room_copies WHERE account = ?").use { it.setString(1, globalId); it.executeUpdate() }
+        c.prepareStatement("DELETE FROM accounts WHERE id = ?").use { it.setString(1, accountId); it.executeUpdate() }
+        Unit
+    }
+
+    /** When each account was made, and its logins here: how many, and when one was last used. */
+    fun activity(): Map<String, Activity> = db.use { c ->
+        val created = c.createStatement().use { s ->
+            s.executeQuery("SELECT id, created_at FROM accounts").use { rows -> buildMap { while (rows.next()) put(rows.getString(1), rows.getLong(2)) } }
+        }
+        val logins = c.createStatement().use { s ->
+            s.executeQuery("SELECT account_id, COUNT(*), MAX(last_used) FROM sessions GROUP BY account_id").use { rows ->
+                buildMap { while (rows.next()) put(rows.getString(1), rows.getInt(2) to rows.getLong(3)) }
+            }
+        }
+        created.mapValues { (id, at) -> Activity(at, logins[id]?.second, logins[id]?.first ?: 0) }
+    }
+
+    data class Activity(val createdAt: Long, val lastSeen: Long?, val logins: Int)
+
+    private fun Connection.isLastAdmin(accountId: String): Boolean {
+        val admins = createStatement().use { s -> s.executeQuery("SELECT id FROM accounts WHERE is_admin = TRUE").use { rows -> buildList { while (rows.next()) add(rows.getString(1)) } } }
+        return admins == listOf(accountId)
+    }
+
     // --- sessions ---------------------------------------------------------------------
 
     /** A new login session; only its hash is stored. */
@@ -109,6 +162,12 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
         Unit
     }
 
+    /** Logs the account out on every device (its login sessions here). */
+    fun endSessions(accountId: String) = db.use { c ->
+        c.prepareStatement("DELETE FROM sessions WHERE account_id = ?").use { it.setString(1, accountId); it.executeUpdate() }
+        Unit
+    }
+
     // --- invites ----------------------------------------------------------------------
 
     /** A new invite code (only its hash is stored), valid for [validForMs]. */
@@ -135,6 +194,21 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
             it.executeUpdate()
         }
         if (used != 1) throw AccountException("This invite link is invalid, expired or already used")
+    }
+
+    /** Invite links not used yet and not expired. Their [Invite.id] is the code's hash, which can't sign up. */
+    fun openInvites(): List<Invite> = db.use { c ->
+        c.prepareStatement("SELECT code_hash, created_by, created_at, expires_at FROM invites WHERE used_by IS NULL AND expires_at > ? ORDER BY created_at").use {
+            it.setLong(1, clock())
+            it.executeQuery().use { rows -> buildList { while (rows.next()) add(Invite(rows.getString(1), rows.getString(2), rows.getLong(3), rows.getLong(4))) } }
+        }
+    }
+
+    data class Invite(val id: String, val createdBy: String, val createdAt: Long, val expiresAt: Long)
+
+    /** Revokes an invite link that wasn't used yet. */
+    fun deleteInvite(id: String): Boolean = db.use { c ->
+        c.prepareStatement("DELETE FROM invites WHERE code_hash = ? AND used_by IS NULL").use { it.setString(1, id); it.executeUpdate() == 1 }
     }
 
     // --- account data -----------------------------------------------------------------

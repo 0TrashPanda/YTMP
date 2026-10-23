@@ -8,6 +8,7 @@
 	import type { RoomConnection } from '../room.svelte';
 	import { saved } from '../storage';
 	import Icon from './Icon.svelte';
+	import NumberField from './NumberField.svelte';
 
 	let {
 		room,
@@ -26,6 +27,19 @@
 
 	function setVolume(outputId: string, volume: number) {
 		room.run({ kind: 'SetOutputVolume', outputId, volume });
+	}
+
+	// Your other devices (the same account) that play this room: their volume, from here
+	// (docs/features/playback-and-outputs.md#your-devices).
+	const myDevices = $derived.by(() => {
+		const me = room.me;
+		if (!me?.accountId) return [];
+		return (room.state?.participants ?? []).filter((p) => p.id !== me.id && p.accountId === me.accountId && !p.screen && p.online && p.listening);
+	});
+
+	async function setDeviceVolume(participantId: string, volume: number) {
+		const error = await room.run({ kind: 'SetDeviceVolume', volume, participantId });
+		if (error) onToast(error.message);
 	}
 
 	// Speakers and TVs on this phone's own network that the host can't reach (a room on a
@@ -160,17 +174,20 @@
 			</label>
 			{#if player.enabled}
 				{#if !phone.current}
-					<input
-						type="range"
-						class="w-full accent-white"
-						min="0"
-						max="1"
-						step="0.01"
-						value={player.volume}
-						aria-label="Volume"
-						use:wheelAdjust
-						oninput={(e) => player.setVolume(Number(e.currentTarget.value))}
-					/>
+					<div class="flex items-center gap-3">
+						<input
+							type="range"
+							class="min-w-0 flex-1 accent-white"
+							min="0"
+							max="1"
+							step="0.01"
+							value={player.volume}
+							aria-label="Volume"
+							use:wheelAdjust
+							oninput={(e) => player.setVolume(Number(e.currentTarget.value))}
+						/>
+						<NumberField value={Math.round(player.volume * 100)} min={0} max={100} unit="%" label="Volume in percent" class="bg-surface py-1.5" onchange={(v) => player.setVolume(v / 100)} />
+					</div>
 				{/if}
 				<button class="flex items-center gap-2 self-start text-sm text-muted hover:text-white" onclick={() => (showSync = !showSync)}>
 					<Icon name="tune" size={16} />
@@ -192,6 +209,18 @@
 						/>
 						<button class="rounded-full bg-surface px-3 py-1 hover:bg-line" onclick={() => nudgeSync(10)}>Earlier</button>
 					</div>
+					<div class="flex items-center gap-2 text-sm text-muted">
+						<NumberField
+							value={player.syncOffsetMs}
+							min={-SYNC_RANGE_MS}
+							max={SYNC_RANGE_MS}
+							unit="ms"
+							label="Sync adjustment in milliseconds (more is earlier)"
+							class="bg-surface py-1.5 text-white"
+							onchange={(v) => player.setSyncOffset(v)}
+						/>
+						<span>earlier (a minus makes it later)</span>
+					</div>
 					<p class="text-xs text-muted">
 						Is this device behind the others (for example on Bluetooth)? Move it to <em>earlier</em>. Saved on this device.
 						{#if player.syncOffsetMs !== 0}
@@ -201,6 +230,34 @@
 				{/if}
 			{/if}
 		</div>
+
+		{#if myDevices.length > 0}
+			<p class="-mb-1 mt-1 text-xs font-medium text-muted">Your other devices</p>
+		{/if}
+		{#each myDevices as device (device.id)}
+			{@const name = device.device || 'Another device'}
+			<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">
+				<div class="flex items-center gap-3">
+					<Icon name={/ on (Windows|Mac|Linux|ChromeOS)$/.test(name) ? 'computer' : 'phone'} size={20} class="text-accent" />
+					<span class="min-w-0 flex-1 truncate">{name}</span>
+				</div>
+				{#if device.volume !== null}
+					<input
+						type="range"
+						class="w-full accent-white"
+						min="0"
+						max="1"
+						step="0.02"
+						value={device.volume}
+						aria-label="Volume of {name}"
+						use:wheelAdjust
+						onchange={(e) => setDeviceVolume(device.id, Number(e.currentTarget.value))}
+					/>
+				{:else}
+					<p class="pl-8 text-xs text-muted">Its volume can only be changed there (update YTMP on it).</p>
+				{/if}
+			</div>
+		{/each}
 
 		{#each outputs as output (output.id)}
 			<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">
@@ -229,18 +286,30 @@
 					</label>
 				{/if}
 				{#if output.active && output.volume !== null}
-					<input
-						type="range"
-						class="w-full accent-white"
-						min="0"
-						max="1"
-						step="0.02"
-						value={output.volume}
-						disabled={!room.can('output_volume')}
-						aria-label="Volume of {output.name}"
-						use:wheelAdjust
-						onchange={(e) => setVolume(output.id, Number(e.currentTarget.value))}
-					/>
+					<div class="flex items-center gap-3">
+						<input
+							type="range"
+							class="min-w-0 flex-1 accent-white"
+							min="0"
+							max="1"
+							step="0.02"
+							value={output.volume}
+							disabled={!room.can('output_volume')}
+							aria-label="Volume of {output.name}"
+							use:wheelAdjust
+							onchange={(e) => setVolume(output.id, Number(e.currentTarget.value))}
+						/>
+						<NumberField
+							value={Math.round(output.volume * 100)}
+							min={0}
+							max={100}
+							unit="%"
+							label="Volume of {output.name} in percent"
+							disabled={!room.can('output_volume')}
+							class="bg-surface py-1.5"
+							onchange={(v) => setVolume(output.id, v / 100)}
+						/>
+					</div>
 				{/if}
 			</div>
 		{/each}
@@ -281,17 +350,28 @@
 					</label>
 				{/if}
 				{#if plays?.here && plays.volume !== null}
-					<input
-						type="range"
-						class="w-full accent-white"
-						min="0"
-						max="1"
-						step="0.02"
-						value={plays.volume}
-						aria-label="Volume of {device.name}"
-						use:wheelAdjust
-						onchange={(e) => nativeBridge?.setNearbyVolume?.(device.id, Number(e.currentTarget.value))}
-					/>
+					<div class="flex items-center gap-3">
+						<input
+							type="range"
+							class="min-w-0 flex-1 accent-white"
+							min="0"
+							max="1"
+							step="0.02"
+							value={plays.volume}
+							aria-label="Volume of {device.name}"
+							use:wheelAdjust
+							onchange={(e) => nativeBridge?.setNearbyVolume?.(device.id, Number(e.currentTarget.value))}
+						/>
+						<NumberField
+							value={Math.round(plays.volume * 100)}
+							min={0}
+							max={100}
+							unit="%"
+							label="Volume of {device.name} in percent"
+							class="bg-surface py-1.5"
+							onchange={(v) => nativeBridge?.setNearbyVolume?.(device.id, v / 100)}
+						/>
+					</div>
 				{/if}
 				{#if starting === device.id}
 					<p class="pl-8 text-xs text-muted">Starting on the TV…</p>

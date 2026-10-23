@@ -135,9 +135,9 @@ data class HostOptions(
     val deviceOwner: () -> String? = { null },
     /**
      * No guests: the API (but logging in and audio for speakers) and rooms need an account
-     * of [auth]. A server setting (`accounts.guests = false`).
+     * of [auth]. A server setting (`accounts.guests = false`, or its admin page), so it can change while running.
      */
-    val accountsOnly: Boolean = false,
+    val accountsOnly: () -> Boolean = { false },
     /**
      * `/api/me/…` (your YouTube Music) may be used by pages of other hosts (CORS): the pages of
      * rooms on someone else's phone or server use your account's YouTube Music here. A server.
@@ -260,6 +260,7 @@ fun Application.ytmpModule(
             // Your YouTube Music from another host's page: a browser asks first (OPTIONS), then
             // comes with a token just for that (personalFor).
             val personalCall = path.startsWith("/api/me/") && (call.request.httpMethod == HttpMethod.Options || sources.personalFor?.invoke(call) != null)
+            if (!options.accountsOnly()) return@onCall
             if (OPEN_WITHOUT_ACCOUNT.none { path == it || path.startsWith(it) } && !personalCall && with(host) { call.account() } == null) {
                 throw ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Log in to use this server")
             }
@@ -268,7 +269,7 @@ fun Application.ytmpModule(
 
     routing {
         route("/api") {
-            if (options.accountsOnly) install(accountsOnly)
+            install(accountsOnly)
             roomRoutes(host)
             catalogRoutes(host)
             personalRoutes(host)

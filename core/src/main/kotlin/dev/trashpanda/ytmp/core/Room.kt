@@ -1,11 +1,11 @@
 package dev.trashpanda.ytmp.core
 
+import dev.trashpanda.ytmp.protocol.AdminRoomInfo
 import dev.trashpanda.ytmp.protocol.BanInfo
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.ErrorInfo
-import dev.trashpanda.ytmp.protocol.EPISODE_SPEEDS
 import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.ItemList
@@ -34,6 +34,7 @@ import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.SkipVotes
 import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.protocol.isEpisodeSpeed
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -288,6 +289,7 @@ class Room(
         member.outbox = outbox
         if (!member.screen) member.name = account?.displayName ?: name
         member.accountId = account?.id.takeUnless { member.screen }
+        hello.device?.trim()?.take(MAX_NAME_LENGTH)?.let { member.device = it }
         member.accountToken = hello.accountToken.takeIf { account != null }
         member.hideFromHistory = hello.hideFromHistory || account?.hideFromHistory == true
         // Logging in later (same guest token, now with the owner's account) makes you the owner.
@@ -400,6 +402,24 @@ class Room(
     }
 
     /** [guestToken] is a party screen's: it may join without an account. */
+    /** For the server admin's list of rooms: who's here and what plays. */
+    suspend fun adminInfo(): AdminRoomInfo = mutex.withLock {
+        val people = members.values.filter { !it.screen }
+        AdminRoomInfo(
+            code = code,
+            name = name,
+            visibility = visibility,
+            owner = ownerAccount,
+            online = people.count { it.online },
+            members = people.size,
+            playing = isPlaying,
+            current = current?.song?.title,
+            queued = queue.size,
+            alwaysOn = alwaysOn,
+            lastActive = lastActive,
+        )
+    }
+
     suspend fun isScreen(guestToken: String?): Boolean = mutex.withLock {
         guestToken != null && members.values.any { it.screen && it.token == guestToken }
     }
@@ -540,7 +560,7 @@ class Room(
         passwordHash = saved.passwordHash
         repeat = saved.repeat
         runStart = saved.runStart
-        episodeSpeed = saved.episodeSpeed.takeIf { it in EPISODE_SPEEDS } ?: 1.0
+        episodeSpeed = saved.episodeSpeed.takeIf { isEpisodeSpeed(it) } ?: 1.0
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay.items += saved.autoplay
         autoplay.seed = saved.autoplaySeed
@@ -814,7 +834,7 @@ class Room(
             }
             is Command.SetSpeed -> {
                 need(member, Permission.PLAY_PAUSE)?.let { return it }
-                if (command.speed !in EPISODE_SPEEDS) return invalid("Not a speed episodes can play at")
+                if (!isEpisodeSpeed(command.speed)) return invalid("Episodes play at 0.5× to 2×, in steps of 0.05")
                 episodeSpeed = command.speed
                 // Only an episode changes speed; music plays at 1 (the speed waits for the next episode).
                 if (current?.song?.podcast != null && playback.rate != episodeSpeed) {
@@ -859,6 +879,22 @@ class Room(
                 if (command.outputId !in outputs.active) return ErrorInfo(ErrorCode.NOT_FOUND, "Not playing on that speaker")
                 outputs.active[command.outputId] = command.volume.coerceIn(0.0, 1.0)
                 emit(Event.OutputsChanged(outputs.infos()))
+            }
+            is Command.SetDeviceVolume -> {
+                if (!command.volume.isFinite()) return invalid("Not a volume")
+                val volume = command.volume.coerceIn(0.0, 1.0)
+                val target = command.participantId?.let { members[it] ?: return notFoundPerson() } ?: member
+                if (target !== member) {
+                    // Only your own devices: someone here with the same account.
+                    if (member.accountId == null || target.accountId != member.accountId || target.screen) {
+                        return ErrorInfo(ErrorCode.PERMISSION_DENIED, "That's not one of your devices")
+                    }
+                    target.volumeChanges++
+                } else if (target.volume == volume) {
+                    return null
+                }
+                target.volume = volume
+                emit(Event.ParticipantUpdated(target.toParticipant()))
             }
             is Command.SetOpenElsewhere -> {
                 if (!member.isOwner) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "Only the owner can change this")

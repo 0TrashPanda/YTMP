@@ -1,9 +1,10 @@
 <script lang="ts">
 	// The song cache in the settings: how full it is and Clear cache. On a phone also its size
-	// and where it's kept (Settings → Playback); a server's admin sees it under Server (its size
-	// is in ytmp.toml).
+	// and where it's kept (Settings → Playback); a server's admin sees it under Server admin →
+	// Settings, with its size next to it.
 	import { onDestroy } from 'svelte';
 	import type { SongCacheSettings, SongCacheStatus } from '../../protocol.gen';
+	import NumberField from '../NumberField.svelte';
 	import Choice from './Choice.svelte';
 	import LocalSongsSection from './LocalSongsSection.svelte';
 
@@ -17,7 +18,7 @@
 		load: () => Promise<SongCacheStatus>;
 		clear: () => Promise<SongCacheStatus>;
 		change?: (settings: SongCacheSettings) => Promise<SongCacheStatus>;
-		/** In a card of its own (Settings → Server): a heading like the other cards'. */
+		/** In a card of its own (Settings → Server admin): a heading like the other cards'. */
 		card?: boolean;
 		onToast: (text: string) => void;
 	} = $props();
@@ -49,6 +50,8 @@
 	}
 	refresh();
 	onDestroy(() => clearTimeout(timer));
+
+	const setSize = (maxBytes: number) => attempt(() => patch({ maxBytes }));
 
 	async function attempt(action: () => Promise<SongCacheStatus>, done?: string) {
 		busy = true;
@@ -96,7 +99,7 @@
 			{#if status?.settable}
 				Songs you play are kept on this phone, so they start at once and play without internet (in Local → Cached on this phone). Podcast episodes aren't kept.
 			{:else}
-				Songs played on this server are kept, so they start at once without asking YouTube. Podcast episodes aren't kept. Its size and folder are under [cache] in ytmp.toml.
+				Songs played on this server are kept, so they start at once without asking YouTube. Podcast episodes aren't kept.
 			{/if}
 		</p>
 	</div>
@@ -127,8 +130,10 @@
 				hint="When it's full, the songs you haven't played for the longest time go first (songs you play often stay longer)."
 				options={sizes}
 				value={String(status.maxBytes)}
-				onchange={(v) => attempt(() => patch({ maxBytes: Number(v) }))}
-			/>
+				onchange={(v) => setSize(Number(v))}
+			>
+				<NumberField value={status.maxBytes / GB} min={0} max={1000} step={0.1} unit="GB" label="Size in GB (0: off)" onchange={(v) => setSize(Math.round(v * GB))} />
+			</Choice>
 			<Choice
 				label="Keep songs in the background"
 				hint="Songs you play a 2nd time are downloaded to keep. That's data nobody asked for, so by default only on Wi-Fi."

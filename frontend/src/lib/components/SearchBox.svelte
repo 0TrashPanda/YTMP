@@ -9,6 +9,8 @@
 	import { MediaQuery } from 'svelte/reactivity';
 	import { suggestions } from '../api';
 	import { linkLabel, parseLink, type Link } from '../links';
+	import type { DetectedSong } from '../native';
+	import { recognized } from '../recognized.svelte';
 	import { saved } from '../storage';
 	import Icon from './Icon.svelte';
 
@@ -36,6 +38,8 @@
 	let found = $state<string[]>([]);
 	let recent = $state(saved.recentSearches);
 	let highlighted = $state(-1);
+	/** The Now Playing icon was tapped: the list shows the songs the phone recognized lately. */
+	let detectedOpen = $state(false);
 
 	// Back button on a phone: the search page's history entry went away, so close it.
 	let wasSearching = false;
@@ -75,8 +79,9 @@
 		return () => clearTimeout(timer);
 	});
 
-	type Row = { text: string; recent: boolean; link?: Link };
+	type Row = { text: string; recent: boolean; link?: Link; detected?: DetectedSong };
 	const rows = $derived.by((): Row[] => {
+		if (detectedOpen) return recognized.songs.map((song) => ({ text: `${song.title} ${song.artist}`, recent: false, detected: song }));
 		if (link) return [{ text: linkLabel(link), recent: false, link }];
 		const q = text.trim().toLowerCase();
 		if (!q) return recent.slice(0, 10).map((t) => ({ text: t, recent: true }));
@@ -85,11 +90,22 @@
 		const theirs = found.filter((t) => !mine.includes(t));
 		return [...mine.map((t) => ({ text: t, recent: true })), ...theirs.slice(0, 8 - mine.length).map((t) => ({ text: t, recent: false }))];
 	});
+	/** The list under the box: suggestions, or the recognized songs (also when there are none yet, to say so). */
+	const showList = $derived(active && (rows.length > 0 || detectedOpen));
+
+	/** The Now Playing icon: the recognized songs, or Android's settings when YTMP may not read them yet. */
+	function toggleDetected() {
+		if (!recognized.access) return recognized.askAccess();
+		recognized.refresh();
+		detectedOpen = !detectedOpen;
+		highlighted = -1;
+	}
 
 	async function open() {
 		// On phones the search page is a history entry, so the back button closes it.
 		if (!wide.current && !page.state.searching) pushState('', { searching: true });
 		active = true;
+		detectedOpen = false;
 		highlighted = -1;
 		onopen();
 		await tick();
@@ -102,6 +118,7 @@
 	function close() {
 		if (page.state.searching) history.back();
 		active = false;
+		detectedOpen = false;
 		highlighted = -1;
 		input?.blur();
 	}
@@ -128,6 +145,7 @@
 	/** Pasting a link opens it right away, without Enter. */
 	function changed(event: Event) {
 		highlighted = -1;
+		detectedOpen = false;
 		const e = event as InputEvent;
 		const pasted = e.inputType === 'insertFromPaste' || (e.data?.length ?? 0) > 8;
 		const found = pasted ? parseLink(text) : null;
@@ -201,6 +219,18 @@
 			<Icon name="close" size={22} />
 		</button>
 	{/if}
+	<!-- A Pixel's Now Playing: the songs it recognized lately (Android's settings first, until YTMP may read them). -->
+	{#if recognized.available}
+		<button
+			class="shrink-0 rounded-full p-1 hover:text-white {detectedOpen ? 'text-white' : 'text-muted'}"
+			aria-label={recognized.access ? 'Songs Now Playing recognized' : 'Allow YTMP to read Now Playing'}
+			aria-pressed={detectedOpen}
+			onpointerdown={(e) => e.preventDefault()}
+			onclick={toggleDetected}
+		>
+			<Icon name="note" size={22} />
+		</button>
+	{/if}
 {/snippet}
 
 {#snippet list(full: boolean)}
@@ -217,13 +247,18 @@
 				onpointerdown={(e) => e.preventDefault()}
 				onclick={() => (row.link ? openLink(row.link, text.trim()) : search(row.text))}
 			>
-				<Icon name={row.link ? 'open' : row.recent ? 'history' : 'search'} size={22} class="shrink-0 text-muted" />
+				<Icon name={row.link ? 'open' : row.detected ? 'note' : row.recent ? 'history' : 'search'} size={22} class="shrink-0 text-muted" />
 				{#if row.link}
 					<span class="min-w-0 flex-1 truncate font-bold {full ? 'text-base' : ''}">{row.text}</span>
+				{:else if row.detected}
+					<span class="min-w-0 flex-1 {full ? 'text-base' : ''}">
+						<span class="block truncate">{row.detected.title}</span>
+						<span class="block truncate text-sm text-muted">{row.detected.artist}</span>
+					</span>
 				{:else}
 					<span class="min-w-0 flex-1 truncate {full ? 'text-base' : ''}">{typed}<b class="font-bold">{rest}</b></span>
 				{/if}
-				{#if row.link}
+				{#if row.link || row.detected}
 					<!-- Nothing to edit. -->
 				{:else if row.recent && !text.trim()}
 					<button class="-my-2 rounded-full p-2 text-muted hover:text-white" aria-label="Remove {row.text} from recent searches" onpointerdown={(e) => e.preventDefault()} onclick={(e) => (e.stopPropagation(), forget(row.text))}>
@@ -236,16 +271,19 @@
 				{/if}
 			</li>
 		{/each}
+		{#if detectedOpen && !rows.length}
+			<li class="px-4 py-3 text-sm text-muted">Nothing recognized yet. Songs your Pixel's Now Playing hears show up here.</li>
+		{/if}
 	</ul>
 {/snippet}
 
 {#if wide.current}
 	<div class="relative flex min-w-0 flex-1 sm:max-w-xl">
-		<label class="flex min-w-0 flex-1 items-center gap-3 bg-raised px-4 py-2 {active && rows.length ? 'rounded-t-lg' : 'rounded-lg'}">
+		<label class="flex min-w-0 flex-1 items-center gap-3 bg-raised px-4 py-2 {showList ? 'rounded-t-lg' : 'rounded-lg'}">
 			<Icon name="search" size={22} class="shrink-0 text-muted" />
 			{@render field(false)}
 		</label>
-		{#if active && rows.length}
+		{#if showList}
 			{@render list(false)}
 		{/if}
 	</div>

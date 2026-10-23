@@ -88,6 +88,11 @@ class TrustedAuthServers(
 
     fun clear() = trusted.clear()
 
+    /** Stops trusting the auth servers [keep] says no to. */
+    fun retain(keep: (AuthServerRef) -> Boolean) {
+        trusted.values.removeIf { !keep(it.ref) }
+    }
+
     override fun servers() = trusted.values.map { it.ref }
 
     /** What [token] says, if it's valid and from a trusted auth server (whatever host it's for). */

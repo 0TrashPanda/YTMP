@@ -44,8 +44,11 @@ The pre-shared key is then only needed for privileged host ↔ auth server actio
 - **Issuer**: `accounts.name` in `ytmp.toml`, or else the host name of `accounts.url`, or of
   the machine, remembered in the database on first start so it doesn't change.
 - **Sign-up** (`accounts.signup`): `open`, `invite` (default) or `admin`. The first account on a
-  fresh server can always be created and becomes the **server admin**. The admin makes
-  invite links (once, 7 days) and accounts, and sets passwords, on `/account`.
+  fresh server can always be created and becomes the **server admin** (`accounts.is_admin`;
+  there can be several, never none). Admins manage accounts and invite links on the admin
+  page (`/api/admin/*`, `AdminApi.kt`). Sign-up mode, guests, the tracking default and the
+  trusted servers can also be set there: `ServerSettings.kt` keeps what the admin set in the
+  `settings` table (`server_settings`, JSON), over `ytmp.toml`, and applies changes live.
 - Logging in on the server's own pages gives a **session** token (random, stored hashed),
   sent as `Authorization: Bearer`. Five wrong passwords for a username → 15 minutes wait.
 - The token signing key (ES256 / P-256) is made on first start and kept in the database.

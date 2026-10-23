@@ -1,11 +1,12 @@
 <script lang="ts">
 	// The speed podcast episodes play at, for everyone in the room (music always plays at 1×).
-	// Shows the speed; a tap opens the speeds to pick from, like YouTube Music's.
+	// Shows the speed; a tap opens the speeds to pick from, like YouTube Music's, or to type one.
 	import type { RoomConnection } from '../room.svelte';
+	import NumberField from './NumberField.svelte';
 
 	let { room, onToast, class: className = '', up = false }: { room: RoomConnection; onToast: (text: string) => void; class?: string; up?: boolean } = $props();
 
-	/** The same as EPISODE_SPEEDS in protocol/.../Models.kt. */
+	/** The same as EPISODE_SPEEDS in protocol/.../Models.kt; typed ones go from 0.5 to 2 in steps of 0.05 (isEpisodeSpeed). */
 	const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 	const speed = $derived(room.state?.playback.speed ?? 1);
 	let open = $state(false);
@@ -35,7 +36,7 @@
 	</button>
 	{#if open}
 		<div class="fixed inset-0 z-[55]" role="presentation" onclick={() => (open = false)}></div>
-		<div class="absolute left-1/2 z-[56] w-32 -translate-x-1/2 overflow-hidden rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line {up ? 'bottom-full mb-2' : 'top-full mt-2'}" role="menu">
+		<div class="absolute left-1/2 z-[56] w-36 -translate-x-1/2 overflow-hidden rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line {up ? 'bottom-full mb-2' : 'top-full mt-2'}" role="menu">
 			<div class="px-4 pt-1 pb-2 text-xs text-muted">Speed</div>
 			{#each SPEEDS as s (s)}
 				<button role="menuitemradio" aria-checked={s === speed} class="flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-line {s === speed ? 'font-bold text-accent' : ''}" onclick={() => pick(s)}>
@@ -43,6 +44,9 @@
 					{#if s === 1}<span class="text-xs text-muted">Normal</span>{/if}
 				</button>
 			{/each}
+			<div class="border-t border-line px-4 pt-2 pb-1">
+				<NumberField value={speed} min={0.5} max={2} step={0.05} unit="×" label="Playback speed (0.5 to 2)" class="bg-surface py-1.5" onchange={pick} />
+			</div>
 		</div>
 	{/if}
 </div>

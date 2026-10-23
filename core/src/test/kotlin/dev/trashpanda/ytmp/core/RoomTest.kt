@@ -114,6 +114,12 @@ class RoomTest {
         assertEquals(90_000L, playback.positionMs, "a minute at 1.5 is a minute and a half of the episode")
         room.run(anna, Command.SetSpeed(3.0))
         assertTrue(anna.messages.filterIsInstance<ServerMessage.Result>().last().error != null, "not a speed episodes play at")
+        room.run(anna, Command.SetSpeed(1.33))
+        assertTrue(anna.messages.filterIsInstance<ServerMessage.Result>().last().error != null, "not a step of 0.05")
+        // A typed speed between the ones to pick from.
+        room.run(anna, Command.SetSpeed(1.35))
+        assertEquals(1.35, anna.state.playback.speed)
+        room.run(anna, Command.SetSpeed(1.5))
 
         // The rest of the hour takes 39 minutes at 1.5; then the song plays at 1.
         advanceTimeBy(39 * 60_000L + 1_000)

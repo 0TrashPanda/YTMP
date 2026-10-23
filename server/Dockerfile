@@ -21,6 +21,9 @@ COPY server server
 RUN ./gradlew :server:installDist --no-daemon -q
 
 FROM eclipse-temurin:21-jre
+# The release this is (shown on the admin page); empty for a build of your own.
+ARG YTMP_VERSION=
+ENV YTMP_VERSION=$YTMP_VERSION
 WORKDIR /app
 COPY --from=server /src/server/build/install/server /app
 COPY --from=frontend /src/frontend/build /app/frontend/build

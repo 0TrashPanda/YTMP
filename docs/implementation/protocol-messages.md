@@ -35,7 +35,7 @@ generated from them.
 
 | Direction | Message | Content |
 |-----------|---------|---------|
-| → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`, `accountToken` ✅ (a host token, see [auth](auth.md)), `hideFromHistory` ✅ (keep me out of others' listening history), `migrationKey` ✅ (moved here from another room: see *Clones* below), `password` ✅ (the room's password, when `room.hasPassword`) |
+| → | `hello` ✅ | `protocolVersion`, `roomCode`, `guestName`, `guestToken` (to reconnect as the same guest), `ownerToken`, `accountToken` ✅ (a host token, see [auth](auth.md)), `hideFromHistory` ✅ (keep me out of others' listening history), `migrationKey` ✅ (moved here from another room: see *Clones* below), `password` ✅ (the room's password, when `room.hasPassword`), `device` ✅ (which device this is, e.g. "Pixel 8": tells your devices apart) |
 | → | `attach` ✅ | Instead of `hello`: `protocolVersion`, `roomCode`, `guestToken`. A **second connection for a participant who is already in the room**: it gets the same `welcome` and events and may send `command`s and `ping`s as them, but doesn't replace their connection or change whether they're online. Kicks, bans and cleanup end it (`rejected`: `kicked`/`banned`); an unknown token gets `kicked`. Used by the Android app's player, see [android-app](android-app.md) |
 | ← | `welcome` ✅ | `participantId`, `guestToken`, `seq`, `state` (the snapshot), `accountId` ✅ (null when joined as a guest, also when the token wasn't accepted), `migrationKey` ✅ (only yours) |
 | ← | `owner_token` ✅ | `ownerToken`: you're the owner now (keep it, like the one from creating the room) |
@@ -51,7 +51,8 @@ aren't built yet. Repeat (`repeat`) and the skip vote (`skipVotes`) are built, a
 {
   "room":        { "id", "code", "name", "visibility", "ownerId", "settings": { ... } },
   "me":          { "participantId", "roleId", "permissions": [...] },
-  "participants":[ { "id", "name", "accountId?", "roleId", "listening": true } ],   // accountId ✅
+  "participants":[ { "id", "name", "accountId?", "roleId", "listening": true,
+                     "device", "volume", "volumeChanges" } ],   // accountId ✅, device/volume ✅ (your devices)
   "roles":       [ { "id", "name", "permissions": [...] } ],
   "queue":       [ QueueItem ],
   "autoplay":    { "seed": Song | Artist | Album | Playlist, "items": [ QueueItem ] },
@@ -109,6 +110,7 @@ Each command lists the permission it needs (see [room management](../features/ro
 |---------|--------|------------|
 | `SetListening` ✅ | `on`, `startsTogether` (the player sends `PlayerReady`) | Play audio locally |
 | `SetSpeakers` ✅ | `names` (speakers near the phone that play the room, from the app; empty: none), `startsTogether` | Play audio locally |
+| `SetDeviceVolume` ✅ | `volume` (0–1), `participantId` (null: this device). A device says its own volume whenever it changes (`Participant.volume`); with the id of another participant **with the same account** it sets theirs, which bumps their `volumeChanges`, and that device turns its volume to it. See [your devices](../features/playback-and-outputs.md#your-devices) | — (only your own devices) |
 | `SetRoomCode` ✅ | `code` (3–12 letters and digits; the old codes keep leading to the room) | Change settings |
 | `PlayerReady` ✅ | `itemId`, `speakers` (this player, or all the phone's speakers, loaded a starting song; see [starting together](playback-sync.md#starting-a-song-together)) | — |
 
@@ -174,7 +176,7 @@ network) gets its screen from `POST /api/screens/cast` instead, and leaves with
 | Event | Fields | Sent to |
 |-------|--------|---------|
 | `ParticipantJoined` ✅ / `ParticipantLeft` ✅ | participant / `participantId` | everyone |
-| `ParticipantUpdated` ✅ | participant (role, permissions, name, online, listening) | everyone |
+| `ParticipantUpdated` ✅ | participant (role, permissions, name, online, listening, `device`, `volume`, `volumeChanges`) | everyone |
 | `YouWereKicked` / `YouWereBanned` (done as `rejected` with reason `kicked` / `banned` ✅) | – | that participant |
 | `QueueItemsAdded` ✅ | `items`, `index` | everyone |
 | `QueueItemRemoved` ✅ | `itemId` | everyone |

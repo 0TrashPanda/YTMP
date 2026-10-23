@@ -45,6 +45,8 @@ Music, without Premium, and not tied to a single music service.
   who added it, and a QR code to join. A TV links with a code, like YouTube's, and a TV with
   Chromecast shows it from *Play on* (it plays the music too), also a TV at your place in a
   room on a server, from the app.
+- Every setting that is a number can be typed in too (volumes, sync adjustment, limits,
+  songs per page, cache size, playback speed), next to its slider or choices.
 - Everyone who listens stays in sync, with a per-device sync adjustment (for Bluetooth). A
   new song waits until every phone, browser, TV and speaker has it, so nobody misses its start.
 - Hand a room to someone else, clone it (here, onto your phone or onto your server), and
@@ -56,6 +58,8 @@ Music, without Premium, and not tied to a single music service.
   artists, playlists, podcasts, episodes.
 - Paste a YouTube Music or YouTube link in the search box to open that song, album,
   playlist, artist or podcast (or a YTMP room link to open the room).
+- On a Pixel, a music-note icon in the search box lists the songs Now Playing recognized
+  lately; tap one to search for it (allow notification access for YTMP once).
 - Artist, album, playlist and podcast pages.
 - Lyrics, synced line by line (from LRCLIB or YouTube Music), and a karaoke mode that shows
   them large on the party screen and in everyone's player.
@@ -75,8 +79,12 @@ Music, without Premium, and not tied to a single music service.
   keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
   speakers near your phone (the phone looks the songs up and serves them).
 - Android: lock screen and notification controls, keeps playing with the screen off.
+- Your other devices in the room (signed in to your account) show in *Play on* with their
+  own volume slider: turn the laptop down from your phone. On a phone it's the media volume.
 - A sleep timer (in the playing song's ⋮ menu): after some minutes or at the end of the
   song the sound fades out, then a solo room pauses; in a party room only your device stops.
+- An equalizer (*Settings → Playback*): ten bands and presets (Bass boost, Spoken word, …).
+  In the app the phone's speaker, wired headphones and each Bluetooth device keep their own.
 - Download a song or episode from its menu: a music file with its title, artist, album and
   cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app
@@ -88,7 +96,7 @@ Music, without Premium, and not tied to a single music service.
 - A **song cache** on the server and the phone: songs you play are kept, so next time they
   start at once without asking YouTube, and on the phone they play without internet (*Local →
   Cached on this phone*, with your downloads). Songs streamed anyway are kept for free, others
-  from their second play; podcast episodes aren't. 5 GB on a server (`ytmp.toml`), 1 GB on a
+  from their second play; podcast episodes aren't. 5 GB on a server (admin page), 1 GB on a
   phone (*Settings → Playback*, on the phone or its SD card), with *Clear cache*. Optionally the
   phone's own music that is also on YouTube Music is listed there too and plays offline.
 
@@ -110,6 +118,12 @@ Music, without Premium, and not tied to a single music service.
 - **Your rooms on all your devices:** rooms on your phone show up on your server and the
   other way round; open one there or move it (with an account).
 - Log in once: the server's pages and the app's own pages share the login.
+- Open pages update themselves after a server update: they reload when the sound stops in
+  that browser and you're not typing, so you never need to clear your browser's cache.
+- **An admin page** for the server (*Settings → Server admin*): accounts (make someone admin,
+  rename, new password, log out everywhere, delete), invite links, server settings that work
+  right away (sign-up, guests, trusted servers, room codes, audio, song cache, logs), the
+  rooms (close one), and versions.
 
 **The app**
 - Checks for new versions when it starts and installs them; *Check for updates* and *Send
