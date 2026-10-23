@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrange, isPodcasts, learn, loadPrefs } from './home.svelte';
+import { arrange, isPodcasts, learn, loadPrefs, PINNED, withPins, type Pin } from './home.svelte';
 import type { HomeSection, SearchItem } from './protocol.gen';
 
 const song = (id: string, podcast = false): SearchItem =>
@@ -64,5 +64,26 @@ describe('pins', () => {
 			JSON.stringify({ pins: [{ kind: 'playlist', id: 'LM', title: 'Liked music', personal: true }, { kind: 'song', id: 'x', title: 'X' }, { kind: 'album', id: 'a' }] })
 		);
 		expect(prefs.pins).toEqual([{ kind: 'playlist', id: 'LM', title: 'Liked music', art: undefined, personal: true }]);
+	});
+});
+
+describe('pinned sections', () => {
+	const pin = (id: string, contents = false): Pin => ({ kind: 'playlist', id, title: id, contents: contents || undefined });
+
+	it('shows tiles in Pinned, and a pin with its songs as its own section, both above YTM', () => {
+		const prefs = { ...loadPrefs(null), pins: [pin('LM', true), pin('a'), pin('b')] };
+		const shown = arrange([section('Quick picks')], prefs);
+		expect(shown.map((b) => b.key)).toEqual([PINNED, 'ytmp:pin:playlist:LM', 'Quick picks']);
+		expect(shown[0].kind === 'pinned' && shown[0].pins.map((p) => p.id)).toEqual(['a', 'b']);
+	});
+
+	it('shows pins while Home loads, and they move and hide like any section', () => {
+		const prefs = { ...loadPrefs(null), pins: [pin('LM', true), pin('a')], order: ['Quick picks', 'ytmp:pin:playlist:LM'], hidden: [PINNED] };
+		expect(arrange(null, prefs).map((b) => b.key)).toEqual(['ytmp:pin:playlist:LM']);
+		expect(arrange([section('Quick picks')], prefs).map((b) => b.key)).toEqual(['Quick picks', 'ytmp:pin:playlist:LM']);
+	});
+
+	it('forgets the place of a pin that is gone', () => {
+		expect(withPins(['ytmp:pin:playlist:old', 'Quick picks'], { ...loadPrefs(null), pins: [pin('a')] })).toEqual([PINNED, 'Quick picks']);
 	});
 });

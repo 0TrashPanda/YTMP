@@ -33,12 +33,15 @@ Like YTM:
   YouTube account these are YTM's general suggestions for the host's country; with one,
   your own (see [accounts](accounts.md#linked-youtube-account)).
 - **Your own Home** ✅ (*Settings → Home*, saved on the device): **pin** a playlist (Liked
-  music too), album, artist or podcast with *Pin to Home* on its page; pins are tiles at the
-  top of Home, there at once. Each section can be **hidden**, **moved** and shown as a
-  **carousel** (like YTM) or a **list**: songs one under the other that tap and swipe like
-  any song list, albums and playlists as rows. *Podcast sections* hides every section of
-  podcasts and episodes. A section's **⋮** on Home does the same in place. YTM picks and
-  names the sections, so they're known by name; a new one shows where YTM puts it.
+  music too), album, artist or podcast with *Pin to Home* on its page. A pin is a **tile** in
+  the **Pinned** section, or a **section of its own with its songs** (the first 20, a
+  podcast's newest episodes; *More* opens its page). Pins show at once, before the
+  suggestions load. Every section, Pinned and pins included, can be **hidden**, **moved**
+  and shown as a **carousel** (like YTM; Pinned: tiles) or a **list**: songs one under the
+  other that tap and swipe like any song list, albums and playlists as rows. *Podcast
+  sections* hides YTM's sections of podcasts and episodes. A section's **⋮** on Home does the
+  same in place. YTM picks and names its sections, so they're known by name; a new one shows
+  where YTM puts it.
 - **Library** ✅ (with a linked YouTube Music account): your playlists and podcasts, with a
   search field at the top that finds them by name or author as you type. It's forgiving:
   typos ("chlil"), letters in order or initials ("rdtrip", "rt" for *Road trip*), no

@@ -54,7 +54,7 @@ Music, without Premium, and not tied to a single music service.
 
 **Finding music** (through YouTube Music, no Premium needed)
 - Home with YouTube Music's suggestions (quick picks, new releases, mixes), made your own:
-  pins at the top, sections hidden, moved, or shown as a list.
+  pins (as tiles, or with their songs), sections hidden, moved, or shown as a list.
 - Search with suggestions while typing and YouTube Music's chips: songs, videos, albums,
   artists, playlists, podcasts, episodes.
 - Paste a YouTube Music or YouTube link in the search box to open that song, album,
