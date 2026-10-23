@@ -79,11 +79,18 @@ object Updates {
         val prefs = activity.getSharedPreferences("ytmp", Context.MODE_PRIVATE)
         val dialog = AlertDialog.Builder(activity)
             .setTitle("YTMP ${release.version} is available")
-            .setMessage("You have ${installedVersion(activity)}.\n\n${plainNotes(release.notes)}".trimEnd())
+            .setMessage("You have ${installedVersion(activity)}.${if (onMobileData(activity)) "\nYou're on mobile data: the update is a big download.\n" else ""}\n\n${plainNotes(release.notes)}".trimEnd())
             .setPositiveButton("Update") { _, _ -> download(activity, scope, release) }
             .setNegativeButton("Later", null)
         if (fromStart) dialog.setNeutralButton("Skip this version") { _, _ -> prefs.edit().putString(SKIPPED, release.version).apply() }
         dialog.show()
+    }
+
+    /** Connected through mobile data (a metered network). */
+    private fun onMobileData(context: Context): Boolean {
+        val manager = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return false
+        val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
+        return !capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
     }
 
     /** At app start: offers a new version, unless you skipped it. Not for debug builds. */

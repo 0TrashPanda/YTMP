@@ -7,7 +7,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import dev.trashpanda.ytmp.protocol.UnmatchedSong
 import org.slf4j.LoggerFactory
 import java.text.Normalizer
 import java.util.concurrent.atomic.AtomicInteger
@@ -29,6 +32,8 @@ class LocalMatcher(
     /** A YouTube Music song by its ID, or null when there's none. */
     private val lookup: suspend (songId: String) -> Song? = { null },
     private val scope: CoroutineScope,
+    /** Why looking up is on hold right now ("Wi-Fi", "charging"), or null. */
+    private val hold: () -> String? = { null },
     private val gapMs: Long = GAP_MS,
     private val retryMs: Long = RETRY_MS,
     private val rescanMs: Long = RESCAN_MS,
@@ -42,6 +47,10 @@ class LocalMatcher(
     private var byId: Map<String, LocalTrack> = emptyMap()
 
     private val left = AtomicInteger()
+    private val wake = Channel<Unit>(Channel.CONFLATED)
+
+    /** Why it isn't looking anything up right now, or null. */
+    val waiting: String? get() = if (enabled && left.get() > 0) hold() else null
 
     /** Files still to look up. */
     val pending: Int get() = left.get()
@@ -73,7 +82,8 @@ class LocalMatcher(
                     log.info("Matching phone music: {}; trying again later", e.message)
                     retryMs
                 }
-                delay(wait)
+                // Until the next look, or until someone asks for one.
+                withTimeoutOrNull(wait) { wake.receive() }
             }
         }
     }
@@ -105,7 +115,7 @@ class LocalMatcher(
         current = valid
         total = files.size
         publish(valid)
-        val todo = files.filter { cache.localMatch(it.key)?.sig != signature(it) }
+        val todo = files.filter { f -> cache.localMatch(f.key).let { it == null || (!it.manual && it.sig != signature(f)) } }
         left.set(todo.size)
         val next = AtomicInteger()
         // Workers 0 until [parallel] take files one by one; the others wait until they're wanted.
@@ -118,9 +128,9 @@ class LocalMatcher(
                             delay(IDLE_MS)
                             continue
                         }
+                        while (isActive && hold() != null) delay(HOLD_MS)
                         val track = todo.getOrNull(next.getAndIncrement()) ?: break
-                        val byId = (idInName(track.file) ?: tagged(track))?.let { id -> lookup("ytm:$id")?.takeIf { sameLength(track, it) } }
-                        val match = LocalMatch(signature(track), byId ?: match(track, search("${track.artist} ${track.title}")))
+                        val match = check(track)
                         cache.setLocalMatch(track.key, match)
                         if (match.song != null) publish(valid)
                         left.decrementAndGet()
@@ -133,6 +143,66 @@ class LocalMatcher(
         // Files that went: forget what was found.
         for (key in cache.localMatchKeys() - valid.keys) cache.setLocalMatch(key, null)
         return rescanMs
+    }
+
+    /** Looks one file up: by an ID in its name or tags first, else by title and artist. */
+    private suspend fun check(track: LocalTrack): LocalMatch {
+        val sig = signature(track)
+        val id = idInName(track.file) ?: tagged(track)
+        var why: String? = null
+        if (id != null) {
+            val song = lookup("ytm:$id")
+            when {
+                song == null -> why = "Its ID ($id) isn't a YouTube Music song"
+                sameLength(track, song) -> return LocalMatch(sig, song)
+                else -> why = "The song its ID points to has another length"
+            }
+        }
+        if (track.title == UNKNOWN_SONG || track.artist == UNKNOWN_ARTIST) {
+            return LocalMatch(sig, null, why ?: "No title or artist tag, and no ID in its name or tags")
+        }
+        val results = search("${track.artist} ${track.title}")
+        return LocalMatch(sig, match(track, results), why ?: if (results.isEmpty()) "YouTube Music found nothing" else "No result with the same title, artist and length")
+    }
+
+    /** The files without a match, with why. */
+    fun unmatched(): List<UnmatchedSong> = current.values.mapNotNull { t ->
+        val m = cache.localMatch(t.key) ?: return@mapNotNull null
+        if (m.song != null) return@mapNotNull null
+        UnmatchedSong(t.key, t.title, t.artist, t.file, if (m.manual) "Skipped by you" else m.why ?: "No match")
+    }.sortedBy { it.file.ifEmpty { it.title }.lowercase() }
+
+    /** Looks at the files without a match again (not the ones the owner decided). */
+    fun recheck() {
+        cache.forgetLocalMatches { it.song == null && !it.manual }
+        wake.trySend(Unit)
+    }
+
+    /** Forgets what was found; what the owner chose stays. */
+    fun forget() {
+        cache.forgetLocalMatches { !it.manual }
+        wake.trySend(Unit)
+    }
+
+    /** The owner says file [key] is the song at [link] (a link or a video ID); empty: it isn't on YouTube Music. Null when it worked, else why not. */
+    suspend fun link(key: String, link: String): String? {
+        val track = current[key] ?: return "That song isn't on this phone any more"
+        val text = link.trim()
+        if (text.isEmpty()) {
+            cache.setLocalMatch(key, LocalMatch(signature(track), null, null, manual = true))
+            return null
+        }
+        val id = LINK.find(text)?.groupValues?.get(1) ?: Regex("^$ID$").find(text)?.value ?: return "That isn't a YouTube link or video ID"
+        val song = try {
+            lookup("ytm:$id")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return e.message ?: "Couldn't look it up"
+        } ?: return "YouTube Music doesn't have that song"
+        cache.setLocalMatch(key, LocalMatch(signature(track), song, null, manual = true))
+        publish(current)
+        return null
     }
 
     private fun publish(valid: Map<String, LocalTrack>) {
@@ -148,10 +218,13 @@ class LocalMatcher(
         private const val DURATION_SLACK_MS = 3_000L
         private const val MAX_MS = 60 * 60_000L
 
-        /** Music, not the app's own downloads (found by their tags), nothing unknown or over an hour. */
+        const val UNKNOWN_SONG = "Unknown song"
+        const val UNKNOWN_ARTIST = "Unknown artist"
+        private const val HOLD_MS = 15_000L
+
+        /** Music, not the app's own downloads (found by their tags), nothing over an hour. A file without title or artist can still be found by an ID. */
         internal fun eligible(t: LocalTrack) =
-            !t.folder.startsWith("Music/YTMP") && t.durationMs in 30_000..MAX_MS &&
-                t.title != "Unknown song" && t.artist != "Unknown artist"
+            !t.folder.startsWith("Music/YTMP") && t.durationMs in 30_000..MAX_MS
 
         // v2: IDs in names and tags count.
         internal fun signature(t: LocalTrack) = "v2|${t.title}|${t.artist}|${t.durationMs}"

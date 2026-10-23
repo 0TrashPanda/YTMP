@@ -3,6 +3,8 @@ package dev.trashpanda.ytmp.protocol.tsgen
 import dev.trashpanda.ytmp.protocol.ApiError
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.SongCacheStatus
+import dev.trashpanda.ytmp.protocol.UnmatchedSongs
+import dev.trashpanda.ytmp.protocol.LocalLinkRequest
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
@@ -217,6 +219,8 @@ fun main(args: Array<String>) {
     generator.addRoot(LocalLibraryPage.serializer().descriptor)
     generator.addRoot(SongCacheStatus.serializer().descriptor)
     generator.addRoot(SongCacheSettings.serializer().descriptor)
+    generator.addRoot(UnmatchedSongs.serializer().descriptor)
+    generator.addRoot(LocalLinkRequest.serializer().descriptor)
     generator.addRoot(YoutubeAccountStatus.serializer().descriptor)
     generator.addRoot(YoutubeHistorySetting.serializer().descriptor)
     generator.addRoot(YoutubePersonalizeSetting.serializer().descriptor)

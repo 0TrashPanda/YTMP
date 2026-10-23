@@ -133,6 +133,15 @@ store every 5 minutes.
 `PhoneDownloads` in `CombinedDownloads`, so they play and are listed like downloads, in the folder
 *On this phone*. The status says how many (`local`) and how many are still to look up (`checking`).
 
+Each check keeps why a file has no match (`LocalMatch.why`) and whether the owner decided it
+(`manual`, from `POST /api/cache/local/link`: a link or ID, looked up without the length check;
+empty: skipped). `GET /api/cache/local/unmatched` lists the files without a match,
+`POST …/recheck` forgets the automatic "no match" answers and `POST …/forget` all automatic
+answers; both wake the matcher at once. `DataRules` (android) holds the Wi-Fi/charging settings
+(prefs `ytmp.cache`): the matcher's `hold` pauses lookups, `SongCache.fetchGate` the background
+fetches, `PhoneDownloads`' gate the downloads (the page hears `onDownloadWaiting`). Wi-Fi means a
+network without `NET_CAPABILITY_NOT_METERED`.
+
 ## Removing songs
 
 When saving a song would take the cache over its size, songs are removed until it is back

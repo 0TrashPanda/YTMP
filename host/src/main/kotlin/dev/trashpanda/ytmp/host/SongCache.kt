@@ -63,7 +63,7 @@ data class DownloadedSong(val song: Song, val uri: String, val local: Boolean = 
  * was (title, artist, length), so a changed file is checked again; [song] null: checked, no match.
  */
 @Serializable
-data class LocalMatch(val sig: String, val song: Song? = null)
+data class LocalMatch(val sig: String, val song: Song? = null, val why: String? = null, val manual: Boolean = false)
 
 /**
  * The song cache (docs/implementation/song-cache.md): YouTube Music songs kept as files in
@@ -200,6 +200,14 @@ class SongCache(
         synchronized(lock) {
             if (match == null) localMatches.remove(key) else localMatches[key] = match
             version++
+        }
+        saveSoon()
+    }
+
+    /** Forgets the checks [drop] says yes to. */
+    fun forgetLocalMatches(drop: (LocalMatch) -> Boolean) {
+        synchronized(lock) {
+            if (localMatches.values.removeAll(drop)) version++
         }
         saveSoon()
     }
@@ -393,12 +401,19 @@ class SongCache(
         if (queued.add(song.id)) fetches.trySend(song)
     }
 
+    /** Waits until fetching in the background is allowed (a phone: on Wi-Fi, if the owner wants that). */
+    @Volatile
+    var fetchGate: suspend () -> Unit = {}
+
     /** One song at a time, in the background. */
     private suspend fun fetchLoop() {
         val audio = audio ?: return
         for (song in fetches) {
             try {
                 if (!takes(song) || has(song.id) || fills.containsKey(song.id) || copies.containsKey(song.id) || downloads?.find(song.id) != null) continue
+                fetchGate()
+                // It may have come in for free meanwhile.
+                if (has(song.id) || fills.containsKey(song.id) || copies.containsKey(song.id)) continue
                 val temp = File(dir, key(song.id) + ".part")
                 val started = System.nanoTime()
                 try {

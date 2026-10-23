@@ -37,10 +37,10 @@ class LocalMatcherTest {
     }
 
     @Test
-    fun `an artist among several matches, the app's downloads and unknown files are skipped`() {
+    fun `an artist among several matches, the app's downloads are skipped`() {
         assertNotNull(LocalMatcher.match(track("1", "Stay", "Rihanna, Mikky Ekko", 240_000), listOf(song("ytm:a", "Stay", "Rihanna", 240_000))))
         assertEquals(false, LocalMatcher.eligible(track("1", "A", "B", 200_000, "Music/YTMP/")))
-        assertEquals(false, LocalMatcher.eligible(track("1", "Unknown song", "B", 200_000)))
+        assertEquals(true, LocalMatcher.eligible(track("1", "Unknown song", "Unknown artist", 200_000)))
         assertEquals(true, LocalMatcher.eligible(track("1", "A", "B", 200_000)))
     }
 
@@ -99,6 +99,38 @@ class LocalMatcherTest {
         assertEquals("1", matcher.find("ytm:halo")?.first?.key)
         assertNull(cache.localMatch("2")?.song)
         assertEquals(2, searches.size)
+        matcher.stop()
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+    }
+
+    @Test
+    fun `a file without artist is matched by its ID, asked again and linked by hand`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val dir = createTempDirectory("matcher-manual").toFile().apply { deleteOnExit() }
+        val cache = SongCache(dir, 1_000_000, StreamResolver { error("not used") }, null, scope, coverOf = { null })
+        val files = listOf(
+            track("1", "Unknown song", "Unknown artist", 215_000).copy(file = "Love And Truth [JsYh2wQVUAI].opus"),
+            track("2", "Unknown song", "Unknown artist", 100_000).copy(file = "mystery.opus"),
+        )
+        var known = setOf("ytm:JsYh2wQVUAI")
+        val matcher = LocalMatcher(cache, { files }, { emptyList() }, lookup = { id ->
+            if (id in known) song(id, "Whatever", "Y", if (id == "ytm:JsYh2wQVUAI") 215_000 else 100_000) else null
+        }, scope = scope, gapMs = 0)
+        matcher.start()
+        withTimeout(5_000) { while (matcher.pending > 0 || cache.localMatch("2") == null) delay(10) }
+        assertEquals("ytm:JsYh2wQVUAI", matcher.find("ytm:JsYh2wQVUAI")?.second?.id)
+        assertEquals(listOf("2"), matcher.unmatched().map { it.key })
+        assertEquals(false, matcher.link("2", "nonsense") == null)
+        known = known + "ytm:abcdefghijk"
+        assertNull(matcher.link("2", "https://music.youtube.com/watch?v=abcdefghijk"))
+        assertEquals("ytm:abcdefghijk", matcher.find("ytm:abcdefghijk")?.second?.id)
+        assertEquals(emptyList(), matcher.unmatched())
+        // Skipping is the owner's say too: forgetting keeps it, and it shows as skipped.
+        assertNull(matcher.link("2", ""))
+        matcher.forget()
+        withTimeout(5_000) { while (cache.localMatch("1") == null) delay(10) }
+        assertEquals("Skipped by you", matcher.unmatched().single().why)
+        assertEquals("ytm:JsYh2wQVUAI", matcher.find("ytm:JsYh2wQVUAI")?.second?.id)
         matcher.stop()
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }

@@ -112,6 +112,8 @@ export interface NativeCallbacks {
 	onMusicFolders?(folders: { id: string; name: string }[]): void;
 	/** Back from setPhoneMusic: whether it's on now, and why not when Android said no. */
 	onPhoneMusic?(on: boolean, error: string | null): void;
+	/** downloadSong waits for Wi-Fi (the owner wants downloads only on Wi-Fi). */
+	onDownloadWaiting?(songId: string): void;
 	/** Back from downloadSong: null when the song is in the Music folder, else why not. */
 	onDownloaded?(songId: string, error: string | null): void;
 }

@@ -4,9 +4,8 @@
 	// is in ytmp.toml).
 	import { onDestroy } from 'svelte';
 	import type { SongCacheSettings, SongCacheStatus } from '../../protocol.gen';
-	import { local } from '../../local.svelte';
 	import Choice from './Choice.svelte';
-	import Switch from './Switch.svelte';
+	import LocalSongsSection from './LocalSongsSection.svelte';
 
 	let {
 		load,
@@ -64,6 +63,21 @@
 		}
 	}
 
+	/** The settings as they are, with [changes]. */
+	function patch(changes: Partial<SongCacheSettings>): Promise<SongCacheStatus> {
+		return change!({
+			maxBytes: status!.maxBytes,
+			place: status?.place ?? null,
+			localSongs: null,
+			localParallel: null,
+			fetchWifiOnly: null,
+			downloadsWifiOnly: null,
+			localWifiOnly: null,
+			localCharging: null,
+			...changes
+		});
+	}
+
 	/** 1536 MB -> "1.5 GB". */
 	function size(bytes: number): string {
 		if (bytes >= GB) return `${(bytes / GB).toFixed(bytes >= 10 * GB ? 0 : 1).replace(/\.0$/, '')} GB`;
@@ -113,43 +127,24 @@
 				hint="When it's full, the songs you haven't played for the longest time go first (songs you play often stay longer)."
 				options={sizes}
 				value={String(status.maxBytes)}
-				onchange={(v) => attempt(() => change({ maxBytes: Number(v), place: status?.place ?? null, localSongs: null, localParallel: null }))}
+				onchange={(v) => attempt(() => patch({ maxBytes: Number(v) }))}
+			/>
+			<Choice
+				label="Keep songs in the background"
+				hint="Songs you play a 2nd time are downloaded to keep. That's data nobody asked for, so by default only on Wi-Fi."
+				options={[['1', 'Only on Wi-Fi'], ['0', 'Also on mobile data']]}
+				value={status.fetchWifiOnly === false ? '0' : '1'}
+				onchange={(v) => attempt(() => patch({ fetchWifiOnly: v === '1' }))}
+			/>
+			<Choice
+				label="Downloads"
+				hint="The Download in a song's menu (to the Music folder)."
+				options={[['0', 'Right away'], ['1', 'Wait for Wi-Fi']]}
+				value={status.downloadsWifiOnly ? '1' : '0'}
+				onchange={(v) => attempt(() => patch({ downloadsWifiOnly: v === '1' }))}
 			/>
 			{#if status.localSongs != null}
-				<div class="flex items-center gap-4">
-					<div class="min-w-0 flex-1">
-						<p class="text-sm font-medium">Songs from this phone</p>
-						<p class="text-xs text-muted">
-							Lists the music stored on this phone that is also on YouTube Music (same title, artist and length) under Cached on this phone, and plays it from the file, also offline. Each song is looked up once, slowly.
-							{#if !local.phone}Needs <em>Music on this phone</em> in Settings → Local music.{/if}
-						</p>
-					</div>
-					<Switch
-						checked={status.localSongs}
-						label="Songs from this phone"
-						disabled={busy || !local.phone}
-						onchange={(on) => attempt(() => change({ maxBytes: status!.maxBytes, place: status?.place ?? null, localSongs: on, localParallel: null }))}
-					/>
-				</div>
-				{#if status.localSongs}
-					<Choice
-						label="Lookups at once"
-						hint="More is faster, but YouTube may block this network if you ask a lot (then it waits 10 minutes). 1 is about 15 songs a minute."
-						options={[['1', '1'], ['2', '2'], ['4', '4'], ['8', '8']]}
-						value={String(status.localParallel)}
-						onchange={(v) => attempt(() => change({ maxBytes: status!.maxBytes, place: status?.place ?? null, localSongs: null, localParallel: Number(v) }))}
-					/>
-				{/if}
-				{#if status.localSongs && status.checkingOf}
-					<div class="flex flex-col gap-1.5">
-						<div class="h-1.5 overflow-hidden rounded-full bg-raised">
-							<div class="h-full rounded-full bg-white" style="width: {((status.checkingOf - status.checking) / status.checkingOf) * 100}%"></div>
-						</div>
-						<p class="text-xs text-muted">
-							{status.checkingOf - status.checking} of {status.checkingOf} phone songs looked up · {status.local} found on YouTube Music{status.checking ? '' : ' · done'}
-						</p>
-					</div>
-				{/if}
+				<LocalSongsSection {status} {busy} {patch} {attempt} {onToast} />
 			{/if}
 			{#if status.places.length > 1}
 				<Choice
@@ -157,7 +152,7 @@
 					hint={status.places.map((p) => (p.freeBytes != null ? `${p.name}: ${size(p.freeBytes)} free` : p.name)).join(' · ')}
 					options={status.places.map((p) => [p.id, p.name] as [string, string])}
 					value={status.place ?? status.places[0].id}
-					onchange={(v) => attempt(() => change({ maxBytes: status!.maxBytes, place: v, localSongs: null, localParallel: null }), 'Moving the cached songs…')}
+					onchange={(v) => attempt(() => patch({ place: v }), 'Moving the cached songs…')}
 				/>
 			{/if}
 		{/if}

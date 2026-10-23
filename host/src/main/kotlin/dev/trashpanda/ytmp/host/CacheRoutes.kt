@@ -1,7 +1,9 @@
 package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.protocol.ErrorCode
+import dev.trashpanda.ytmp.protocol.LocalLinkRequest
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
+import dev.trashpanda.ytmp.protocol.UnmatchedSongs
 import dev.trashpanda.ytmp.protocol.SongCacheStatus
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -22,7 +24,9 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
     suspend fun ApplicationCall.status(): SongCacheStatus {
         if (!allowed(this)) throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Only the owner can see the song cache")
         val status = cache?.status() ?: SongCacheStatus(songs = 0, bytes = 0, maxBytes = 0)
-        return if (settings == null) status else status.copy(places = settings.places(), place = settings.place(), settable = true, localSongs = settings.localSongs(), checking = settings.checking(), checkingOf = settings.checkingOf(), localParallel = settings.localParallel())
+        return if (settings == null) status else status.copy(places = settings.places(), place = settings.place(), settable = true, localSongs = settings.localSongs(), checking = settings.checking(), checkingOf = settings.checkingOf(), localParallel = settings.localParallel(),
+            fetchWifiOnly = settings.fetchWifiOnly(), downloadsWifiOnly = settings.downloadsWifiOnly(),
+            localWifiOnly = settings.localWifiOnly(), localCharging = settings.localCharging(), localWaiting = settings.localWaiting())
     }
     get { call.respond(call.status()) }
     put {
@@ -31,6 +35,21 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
         settings ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "The song cache is set in ytmp.toml here")
         settings.change(wanted)
         call.respond(call.status())
+    }
+    route("/local") {
+        suspend fun ApplicationCall.phone(): CacheSettings {
+            status()
+            return settings ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Only on a phone")
+        }
+        get("/unmatched") { call.respond(UnmatchedSongs(call.phone().unmatched())) }
+        post("/recheck") { call.phone().recheck(); call.respond(call.status()) }
+        post("/forget") { call.phone().forget(); call.respond(call.status()) }
+        post("/link") {
+            val phone = call.phone()
+            val wanted = call.receive<LocalLinkRequest>()
+            phone.link(wanted.key, wanted.link)?.let { throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, it) }
+            call.respond(call.status())
+        }
     }
     post("/clear") {
         call.status()

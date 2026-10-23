@@ -134,6 +134,8 @@ class LocalHost(private val context: Context) {
         override suspend fun resolve(songId: String) = ytm.resolve(songId)
     }
     private val cacheSettings = context.getSharedPreferences("ytmp.cache", Context.MODE_PRIVATE)
+    /** What may use mobile data or the battery (Settings → Playback → Song cache). */
+    val dataRules = DataRules(context)
 
     /** Download in the song menu: for friends' browsers (the host's /api/download) and this phone's Music folder; a cached song from its file. */
     val downloads: PhoneDownloads = PhoneDownloads(
@@ -143,6 +145,7 @@ class LocalHost(private val context: Context) {
         }, context.cacheDir),
         scope,
         phoneLibrary,
+        gate = dataRules::awaitDownload,
     )
 
     /**
@@ -161,6 +164,7 @@ class LocalHost(private val context: Context) {
         { query -> ytm.search(query, SearchType.SONGS).sections.flatMap { it.items }.filterIsInstance<SearchItem.SongResult>().filter { !it.video }.map { it.song } },
         tagged = { track -> phoneLibrary.head(track.key)?.let(LocalMatcher::idInBytes) },
         lookup = { id -> try { ytm.song(id) } catch (e: CancellationException) { throw e } catch (e: Exception) { null } },
+        hold = dataRules::localHold,
         scope = scope,
     )
 
@@ -241,6 +245,24 @@ class LocalHost(private val context: Context) {
 
         override fun localParallel() = cacheSettings.getInt(CACHE_PARALLEL, 1)
 
+        override fun fetchWifiOnly() = dataRules.fetchWifiOnly
+
+        override fun downloadsWifiOnly() = dataRules.downloadsWifiOnly
+
+        override fun localWifiOnly() = dataRules.localWifiOnly
+
+        override fun localCharging() = dataRules.localCharging
+
+        override fun localWaiting() = matcher.waiting
+
+        override suspend fun unmatched() = matcher.unmatched()
+
+        override suspend fun recheck() = matcher.recheck()
+
+        override suspend fun forget() = matcher.forget()
+
+        override suspend fun link(key: String, link: String) = matcher.link(key, link)
+
         override fun checkingOf() = if (matcher.enabled) matcher.total else 0
 
         override suspend fun change(settings: SongCacheSettings) {
@@ -251,6 +273,10 @@ class LocalHost(private val context: Context) {
                 settings.localSongs?.let { putBoolean(CACHE_LOCAL, it) }
                 settings.localParallel?.let { putInt(CACHE_PARALLEL, it.coerceIn(1, LocalMatcher.MAX_PARALLEL)) }
             }
+            settings.fetchWifiOnly?.let { dataRules.fetchWifiOnly = it }
+            settings.downloadsWifiOnly?.let { dataRules.downloadsWifiOnly = it }
+            settings.localWifiOnly?.let { dataRules.localWifiOnly = it }
+            settings.localCharging?.let { dataRules.localCharging = it }
             matcher.parallel = localParallel()
             applyLocalSongs()
             cache.setMaxBytes(settings.maxBytes)
@@ -296,6 +322,7 @@ class LocalHost(private val context: Context) {
         outputs.attach(rooms)
         if (phoneMusicOn) local.add(phoneLibrary)
         cache.inUse = { rooms.songsInUse() }
+        cache.fetchGate = dataRules::awaitFetch
         downloads.onSaved = cache::downloaded
         showCacheLibrary()
         applyLocalSongs()

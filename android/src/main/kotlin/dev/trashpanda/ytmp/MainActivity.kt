@@ -669,6 +669,9 @@ class MainActivity : ComponentActivity() {
         fun downloadSong(songJson: String) {
             if (currentUrl?.let(::isAppPage) != true) return
             val song = runCatching { ProtocolJson.decodeFromString(Song.serializer(), songJson) }.getOrNull() ?: return
+            if (app.host.dataRules.downloadWaits()) {
+                js("window.__ytmpNative && window.__ytmpNative.onDownloadWaiting && window.__ytmpNative.onDownloadWaiting(${JSONObject.quote(song.id)})")
+            }
             app.host.downloads.save(song) { error ->
                 js("window.__ytmpNative && window.__ytmpNative.onDownloaded && window.__ytmpNative.onDownloaded(${JSONObject.quote(song.id)}, ${error?.let(JSONObject::quote) ?: "null"})")
             }

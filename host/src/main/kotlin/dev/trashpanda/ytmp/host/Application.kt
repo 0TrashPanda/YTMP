@@ -18,6 +18,7 @@ import dev.trashpanda.ytmp.protocol.ShareAddress
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.SongCachePlace
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
+import dev.trashpanda.ytmp.protocol.UnmatchedSong
 import io.ktor.http.CacheControl
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -166,6 +167,29 @@ interface CacheSettings {
 
     /** How many phone songs are looked up at once. */
     fun localParallel(): Int = 1
+
+    fun fetchWifiOnly(): Boolean? = null
+
+    fun downloadsWifiOnly(): Boolean? = null
+
+    fun localWifiOnly(): Boolean = false
+
+    fun localCharging(): Boolean = false
+
+    /** Why phone songs aren't being looked up right now, or null. */
+    fun localWaiting(): String? = null
+
+    /** The phone songs without a match, and why. */
+    suspend fun unmatched(): List<UnmatchedSong> = emptyList()
+
+    /** Looks at the phone songs without a match again. */
+    suspend fun recheck() {}
+
+    /** Forgets what was found (not what the owner chose). */
+    suspend fun forget() {}
+
+    /** [link] is the song of phone song [key] (empty: none); null when it worked, else why not. */
+    suspend fun link(key: String, link: String): String? = "Not here"
 
     /** Saves [settings] and applies them (a new place moves what's cached). */
     suspend fun change(settings: SongCacheSettings)

@@ -1117,6 +1117,11 @@ export interface SongCacheStatus {
   checking: number;
   checkingOf: number;
   localParallel: number;
+  fetchWifiOnly: boolean | null;
+  downloadsWifiOnly: boolean | null;
+  localWifiOnly: boolean;
+  localCharging: boolean;
+  localWaiting: string | null;
   places: SongCachePlace[];
   place: string | null;
   settable: boolean;
@@ -1128,6 +1133,27 @@ export interface SongCacheSettings {
   place: string | null;
   localSongs: boolean | null;
   localParallel: number | null;
+  fetchWifiOnly: boolean | null;
+  downloadsWifiOnly: boolean | null;
+  localWifiOnly: boolean | null;
+  localCharging: boolean | null;
+}
+
+export interface UnmatchedSong {
+  key: string;
+  title: string;
+  artist: string;
+  file: string;
+  why: string;
+}
+
+export interface UnmatchedSongs {
+  songs: UnmatchedSong[];
+}
+
+export interface LocalLinkRequest {
+  key: string;
+  link: string;
 }
 
 export interface YoutubeAccount {

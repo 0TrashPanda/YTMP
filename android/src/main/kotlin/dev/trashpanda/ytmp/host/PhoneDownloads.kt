@@ -36,6 +36,8 @@ class PhoneDownloads(
     val files: SongFiles,
     private val scope: CoroutineScope,
     private val media: PhoneLibrary,
+    /** Waits until a download may start (on Wi-Fi, if the owner wants that). */
+    private val gate: suspend () -> Unit = {},
 ) : DownloadedSongs {
     private val running = ConcurrentHashMap<String, Deferred<Unit>>()
 
@@ -118,6 +120,7 @@ class PhoneDownloads(
             // Started once it's in [running], so it can't take itself out before it's there.
             scope.async(start = CoroutineStart.LAZY) {
                 try {
+                    gate()
                     saveNow(song)
                 } finally {
                     running.remove(song.id)

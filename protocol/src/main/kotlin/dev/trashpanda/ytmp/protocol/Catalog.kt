@@ -363,6 +363,15 @@ data class SongCacheStatus(
     val checkingOf: Int = 0,
     /** How many phone songs are looked up at once. */
     val localParallel: Int = 1,
+    /** Songs kept in the background (from their 2nd play) only on Wi-Fi; null where that isn't a setting. */
+    val fetchWifiOnly: Boolean? = null,
+    /** Downloads (song menu) wait for Wi-Fi; null where that isn't a setting. */
+    val downloadsWifiOnly: Boolean? = null,
+    /** Phone songs are looked up only on Wi-Fi / only while charging. */
+    val localWifiOnly: Boolean = false,
+    val localCharging: Boolean = false,
+    /** Why the lookups are waiting right now ("Wi-Fi", "charging"), or null. */
+    val localWaiting: String? = null,
     /** Where it can be kept (a phone: its own storage, an SD card); empty where that isn't a setting. */
     val places: List<SongCachePlace> = emptyList(),
     val place: String? = null,
@@ -378,4 +387,27 @@ data class SongCachePlace(val id: String, val name: String, val freeBytes: Long?
 
 @Serializable
 @SerialName("SongCacheSettings")
-data class SongCacheSettings(val maxBytes: Long, val place: String? = null, val localSongs: Boolean? = null, val localParallel: Int? = null)
+data class SongCacheSettings(
+    val maxBytes: Long,
+    val place: String? = null,
+    val localSongs: Boolean? = null,
+    val localParallel: Int? = null,
+    val fetchWifiOnly: Boolean? = null,
+    val downloadsWifiOnly: Boolean? = null,
+    val localWifiOnly: Boolean? = null,
+    val localCharging: Boolean? = null,
+)
+
+/** A phone song that has no YouTube Music match (`GET /api/cache/local/unmatched`), and why. */
+@Serializable
+@SerialName("UnmatchedSong")
+data class UnmatchedSong(val key: String, val title: String, val artist: String, val file: String, val why: String)
+
+@Serializable
+@SerialName("UnmatchedSongs")
+data class UnmatchedSongs(val songs: List<UnmatchedSong>)
+
+/** `POST /api/cache/local/link`: [link] (a YouTube Music link or video ID) is the song of the phone song [key]; empty: it isn't on YouTube Music. */
+@Serializable
+@SerialName("LocalLinkRequest")
+data class LocalLinkRequest(val key: String, val link: String)

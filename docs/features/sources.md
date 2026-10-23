@@ -179,7 +179,16 @@ without internet on the phone. It works by itself: there is nothing to pick.
   song with the same title, an artist in common and the same length (within 3 seconds); anything
   less sure is left out. A file that says which YouTube video it is, in its name (`Song [dQw4w9WgXcQ].mp3`,
   `Song-dQw4w9WgXcQ.mp3`) or in a tag with a YouTube link (what yt-dlp writes), is matched by that
-  instead, as long as its length agrees (within 10 seconds). Each file is looked up once and slowly (so YouTube doesn't block the
+  instead, as long as its length agrees (within 10 seconds). Files with no artist tag are matched by
+  such an ID too.
+- **Songs from this phone, in the settings:** *Lookups at once* (1, 2, 4 or 8), *Look up* (any time,
+  only on Wi-Fi, only while charging, or both), a progress bar, **Check again** (looks again at the
+  songs without a match), **Forget matches** and **Not found**: the songs without a match and why,
+  where you can paste a YouTube Music link or video ID to say which song it is, or skip it. What
+  you chose yourself stays when matches are forgotten.
+- **Mobile data:** songs kept in the background (from their 2nd play) wait for Wi-Fi by default
+  (*Keep songs in the background*); *Downloads* can wait for Wi-Fi too (the page says
+  "downloads when you're on Wi-Fi"); the app's update dialog warns when you're on mobile data. Each file is looked up once and slowly (so YouTube doesn't block the
   network), and the answer is kept. *Lookups at once* (1, 2, 4 or 8; 1 by default) makes it faster, with more risk of YouTube's bot check. The setting shows how far it is ("120 of 800 phone songs looked up · 95 found on YouTube Music"). They don't count toward the cache's size and are never removed.
 - Only songs from online sources (YouTube Music, later YouTube) are cached. Local music and
   media servers are already files.

@@ -26,12 +26,14 @@ export function fileNameFrom(disposition: string | null): string | null {
 
 /** Answers from the app, by song: one download per song at a time. */
 const waiting = new Map<string, (error: string | null) => void>();
+const waitingForWifi = new Map<string, () => void>();
 
-function inApp(song: Song): Promise<string | null> | null {
+function inApp(song: Song, onWaiting: () => void): Promise<string | null> | null {
 	const bridge = nativeBridge;
 	if (!bridge?.downloadSong) return null;
 	window.__ytmpNative = {
 		...window.__ytmpNative,
+		onDownloadWaiting: (songId) => waitingForWifi.get(songId)?.(),
 		onDownloaded: (songId, error) => {
 			waiting.get(songId)?.(error);
 			waiting.delete(songId);
@@ -39,7 +41,8 @@ function inApp(song: Song): Promise<string | null> | null {
 	};
 	return new Promise((resolve) => {
 		const before = waiting.get(song.id);
-		waiting.set(song.id, (error) => (before?.(error), resolve(error)));
+		waiting.set(song.id, (error) => (before?.(error), waitingForWifi.delete(song.id), resolve(error)));
+		waitingForWifi.set(song.id, onWaiting);
 		bridge.downloadSong!(JSON.stringify(song));
 	});
 }
@@ -59,7 +62,7 @@ async function inBrowser(song: Song): Promise<void> {
 /** Downloads [song], telling how it goes with [onToast]. */
 export async function downloadSong(song: Song, onToast: (text: string) => void): Promise<void> {
 	onToast(`Downloading "${song.title}"…`);
-	const app = inApp(song);
+	const app = inApp(song, () => onToast(`"${song.title}" downloads when you're on Wi-Fi`));
 	if (app) {
 		const error = await app;
 		onToast(error ? `Couldn't download "${song.title}": ${error}` : `Downloaded "${song.title}" to the Music folder`);

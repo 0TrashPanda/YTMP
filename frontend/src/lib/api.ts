@@ -1,6 +1,8 @@
 import type {
+	LocalLinkRequest,
 	SongCacheSettings,
 	SongCacheStatus,
+	UnmatchedSongs,
 	AlbumPage,
 	ApiError,
 	ArtistPage,
@@ -509,6 +511,22 @@ export function setSongCache(settings: SongCacheSettings): Promise<SongCacheStat
 
 export function clearSongCache(): Promise<SongCacheStatus> {
 	return request('/api/cache/clear', { method: 'POST' });
+}
+
+export function getUnmatchedSongs(): Promise<UnmatchedSongs> {
+	return request('/api/cache/local/unmatched');
+}
+
+export function recheckLocalSongs(): Promise<SongCacheStatus> {
+	return request('/api/cache/local/recheck', { method: 'POST' });
+}
+
+export function forgetLocalSongs(): Promise<SongCacheStatus> {
+	return request('/api/cache/local/forget', { method: 'POST' });
+}
+
+export function linkLocalSong(link: LocalLinkRequest): Promise<SongCacheStatus> {
+	return request('/api/cache/local/link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(link) });
 }
 
 /** Audio streamed through the host, for when the direct stream URL doesn't work. */
