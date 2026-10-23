@@ -593,6 +593,7 @@ class NativePlayer implements RoomPlayer {
 				alone: this.room.listeningAlone,
 				volume: this.volume,
 				headphones: saved.headphonesAction,
+				skipSilence: saved.skipSilence,
 				// So the app can follow the room itself while this page is frozen in the background.
 				room: this.followableRoom(),
 				// The sleep timer pauses a solo room (in a shared room it only stops playing here).

@@ -171,3 +171,12 @@ skipped, most on a TV. Now a new song waits for the players, like Sonos or Spoti
 For sub-millisecond multi-room sync, the plan is a [Snapcast output](../features/future-ideas.md#snapcast-output)
 rather than building it into YTMP.
 
+## Skip silence
+
+`PlaybackTarget.skipSilence` (the page's `saved.skipSilence`) turns on ExoPlayer's
+`skipSilenceEnabled` for an episode when `alone`. `AudioClock` reads the audio sink's media
+position, which counts the skipped silence, so the device runs ahead of the room; the existing
+alone rule (`correct`: drift over `ALONE_ROOM_TOLERANCE_MS` and up to `MAX_ROOM_FOLLOW_MS` makes the
+room `Seek` to this device, and `followRoomJump` sees it follow) keeps the room up with it. Not
+verified on a device yet.
+

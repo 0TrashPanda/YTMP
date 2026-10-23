@@ -131,6 +131,29 @@ class RoomTest {
     }
 
     @Test
+    fun `each podcast starts at the speed it was last played at`() = runTest {
+        val room = newRoom()
+        val anna = room.connect()
+        fun episode(n: Int, podcast: String) = Song("ytm:ep$n", "Episode $n", emptyList(), null, 10 * 60_000L, emptyList(), podcast = PodcastRef(podcast, podcast))
+        room.run(anna, Command.AddSongs(listOf(episode(1, "news"), episode(2, "talk"), episode(3, "news"), episode(4, "other")), QueuePosition.END))
+        runCurrent()
+        room.run(anna, Command.SetSpeed(1.5)) // the news at 1.5
+        room.run(anna, Command.Skip())
+        runCurrent()
+        // The next podcast has no speed of its own yet: it goes on at the last one used.
+        assertEquals("ytm:ep2", anna.state.nowPlaying?.item?.song?.id)
+        assertEquals(1.5, anna.state.playback.speed)
+        room.run(anna, Command.SetSpeed(1.0)) // the talk at normal speed
+        room.run(anna, Command.Skip())
+        runCurrent()
+        // The news again: at its own speed, not the talk's.
+        assertEquals("ytm:ep3", anna.state.nowPlaying?.item?.song?.id)
+        assertEquals(1.5, anna.state.playback.speed)
+        // Kept with the room.
+        assertEquals(mapOf("news" to 1.5, "talk" to 1.0), room.save().podcastSpeeds)
+    }
+
+    @Test
     fun `a client that follows the events has the room the host has`() = runTest {
         val room = newRoom()
         val anna = room.connect()

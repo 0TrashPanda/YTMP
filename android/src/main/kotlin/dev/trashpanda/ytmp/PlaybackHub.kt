@@ -33,6 +33,8 @@ data class PlaybackTarget(
     val volume: Float,
     /** What unplugging headphones (or Bluetooth disconnecting) does: "pause", "stop" (playing here) or "keep" (playing). */
     val headphones: String = "stop",
+    /** Skip the silent parts of an episode when listening alone (Settings → Playback); the room follows this device. */
+    val skipSilence: Boolean = false,
     /** The room this is from, so the app can follow it itself (see [RoomFollower]). */
     val room: RoomLink? = null,
     /** Next (notification, lock screen) while paused plays the next song (Settings → Playback). */

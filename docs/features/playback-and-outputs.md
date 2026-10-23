@@ -138,6 +138,14 @@ Changes the sound of **your own device's playback**, like a phone's or a car's e
 - In a browser, with the equalizer on, songs whose own link doesn't allow it come from your
   own module or through the host instead (see [implementation](../implementation/playback-sync.md#equalizer-in-a-browser)).
 
+## Skip silence in podcasts ✅
+
+*Settings → Playback → Skip silence in podcasts* (the app, off by default) skips the quiet
+parts of an episode. Only while you're the only one listening: the room's position follows
+your phone, as it does when your phone starts a song a moment late. With others listening,
+or music playing, nothing is skipped. Not tried on a phone yet (see
+[playback sync](../implementation/playback-sync.md)).
+
 ## Sleep timer ✅
 
 Stops the music automatically, for example when falling asleep. Like YouTube Music's, it's

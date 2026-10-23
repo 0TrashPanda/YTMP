@@ -159,6 +159,13 @@ export const saved = {
 		write('ytmp.tabOrder', value);
 	},
 	/** Next while paused plays the next song (like YouTube Music), or keeps the room paused. */
+	/** The app skips silent parts of podcast episodes, when you listen alone (Settings → Playback). */
+	get skipSilence(): boolean {
+		return read('ytmp.skipSilence') === '1';
+	},
+	set skipSilence(on: boolean) {
+		write('ytmp.skipSilence', on ? '1' : '0');
+	},
 	get nextPlays(): boolean {
 		return read('ytmp.nextPlays') !== '0';
 	},

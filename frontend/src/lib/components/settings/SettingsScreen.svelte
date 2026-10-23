@@ -110,6 +110,7 @@
 		saved.pageSize = size;
 	}
 	let nextPlays = $state(saved.nextPlays);
+	let skipSilence = $state(saved.skipSilence);
 	const qualityOptions: [ImageQuality, string][] = [
 		['high', 'High'],
 		['low', 'Low']
@@ -190,6 +191,20 @@
 				{#if !inApp}
 					<OwnModuleSection {onToast} />
 				{:else}
+				<Choice
+					label="Skip silence in podcasts"
+					hint="Skips the quiet parts of an episode, so it takes less time. Only when you're the only one listening: the room follows you."
+					options={[
+						['off', 'Off'],
+						['on', 'On']
+					] as ['off' | 'on', string][]}
+					value={skipSilence ? 'on' : 'off'}
+					onchange={(v) => {
+						skipSilence = v === 'on';
+						saved.skipSilence = skipSilence;
+						window.dispatchEvent(new Event('ytmp:settings'));
+					}}
+				/>
 				<Choice
 					label="Headphones disconnected"
 					hint="Pause only pauses the room when you're the only one listening; otherwise it stops playing here."

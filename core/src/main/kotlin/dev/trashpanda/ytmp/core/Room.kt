@@ -155,6 +155,8 @@ class Room(
 
     /** The speed podcast episodes play at ([Command.SetSpeed]); music always plays at 1. */
     private var episodeSpeed = 1.0
+    /** The speed each podcast was last played at (podcast ID -> speed): its next episodes start at it. */
+    private val podcastSpeeds = LinkedHashMap<String, Double>()
 
     private val skipVote = SkipVote()
     private val limits = QueueLimits(clock)
@@ -551,6 +553,7 @@ class Room(
             repeat = repeat,
             runStart = runStart,
             episodeSpeed = episodeSpeed,
+            podcastSpeeds = podcastSpeeds.toMap(),
         )
     }
 
@@ -578,6 +581,7 @@ class Room(
         repeat = saved.repeat
         runStart = saved.runStart
         episodeSpeed = saved.episodeSpeed.takeIf { isEpisodeSpeed(it) } ?: 1.0
+        saved.podcastSpeeds.filterValues(::isEpisodeSpeed).forEach { (id, speed) -> podcastSpeeds[id] = speed }
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay.items += saved.autoplay
         autoplay.seed = saved.autoplaySeed
@@ -870,6 +874,11 @@ class Room(
                 need(member, Permission.PLAY_PAUSE)?.let { return it }
                 if (!isEpisodeSpeed(command.speed)) return invalid("Episodes play at 0.5× to 2×, in steps of 0.05")
                 episodeSpeed = command.speed
+                current?.song?.podcast?.let { podcast ->
+                    podcastSpeeds.remove(podcast.id)
+                    podcastSpeeds[podcast.id] = command.speed
+                    while (podcastSpeeds.size > MAX_PODCAST_SPEEDS) podcastSpeeds.remove(podcastSpeeds.keys.first())
+                }
                 // Only an episode changes speed; music plays at 1 (the speed waits for the next episode).
                 if (current?.song?.podcast != null && playback.rate != episodeSpeed) {
                     playback.setRate(episodeSpeed, moving = playingNow())
@@ -1835,7 +1844,10 @@ class Room(
     )
 
     /** How fast [item] plays: an episode at the room's episode speed, music at 1. */
-    private fun speedOf(item: QueueItem?) = if (item?.song?.podcast != null) episodeSpeed else 1.0
+    private fun speedOf(item: QueueItem?): Double {
+        val podcast = item?.song?.podcast ?: return 1.0
+        return podcastSpeeds[podcast.id] ?: episodeSpeed
+    }
 
     private fun snapshot() = RoomState(
         room = info,
@@ -1880,6 +1892,8 @@ class Room(
         const val MAX_URL_LENGTH = 300
         /** A clone's queue (and autoplay queue) keeps at most this many songs. */
         const val MAX_CLONE_QUEUE = 1000
+        /** How many podcasts' speeds a room remembers. */
+        const val MAX_PODCAST_SPEEDS = 100
         const val MAX_MIGRANTS = 200
         /** Party screens one room can have. */
         const val MAX_SCREENS = 5

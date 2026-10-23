@@ -165,7 +165,9 @@ YTMP plays YouTube Music's podcasts like YTM does:
 - **New episodes** on Home (with a YouTube Music sign-in): the first row is the newest episodes
   of the podcasts you're subscribed to, from YouTube Music's own New episodes list.
 - **Playback speed**: the speed button next to the controls while an episode plays (0.5× to
-  2×: the usual speeds, or one typed in steps of 0.05), for **everyone in the room**, kept for the next episodes; music always plays at 1×.
+  2×: the usual speeds, or one typed in steps of 0.05), for **everyone in the room**; music always plays at 1×.
+  Each **podcast keeps its own speed**: its next episodes start at the speed it was last
+  played at, and a podcast not played before starts at the last speed used.
   Chromecasts play along at that speed; Sonos speakers, MPDs and amplifier zones can't, so
   they pause during an episode played faster or slower (the room says so).
 

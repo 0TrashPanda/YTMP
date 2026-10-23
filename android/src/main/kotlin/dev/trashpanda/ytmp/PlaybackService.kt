@@ -452,6 +452,8 @@ class PlaybackService : MediaSessionService() {
         }
         exo.volume = target.volume * sleepFade
         exo.setHandleAudioBecomingNoisy(target.headphones != "keep")
+        // Skipping silence moves this device ahead of the room; alone, the room follows (see [correct]).
+        exo.skipSilenceEnabled = target.skipSilence && target.alone && target.item?.song?.podcast != null
         if (!target.playing || !target.alone) pausingRoom = false
         followRoomJump(target)
         correct(target)

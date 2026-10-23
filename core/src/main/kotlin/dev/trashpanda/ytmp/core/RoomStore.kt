@@ -66,6 +66,8 @@ data class SavedRoom(
     val runStart: String? = null,
     /** The speed episodes play at ([Command.SetSpeed]). */
     val episodeSpeed: Double = 1.0,
+    /** The speed each podcast was last played at (podcast ID -> speed). */
+    val podcastSpeeds: Map<String, Double> = emptyMap(),
     /** Codes the room had before ([Command.SetRoomCode]): they still lead to it. Newest first. */
     val formerCodes: List<String> = emptyList(),
 ) {
