@@ -69,6 +69,7 @@ internal fun Route.roomRoutes(host: HostContext) = with(host) {
         val request = call.receive<CreateRoomRequest>()
         val token = call.bearerToken()
         val account = call.account()
+        options.roomCreateDenied(account)?.let { throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, it) }
         // The creator's own roles, if they saved a template to their account (a clone keeps the
         // room's), and their default room password.
         val template = if (account != null && token != null) options.auth.roleTemplate(token) else null

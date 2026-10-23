@@ -145,6 +145,12 @@ class Database private constructor(private val url: String, private val user: St
                     PRIMARY KEY (account_id, episode_id)
                 )""",
             ),
+            // 8: accounts can be disabled (0: not; -1: until an admin enables it; else until that time), and what admins did
+            listOf(
+                "ALTER TABLE accounts ADD COLUMN disabled_until BIGINT NOT NULL DEFAULT 0",
+                "CREATE TABLE audit_log (id VARCHAR(32) PRIMARY KEY, at BIGINT NOT NULL, actor VARCHAR(64) NOT NULL, action VARCHAR(64) NOT NULL, target VARCHAR(128) NOT NULL, detail TEXT NOT NULL)",
+                "CREATE INDEX audit_log_at ON audit_log (at)",
+            ),
         )
 
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {

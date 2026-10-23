@@ -19,9 +19,32 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
         val displayName: String,
         val passwordHash: String,
         val isAdmin: Boolean,
-    )
+        /** 0: enabled; -1: disabled until an admin enables it; else disabled until that time (ms). */
+        val disabledUntil: Long = 0,
+    ) {
+        fun disabledAt(now: Long) = disabledUntil == Accounts.FOREVER || disabledUntil > now
+    }
 
     class AccountException(message: String) : Exception(message)
+
+    /**
+     * Disables an account until [until] (ms), or until an admin enables it ([FOREVER]); 0 enables
+     * it. A disabled account is logged out everywhere and can't log in. Not the only enabled admin.
+     */
+    fun setDisabledUntil(accountId: String, until: Long) = db.transaction { c ->
+        if (until != 0L) {
+            val others = c.createStatement().use { s ->
+                s.executeQuery("SELECT id, disabled_until FROM accounts WHERE is_admin = TRUE").use { rows ->
+                    buildList { while (rows.next()) add(rows.getString(1) to rows.getLong(2)) }
+                }
+            }.filter { (id, disabled) -> id != accountId && !(disabled == FOREVER || disabled > clock()) }
+            val isAdmin = c.findBy("id", accountId)?.isAdmin == true
+            if (isAdmin && others.isEmpty()) throw AccountException("This is the only server admin that isn't disabled. Make someone else admin first.")
+        }
+        c.prepareStatement("UPDATE accounts SET disabled_until = ? WHERE id = ?").use { it.setLong(1, until); it.setString(2, accountId); it.executeUpdate() }
+        if (until != 0L) c.prepareStatement("DELETE FROM sessions WHERE account_id = ?").use { it.setString(1, accountId); it.executeUpdate() }
+        Unit
+    }
 
     fun count(): Int = db.use { c -> c.createStatement().use { s -> s.executeQuery("SELECT COUNT(*) FROM accounts").use { it.next(); it.getInt(1) } } }
 
@@ -154,7 +177,8 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
             it.executeQuery().use { rows -> if (rows.next()) rows.getString(1) else null }
         } ?: return@use null
         c.prepareStatement("UPDATE sessions SET last_used = ? WHERE token_hash = ?").use { it.setLong(1, clock()); it.setString(2, sha256(token)); it.executeUpdate() }
-        c.findBy("id", accountId)
+        // A disabled account's sessions are gone already; this is for one disabled for a while that kept one.
+        c.findBy("id", accountId)?.takeIf { !it.disabledAt(clock()) }
     }
 
     fun endSession(token: String) = db.use { c ->
@@ -286,6 +310,7 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
         displayName = getString("display_name"),
         passwordHash = getString("password_hash"),
         isAdmin = getBoolean("is_admin"),
+        disabledUntil = getLong("disabled_until"),
     )
 
     private fun checkPassword(password: String) {
@@ -294,6 +319,8 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
     }
 
     companion object {
+        /** [Account.disabledUntil] of an account disabled until an admin enables it. */
+        const val FOREVER = -1L
         private val USERNAME = Regex("[a-z0-9._-]{2,32}")
         private val DUMMY_HASH by lazy { Passwords.hash("not a real password") }
 

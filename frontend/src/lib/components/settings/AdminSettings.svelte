@@ -55,13 +55,19 @@
 		roomCodeLength: (v) => String(v),
 		audioProxy: (v) => v,
 		cacheBytes: (v) => (v ? `${Math.round((v / GB) * 100) / 100} GB` : 'off'),
-		logLevel: (v) => v
+		logLevel: (v) => v,
+		roomCreate: (v) => v
 	};
 
 	const signupOptions: [SignupMode, string][] = [
 		['open', 'Anyone'],
 		['invite', 'Invite link'],
 		['admin', 'Admins only']
+	];
+	const createOptions: [string, string][] = [
+		['everyone', 'Everyone'],
+		['accounts', 'People with an account'],
+		['admins', 'Server admins']
 	];
 	const styleOptions: [string, string][] = [
 		['letters', 'Letters'],
@@ -153,6 +159,8 @@
 			<NumberField value={v.roomCodeLength} min={3} max={8} label="Code length" disabled={busy} onchange={(n) => set('roomCodeLength', n)} />
 		</div>
 		{@render fromFile('roomCodeLength')}
+		<Choice label="Who can create rooms" hint="Joining a room is never limited by this. Rooms that exist stay." options={createOptions} value={v.roomCreate} onchange={(x) => set('roomCreate', x)} />
+		{@render fromFile('roomCreate')}
 	</section>
 
 	<section class={card}>

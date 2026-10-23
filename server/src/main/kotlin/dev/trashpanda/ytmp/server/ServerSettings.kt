@@ -24,6 +24,7 @@ class ServerSettings(private val accounts: Accounts, config: Config) {
         audioProxy = config.audio.proxy.lowercase(),
         cacheBytes = config.cache.bytes(),
         logLevel = config.logs.level.lowercase(),
+        roomCreate = config.rooms.create.lowercase(),
     )
 
     @Volatile
@@ -67,6 +68,7 @@ class ServerSettings(private val accounts: Accounts, config: Config) {
         audioProxy = o.audioProxy ?: file.audioProxy,
         cacheBytes = o.cacheBytes ?: file.cacheBytes,
         logLevel = o.logLevel ?: file.logLevel,
+        roomCreate = o.roomCreate ?: file.roomCreate,
     )
 
     /** [o] with its values checked and tidied. */
@@ -79,9 +81,11 @@ class ServerSettings(private val accounts: Accounts, config: Config) {
         require((o.cacheBytes ?: 0) >= 0) { "The song cache can't be smaller than 0" }
         val level = o.logLevel?.trim()?.lowercase()
         require(level == null || level in LOG_LEVELS) { "The log level is info or debug" }
+        val create = o.roomCreate?.trim()?.lowercase()
+        require(create == null || create in ROOM_CREATE) { "Rooms can be created by everyone, accounts or admins" }
         val trusted = o.trusted?.map { it.trim().trimEnd('/') }?.filter { it.isNotEmpty() }?.distinct()
         trusted?.forEach { require(it.startsWith("http://") || it.startsWith("https://")) { "\"$it\" isn't a web address (http:// or https://)" } }
-        return o.copy(roomCodeStyle = style, audioProxy = proxy, logLevel = level, trusted = trusted)
+        return o.copy(roomCodeStyle = style, audioProxy = proxy, logLevel = level, trusted = trusted, roomCreate = create)
     }
 
     companion object {
@@ -89,6 +93,7 @@ class ServerSettings(private val accounts: Accounts, config: Config) {
         private const val SETTING = "server_settings"
         val CODE_LENGTHS = 3..8
         private val LOG_LEVELS = setOf("info", "debug")
+        val ROOM_CREATE = setOf("everyone", "accounts", "admins")
     }
 }
 

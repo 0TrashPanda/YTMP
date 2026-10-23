@@ -227,6 +227,8 @@ data class RoomsConfig(
     val codeStyle: String = "letters",
     @SerialName("code_length")
     val codeLength: Int = 4,
+    /** Who may create rooms: everyone | accounts | admins. */
+    val create: String = "everyone",
 ) {
     fun style(): RoomCodeStyle = RoomCodeStyle.valueOf(codeStyle.uppercase())
 }

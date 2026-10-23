@@ -101,6 +101,23 @@
 		}, `${a.displayName} is logged out everywhere.`);
 	}
 
+	const disabled = (a: AdminAccountInfo) => a.disabledUntil === -1 || a.disabledUntil > Date.now();
+
+	/** Disable for a while ([minutes]) or until enabled again (null). */
+	function disable(a: AdminAccountInfo, minutes: number | null) {
+		attempt(async () => {
+			await authServer.disableAccount(a.username, minutes);
+			await load();
+		}, `${a.displayName} is disabled and logged out everywhere.`);
+	}
+
+	function enable(a: AdminAccountInfo) {
+		attempt(async () => {
+			await authServer.enableAccount(a.username);
+			await load();
+		}, `${a.displayName} can log in again.`);
+	}
+
 	function remove(a: AdminAccountInfo) {
 		if (!confirm(`Delete the account ${a.username}? Its listening history, settings and rooms go too. This can't be undone.`)) return;
 		attempt(async () => {
@@ -125,6 +142,7 @@
 						{a.displayName}
 						<span class="text-sm text-muted">{a.username}{a.username === me.username ? ' · you' : ''}</span>
 						{#if a.isAdmin}<span class="ml-1 rounded bg-white/15 px-1.5 py-0.5 text-xs">Admin</span>{/if}
+						{#if disabled(a)}<span class="ml-1 rounded bg-red-500/30 px-1.5 py-0.5 text-xs">Disabled{a.disabledUntil > 0 ? ` until ${new Date(a.disabledUntil).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}</span>{/if}
 					</span>
 					<span class="block truncate text-xs text-muted">
 						{a.lastSeen ? `Seen ${timeAgo(a.lastSeen)}` : 'Not logged in'}{a.logins > 1 ? ` · ${a.logins} devices` : ''}
@@ -149,6 +167,20 @@
 						<input class="{input} min-w-0 flex-1 py-2" type="password" bind:value={newPassword} placeholder="New password" autocomplete="new-password" aria-label="New password" />
 						<button class={small} disabled={busy || !newPassword}>Set</button>
 					</form>
+					<div class="flex flex-col gap-2">
+						<p class="text-sm font-medium">Disable</p>
+						<p class="text-xs text-muted">Logs it out everywhere and stops it logging in, for a while or until you enable it. Its listening history, settings and rooms stay.</p>
+						{#if disabled(a)}
+							<div><button class={small} disabled={busy} onclick={() => enable(a)}>Enable again</button></div>
+						{:else if a.username !== me.username}
+							<div class="flex flex-wrap gap-2">
+								<button class={small} disabled={busy} onclick={() => disable(a, 60)}>1 hour</button>
+								<button class={small} disabled={busy} onclick={() => disable(a, 24 * 60)}>1 day</button>
+								<button class={small} disabled={busy} onclick={() => disable(a, 7 * 24 * 60)}>1 week</button>
+								<button class={small} disabled={busy} onclick={() => disable(a, null)}>Until I enable it</button>
+							</div>
+						{/if}
+					</div>
 					<div class="flex flex-wrap gap-2">
 						<button class={small} disabled={busy || a.logins === 0} onclick={() => logOut(a)}>Log out everywhere</button>
 						<button class="{small} text-red-400" disabled={busy} onclick={() => remove(a)}>Delete account</button>

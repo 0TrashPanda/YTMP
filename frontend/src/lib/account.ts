@@ -21,6 +21,7 @@ import type {
 	InviteListResponse,
 	UpdateAccountRequest,
 	AdminSettings,
+	AuditLogResponse,
 	ServerSettingOverrides,
 	AdminRoomList,
 	ServerAbout,
@@ -146,6 +147,11 @@ export const authServer = {
 		call<AccountInfo>(`/api/admin/accounts/${encodeURIComponent(username)}`, { displayName: null, isAdmin: null, ...change }, 'PUT'),
 	setPassword: (username: string, password: string) =>
 		call<null>(`/api/admin/accounts/${encodeURIComponent(username)}/password`, { password }),
+	/** Disables an account for [minutes], or (null) until it is enabled again. */
+	disableAccount: (username: string, minutes: number | null) =>
+		call<AccountInfo>(`/api/admin/accounts/${encodeURIComponent(username)}/disable`, { minutes }),
+	enableAccount: (username: string) => call<AccountInfo>(`/api/admin/accounts/${encodeURIComponent(username)}/enable`, {}),
+	auditLog: async () => (await call<AuditLogResponse>('/api/admin/audit')).entries,
 	logOutEverywhere: (username: string) => call<null>(`/api/admin/accounts/${encodeURIComponent(username)}/logout`, {}),
 	deleteAccount: (username: string) => call<null>(`/api/admin/accounts/${encodeURIComponent(username)}`, undefined, 'DELETE'),
 	createInvite: () => call<InviteResponse>('/api/admin/invites', {}),

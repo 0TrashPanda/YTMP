@@ -95,6 +95,8 @@ data class AdminAccountInfo(
     val lastSeen: Long? = null,
     /** How many devices are logged in to it here. */
     val logins: Int = 0,
+    /** 0: enabled; -1: disabled until an admin enables it; else disabled until then (ms). */
+    val disabledUntil: Long = 0,
 )
 
 /** `GET /api/admin/accounts` */
@@ -106,6 +108,20 @@ data class AccountListResponse(val accounts: List<AdminAccountInfo>)
 @Serializable
 @SerialName("CreateAccountRequest")
 data class CreateAccountRequest(val username: String, val password: String, val displayName: String? = null, val isAdmin: Boolean = false)
+
+/** `POST /api/admin/accounts/{username}/disable`: for [minutes], or (null) until it is enabled again. */
+@Serializable
+@SerialName("DisableAccountRequest")
+data class DisableAccountRequest(val minutes: Long? = null)
+
+/** One thing a server admin did (`GET /api/admin/audit`). */
+@Serializable
+@SerialName("AuditEntry")
+data class AuditEntry(val at: Long, val actor: String, val action: String, val target: String, val detail: String)
+
+@Serializable
+@SerialName("AuditLogResponse")
+data class AuditLogResponse(val entries: List<AuditEntry>)
 
 /** `PUT /api/admin/accounts/{username}`: what to change (null: leave it). */
 @Serializable
@@ -155,6 +171,8 @@ data class ServerSettingValues(
     val cacheBytes: Long,
     /** info | debug */
     val logLevel: String,
+    /** Who may create rooms: everyone | accounts | admins. */
+    val roomCreate: String = "everyone",
 )
 
 /** The same settings as [ServerSettingValues], as set on the admin page: null means "as in ytmp.toml". */
@@ -170,6 +188,7 @@ data class ServerSettingOverrides(
     val audioProxy: String? = null,
     val cacheBytes: Long? = null,
     val logLevel: String? = null,
+    val roomCreate: String? = null,
 )
 
 /** `GET`/`PUT /api/admin/settings` (`PUT` sends [ServerSettingOverrides]). */

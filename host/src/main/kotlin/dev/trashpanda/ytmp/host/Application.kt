@@ -138,6 +138,8 @@ data class HostOptions(
      * of [auth]. A server setting (`accounts.guests = false`, or its admin page), so it can change while running.
      */
     val accountsOnly: () -> Boolean = { false },
+    /** Whether [account] (null: a guest) may create a room here: null when so, else why not (a server setting). */
+    val roomCreateDenied: (account: AccountIdentity?) -> String? = { null },
     /**
      * `/api/me/…` (your YouTube Music) may be used by pages of other hosts (CORS): the pages of
      * rooms on someone else's phone or server use your account's YouTube Music here. A server.

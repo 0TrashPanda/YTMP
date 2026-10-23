@@ -332,6 +332,7 @@ class AccountService(
                 throw ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Wrong username or password")
             }
             throttle.succeeded(name)
+            if (account.disabledAt(clock())) throw forbidden(disabledMessage(account))
             call.respond(SessionResponse(io { accounts.newSession(account.id) }, toInfo(account)))
         }
 
@@ -449,6 +450,13 @@ class AccountService(
     }
 
     private fun notLoggedIn() = ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Not logged in")
+
+    /** Why a disabled account can't log in. */
+    private fun disabledMessage(account: Accounts.Account): String {
+        if (account.disabledUntil == Accounts.FOREVER) return "This account is disabled. Ask a server admin."
+        val minutes = ((account.disabledUntil - clock()) / 60_000).coerceAtLeast(1)
+        return "This account is disabled for another ${if (minutes >= 120) "${minutes / 60} hours" else "$minutes minutes"}."
+    }
 
     private fun forbidden(message: String) = ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, message)
 

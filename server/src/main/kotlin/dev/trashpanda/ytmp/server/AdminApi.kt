@@ -5,6 +5,8 @@ import dev.trashpanda.ytmp.host.ApiException
 import dev.trashpanda.ytmp.protocol.AccountListResponse
 import dev.trashpanda.ytmp.protocol.AdminAccountInfo
 import dev.trashpanda.ytmp.protocol.AdminRoomList
+import dev.trashpanda.ytmp.protocol.AuditLogResponse
+import dev.trashpanda.ytmp.protocol.DisableAccountRequest
 import dev.trashpanda.ytmp.protocol.CreateAccountRequest
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.InviteInfo
@@ -46,6 +48,8 @@ class AdminApi(
     /** Null: no settings to change (tests). */
     private val settings: ServerSettings? = null,
     private val versions: Versions? = null,
+    /** What admins do is written here (the admin page's Log). Null: not kept (tests). */
+    private val audit: AuditLog? = null,
 ) {
     private val accounts get() = service.accounts
 
@@ -58,8 +62,9 @@ class AdminApi(
         post("/admin/accounts") {
             service.admin(call)
             val request = call.receive<CreateAccountRequest>()
+            val admin = service.admin(call)
             val account = io { service.accountCall { accounts.create(request.username, request.password, request.displayName, admin = request.isAdmin) } }
-            log.info("Account {} created on the admin page{}", account.username, if (account.isAdmin) " (server admin)" else "")
+            audit?.record(admin.username, "Created account", account.username, if (account.isAdmin) "server admin" else "")
             call.respond(service.toInfo(account))
         }
 
@@ -75,31 +80,58 @@ class AdminApi(
                 }
                 accounts.byId(account.id)!!
             }
-            if (request.isAdmin != null) log.info("{}: {} is {} server admin", admin.username, account.username, if (account.isAdmin) "now" else "no longer")
+            if (request.isAdmin != null) audit?.record(admin.username, if (account.isAdmin) "Made server admin" else "Removed server admin", account.username)
+            if (request.displayName != null) audit?.record(admin.username, "Renamed account", account.username, "now \"${account.displayName}\"")
             call.respond(service.toInfo(account))
         }
 
         post("/admin/accounts/{username}/password") {
-            service.admin(call)
+            val admin = service.admin(call)
             val request = call.receive<SetPasswordRequest>()
-            io {
+            val account = io {
                 val account = call.target()
                 service.accountCall { accounts.setPassword(account.id, request.password) }
+                account
             }
+            audit?.record(admin.username, "Set a new password", account.username)
             call.respond(HttpStatusCode.NoContent)
+        }
+
+        // Disable: for a while, or until enabled again. Logs it out everywhere; it can't log in meanwhile.
+        post("/admin/accounts/{username}/disable") {
+            val admin = service.admin(call)
+            val request = call.receive<DisableAccountRequest>()
+            if (request.minutes != null && request.minutes !in 1..MAX_DISABLE_MINUTES) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Disable for 1 minute to ${MAX_DISABLE_MINUTES / 60 / 24} days, or until you enable it")
+            val account = io { call.target() }
+            if (account.id == admin.id) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "You can't disable your own account")
+            val until = request.minutes?.let { System.currentTimeMillis() + it * 60_000 } ?: Accounts.FOREVER
+            io { service.accountCall { accounts.setDisabledUntil(account.id, until) } }
+            audit?.record(admin.username, "Disabled account", account.username, request.minutes?.let { "for $it minutes" } ?: "until enabled")
+            call.respond(service.toInfo(io { accounts.byId(account.id)!! }))
+        }
+
+        post("/admin/accounts/{username}/enable") {
+            val admin = service.admin(call)
+            val account = io { call.target() }
+            io { service.accountCall { accounts.setDisabledUntil(account.id, 0) } }
+            audit?.record(admin.username, "Enabled account", account.username)
+            call.respond(service.toInfo(io { accounts.byId(account.id)!! }))
         }
 
         // Log out on every device (logins here; tokens rooms already have last until they expire).
         post("/admin/accounts/{username}/logout") {
-            service.admin(call)
-            io { accounts.endSessions(call.target().id) }
+            val admin = service.admin(call)
+            val account = io { call.target() }
+            io { accounts.endSessions(account.id) }
+            audit?.record(admin.username, "Logged out everywhere", account.username)
             call.respond(HttpStatusCode.NoContent)
         }
 
         delete("/admin/accounts/{username}") {
-            service.admin(call)
+            val admin = service.admin(call)
             val account = io { call.target() }
             io { service.accountCall { service.delete(account) } }
+            audit?.record(admin.username, "Deleted account", account.username)
             // Its rooms here go too: the account is gone, and someone could sign up with its name.
             val id = service.toInfo(account).id
             rooms.all().filter { it.ownerAccount == id }.forEach { rooms.close(it.code) }
@@ -116,12 +148,14 @@ class AdminApi(
         post("/admin/invites") {
             val admin = service.admin(call)
             val (code, expires) = io { accounts.newInvite(admin.id, AccountService.INVITE_LIFETIME.inWholeMilliseconds) }
+            audit?.record(admin.username, "Made an invite link")
             call.respond(InviteResponse(code, expires))
         }
 
         delete("/admin/invites/{id}") {
-            service.admin(call)
+            val admin = service.admin(call)
             if (!io { accounts.deleteInvite(call.parameters["id"]!!) }) throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No such invite link")
+            audit?.record(admin.username, "Revoked an invite link")
             call.respond(HttpStatusCode.NoContent)
         }
 
@@ -143,7 +177,7 @@ class AdminApi(
                     throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "Invalid")
                 }
             }
-            log.info("{} changed the server settings", admin.username)
+            audit?.record(admin.username, "Changed the server settings", detail = new.toString())
             call.respond(settings.admin)
         }
 
@@ -156,8 +190,13 @@ class AdminApi(
             val admin = service.admin(call)
             val room = rooms[call.parameters["code"]!!] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No such room")
             rooms.close(room.code)
-            log.info("{} closed room {} ({}) on the admin page", admin.username, room.code, room.name)
+            audit?.record(admin.username, "Closed room", room.code, room.name)
             call.respond(HttpStatusCode.NoContent)
+        }
+
+        get("/admin/audit") {
+            service.admin(call)
+            call.respond(AuditLogResponse(audit?.recent().orEmpty()))
         }
 
         get("/admin/about") {
@@ -182,7 +221,7 @@ class AdminApi(
         return accounts.list().map { account ->
             val info = service.toInfo(account)
             val seen = activity[account.id]
-            AdminAccountInfo(info.id, info.username, info.displayName, info.isAdmin, seen?.createdAt ?: 0, seen?.lastSeen, seen?.logins ?: 0)
+            AdminAccountInfo(info.id, info.username, info.displayName, info.isAdmin, seen?.createdAt ?: 0, seen?.lastSeen, seen?.logins ?: 0, account.disabledUntil)
         }
     }
 
@@ -195,6 +234,8 @@ class AdminApi(
 
     private companion object {
         val log = LoggerFactory.getLogger(AdminApi::class.java)
+        /** 30 days. */
+        const val MAX_DISABLE_MINUTES = 30L * 24 * 60
     }
 }
 

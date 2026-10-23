@@ -10,7 +10,9 @@ import dev.trashpanda.ytmp.protocol.AccountInfo
 import dev.trashpanda.ytmp.protocol.AccountListResponse
 import dev.trashpanda.ytmp.protocol.AdminRoomList
 import dev.trashpanda.ytmp.protocol.AdminSettings
+import dev.trashpanda.ytmp.protocol.AuditLogResponse
 import dev.trashpanda.ytmp.protocol.AuthServerRef
+import dev.trashpanda.ytmp.protocol.DisableAccountRequest
 import dev.trashpanda.ytmp.protocol.CreateAccountRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
@@ -76,8 +78,17 @@ class AdminApiTest {
         application {
             ytmpModule(
                 rooms, HostSources({ _, _ -> SearchPage(emptyList()) }),
-                HostOptions(kind = HostKind.SERVER, auth = auth, accountsOnly = { !settings.values.guests }),
-                extraApi = { service.routes(this); AdminApi(service, rooms, settings).routes(this) },
+                HostOptions(
+                    kind = HostKind.SERVER, auth = auth, accountsOnly = { !settings.values.guests },
+                    roomCreateDenied = { account ->
+                        when (settings.values.roomCreate) {
+                            "accounts" -> if (account == null) "Log in" else null
+                            "admins" -> if (account?.id?.substringBefore('@')?.let(service.accounts::find)?.isAdmin == true) null else "Only admins"
+                            else -> null
+                        }
+                    },
+                ),
+                extraApi = { service.routes(this); AdminApi(service, rooms, settings, audit = AuditLog(db)).routes(this) },
             )
         }
         return Server(service, settings, rooms, db)
@@ -113,6 +124,53 @@ class AdminApiTest {
     }
 
     private suspend fun HttpClient.accounts(admin: String) = send("GET", "/api/admin/accounts", admin).body<AccountListResponse>().accounts
+
+    @Test
+    fun `a disabled account is logged out and can't log in until enabled, and the log says who did it`() = testApplication {
+        setup()
+        val client = jsonClient()
+        val (admin, anna) = client.adminAndAnna()
+        assertEquals(HttpStatusCode.OK, client.send("GET", "/api/account", anna).status)
+
+        assertEquals(HttpStatusCode.OK, client.send("POST", "/api/admin/accounts/anna/disable", admin, DisableAccountRequest(minutes = 60)).status)
+        assertEquals(HttpStatusCode.Unauthorized, client.send("GET", "/api/account", anna).status)
+        val login = client.send("POST", "/api/account/login", null, dev.trashpanda.ytmp.protocol.LoginRequest("anna", "password123"))
+        assertEquals(HttpStatusCode.Forbidden, login.status)
+        assertTrue(login.body<String>().contains("disabled"))
+        assertTrue(client.accounts(admin).single { it.username == "anna" }.disabledUntil > 0)
+
+        // Not yourself, and not forever by accident: the admin stays.
+        assertEquals(HttpStatusCode.BadRequest, client.send("POST", "/api/admin/accounts/jonah/disable", admin, DisableAccountRequest()).status)
+
+        assertEquals(HttpStatusCode.OK, client.send("POST", "/api/admin/accounts/anna/enable", admin).status)
+        val again = client.send("POST", "/api/account/login", null, dev.trashpanda.ytmp.protocol.LoginRequest("anna", "password123"))
+        assertEquals(HttpStatusCode.OK, again.status)
+        val annaAgain = again.body<SessionResponse>().sessionToken
+
+        val log = client.send("GET", "/api/admin/audit", admin).body<AuditLogResponse>().entries
+        assertEquals(listOf("Enabled account", "Disabled account", "Created account"), log.map { it.action }.take(3))
+        assertEquals("jonah", log.first().actor)
+        assertEquals(HttpStatusCode.Forbidden, client.send("GET", "/api/admin/audit", annaAgain).status)
+    }
+
+    @Test
+    fun `an admin can limit who creates rooms`() = testApplication {
+        val server = setup()
+        val client = jsonClient()
+        val (admin, anna) = client.adminAndAnna()
+        suspend fun hostToken(session: String) = client.send("POST", "/api/account/host-token", session, HostTokenRequest(origin)).body<HostTokenResponse>().token
+        val adminToken = hostToken(admin)
+        val annaToken = hostToken(anna)
+        suspend fun create(token: String?) = client.send("POST", "/api/rooms", token, CreateRoomRequest("Party")).status
+        assertEquals(HttpStatusCode.OK, create(annaToken))
+        server.settings.change(ServerSettingOverrides(roomCreate = "admins"))
+        assertEquals(HttpStatusCode.OK, create(adminToken))
+        assertEquals(HttpStatusCode.Forbidden, create(annaToken))
+        assertEquals(HttpStatusCode.Forbidden, create(null))
+        server.settings.change(ServerSettingOverrides(roomCreate = "accounts"))
+        assertEquals(HttpStatusCode.OK, create(annaToken))
+        assertEquals(HttpStatusCode.Forbidden, create(null))
+    }
 
     @Test
     fun `an admin makes someone else admin, but the last admin can't stop being one`() = testApplication {

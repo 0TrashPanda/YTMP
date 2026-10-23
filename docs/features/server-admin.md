@@ -24,7 +24,14 @@ There is always at least one.
 - **About** ✅: the server's version and whether a newer release is out, the YouTube Music
   module's yt-dlp and ytmusicapi (or that it can't be reached), and how many accounts and
   rooms there are.
-- Not yet: disabling an account without deleting it, timeouts, who may create rooms.
+- **Disable** ✅ an account (per account: 1 hour, 1 day, 1 week, or until you enable it): it is
+  logged out everywhere and can't log in, and its history, settings and rooms stay. Not your
+  own account, and not the only admin that isn't disabled. Rooms it is in keep it until it
+  leaves, and a room token it already has lasts until it expires.
+- **Who can create rooms** ✅ (Settings → Rooms): everyone, people with an account, or server
+  admins (`[rooms] create` in `ytmp.toml`). Joining a room is never limited by it.
+- **Log** ✅: what admins did (created, renamed, disabled or deleted accounts, new passwords,
+  invite links, settings, closed rooms), newest first, with who and when. The last 1000 are kept.
 
 ## Updates
 

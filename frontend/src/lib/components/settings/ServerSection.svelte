@@ -4,16 +4,18 @@
 	import type { AccountInfo, AuthServerInfo } from '../../protocol.gen';
 	import AdminAbout from './AdminAbout.svelte';
 	import AdminAccounts from './AdminAccounts.svelte';
+	import AdminLog from './AdminLog.svelte';
 	import AdminRooms from './AdminRooms.svelte';
 	import AdminSettings from './AdminSettings.svelte';
 
 	let { info, me, onToast }: { info: AuthServerInfo; me: AccountInfo; onToast: (text: string) => void } = $props();
 
-	type Tab = 'accounts' | 'settings' | 'rooms' | 'about';
+	type Tab = 'accounts' | 'settings' | 'rooms' | 'log' | 'about';
 	const tabs: [Tab, string][] = [
 		['accounts', 'Accounts'],
 		['settings', 'Settings'],
 		['rooms', 'Rooms'],
+		['log', 'Log'],
 		['about', 'About']
 	];
 	let tab = $state<Tab>('accounts');
@@ -36,6 +38,8 @@
 	<AdminSettings {onToast} />
 {:else if tab === 'rooms'}
 	<AdminRooms {onToast} />
+{:else if tab === 'log'}
+	<AdminLog {onToast} />
 {:else}
 	<AdminAbout {onToast} />
 {/if}

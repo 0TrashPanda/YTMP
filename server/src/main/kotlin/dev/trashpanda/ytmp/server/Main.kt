@@ -184,7 +184,7 @@ fun main(args: Array<String>) {
                 trusting = trustServers(auth, new.trusted, ownIssuer = issuer)
             }
         }
-        val admin = AdminApi(service, rooms, settings, Versions(http, config.ytm.url.trimEnd('/'), config.ytm.key))
+        val admin = AdminApi(service, rooms, settings, Versions(http, config.ytm.url.trimEnd('/'), config.ytm.key), AuditLog(db))
 
         ytmpModule(
             rooms,
@@ -229,6 +229,13 @@ fun main(args: Array<String>) {
                 isLocal = { false },
                 mayProxyAudio = { call -> settings.values.proxyMode().allows(call) },
                 accountsOnly = { !settings.values.guests },
+                roomCreateDenied = { account ->
+                    when (settings.values.roomCreate) {
+                        "accounts" -> if (account == null) "Log in to create a room on this server" else null
+                        "admins" -> if (account?.let { localUsername(it.id) }?.let(accounts::find)?.isAdmin == true) null else "Only server admins can create rooms on this server"
+                        else -> null
+                    }
+                },
                 crossOriginPersonal = true,
             ),
             webApp = File(config.server.frontend),

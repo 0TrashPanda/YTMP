@@ -887,6 +887,7 @@ export interface AdminAccountInfo {
   createdAt: number;
   lastSeen: number | null;
   logins: number;
+  disabledUntil: number;
 }
 
 export interface AccountListResponse {
@@ -935,6 +936,7 @@ export interface ServerSettingValues {
   audioProxy: string;
   cacheBytes: number;
   logLevel: string;
+  roomCreate: string;
 }
 
 export interface ServerSettingOverrides {
@@ -947,6 +949,7 @@ export interface ServerSettingOverrides {
   audioProxy: string | null;
   cacheBytes: number | null;
   logLevel: string | null;
+  roomCreate: string | null;
 }
 
 export interface AdminSettings {
@@ -1254,6 +1257,22 @@ export interface UnmatchedSong {
 
 export interface UnmatchedSongs {
   songs: UnmatchedSong[];
+}
+
+export interface AuditEntry {
+  at: number;
+  actor: string;
+  action: string;
+  target: string;
+  detail: string;
+}
+
+export interface AuditLogResponse {
+  entries: AuditEntry[];
+}
+
+export interface DisableAccountRequest {
+  minutes: number | null;
 }
 
 export interface DownloadItem {
