@@ -4,7 +4,9 @@
 	// is in ytmp.toml).
 	import { onDestroy } from 'svelte';
 	import type { SongCacheSettings, SongCacheStatus } from '../../protocol.gen';
+	import { local } from '../../local.svelte';
 	import Choice from './Choice.svelte';
+	import Switch from './Switch.svelte';
 
 	let {
 		load,
@@ -44,6 +46,7 @@
 		// While it moves to another place, look again in a moment.
 		clearTimeout(timer);
 		if (status.moving) timer = setTimeout(refresh, 2000);
+		else if (status.checking) timer = setTimeout(refresh, 10000);
 	}
 	refresh();
 	onDestroy(() => clearTimeout(timer));
@@ -99,6 +102,9 @@
 				{#if status.downloads}
 					· {status.downloads} downloaded {status.downloads === 1 ? 'song' : 'songs'} too (they don't count)
 				{/if}
+				{#if status.local}
+					· {status.local} of this phone's songs too (they don't count)
+				{/if}
 			</p>
 		</div>
 		{#if status.settable && change}
@@ -107,15 +113,33 @@
 				hint="When it's full, the songs you haven't played for the longest time go first (songs you play often stay longer)."
 				options={sizes}
 				value={String(status.maxBytes)}
-				onchange={(v) => attempt(() => change({ maxBytes: Number(v), place: status?.place ?? null }))}
+				onchange={(v) => attempt(() => change({ maxBytes: Number(v), place: status?.place ?? null, localSongs: null }))}
 			/>
+			{#if status.localSongs != null}
+				<div class="flex items-center gap-4">
+					<div class="min-w-0 flex-1">
+						<p class="text-sm font-medium">Songs from this phone</p>
+						<p class="text-xs text-muted">
+							Lists the music stored on this phone that is also on YouTube Music (same title, artist and length) under Cached on this phone, and plays it from the file, also offline. Each song is looked up once, slowly.
+							{#if !local.phone}Needs <em>Music on this phone</em> in Settings → Local music.{/if}
+							{#if status.checking}Looking up {status.checking} more…{/if}
+						</p>
+					</div>
+					<Switch
+						checked={status.localSongs}
+						label="Songs from this phone"
+						disabled={busy || !local.phone}
+						onchange={(on) => attempt(() => change({ maxBytes: status!.maxBytes, place: status?.place ?? null, localSongs: on }))}
+					/>
+				</div>
+			{/if}
 			{#if status.places.length > 1}
 				<Choice
 					label="Kept on"
 					hint={status.places.map((p) => (p.freeBytes != null ? `${p.name}: ${size(p.freeBytes)} free` : p.name)).join(' · ')}
 					options={status.places.map((p) => [p.id, p.name] as [string, string])}
 					value={status.place ?? status.places[0].id}
-					onchange={(v) => attempt(() => change({ maxBytes: status!.maxBytes, place: v }), 'Moving the cached songs…')}
+					onchange={(v) => attempt(() => change({ maxBytes: status!.maxBytes, place: v, localSongs: null }), 'Moving the cached songs…')}
 				/>
 			{/if}
 		{/if}

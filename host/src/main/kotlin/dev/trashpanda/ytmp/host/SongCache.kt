@@ -56,7 +56,14 @@ interface DownloadedSongs {
 }
 
 /** A download: [song] as its tags say, [uri] where the phone's own player can play it. */
-data class DownloadedSong(val song: Song, val uri: String)
+data class DownloadedSong(val song: Song, val uri: String, val local: Boolean = false)
+
+/**
+ * A music file on the phone that [LocalMatcher] found on YouTube Music: [sig] says which file it
+ * was (title, artist, length), so a changed file is checked again; [song] null: checked, no match.
+ */
+@Serializable
+data class LocalMatch(val sig: String, val song: Song? = null)
 
 /**
  * The song cache (docs/implementation/song-cache.md): YouTube Music songs kept as files in
@@ -111,6 +118,8 @@ class SongCache(
     }
     /** What the app knew of songs it downloaded (richer than their tags), by song ID. */
     private val downloadedSongs = HashMap<String, Song>()
+    /** Phone music checked against YouTube Music, by the track's key (see [LocalMatcher]). */
+    private val localMatches = HashMap<String, LocalMatch>()
     /** Changes to [entries] and [downloadedSongs], for [library]. */
     @Volatile
     private var version = 0
@@ -184,6 +193,19 @@ class SongCache(
         synchronized(lock) { plays[song.id]?.let { if (it.isNotEmpty()) it.removeAt(it.lastIndex) } }
         saveSoon()
     }
+
+    fun localMatch(key: String): LocalMatch? = synchronized(lock) { localMatches[key] }
+
+    fun setLocalMatch(key: String, match: LocalMatch?) {
+        synchronized(lock) {
+            if (match == null) localMatches.remove(key) else localMatches[key] = match
+            version++
+        }
+        saveSoon()
+    }
+
+    /** The keys that have a check stored. */
+    fun localMatchKeys(): Set<String> = synchronized(lock) { localMatches.keys.toSet() }
 
     /** Played at least [WORTH_PLAYS] times in [WORTH_WINDOW_MS]: worth an extra download. */
     fun worth(songId: String): Boolean = synchronized(lock) { worthLocked(songId, clock()) }
@@ -677,7 +699,8 @@ class SongCache(
         songs = songCount,
         bytes = totalBytes,
         maxBytes = maxBytes,
-        downloads = downloads?.let { runCatching { it.all().size }.getOrDefault(0) } ?: 0,
+        downloads = downloads?.let { runCatching { it.all().count { d -> !d.local } }.getOrDefault(0) } ?: 0,
+        local = downloads?.let { runCatching { it.all().count { d -> d.local } }.getOrDefault(0) } ?: 0,
         moving = moving,
     )
 
@@ -704,7 +727,7 @@ class SongCache(
             // What the app knew when it downloaded a song, with the file's own length.
             val tracks = downloaded.map { d ->
                 val song = richer[d.song.id]?.let { if (d.song.durationMs > 0) it.copy(durationMs = d.song.durationMs) else it } ?: d.song
-                track(song, DOWNLOADED)
+                track(song, if (d.local) ON_PHONE else DOWNLOADED)
             } + cached.filter { it.id !in downloadIds }.map { track(it, CACHED) }
             built = Triple(now, downloaded, tracks)
             return tracks
@@ -750,6 +773,7 @@ class SongCache(
         val songs: List<Entry> = emptyList(),
         val plays: Map<String, List<Long>> = emptyMap(),
         val downloads: List<Song> = emptyList(),
+        val local: Map<String, LocalMatch> = emptyMap(),
     )
 
     /** Reads the index; files without a row (a fetch cut short, say) go. */
@@ -768,6 +792,7 @@ class SongCache(
             }
             for ((id, times) in index.plays) times.filter { it >= now - PLAYS_KEPT_MS }.takeIf { it.isNotEmpty() }?.let { plays[id] = it.toMutableList() }
             for (song in index.downloads) downloadedSongs[song.id] = song
+            localMatches.putAll(index.local)
         }
         val files = synchronized(lock) { entries.values.map { it.file }.toSet() }
         val covers = synchronized(lock) { (entries.keys + downloadedSongs.keys).map { key(it) + ".jpg" }.toSet() }
@@ -795,7 +820,7 @@ class SongCache(
 
     private fun writeIndex() {
         val index = synchronized(lock) {
-            Index(entries.values.toList(), plays.mapValues { it.value.toList() }, downloadedSongs.values.toList())
+            Index(entries.values.toList(), plays.mapValues { it.value.toList() }, downloadedSongs.values.toList(), HashMap(localMatches))
         }
         val file = File(dir, INDEX)
         val temp = File(dir, "$INDEX.part")
@@ -815,6 +840,7 @@ class SongCache(
         const val LIBRARY_ID = "cache"
         const val DOWNLOADED = "Downloaded"
         const val CACHED = "Cached"
+        const val ON_PHONE = "On this phone"
         private const val INDEX = "index.json"
         private const val MB = 1024L * 1024
 

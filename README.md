@@ -89,7 +89,8 @@ Music, without Premium, and not tied to a single music service.
   start at once without asking YouTube, and on the phone they play without internet (*Local →
   Cached on this phone*, with your downloads). Songs streamed anyway are kept for free, others
   from their second play; podcast episodes aren't. 5 GB on a server (`ytmp.toml`), 1 GB on a
-  phone (*Settings → Playback*, on the phone or its SD card), with *Clear cache*.
+  phone (*Settings → Playback*, on the phone or its SD card), with *Clear cache*. Optionally the
+  phone's own music that is also on YouTube Music is listed there too and plays offline.
 
 **People and accounts**
 - Roles and permissions with a Discord-style editor (one role per person plus per-person

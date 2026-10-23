@@ -353,6 +353,12 @@ data class SongCacheStatus(
     val maxBytes: Long,
     /** Downloaded songs it lists too (a phone), not counted in [bytes]. */
     val downloads: Int = 0,
+    /** The phone's own music it lists too (matched to YouTube Music), not counted in [bytes]. */
+    val local: Int = 0,
+    /** The setting to list the phone's own music; null where that isn't a thing (a server). */
+    val localSongs: Boolean? = null,
+    /** Phone songs still to be looked up on YouTube Music. */
+    val checking: Int = 0,
     /** Where it can be kept (a phone: its own storage, an SD card); empty where that isn't a setting. */
     val places: List<SongCachePlace> = emptyList(),
     val place: String? = null,
@@ -368,4 +374,4 @@ data class SongCachePlace(val id: String, val name: String, val freeBytes: Long?
 
 @Serializable
 @SerialName("SongCacheSettings")
-data class SongCacheSettings(val maxBytes: Long, val place: String? = null)
+data class SongCacheSettings(val maxBytes: Long, val place: String? = null, val localSongs: Boolean? = null)

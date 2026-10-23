@@ -19,6 +19,8 @@ import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ShareAddress
 import dev.trashpanda.ytmp.protocol.SongCachePlace
+import dev.trashpanda.ytmp.protocol.SearchItem
+import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.RoomVisibility
@@ -133,10 +135,25 @@ class LocalHost(private val context: Context) {
      * Songs played here, kept so they start at once and play without internet (Settings →
      * Playback: its size, and the phone's own storage or the SD card).
      */
-    val cache = SongCache(
+    val cache: SongCache = SongCache(
         cacheDir(cacheSettings.getString(CACHE_PLACE, PLACE_PHONE)!!), cacheSettings.getLong(CACHE_SIZE, DEFAULT_CACHE_BYTES),
-        lookup = streams, audio = audio, scope = scope, downloads = downloads,
+        lookup = streams, audio = audio, scope = scope,
+        downloads = CombinedDownloads(downloads, PhoneMatchedSongs({ matcher }, phoneLibrary)),
     )
+
+    /** Which of the phone's music is a YouTube Music song (Settings → Playback → Song cache). */
+    private val matcher: LocalMatcher = LocalMatcher(
+        cache, { phoneLibrary.tracks() },
+        { query -> ytm.search(query, SearchType.SONGS).sections.flatMap { it.items }.filterIsInstance<SearchItem.SongResult>().filter { !it.video }.map { it.song } },
+        scope,
+    )
+
+    /** The setting is on and Android lets us read the music. */
+    private fun localSongsOn() = cacheSettings.getBoolean(CACHE_LOCAL, false) && canReadMusic()
+
+    private fun applyLocalSongs() {
+        if (localSongsOn()) matcher.start() else matcher.stop()
+    }
     private val cacheLibrary = cache.library { lanUrl() ?: LOCAL_URL }
 
     /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
@@ -201,12 +218,18 @@ class LocalHost(private val context: Context) {
 
         override fun place() = cacheSettings.getString(CACHE_PLACE, PLACE_PHONE)
 
+        override fun localSongs() = cacheSettings.getBoolean(CACHE_LOCAL, false)
+
+        override fun checking() = if (matcher.enabled) matcher.pending else 0
+
         override suspend fun change(settings: SongCacheSettings) {
             val place = settings.place?.takeIf { wanted -> cachePlaces().any { it.id == wanted } } ?: place()!!
             cacheSettings.edit {
                 putLong(CACHE_SIZE, settings.maxBytes.coerceAtLeast(0))
                 putString(CACHE_PLACE, place)
+                settings.localSongs?.let { putBoolean(CACHE_LOCAL, it) }
             }
+            applyLocalSongs()
             cache.setMaxBytes(settings.maxBytes)
             cache.moveTo(cacheDir(place))
             showCacheLibrary()
@@ -252,6 +275,7 @@ class LocalHost(private val context: Context) {
         cache.inUse = { rooms.songsInUse() }
         downloads.onSaved = cache::downloaded
         showCacheLibrary()
+        applyLocalSongs()
         // So downloads play from the Music folder from the first song on.
         scope.launch { runCatching { downloads.all() } }
         wifi.start()
@@ -371,6 +395,7 @@ class LocalHost(private val context: Context) {
         private const val PHONE_MUSIC = "phoneMusic"
         private const val CACHE_SIZE = "size"
         private const val CACHE_PLACE = "place"
+        private const val CACHE_LOCAL = "localSongs"
         private const val PLACE_PHONE = "phone"
         private const val PLACE_SD = "sd"
         /** About 250 songs. */

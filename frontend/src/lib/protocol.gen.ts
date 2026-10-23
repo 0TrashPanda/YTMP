@@ -1112,6 +1112,9 @@ export interface SongCacheStatus {
   bytes: number;
   maxBytes: number;
   downloads: number;
+  local: number;
+  localSongs: boolean | null;
+  checking: number;
   places: SongCachePlace[];
   place: string | null;
   settable: boolean;
@@ -1121,6 +1124,7 @@ export interface SongCacheStatus {
 export interface SongCacheSettings {
   maxBytes: number;
   place: string | null;
+  localSongs: boolean | null;
 }
 
 export interface YoutubeAccount {

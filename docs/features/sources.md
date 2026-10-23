@@ -168,6 +168,13 @@ without internet on the phone. It works by itself: there is nothing to pick.
 - **Downloads show in the cache** (on the phone): a song you [download](ui.md#song-menu) is
   listed with the cached songs (in the folder *Downloaded*), and plays from the Music folder
   instead of streaming. It doesn't count toward the cache's size and is never removed: it's yours.
+- **Songs from this phone** (a setting in *Settings → Playback → Song cache*, off by default; needs
+  *Music on this phone*): the music stored on the phone that is also on YouTube Music is
+  listed in its own folder, *On this phone*, and plays as that YouTube Music song (likes, radio
+  and history work) from the file, also offline. A file counts when a YouTube Music search finds a
+  song with the same title, an artist in common and the same length (within 3 seconds); anything
+  less sure is left out. Each file is looked up once and slowly (so YouTube doesn't block the
+  network), and the answer is kept. They don't count toward the cache's size and are never removed.
 - Only songs from online sources (YouTube Music, later YouTube) are cached. Local music and
   media servers are already files.
 

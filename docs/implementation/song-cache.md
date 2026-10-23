@@ -116,6 +116,23 @@ saved. Downloads made before the ID tag existed just stay plain local music.
 
 On a server this doesn't apply: downloads go to the browser.
 
+## Songs from this phone
+
+With the setting on (`ytmp.cache` pref `localSongs`; `SongCacheSettings.localSongs`), `LocalMatcher`
+(`host/`) goes through the phone's music (`PhoneLibrary.tracks()`, without `Music/YTMP`, under
+an hour, with a title and artist) and searches YouTube Music songs for "artist title", one
+search every 4 s. A result is a match when its normalised title (no accents, brackets or
+punctuation) is the same, one of its artists is in the file's artist or album artist, and the
+length differs by at most 3 s. The answer, also "no match", is kept per file in the cache's
+`index.json` (`local`: media store ID → `LocalMatch(title|artist|length, song?)`), so it moves with
+the cache folder and survives *Clear cache*; a changed file is looked up again, a removed one forgotten.
+A failed search (bot check, no internet) stops the round and tries again in 10 minutes; it looks at the media
+store every 5 minutes.
+
+`PhoneMatchedSongs` serves the matches as `DownloadedSongs` (`local = true`), combined with
+`PhoneDownloads` in `CombinedDownloads`, so they play and are listed like downloads, in the folder
+*On this phone*. The status says how many (`local`) and how many are still to look up (`checking`).
+
 ## Removing songs
 
 When saving a song would take the cache over its size, songs are removed until it is back

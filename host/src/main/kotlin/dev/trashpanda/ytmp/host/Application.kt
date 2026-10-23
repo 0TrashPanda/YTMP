@@ -155,6 +155,12 @@ interface CacheSettings {
 
     fun place(): String?
 
+    /** The phone's own music is matched to YouTube Music and listed with the cached songs. */
+    fun localSongs(): Boolean = false
+
+    /** Phone songs still to look up. */
+    fun checking(): Int = 0
+
     /** Saves [settings] and applies them (a new place moves what's cached). */
     suspend fun change(settings: SongCacheSettings)
 }
