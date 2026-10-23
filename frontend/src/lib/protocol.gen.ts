@@ -1116,6 +1116,7 @@ export interface SongCacheStatus {
   localSongs: boolean | null;
   checking: number;
   checkingOf: number;
+  localParallel: number;
   places: SongCachePlace[];
   place: string | null;
   settable: boolean;
@@ -1126,6 +1127,7 @@ export interface SongCacheSettings {
   maxBytes: number;
   place: string | null;
   localSongs: boolean | null;
+  localParallel: number | null;
 }
 
 export interface YoutubeAccount {

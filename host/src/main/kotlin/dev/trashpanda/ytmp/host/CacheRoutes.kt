@@ -22,7 +22,7 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
     suspend fun ApplicationCall.status(): SongCacheStatus {
         if (!allowed(this)) throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Only the owner can see the song cache")
         val status = cache?.status() ?: SongCacheStatus(songs = 0, bytes = 0, maxBytes = 0)
-        return if (settings == null) status else status.copy(places = settings.places(), place = settings.place(), settable = true, localSongs = settings.localSongs(), checking = settings.checking(), checkingOf = settings.checkingOf())
+        return if (settings == null) status else status.copy(places = settings.places(), place = settings.place(), settable = true, localSongs = settings.localSongs(), checking = settings.checking(), checkingOf = settings.checkingOf(), localParallel = settings.localParallel())
     }
     get { call.respond(call.status()) }
     put {

@@ -164,6 +164,9 @@ interface CacheSettings {
     /** Phone songs looked at in all. */
     fun checkingOf(): Int = 0
 
+    /** How many phone songs are looked up at once. */
+    fun localParallel(): Int = 1
+
     /** Saves [settings] and applies them (a new place moves what's cached). */
     suspend fun change(settings: SongCacheSettings)
 }

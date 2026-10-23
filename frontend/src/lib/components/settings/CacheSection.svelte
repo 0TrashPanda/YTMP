@@ -113,7 +113,7 @@
 				hint="When it's full, the songs you haven't played for the longest time go first (songs you play often stay longer)."
 				options={sizes}
 				value={String(status.maxBytes)}
-				onchange={(v) => attempt(() => change({ maxBytes: Number(v), place: status?.place ?? null, localSongs: null }))}
+				onchange={(v) => attempt(() => change({ maxBytes: Number(v), place: status?.place ?? null, localSongs: null, localParallel: null }))}
 			/>
 			{#if status.localSongs != null}
 				<div class="flex items-center gap-4">
@@ -128,9 +128,18 @@
 						checked={status.localSongs}
 						label="Songs from this phone"
 						disabled={busy || !local.phone}
-						onchange={(on) => attempt(() => change({ maxBytes: status!.maxBytes, place: status?.place ?? null, localSongs: on }))}
+						onchange={(on) => attempt(() => change({ maxBytes: status!.maxBytes, place: status?.place ?? null, localSongs: on, localParallel: null }))}
 					/>
 				</div>
+				{#if status.localSongs}
+					<Choice
+						label="Lookups at once"
+						hint="More is faster, but YouTube may block this network if you ask a lot (then it waits 10 minutes). 1 is about 15 songs a minute."
+						options={[['1', '1'], ['2', '2'], ['4', '4'], ['8', '8']]}
+						value={String(status.localParallel)}
+						onchange={(v) => attempt(() => change({ maxBytes: status!.maxBytes, place: status?.place ?? null, localSongs: null, localParallel: Number(v) }))}
+					/>
+				{/if}
 				{#if status.localSongs && status.checkingOf}
 					<div class="flex flex-col gap-1.5">
 						<div class="h-1.5 overflow-hidden rounded-full bg-raised">
@@ -148,7 +157,7 @@
 					hint={status.places.map((p) => (p.freeBytes != null ? `${p.name}: ${size(p.freeBytes)} free` : p.name)).join(' · ')}
 					options={status.places.map((p) => [p.id, p.name] as [string, string])}
 					value={status.place ?? status.places[0].id}
-					onchange={(v) => attempt(() => change({ maxBytes: status!.maxBytes, place: v, localSongs: null }), 'Moving the cached songs…')}
+					onchange={(v) => attempt(() => change({ maxBytes: status!.maxBytes, place: v, localSongs: null, localParallel: null }), 'Moving the cached songs…')}
 				/>
 			{/if}
 		{/if}

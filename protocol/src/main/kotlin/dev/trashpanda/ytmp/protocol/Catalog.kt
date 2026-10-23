@@ -361,6 +361,8 @@ data class SongCacheStatus(
     val checking: Int = 0,
     /** Phone songs that are looked up in all (done and still to do). */
     val checkingOf: Int = 0,
+    /** How many phone songs are looked up at once. */
+    val localParallel: Int = 1,
     /** Where it can be kept (a phone: its own storage, an SD card); empty where that isn't a setting. */
     val places: List<SongCachePlace> = emptyList(),
     val place: String? = null,
@@ -376,4 +378,4 @@ data class SongCachePlace(val id: String, val name: String, val freeBytes: Long?
 
 @Serializable
 @SerialName("SongCacheSettings")
-data class SongCacheSettings(val maxBytes: Long, val place: String? = null, val localSongs: Boolean? = null)
+data class SongCacheSettings(val maxBytes: Long, val place: String? = null, val localSongs: Boolean? = null, val localParallel: Int? = null)

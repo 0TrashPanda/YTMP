@@ -168,6 +168,7 @@ class LocalHost(private val context: Context) {
     private fun localSongsOn() = cacheSettings.getBoolean(CACHE_LOCAL, false) && phoneMusicOn
 
     private fun applyLocalSongs() {
+        matcher.parallel = cacheSettings.getInt(CACHE_PARALLEL, 1)
         if (localSongsOn()) matcher.start() else matcher.stop()
     }
     private val cacheLibrary = cache.library { lanUrl() ?: LOCAL_URL }
@@ -238,6 +239,8 @@ class LocalHost(private val context: Context) {
 
         override fun checking() = if (matcher.enabled) matcher.pending else 0
 
+        override fun localParallel() = cacheSettings.getInt(CACHE_PARALLEL, 1)
+
         override fun checkingOf() = if (matcher.enabled) matcher.total else 0
 
         override suspend fun change(settings: SongCacheSettings) {
@@ -246,7 +249,9 @@ class LocalHost(private val context: Context) {
                 putLong(CACHE_SIZE, settings.maxBytes.coerceAtLeast(0))
                 putString(CACHE_PLACE, place)
                 settings.localSongs?.let { putBoolean(CACHE_LOCAL, it) }
+                settings.localParallel?.let { putInt(CACHE_PARALLEL, it.coerceIn(1, LocalMatcher.MAX_PARALLEL)) }
             }
+            matcher.parallel = localParallel()
             applyLocalSongs()
             cache.setMaxBytes(settings.maxBytes)
             cache.moveTo(cacheDir(place))
@@ -415,6 +420,7 @@ class LocalHost(private val context: Context) {
         private const val CACHE_SIZE = "size"
         private const val CACHE_PLACE = "place"
         private const val CACHE_LOCAL = "localSongs"
+        private const val CACHE_PARALLEL = "localParallel"
         private const val PLACE_PHONE = "phone"
         private const val PLACE_SD = "sd"
         /** About 250 songs. */

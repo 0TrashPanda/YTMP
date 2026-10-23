@@ -3,12 +3,14 @@ package dev.trashpanda.ytmp.host
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.text.Normalizer
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 
 /**
@@ -39,10 +41,17 @@ class LocalMatcher(
     @Volatile
     private var byId: Map<String, LocalTrack> = emptyMap()
 
+    private val left = AtomicInteger()
+
     /** Files still to look up. */
+    val pending: Int get() = left.get()
+
+    /** How many files are looked up at once (1..[MAX_PARALLEL]); changes take effect within a second. */
     @Volatile
-    var pending = 0
-        private set
+    var parallel = 1
+        set(value) {
+            field = value.coerceIn(1, MAX_PARALLEL)
+        }
 
     /** Files that are looked at in all (the ones with an answer already, and the ones to do). */
     @Volatile
@@ -73,7 +82,7 @@ class LocalMatcher(
     fun stop() {
         job?.cancel()
         job = null
-        pending = 0
+        left.set(0)
         total = 0
         current = emptyMap()
         byId = emptyMap()
@@ -97,16 +106,30 @@ class LocalMatcher(
         total = files.size
         publish(valid)
         val todo = files.filter { cache.localMatch(it.key)?.sig != signature(it) }
-        pending = todo.size
-        for (track in todo) {
-            val byId = (idInName(track.file) ?: tagged(track))?.let { id -> lookup("ytm:$id")?.takeIf { sameLength(track, it) } }
-            val match = LocalMatch(signature(track), byId ?: match(track, search("${track.artist} ${track.title}")))
-            cache.setLocalMatch(track.key, match)
-            if (match.song != null) publish(valid)
-            pending--
-            delay(gapMs)
+        left.set(todo.size)
+        val next = AtomicInteger()
+        // Workers 0 until [parallel] take files one by one; the others wait until they're wanted.
+        coroutineScope {
+            repeat(MAX_PARALLEL) { worker ->
+                launch {
+                    while (isActive) {
+                        if (worker >= parallel) {
+                            if (next.get() >= todo.size) break
+                            delay(IDLE_MS)
+                            continue
+                        }
+                        val track = todo.getOrNull(next.getAndIncrement()) ?: break
+                        val byId = (idInName(track.file) ?: tagged(track))?.let { id -> lookup("ytm:$id")?.takeIf { sameLength(track, it) } }
+                        val match = LocalMatch(signature(track), byId ?: match(track, search("${track.artist} ${track.title}")))
+                        cache.setLocalMatch(track.key, match)
+                        if (match.song != null) publish(valid)
+                        left.decrementAndGet()
+                        delay(gapMs)
+                    }
+                }
+            }
         }
-        pending = 0
+        left.set(0)
         // Files that went: forget what was found.
         for (key in cache.localMatchKeys() - valid.keys) cache.setLocalMatch(key, null)
         return rescanMs
@@ -118,6 +141,8 @@ class LocalMatcher(
 
     companion object {
         const val GAP_MS = 4_000L
+        const val MAX_PARALLEL = 8
+        private const val IDLE_MS = 1_000L
         const val RETRY_MS = 10 * 60_000L
         const val RESCAN_MS = 5 * 60_000L
         private const val DURATION_SLACK_MS = 3_000L
