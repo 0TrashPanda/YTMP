@@ -5,10 +5,9 @@
 	// left and hold do what Settings → Taps and swipes says (play, play next, remove like YTM,
 	// the song menu by default); right-click or ⋮ on hover with a mouse: the song menu.
 	import { tick } from 'svelte';
-	import { yourRadio } from '../api';
 	import { artistNames, formatTime } from '../format';
 	import { ACTION_ICONS, ACTION_NAMES, gestures, RowGestures, type QueueAction } from '../gestures.svelte';
-	import { menuAt } from '../songActions';
+	import { menuAt, startRadio } from '../songActions';
 	import type { ItemList, QueueItem } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -283,7 +282,8 @@
 				return;
 			}
 			case 'radio':
-				return room.run({ kind: 'StartRadio', song: item.song, songs: await yourRadio(item.song.id) });
+				await startRadio(room, item.song, () => {});
+				return;
 		}
 	}
 

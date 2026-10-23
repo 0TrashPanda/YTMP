@@ -256,13 +256,16 @@ export function similar(songId: string, signal?: AbortSignal): Promise<Song[]> {
 	);
 }
 
+/** Whether [yourRadio] brings one (it comes from your server), or the room's radio is used. */
+export const bringsOwnRadio = () => viaYourServer();
+
 /**
  * A radio you bring to this room (your own account's, from your server), for Start radio and
  * Autoplay this; null when the room's own radio is used (it's the room's, or your account is
  * on this host anyway).
  */
 export async function yourRadio(songId: string): Promise<Song[] | null> {
-	if (!viaYourServer()) return null;
+	if (!bringsOwnRadio()) return null;
 	try {
 		return await similar(songId);
 	} catch {

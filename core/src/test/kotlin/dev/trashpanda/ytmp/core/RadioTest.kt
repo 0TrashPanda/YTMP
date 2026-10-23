@@ -171,6 +171,63 @@ class RadioTest {
     }
 
     @Test
+    fun `start radio plays the song right away, before its radio is there`() = runTest {
+        val slow = RadioSource { seed -> kotlinx.coroutines.delay(5_000); radio.radio(seed) }
+        val room = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { "https://s/$it" }, backgroundScope, radio = slow) { testScheduler.currentTime }
+        room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Me", null, "owner"), {
+            messages += it
+            if (it is ServerMessage.Welcome) me = it.participantId
+        })
+        room.run(Command.AddSongs(listOf(song("x"), song("y")), QueuePosition.END))
+        runCurrent()
+        room.run(Command.StartRadio(song("a")))
+        runCurrent()
+
+        var state = room.state()
+        assertEquals("a", state.nowPlaying?.item?.song?.id)
+        assertTrue(state.playback.playing)
+        assertTrue(state.queue.isEmpty())
+        assertTrue(state.autoplay.isEmpty())
+        assertEquals("a", state.autoplaySeed?.id)
+
+        advanceTimeBy(5_001)
+        runCurrent()
+        state = room.state()
+        assertEquals("a", state.nowPlaying?.item?.song?.id)
+        assertEquals((1..10).map { "a-$it" }, state.autoplay.map { it.song.id })
+        assertTrue(state.autoplay.all { it.origin == QueueItemOrigin.RADIO })
+    }
+
+    @Test
+    fun `a radio someone brings later follows the song that already plays`() = runTest {
+        val room = room()
+        room.run(Command.StartRadio(song("a"), follows = true))
+        runCurrent()
+        var state = room.state()
+        assertEquals("a", state.nowPlaying?.item?.song?.id)
+        assertTrue(state.autoplay.isEmpty())
+        assertTrue(requests.isEmpty()) // the room doesn't look up its own
+
+        room.run(Command.StartRadio(song("a"), listOf(song("mine-1"), song("mine-2"))))
+        runCurrent()
+        state = room.state()
+        assertEquals("a", state.nowPlaying?.item?.song?.id)
+        assertEquals(listOf("mine-1", "mine-2"), state.autoplay.map { it.song.id }.take(2))
+    }
+
+    @Test
+    fun `when a radio someone said they'd bring doesn't come, autoplay goes on as usual`() = runTest {
+        val room = room()
+        room.run(Command.StartRadio(song("a"), follows = true))
+        runCurrent()
+        advanceTimeBy(Room.BROUGHT_RADIO_WAIT_MS + 1)
+        runCurrent()
+        val state = room.state()
+        assertEquals("a", state.nowPlaying?.item?.song?.id)
+        assertEquals((1..10).map { "a-$it" }, state.autoplay.map { it.song.id })
+    }
+
+    @Test
     fun `start radio on the song that's playing keeps playing it`() = runTest {
         val room = room()
         room.run(Command.AddSongs(listOf(song("a"), song("x")), QueuePosition.END))

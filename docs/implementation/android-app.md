@@ -48,6 +48,9 @@
 - **YouTube Music on the phone** (`OnDeviceYtm`): the Python code from `ytm-module/` run with
   **Chaquopy** (Python 3.14, ytmusicapi + yt-dlp). Measured on a Pixel 7: Python starts in
   0.4 s, a search takes ~1.5 s, resolving a stream ~1.5 s.
+  Python does one thing at a time, so **a stream lookup goes first** (`PlaybackFirst`): while
+  one runs, everything else on Python (the radio, lyrics, pages, searches) waits for it, up
+  to 8 s, so a song that has to start isn't slowed down by them.
 - **yt-dlp's JavaScript** (`JsEngine`): yt-dlp has to run YouTube's player script to solve its
   challenges; without a JavaScript runtime it only gets a reduced set of formats (and warns).
   The phone can't start Deno as a program, so the app hands yt-dlp the **WebView's own

@@ -286,6 +286,7 @@ export interface CommandStartRadio {
   kind: "StartRadio";
   song: Song;
   songs: Song[] | null;
+  follows: boolean;
 }
 
 export interface CommandUnban {

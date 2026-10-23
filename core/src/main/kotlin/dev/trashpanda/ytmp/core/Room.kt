@@ -821,7 +821,7 @@ class Room(
             }
             is Command.StartRadio -> {
                 need(member, Permission.START_RADIO)?.let { return it }
-                startRadio(command.song, member.id to member.name, command.songs?.take(MAX_BROUGHT_RADIO))
+                startRadio(command.song, member.id to member.name, command.songs?.take(MAX_BROUGHT_RADIO), command.follows)
             }
             is Command.AutoplayFromHere -> {
                 need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
@@ -1747,32 +1747,63 @@ class Room(
     /**
      * Start radio: plays [song] now, and the queue becomes a radio from it. On the song that's
      * playing, it keeps playing (like YTM) and only the queue changes. [brought]: the radio the
-     * one who starts it brought (their own account's); null: the room's.
+     * one who starts it brought (their own account's); null: the room's. The song starts right
+     * away; the room's radio follows while it plays. [follows]: the one who starts it sends their
+     * own radio in a moment (another Start radio for the same song): the room doesn't look up its own.
      */
-    private fun startRadio(song: Song, by: Pair<String, String>, brought: List<Song>? = null) {
+    private fun startRadio(song: Song, by: Pair<String, String>, brought: List<Song>? = null, follows: Boolean = false) {
         val source = radio
-        if (source == null && brought == null) return
-        scope.launch {
-            val songs = runCatching { brought ?: source!!.radio(song.id) }
-            mutex.withLock {
-                songs.onFailure { e ->
-                    if (e is CancellationException) throw e
-                    emit(Event.Notice("Couldn't start a radio from \"${song.title}\": ${e.message}"))
-                    return@withLock
-                }
-                // The queue is cleared and the radio goes into autoplay, the song itself first:
-                // it plays from there, so it's heard once, and the radio keeps going after it.
-                autoplay.job?.cancel()
-                val keepPlaying = current?.song?.id == song.id
-                if (!keepPlaying) retireCurrent(QueueItemResult.SKIPPED)
-                if (queue.isNotEmpty()) replaceQueue(emptyList())
-                val radioSongs = listOf(song).takeUnless { keepPlaying }.orEmpty() + songs.getOrThrow().filter { it.id != song.id }
-                autoplay.replace(song, by, radioSongs, QueueItemOrigin.RADIO)
-                emit(autoplay.changed())
-                if (keepPlaying) return@withLock
+        if (source == null && brought == null && !follows) return
+        // The queue is cleared and the radio goes into autoplay, the song itself first: it plays
+        // from there, so it's heard once, and the radio keeps going after it.
+        autoplay.job?.cancel()
+        val keepPlaying = current?.song?.id == song.id
+        if (!keepPlaying) retireCurrent(QueueItemResult.SKIPPED)
+        if (queue.isNotEmpty()) replaceQueue(emptyList())
+        val radioSongs = listOf(song).takeUnless { keepPlaying }.orEmpty() + brought.orEmpty().filter { it.id != song.id }
+        autoplay.replace(song, by, radioSongs, QueueItemOrigin.RADIO)
+        // Set before the song starts, so autoplay doesn't top itself up from it in the meantime.
+        if (brought == null) autoplay.job = if (follows) waitForBroughtRadio() else loadRadio(source!!, song)
+        emit(autoplay.changed())
+        if (keepPlaying) return
+        wantPlaying = true
+        playNextFromQueue()
+    }
+
+    /** The room's radio from [song], after it in the autoplay queue (while [song] already plays). */
+    private fun loadRadio(source: RadioSource, song: Song): Job = scope.launch {
+        val songs = runCatching { source.radio(song.id) }
+        mutex.withLock {
+            if (autoplay.job != coroutineContext[Job]) return@withLock
+            autoplay.job = null
+            val start = autoplay.startWhenLoaded
+            autoplay.startWhenLoaded = false
+            songs.onFailure { e ->
+                if (e is CancellationException) throw e
+                emit(Event.Notice("Couldn't start a radio from \"${song.title}\": ${e.message}"))
+                refillAutoplay()
+                return@withLock
+            }
+            val have = autoplay.items.map { it.song.id }.toSet() + listOfNotNull(current?.song?.id)
+            autoplay.add(songs.getOrThrow().filter { it.id != song.id && it.id !in have }.distinctBy { it.id }, QueueItemOrigin.RADIO)
+            emit(autoplay.changed())
+            if (start && current == null) {
                 wantPlaying = true
                 playNextFromQueue()
+            } else {
+                // A short radio is topped up from its last song.
+                refillAutoplay()
             }
+        }
+    }
+
+    /** Waits a while for a radio someone brings; if it doesn't come, autoplay goes on as usual. */
+    private fun waitForBroughtRadio(): Job = scope.launch {
+        delay(BROUGHT_RADIO_WAIT_MS)
+        mutex.withLock {
+            if (autoplay.job != coroutineContext[Job]) return@withLock
+            autoplay.job = null
+            refillAutoplay()
         }
     }
 
@@ -1923,6 +1954,8 @@ class Room(
         const val SCREEN_NAME = "Party screen"
         /** A radio someone brings ([Command.StartRadio.songs]) keeps at most this many songs. */
         const val MAX_BROUGHT_RADIO = 100
+        /** How long a room waits for a radio someone said they'd bring ([Command.StartRadio.follows]). */
+        const val BROUGHT_RADIO_WAIT_MS = 15_000L
         /** The last listening device disconnected this long ago: the music pauses (a reload isn't leaving). */
         const val GONE_PAUSE_MS = 60_000L
         const val PREVIOUS_RESTART_MS = 3_000L

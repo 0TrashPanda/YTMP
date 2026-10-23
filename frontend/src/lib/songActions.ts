@@ -1,6 +1,6 @@
 // What songs do when you tap, swipe or hold them, pick something in the song menu, or press a
 // page's Play buttons, and what it says afterwards: the same everywhere.
-import { yourRadio } from './api';
+import { bringsOwnRadio, yourRadio } from './api';
 import type { Command, Song } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 
@@ -32,9 +32,19 @@ export const addToQueue = (room: RoomConnection, songs: Song[], name: string, on
 
 export const playNow = (room: RoomConnection, song: Song, onToast: Toast) => runCommand(room, { kind: 'PlayNow', song }, onToast);
 
-/** Start radio: the queue becomes a radio from [song] (your own account's, when you bring one). [name]: what it's from. */
+/**
+ * Start radio: the queue becomes a radio from [song] (your own account's, when you bring one).
+ * [name]: what it's from. The song starts right away; your own radio follows once it's loaded.
+ */
 export async function startRadio(room: RoomConnection, song: Song, onToast: Toast, name = quoted(song)) {
-	return runCommand(room, { kind: 'StartRadio', song, songs: await yourRadio(song.id) }, onToast, `Starting a radio from ${name}`);
+	const own = bringsOwnRadio();
+	const radio = own ? yourRadio(song.id) : null;
+	const started = await runCommand(room, { kind: 'StartRadio', song, songs: null, follows: own }, onToast, `Starting a radio from ${name}`);
+	if (!started || !radio) return started;
+	const songs = await radio;
+	// Unless something else was played meanwhile: then that keeps playing.
+	if (room.state?.nowPlaying?.item.song.id === song.id) await room.run({ kind: 'StartRadio', song, songs, follows: false });
+	return started;
 }
 
 /** Autoplay this: the autoplay queue becomes a radio from [song]. */
