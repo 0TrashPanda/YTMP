@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
  * here. The phone serves the files and covers itself (`/api/audio/…`, `/api/local/art/…`), at
  * [baseUrl] (its address on the network, so speakers and friends reach it too).
  */
-class PhoneLibrary(private val context: Context, private val baseUrl: () -> String) : LocalLibrary {
+class PhoneLibrary(private val context: Context, private val baseUrl: () -> String, val folders: PhoneFolders = PhoneFolders(context), private val canRead: () -> Boolean = { true }) : LocalLibrary {
     override val id = ID
     override val name = "On this phone"
     override val kind = LocalLibraryKind.PHONE
@@ -35,15 +35,21 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
     private val mutex = Mutex()
     private var tracks: List<LocalTrack>? = null
     private var generation = -1L
+    private var foldersSeen = -1
     private val types = ConcurrentHashMap<String, String>()
 
     /** The phone's music; read again when the media store changed. */
     override suspend fun tracks(): List<LocalTrack> = mutex.withLock {
         val now = withContext(Dispatchers.IO) { generation() }
-        tracks?.let { if (now == generation) return it }
-        val read = withContext(Dispatchers.IO) { query() }
+        tracks?.let { if (now == generation && !folders.stale(foldersSeen)) return it }
+        val seen = folders.version
+        val read = withContext(Dispatchers.IO) {
+            // The media store needs the permission; the picked folders don't.
+            (if (canRead()) query() else emptyList()) + folders.tracks().onEach { track -> folders.mime(track.key)?.let { types[track.key] = it } }
+        }
         tracks = read
         generation = now
+        foldersSeen = seen
         read
     }
 
@@ -55,7 +61,7 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
 
     /** Sends the media store's file [key], with [range], as [type] (e.g. "audio/mp4"; null: not said). */
     suspend fun respond(call: ApplicationCall, key: String, range: String?, type: String?) {
-        val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, key.toLongOrNull() ?: throw SourceException("Not a song on this phone"))
+        val uri = uriOf(key) ?: throw SourceException("Not a song on this phone")
         val file = withContext(Dispatchers.IO) { context.contentResolver.openFileDescriptor(uri, "r") } ?: throw SourceException("That song isn't on this phone any more")
         val total = file.statSize
         val (start, requestedEnd) = ByteRange.parse(range)
@@ -102,13 +108,21 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
         }
     }
 
+    /** The file of song [key]: the media store's, or one in a picked folder. */
+    fun uriOf(key: String): android.net.Uri? =
+        if (folders.isFolderKey(key)) folders.uri(key)
+        else key.toLongOrNull()?.let { ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }
+
     override suspend fun respondArt(call: ApplicationCall, key: String, size: Int): Boolean {
-        val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, key.toLongOrNull() ?: return false)
         val bytes = withContext(Dispatchers.IO) {
-            runCatching {
-                val picture = context.contentResolver.loadThumbnail(uri, Size(size, size), null)
-                ByteArrayOutputStream().also { picture.compress(Bitmap.CompressFormat.JPEG, 85, it) }.toByteArray()
-            }.getOrNull()
+            if (folders.isFolderKey(key)) folders.art(key, size)
+            else {
+                val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, key.toLongOrNull() ?: return@withContext null)
+                runCatching {
+                    val picture = context.contentResolver.loadThumbnail(uri, Size(size, size), null)
+                    ByteArrayOutputStream().also { picture.compress(Bitmap.CompressFormat.JPEG, 85, it) }.toByteArray()
+                }.getOrNull()
+            }
         } ?: return false
         call.response.header(HttpHeaders.CacheControl, "max-age=86400")
         call.respondBytes(bytes, ContentType.Image.JPEG)

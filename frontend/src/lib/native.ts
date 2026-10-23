@@ -67,6 +67,11 @@ export interface NativeBridge {
 	 * the answer comes as onDownloaded.
 	 */
 	downloadSong?(songJson: string): void;
+	/** The folders picked as music, JSON [{ id, name }] (bridge version 13). */
+	musicFolders?(): string;
+	/** Opens Android's folder picker; the new list comes as onMusicFolders (bridge version 13). */
+	addMusicFolder?(): void;
+	removeMusicFolder?(id: string): void;
 	/** The sleep timer, which the app's player runs (bridge version 12): JSON SleepSetting, or null when it's off. */
 	sleepTimer?(): string | null;
 	/** Sets it (JSON SleepSetting) or turns it off ("null"); the app tells every page as onSleepTimer. */
@@ -100,6 +105,8 @@ export interface NativeCallbacks {
 	onNearby?(state: NearbyState): void;
 	/** A speaker near the phone had a problem (couldn't play a song, another app took it). */
 	onNearbyNotice?(text: string): void;
+	/** The picked music folders changed. */
+	onMusicFolders?(folders: { id: string; name: string }[]): void;
 	/** Back from setPhoneMusic: whether it's on now, and why not when Android said no. */
 	onPhoneMusic?(on: boolean, error: string | null): void;
 	/** Back from downloadSong: null when the song is in the Music folder, else why not. */

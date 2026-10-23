@@ -83,7 +83,10 @@ computer: the left side). It shows when there's local music:
   folder with YTMP (see [implementation](../implementation/local-music.md)). Every phone and
   home server on that Wi-Fi finds it by itself.
 - **Music on this phone**: the songs stored on the phone, in rooms on the phone. Android asks
-  once whether YTMP may read them.
+  once whether YTMP may read them. Music Android's own scan doesn't know (an SD card, a folder
+  with a `.nomedia` file) comes in through **Music folders** (*Settings → Local music → Add a
+  folder*): pick a folder with Android's folder picker (no permission needed) and its songs show
+  with the rest of the phone's music.
 
 The tab is like YouTube Music's library: **Albums** (the default, with covers), **Artists**,
 **Songs** (300 at a time, with *Load more*; see [songs per page](ui.md)), **Genres** and

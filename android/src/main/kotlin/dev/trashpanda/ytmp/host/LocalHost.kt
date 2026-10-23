@@ -83,11 +83,13 @@ class LocalHost(private val context: Context) {
     /** Amplifier zones the house describes in a file on its network (fed by one of those MPDs). */
     /** Local music (the Local tab): what a Raspberry Pi shares, and the music on this phone. */
     val local = LocalMusic()
-    private val phoneLibrary = PhoneLibrary(context) { lanUrl() ?: "http://127.0.0.1:$PORT" }
+    private val phoneLibrary = PhoneLibrary(context, { lanUrl() ?: "http://127.0.0.1:$PORT" }, canRead = ::canReadMusic)
+    /** Music folders the owner picked (Settings → Local music), for music the media store doesn't know. */
+    val musicFolders get() = phoneLibrary.folders
     private val localSettings = context.getSharedPreferences("ytmp.local", Context.MODE_PRIVATE)
 
     /** The music on this phone shows in the Local tab (Settings → Local music), and Android lets us read it. */
-    val phoneMusicOn: Boolean get() = localSettings.getBoolean(PHONE_MUSIC, false) && canReadMusic()
+    val phoneMusicOn: Boolean get() = localSettings.getBoolean(PHONE_MUSIC, false) && (canReadMusic() || !musicFolders.isEmpty())
 
     fun canReadMusic() = context.checkSelfPermission(MUSIC_PERMISSION) == PackageManager.PERMISSION_GRANTED
 
@@ -149,7 +151,7 @@ class LocalHost(private val context: Context) {
     )
 
     /** The setting is on and Android lets us read the music. */
-    private fun localSongsOn() = cacheSettings.getBoolean(CACHE_LOCAL, false) && canReadMusic()
+    private fun localSongsOn() = cacheSettings.getBoolean(CACHE_LOCAL, false) && phoneMusicOn
 
     private fun applyLocalSongs() {
         if (localSongsOn()) matcher.start() else matcher.stop()

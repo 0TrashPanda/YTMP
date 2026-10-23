@@ -30,6 +30,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.lifecycle.lifecycleScope
 import com.google.common.util.concurrent.ListenableFuture
 import dev.trashpanda.ytmp.host.LocalHost
+import dev.trashpanda.ytmp.host.MusicFolder
 import dev.trashpanda.ytmp.host.createFor
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
@@ -74,6 +75,18 @@ class MainActivity : ComponentActivity() {
         app.host.setPhoneMusic(granted)
         phoneMusicAnswer(granted, if (granted) null else "YTMP may not read the music on this phone. You can allow Music and audio in the app's settings (Android settings → Apps → YTMP).")
     }
+
+    /** Picking a folder of music (Settings → Local music); the page hears the new list as onMusicFolders. */
+    private val musicFolderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+        if (tree != null) {
+            app.host.musicFolders.add(tree)
+            app.host.setPhoneMusic(true)
+        }
+        musicFoldersAnswer()
+    }
+
+    private fun musicFoldersAnswer() =
+        js("window.__ytmpNative && window.__ytmpNative.onMusicFolders && window.__ytmpNative.onMusicFolders(${app.host.musicFolders.all().let { Json.encodeToString(ListSerializer(MusicFolder.serializer()), it) }})")
 
     private fun phoneMusicAnswer(on: Boolean, error: String?) =
         js("window.__ytmpNative && window.__ytmpNative.onPhoneMusic && window.__ytmpNative.onPhoneMusic($on, ${error?.let(JSONObject::quote) ?: "null"})")
@@ -384,6 +397,20 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        /** The folders picked as music, JSON [{id, name}] (bridge version 13). */
+        @JavascriptInterface
+        fun musicFolders(): String = Json.encodeToString(ListSerializer(MusicFolder.serializer()), app.host.musicFolders.all())
+
+        /** Opens Android's folder picker; the answer comes as onMusicFolders (bridge version 13). */
+        @JavascriptInterface
+        fun addMusicFolder() = runOnUiThread { musicFolderPicker.launch(null) }
+
+        @JavascriptInterface
+        fun removeMusicFolder(id: String) = runOnUiThread {
+            app.host.musicFolders.remove(id)
+            musicFoldersAnswer()
+        }
+
         @JavascriptInterface
         fun serverUrl(): String = server.orEmpty()
 
@@ -654,7 +681,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 12
+        const val BRIDGE_VERSION = 13
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

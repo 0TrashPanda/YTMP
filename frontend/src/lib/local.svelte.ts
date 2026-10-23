@@ -4,11 +4,21 @@ import { nativeBridge } from './native';
 import type { LocalGroup, LocalLibrarySummary } from './protocol.gen';
 import { read, saved, write } from './storage';
 
+function readFolders(): { id: string; name: string }[] {
+	try {
+		return JSON.parse(nativeBridge?.musicFolders?.() ?? '[]');
+	} catch {
+		return [];
+	}
+}
+
 export const local = $state({
 	/** Show the music on the network (a Raspberry Pi's). */
 	network: saved.localNetwork,
 	/** The app shows the music on this phone (in rooms on this phone). */
 	phone: nativeBridge?.phoneMusic?.() ?? false,
+	/** Folders picked as music on this phone (for music the phone's own scan doesn't know). */
+	folders: readFolders(),
 	/** The libraries this host has that are switched on here; null until asked. */
 	libraries: null as LocalLibrarySummary[] | null
 });
@@ -109,4 +119,31 @@ export function subfolders(folders: LocalGroup[], path: string): { path: string;
 /** Every song in folder [path] and the folders inside it, as places in the library's songs. */
 export function songsUnder(folders: LocalGroup[], path: string): number[] {
 	return folders.filter((f) => inside(f.name, path)).flatMap((f) => f.songs);
+}
+
+/** Opens the folder picker; the list updates when it is back. */
+export function addMusicFolder(): void {
+	if (!nativeBridge?.addMusicFolder) return;
+	window.__ytmpNative = {
+		...window.__ytmpNative,
+		onMusicFolders: (folders) => {
+			local.folders = folders;
+			local.phone = nativeBridge?.phoneMusic?.() ?? local.phone;
+			void loadLocal(true);
+		}
+	};
+	nativeBridge.addMusicFolder();
+}
+
+export function removeMusicFolder(id: string): void {
+	if (!nativeBridge?.removeMusicFolder) return;
+	window.__ytmpNative = {
+		...window.__ytmpNative,
+		onMusicFolders: (folders) => {
+			local.folders = folders;
+			local.phone = nativeBridge?.phoneMusic?.() ?? local.phone;
+			void loadLocal(true);
+		}
+	};
+	nativeBridge.removeMusicFolder(id);
 }

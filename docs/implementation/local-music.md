@@ -77,6 +77,15 @@ changes. The phone serves the files (`/api/audio/…`, from a file descriptor, w
 covers (`ContentResolver.loadThumbnail`) itself, at its address on the network, so speakers and
 friends reach them too.
 
+**Picked folders** (`PhoneFolders`, bridge version 13: `musicFolders`, `addMusicFolder`,
+`removeMusicFolder`, `onMusicFolders`): `ACTION_OPEN_DOCUMENT_TREE` with a persisted read grant
+(prefs `ytmp.local` `musicFolders`). The tree is walked with `DocumentsContract` every 2 minutes
+(and when the list changes); tags come from `MediaMetadataRetriever` once per file (its
+modified time and size), kept in `files/music-folders.json`, which also maps a song's key
+(`f` + the first 8 bytes of the SHA-1 of its document URI) back to the file after a restart. Covers
+are the embedded picture. Their songs are tracks of `PhoneLibrary` next to the media store's;
+without the music permission the media store part is skipped and only the folders show.
+
 Settings → Local music → *Music on this phone* (bridge version 10: `phoneMusic`,
 `setPhoneMusic`, answered with `onPhoneMusic`) asks Android once for `READ_MEDIA_AUDIO`
 (`READ_EXTERNAL_STORAGE` before Android 13). It's in rooms on the phone only.

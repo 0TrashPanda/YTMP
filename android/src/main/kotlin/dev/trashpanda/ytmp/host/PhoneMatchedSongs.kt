@@ -1,7 +1,5 @@
 package dev.trashpanda.ytmp.host
 
-import android.content.ContentUris
-import android.provider.MediaStore
 import io.ktor.server.application.ApplicationCall
 
 /**
@@ -27,11 +25,11 @@ class PhoneMatchedSongs(private val matcherOf: () -> LocalMatcher, private val m
 
     private fun download(match: Pair<LocalTrack, dev.trashpanda.ytmp.protocol.Song>) = DownloadedSong(
         match.second,
-        ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, match.first.key.toLong()).toString(),
+        media.uriOf(match.first.key).toString(),
         local = true,
     )
 
-    private fun key(download: DownloadedSong) = android.net.Uri.parse(download.uri).lastPathSegment!!
+    private fun key(download: DownloadedSong) = matcher.find(download.song.id)?.first?.key ?: throw SourceException("That song isn't on this phone any more")
 }
 
 /** [first]'s downloads, then [second]'s songs for the ones it doesn't have. */
