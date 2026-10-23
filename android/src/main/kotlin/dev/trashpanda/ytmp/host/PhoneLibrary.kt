@@ -111,6 +111,23 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
         }
     }
 
+    /** The first [bytes] of song [key]'s file, where its tags are (null: can't read it). */
+    suspend fun head(key: String, bytes: Int = 128 * 1024): ByteArray? = withContext(Dispatchers.IO) {
+        val uri = uriOf(key) ?: return@withContext null
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val buffer = ByteArray(bytes)
+                var got = 0
+                while (got < bytes) {
+                    val n = input.read(buffer, got, bytes - got)
+                    if (n < 0) break
+                    got += n
+                }
+                buffer.copyOf(got)
+            }
+        }.getOrNull()
+    }
+
     /** Title, artist, album and length in seconds: the same song in two places. */
     private fun sameSong(t: LocalTrack) = listOf(t.title, t.artist, t.album).joinToString("|") { it.trim().lowercase() } + "|" + t.durationMs / 1000
 
@@ -154,6 +171,7 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
             MediaStore.Audio.Media.RELATIVE_PATH,
             MediaStore.Audio.Media.MIME_TYPE,
             MediaStore.Audio.Media.GENRE,
+            MediaStore.Audio.Media.DISPLAY_NAME,
         )
         val found = ArrayList<LocalTrack>()
         context.contentResolver.query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, columns, "${MediaStore.Audio.Media.IS_MUSIC} != 0", null, null)?.use { c ->
@@ -176,6 +194,7 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
                     durationMs = c.getLong(7),
                     folder = c.getString(8).orEmpty(),
                     genre = text(10).orEmpty(),
+                    file = c.getString(11).orEmpty(),
                 )
             }
         }

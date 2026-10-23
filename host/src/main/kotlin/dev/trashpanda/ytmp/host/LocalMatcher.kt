@@ -22,6 +22,10 @@ class LocalMatcher(
     private val cache: SongCache,
     private val tracks: suspend () -> List<LocalTrack>,
     private val search: suspend (query: String) -> List<Song>,
+    /** The YouTube video ID written in a file's tags (a link, say), or null. */
+    private val tagged: suspend (LocalTrack) -> String? = { null },
+    /** A YouTube Music song by its ID, or null when there's none. */
+    private val lookup: suspend (songId: String) -> Song? = { null },
     private val scope: CoroutineScope,
     private val gapMs: Long = GAP_MS,
     private val retryMs: Long = RETRY_MS,
@@ -88,7 +92,8 @@ class LocalMatcher(
         val todo = files.filter { cache.localMatch(it.key)?.sig != signature(it) }
         pending = todo.size
         for (track in todo) {
-            val match = LocalMatch(signature(track), match(track, search("${track.artist} ${track.title}")))
+            val byId = (idInName(track.file) ?: tagged(track))?.let { id -> lookup("ytm:$id")?.takeIf { sameLength(track, it) } }
+            val match = LocalMatch(signature(track), byId ?: match(track, search("${track.artist} ${track.title}")))
             cache.setLocalMatch(track.key, match)
             if (match.song != null) publish(valid)
             pending--
@@ -116,7 +121,29 @@ class LocalMatcher(
             !t.folder.startsWith("Music/YTMP") && t.durationMs in 30_000..MAX_MS &&
                 t.title != "Unknown song" && t.artist != "Unknown artist"
 
-        internal fun signature(t: LocalTrack) = "${t.title}|${t.artist}|${t.durationMs}"
+        // v2: IDs in names and tags count.
+        internal fun signature(t: LocalTrack) = "v2|${t.title}|${t.artist}|${t.durationMs}"
+
+        private val ID = "[A-Za-z0-9_-]{11}"
+        private val IN_BRACKETS = Regex("\\[($ID)]\\s*$")
+        private val AFTER_DASH = Regex("-($ID)$")
+        private val LINK = Regex("(?:youtube\\.com/(?:watch\\?(?:[^\\s\"'&]*&)?v=|shorts/|embed/)|youtu\\.be/)($ID)")
+
+        /** The video ID in a yt-dlp style file name: "Song [dQw4w9WgXcQ].mp3" or "Song-dQw4w9WgXcQ.mp3". */
+        internal fun idInName(file: String): String? {
+            val name = file.substringBeforeLast('.')
+            return (IN_BRACKETS.find(name) ?: AFTER_DASH.find(name))?.groupValues?.get(1)
+        }
+
+        /** The video ID in a YouTube link somewhere in [bytes] (a tag's text, in any of its encodings). */
+        fun idInBytes(bytes: ByteArray): String? {
+            // UTF-16 text has a zero byte between letters: leave those out.
+            val text = String(bytes.filter { it != 0.toByte() }.toByteArray(), Charsets.ISO_8859_1)
+            return LINK.find(text)?.groupValues?.get(1)
+        }
+
+        private fun sameLength(t: LocalTrack, song: Song) = song.durationMs > 0 && abs(song.durationMs - t.durationMs) <= ID_SLACK_MS
+        private const val ID_SLACK_MS = 10_000L
 
         /** The first result with the same title, an artist in common and (about) the same length. */
         internal fun match(track: LocalTrack, results: List<Song>): Song? {

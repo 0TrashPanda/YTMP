@@ -177,7 +177,9 @@ without internet on the phone. It works by itself: there is nothing to pick.
   listed in its own folder, *On this phone*, and plays as that YouTube Music song (likes, radio
   and history work) from the file, also offline. A file counts when a YouTube Music search finds a
   song with the same title, an artist in common and the same length (within 3 seconds); anything
-  less sure is left out. Each file is looked up once and slowly (so YouTube doesn't block the
+  less sure is left out. A file that says which YouTube video it is, in its name (`Song [dQw4w9WgXcQ].mp3`,
+  `Song-dQw4w9WgXcQ.mp3`) or in a tag with a YouTube link (what yt-dlp writes), is matched by that
+  instead, as long as its length agrees (within 10 seconds). Each file is looked up once and slowly (so YouTube doesn't block the
   network), and the answer is kept. They don't count toward the cache's size and are never removed.
 - Only songs from online sources (YouTube Music, later YouTube) are cached. Local music and
   media servers are already files.

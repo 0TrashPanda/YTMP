@@ -56,6 +56,8 @@ data class LocalTrack(
     val folder: String = "",
     val genre: String = "",
     val song: Song? = null,
+    /** The file's name, when the library knows it (an ID may be in it). */
+    val file: String = "",
 )
 
 /** Music the host reaches itself: an MPD's music folder ([MpdLibrary]), the music on the hosting phone. */

@@ -45,6 +45,41 @@ class LocalMatcherTest {
     }
 
     @Test
+    fun `a YouTube ID in the file name or a tag is found`() {
+        assertEquals("JsYh2wQVUAI", LocalMatcher.idInName("Love And Truth [JsYh2wQVUAI].opus"))
+        assertEquals("QNXyamTN5D0", LocalMatcher.idInName("did you get enough love-QNXyamTN5D0.mp3"))
+        assertEquals("_b7OanWbpjU", LocalMatcher.idInName("Stockholm Syndrome [_b7OanWbpjU].mkv"))
+        assertNull(LocalMatcher.idInName("A Really Long Time (Rick and Morty Remix).mp3"))
+        assertEquals("JsYh2wQVUAI", LocalMatcher.idInBytes("xx PURL=https://www.youtube.com/watch?v=JsYh2wQVUAI\u0000more".toByteArray()))
+        assertEquals("JsYh2wQVUAI", LocalMatcher.idInBytes("https://music.youtube.com/watch?v=JsYh2wQVUAI".toByteArray(Charsets.UTF_16LE)))
+        assertNull(LocalMatcher.idInBytes("no link".toByteArray()))
+    }
+
+    @Test
+    fun `an ID is looked up first and beats a search`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val dir = createTempDirectory("matcher-id").toFile().apply { deleteOnExit() }
+        val youtube = StreamResolver { error("not used") }
+        val cache = SongCache(dir, 1_000_000, youtube, null, scope, coverOf = { null })
+        val searches = ArrayList<String>()
+        val files = listOf(
+            track("1", "Whatever the file says", "", 215_000).copy(file = "Love And Truth [JsYh2wQVUAI].opus"),
+            track("2", "Far off", "X", 100_000).copy(file = "Far off [AAAAAAAAAAA].opus"),
+        )
+        val matcher = LocalMatcher(cache, { files }, { searches += it; emptyList() }, lookup = { id ->
+            if (id == "ytm:JsYh2wQVUAI") song(id, "Love And Truth", "Y", 215_700) else song(id, "Other", "Z", 300_000)
+        }, scope = scope, gapMs = 0)
+        matcher.start()
+        withTimeout(5_000) { while (matcher.pending > 0 || cache.localMatch("2") == null) delay(10) }
+        assertEquals("ytm:JsYh2wQVUAI", matcher.find("ytm:JsYh2wQVUAI")?.second?.id)
+        // The second one's ID was another length: searched, and nothing found.
+        assertNull(cache.localMatch("2")?.song)
+        assertEquals(1, searches.size)
+        matcher.stop()
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+    }
+
+    @Test
     fun `each file is looked up once and the answer is kept`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val dir = createTempDirectory("matcher").toFile().apply { deleteOnExit() }
@@ -57,7 +92,7 @@ class LocalMatcherTest {
         val matcher = LocalMatcher(cache, { files }, { query ->
             searches += query
             listOf(song("ytm:halo", "Halo", "Beyoncé", 261_000))
-        }, scope, gapMs = 0)
+        }, scope = scope, gapMs = 0)
         matcher.start()
         withTimeout(5_000) { while (matcher.pending > 0 || cache.localMatch("2") == null) delay(10) }
         assertEquals("ytm:halo", matcher.find("ytm:halo")?.second?.id)

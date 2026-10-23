@@ -58,6 +58,7 @@ class PhoneFolders(private val context: Context) {
         val durationMs: Long,
         val genre: String = "",
         val folder: String,
+        val file: String = "",
     )
 
     init {
@@ -120,14 +121,14 @@ class PhoneFolders(private val context: Context) {
                 val key = KEY_PREFIX + sha(doc.uri.toString())
                 seen += key
                 val old = files[key]
-                val entry = if (old != null && old.modified == doc.modified && old.size == doc.size) old else {
+                val entry = if (old != null && old.file.isNotEmpty() && old.modified == doc.modified && old.size == doc.size) old else {
                     read++
                     read(key, doc) ?: return@walk
                 }
                 files[key] = entry
                 found += LocalTrack(
                     key = key, title = entry.title, artist = entry.artist, albumArtist = entry.albumArtist, album = entry.album,
-                    disc = entry.disc, track = entry.track, year = entry.year, durationMs = entry.durationMs, folder = entry.folder, genre = entry.genre,
+                    disc = entry.disc, track = entry.track, year = entry.year, durationMs = entry.durationMs, folder = entry.folder, genre = entry.genre, file = entry.file,
                 )
             }
         }
@@ -205,6 +206,7 @@ class PhoneFolders(private val context: Context) {
                 durationMs = duration,
                 genre = tag(MediaMetadataRetriever.METADATA_KEY_GENRE).orEmpty(),
                 folder = doc.path,
+                file = doc.name,
             )
         } catch (e: Exception) {
             Log.w(TAG, "couldn't read ${doc.name}: ${e.message}")
