@@ -86,7 +86,8 @@ computer: the left side). It shows when there's local music:
   once whether YTMP may read them. Music Android's own scan doesn't know (an SD card, a folder
   with a `.nomedia` file) comes in through **Music folders** (*Settings → Local music → Add a
   folder*): pick a folder with Android's folder picker (no permission needed) and its songs show
-  with the rest of the phone's music.
+  with the rest of the phone's music. *Use Android's music scan* can be switched off to use only
+  the picked folders. A song that is in both shows once.
 
 The tab is like YouTube Music's library: **Albums** (the default, with covers), **Artists**,
 **Songs** (300 at a time, with *Load more*; see [songs per page](ui.md)), **Genres** and

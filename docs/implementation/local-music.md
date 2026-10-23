@@ -84,7 +84,9 @@ friends reach them too.
 modified time and size), kept in `files/music-folders.json`, which also maps a song's key
 (`f` + the first 8 bytes of the SHA-1 of its document URI) back to the file after a restart. Covers
 are the embedded picture. Their songs are tracks of `PhoneLibrary` next to the media store's;
-without the music permission the media store part is skipped and only the folders show.
+without the music permission, or with *Use Android's music scan* off (prefs `ytmp.local` `mediaScan`, bridge
+`mediaScan`/`setMediaScan`), the media store part is skipped and only the folders show. A folder song
+with the same title, artist, album and length (in seconds) as a media store one is left out.
 
 Settings → Local music → *Music on this phone* (bridge version 10: `phoneMusic`,
 `setPhoneMusic`, answered with `onPhoneMusic`) asks Android once for `READ_MEDIA_AUDIO`

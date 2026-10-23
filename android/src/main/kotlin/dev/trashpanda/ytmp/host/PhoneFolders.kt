@@ -90,6 +90,9 @@ class PhoneFolders(private val context: Context) {
         saveIndex()
     }
 
+    /** Read the folders again at the next look. */
+    fun rescan() = changed()
+
     private fun changed() {
         version++
         scannedAt = 0

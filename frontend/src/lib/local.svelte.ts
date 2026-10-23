@@ -19,6 +19,8 @@ export const local = $state({
 	phone: nativeBridge?.phoneMusic?.() ?? false,
 	/** Folders picked as music on this phone (for music the phone's own scan doesn't know). */
 	folders: readFolders(),
+	/** Android's own music scan is used for the music on this phone. */
+	scan: nativeBridge?.mediaScan?.() ?? true,
 	/** The libraries this host has that are switched on here; null until asked. */
 	libraries: null as LocalLibrarySummary[] | null
 });
@@ -127,9 +129,7 @@ export function addMusicFolder(): void {
 	window.__ytmpNative = {
 		...window.__ytmpNative,
 		onMusicFolders: (folders) => {
-			local.folders = folders;
-			local.phone = nativeBridge?.phoneMusic?.() ?? local.phone;
-			void loadLocal(true);
+			musicSourcesChanged(folders);
 		}
 	};
 	nativeBridge.addMusicFolder();
@@ -140,10 +140,22 @@ export function removeMusicFolder(id: string): void {
 	window.__ytmpNative = {
 		...window.__ytmpNative,
 		onMusicFolders: (folders) => {
-			local.folders = folders;
-			local.phone = nativeBridge?.phoneMusic?.() ?? local.phone;
-			void loadLocal(true);
+			musicSourcesChanged(folders);
 		}
 	};
 	nativeBridge.removeMusicFolder(id);
+}
+
+function musicSourcesChanged(folders: { id: string; name: string }[]): void {
+	local.folders = folders;
+	local.phone = nativeBridge?.phoneMusic?.() ?? local.phone;
+	local.scan = nativeBridge?.mediaScan?.() ?? local.scan;
+	void loadLocal(true);
+}
+
+/** Switches Android's own music scan on or off (it may ask for permission). */
+export function setMediaScan(on: boolean): void {
+	if (!nativeBridge?.setMediaScan) return;
+	window.__ytmpNative = { ...window.__ytmpNative, onMusicFolders: musicSourcesChanged };
+	nativeBridge.setMediaScan(on);
 }

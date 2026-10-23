@@ -72,6 +72,9 @@ export interface NativeBridge {
 	/** Opens Android's folder picker; the new list comes as onMusicFolders (bridge version 13). */
 	addMusicFolder?(): void;
 	removeMusicFolder?(id: string): void;
+	/** Android's own music scan is used (bridge version 13); setMediaScan answers with onMusicFolders. */
+	mediaScan?(): boolean;
+	setMediaScan?(on: boolean): void;
 	/** The sleep timer, which the app's player runs (bridge version 12): JSON SleepSetting, or null when it's off. */
 	sleepTimer?(): string | null;
 	/** Sets it (JSON SleepSetting) or turns it off ("null"); the app tells every page as onSleepTimer. */

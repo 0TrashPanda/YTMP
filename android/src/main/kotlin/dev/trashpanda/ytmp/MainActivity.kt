@@ -73,6 +73,9 @@ class MainActivity : ComponentActivity() {
     /** Reading the music on the phone, for the Local tab: the answer goes to the page as onPhoneMusic. */
     private val musicPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         app.host.setPhoneMusic(granted)
+        if (granted && pendingScan) app.host.setMediaScan(true)
+        if (pendingScan) musicFoldersAnswer()
+        pendingScan = false
         phoneMusicAnswer(granted, if (granted) null else "YTMP may not read the music on this phone. You can allow Music and audio in the app's settings (Android settings → Apps → YTMP).")
     }
 
@@ -87,6 +90,9 @@ class MainActivity : ComponentActivity() {
 
     private fun musicFoldersAnswer() =
         js("window.__ytmpNative && window.__ytmpNative.onMusicFolders && window.__ytmpNative.onMusicFolders(${app.host.musicFolders.all().let { Json.encodeToString(ListSerializer(MusicFolder.serializer()), it) }})")
+
+    /** The permission being asked for is for switching the media scan on. */
+    private var pendingScan = false
 
     private fun phoneMusicAnswer(on: Boolean, error: String?) =
         js("window.__ytmpNative && window.__ytmpNative.onPhoneMusic && window.__ytmpNative.onPhoneMusic($on, ${error?.let(JSONObject::quote) ?: "null"})")
@@ -409,6 +415,22 @@ class MainActivity : ComponentActivity() {
         fun removeMusicFolder(id: String) = runOnUiThread {
             app.host.musicFolders.remove(id)
             musicFoldersAnswer()
+        }
+
+        /** Android's own music scan is used for the music on this phone (bridge version 13). */
+        @JavascriptInterface
+        fun mediaScan(): Boolean = app.host.mediaScanSetting() && app.host.canReadMusic()
+
+        /** Switches it (asking Android once to read the music); the answer comes as onMusicFolders (bridge version 13). */
+        @JavascriptInterface
+        fun setMediaScan(on: Boolean) = runOnUiThread {
+            if (on && !app.host.canReadMusic()) {
+                pendingScan = true
+                musicPermission.launch(LocalHost.MUSIC_PERMISSION)
+            } else {
+                app.host.setMediaScan(on)
+                musicFoldersAnswer()
+            }
         }
 
         @JavascriptInterface

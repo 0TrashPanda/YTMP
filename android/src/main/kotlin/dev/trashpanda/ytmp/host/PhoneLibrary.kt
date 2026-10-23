@@ -45,7 +45,10 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
         val seen = folders.version
         val read = withContext(Dispatchers.IO) {
             // The media store needs the permission; the picked folders don't.
-            (if (canRead()) query() else emptyList()) + folders.tracks().onEach { track -> folders.mime(track.key)?.let { types[track.key] = it } }
+            val scanned = if (canRead()) query() else emptyList()
+            // A file the media store knows too shows once (its entry stays).
+            val seenSongs = scanned.mapTo(HashSet(), ::sameSong)
+            scanned + folders.tracks().filter { seenSongs.add(sameSong(it)) }.onEach { track -> folders.mime(track.key)?.let { types[track.key] = it } }
         }
         tracks = read
         generation = now
@@ -107,6 +110,12 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
             }
         }
     }
+
+    /** Title, artist, album and length in seconds: the same song in two places. */
+    private fun sameSong(t: LocalTrack) = listOf(t.title, t.artist, t.album).joinToString("|") { it.trim().lowercase() } + "|" + t.durationMs / 1000
+
+    /** The scan was switched or the folders changed: read the music again. */
+    fun reload() = folders.rescan()
 
     /** The file of song [key]: the media store's, or one in a picked folder. */
     fun uriOf(key: String): android.net.Uri? =

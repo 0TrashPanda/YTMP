@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Settings → Local music: which music the Local tab shows on this device.
-	import { local, localPlace, addMusicFolder, removeMusicFolder, setLocalNetwork, setLocalRemember, setPhoneMusic } from '../../local.svelte';
+	import { local, localPlace, addMusicFolder, removeMusicFolder, setMediaScan, setLocalNetwork, setLocalRemember, setPhoneMusic } from '../../local.svelte';
 	import { nativeBridge } from '../../native';
 	import Switch from './Switch.svelte';
 
@@ -34,6 +34,13 @@
 		</div>
 	{/if}
 	{#if nativeBridge?.addMusicFolder}
+		<div class="flex items-center gap-4">
+			<div class="min-w-0 flex-1">
+				<p class="text-sm font-medium">Use Android's music scan</p>
+				<p class="text-xs text-muted">Everything Android found on the phone. Off: only the folders below. A song in both shows once.</p>
+			</div>
+			<Switch checked={local.scan} label="Use Android's music scan" onchange={setMediaScan} />
+		</div>
 		<div class="flex flex-col gap-2">
 			<div>
 				<p class="text-sm font-medium">Music folders</p>

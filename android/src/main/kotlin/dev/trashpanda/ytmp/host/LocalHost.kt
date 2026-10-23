@@ -83,13 +83,25 @@ class LocalHost(private val context: Context) {
     /** Amplifier zones the house describes in a file on its network (fed by one of those MPDs). */
     /** Local music (the Local tab): what a Raspberry Pi shares, and the music on this phone. */
     val local = LocalMusic()
-    private val phoneLibrary = PhoneLibrary(context, { lanUrl() ?: "http://127.0.0.1:$PORT" }, canRead = ::canReadMusic)
+    private val phoneLibrary = PhoneLibrary(context, { lanUrl() ?: "http://127.0.0.1:$PORT" }, canRead = ::mediaScanOn)
     /** Music folders the owner picked (Settings → Local music), for music the media store doesn't know. */
     val musicFolders get() = phoneLibrary.folders
     private val localSettings = context.getSharedPreferences("ytmp.local", Context.MODE_PRIVATE)
 
     /** The music on this phone shows in the Local tab (Settings → Local music), and Android lets us read it. */
-    val phoneMusicOn: Boolean get() = localSettings.getBoolean(PHONE_MUSIC, false) && (canReadMusic() || !musicFolders.isEmpty())
+    val phoneMusicOn: Boolean get() = localSettings.getBoolean(PHONE_MUSIC, false) && (mediaScanOn() || !musicFolders.isEmpty())
+
+    /** Android's own music scan (the media store) is used, and Android lets us read it. */
+    fun mediaScanOn() = localSettings.getBoolean(MEDIA_SCAN, true) && canReadMusic()
+
+    /** The setting itself, whatever the permission. */
+    fun mediaScanSetting() = localSettings.getBoolean(MEDIA_SCAN, true)
+
+    fun setMediaScan(on: Boolean) {
+        localSettings.edit { putBoolean(MEDIA_SCAN, on) }
+        phoneLibrary.reload()
+        if (phoneMusicOn) local.add(phoneLibrary) else local.remove(PhoneLibrary.ID)
+    }
 
     fun canReadMusic() = context.checkSelfPermission(MUSIC_PERMISSION) == PackageManager.PERMISSION_GRANTED
 
@@ -395,6 +407,7 @@ class LocalHost(private val context: Context) {
     companion object {
         const val PORT = 8765
         private const val PHONE_MUSIC = "phoneMusic"
+        private const val MEDIA_SCAN = "mediaScan"
         private const val CACHE_SIZE = "size"
         private const val CACHE_PLACE = "place"
         private const val CACHE_LOCAL = "localSongs"
