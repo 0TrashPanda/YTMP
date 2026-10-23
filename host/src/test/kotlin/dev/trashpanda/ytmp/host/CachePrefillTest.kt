@@ -108,7 +108,7 @@ class CachePrefillTest {
     }
 
     @Test
-    fun `songs from the history played on more than one day are kept`() = runBlocking {
+    fun `the songs in the history are kept, and their plays count`() = runBlocking {
         val youtube = FakeYoutube()
         val cache = cache(youtube)
         val (often, once) = song("often") to song("once")
@@ -116,9 +116,10 @@ class CachePrefillTest {
         cache.importPlays(listOf(often to now - 3 * day))
         val prefill = prefill(cache, history = listOf(often to 0, once to 1))
         prefill.set(liked = 0, fromHistory = true)
-        eventually { cache.has(often.id) }
-        assertEquals(listOf(often.id), youtube.downloads.toList())
-        assertFalse(cache.has(once.id))
+        eventually { cache.has(often.id) && cache.has(once.id) }
+        assertEquals(listOf(often.id, once.id), youtube.downloads.toList())
+        assertTrue(cache.worth(often.id))
+        assertFalse(cache.worth(once.id))
     }
 
     @Test

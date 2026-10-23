@@ -160,11 +160,12 @@ without internet on the phone. It works by itself: there is nothing to pick.
   Playback → Song cache*):
   - **Keep your recent likes**: the songs you liked last (Off, 50, 100, 250, 500 or a number you
     type) are downloaded to keep, so they start at once and play offline.
-  - **Songs from your YouTube Music history**: plays in that history count like plays here, also
-    the ones on other devices, so a song you played on more than one day in 30 days is downloaded
-    to keep. YouTube Music lists only about the last 200 songs, each once, so the app reads it a
-    few times a day and counts what it sees over time. (A Google Takeout import is a
-    [future idea](future-ideas.md#song-cache-from-a-google-takeout-history).)
+  - **Songs from your YouTube Music history**: the songs in that history (also from other
+    devices) are downloaded to keep. YouTube Music lists only about the last 200 songs, each
+    once, so it can't tell what you played often: for now all of them are kept, also songs played
+    once. The app reads it a few times a day, and its plays count like plays here (so they stay
+    longer). Importing the full history from Google Takeout, to keep only what you play most, is a
+    [future idea](future-ideas.md#song-cache-from-a-google-takeout-history).
   - They're **ordinary cached songs**: they go like any other when the cache is full. Only free
     room is filled, nothing is pushed out for them; the setting says when the cache is full. They
     come in one at a time with a pause between (so YouTube doesn't block the network), and follow

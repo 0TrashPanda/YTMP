@@ -86,10 +86,10 @@ the account when a setting changes, at app start and every 6 hours (after an err
   weekday, This week, Last week, a month; another language: unknown, counted as 31 days ago). Each
   becomes a play at noon that day in the index's play counts (`SongCache.importPlays`), unless
   the song already has a play that day: plays here go into that history too
-  ([`addToHistory`](../features/accounts.md)), and the history is read again. YouTube Music lists
-  a song once (its last play), so repeated reads build up the count. A history song that is then
-  [worth an extra download](#filling-it) (2 plays in 30 days) is fetched; the imported plays
-  also count in the keep score.
+  ([`addToHistory`](../features/accounts.md)), and the history is read again. Every song in it
+  is fetched, newest first: YouTube Music lists a song once (its last play) and only about 200,
+  so it can't tell what was played often (a [Takeout import](../features/future-ideas.md#song-cache-from-a-google-takeout-history)
+  could). The imported plays count in the keep score and toward [worth an extra download](#filling-it).
 
 Both go through `SongCache.fetch` (one song at a time, together with the background fetches),
 20 s apart, behind `fetchGate` (*Keep songs in the background*). They're ordinary entries: no

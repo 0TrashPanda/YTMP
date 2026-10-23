@@ -189,7 +189,7 @@
 				</Choice>
 				<Choice
 					label="Songs from your YouTube Music history"
-					hint="Songs YouTube Music says you played more than once (also on other devices) are downloaded to keep. It looks at your history a few times a day."
+					hint="The songs in your YouTube Music history (also from other devices) are downloaded to keep. YouTube Music only shows about your last 200 songs, so for now that's all of them, also songs played once. Importing your full history from Google Takeout, to keep only what you play most, may come later."
 					options={[['0', 'Off'], ['1', 'On']]}
 					value={status.fromHistory ? '1' : '0'}
 					onchange={(v) => attempt(() => patch({ fromHistory: v === '1' }))}

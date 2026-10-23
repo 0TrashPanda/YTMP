@@ -16,8 +16,8 @@ import java.time.ZoneId
 /**
  * Fills the song cache from the owner's YouTube Music account, not only from what plays here
  * (docs/implementation/song-cache.md#from-your-youtube-music): the [liked] most recently liked
- * songs, and songs its history says were played more than once (that history's plays count as
- * plays here: [SongCache.importPlays]). They're ordinary cached songs: they go like any other
+ * songs, and the songs in its history (about the last 200; their plays count as plays here too:
+ * [SongCache.importPlays]). They're ordinary cached songs: they go like any other
  * when the cache is full, and only free room is filled (no song is pushed out for them).
  * Slow on purpose, one song every [gapMs]: YouTube blocks a network that fetches a lot.
  */
@@ -47,7 +47,7 @@ class CachePrefill(
     var liked = 0
         private set
 
-    /** Songs in the YouTube Music history played more than once are cached. */
+    /** The songs in the YouTube Music history are cached. */
     @Volatile
     var fromHistory = false
         private set
@@ -108,8 +108,9 @@ class CachePrefill(
             val heard = history()
             val added = cache.importPlays(heard.map { (song, days) -> song to playedAt(days) })
             log.info("Song cache: {} song(s) in the YouTube Music history, {} play(s) new", heard.size, added)
-            // Played more than once: worth keeping, like a song played twice here.
-            for ((song, _) in heard) if (cache.worth(song.id)) wanted.putIfAbsent(song.id, song)
+            // All of it (about the last 200 songs), newest first: it only goes back that far and
+            // lists each song once, so it can't tell what was played often (a Takeout import could).
+            for ((song, _) in heard) wanted.putIfAbsent(song.id, song)
         }
         val count = liked
         if (count > 0) {

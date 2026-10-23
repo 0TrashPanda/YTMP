@@ -54,7 +54,7 @@ Emoji reactions on the current song, and/or a small text chat in the room.
 ## Song cache from a Google Takeout history
 
 YouTube Music's own history (what the [song cache](sources.md#song-cache) reads now) only goes
-back about 200 songs and lists each song once. Google Takeout's `watch-history.json` has every
+back about 200 songs and lists each song once, so for now all of them are cached. Google Takeout's `watch-history.json` has every
 play, years back: picking that file in *Settings → Playback → Song cache* could count the plays
 per song and keep the ones played most, from the first day.
 
