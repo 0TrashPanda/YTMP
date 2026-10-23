@@ -11,8 +11,8 @@ import dev.trashpanda.ytmp.Log
 /**
  * Finds one kind of device (an mDNS service type) on the phone's network for an output list.
  * A device leaves the list again when the network says it's gone (after [LOST_GRACE_MS], in
- * case it's back right away), when a new search doesn't find it within [SEARCH_GRACE_MS], and
- * when the phone moves to another network ([forgetAll]).
+ * case it's back right away) or a new search doesn't find it within [SEARCH_GRACE_MS] ([lose]:
+ * not while a room still plays on it), and when the phone moves to another network ([forgetAll]).
  */
 abstract class NsdFinder(context: Context, private val serviceType: String, private val tag: String) {
     private val nsd = context.getSystemService(NsdManager::class.java)
@@ -30,6 +30,9 @@ abstract class NsdFinder(context: Context, private val serviceType: String, priv
     protected abstract fun add(info: NsdServiceInfo): String?
 
     protected abstract fun remove(id: String)
+
+    /** The search lost the device (it may still be there): [remove] it, or later if it's still in use. */
+    protected open fun lose(id: String) = remove(id)
 
     @Synchronized
     fun start() {
@@ -82,7 +85,7 @@ abstract class NsdFinder(context: Context, private val serviceType: String, priv
     /** The phone is on another network now: none of the devices found are here, look again. */
     @Synchronized
     fun forgetAll() {
-        for (name in found.keys.toList()) forget(name, "on another network")
+        for (name in found.keys.toList()) forget(name, "on another network", lost = false)
         seenAt.clear()
         if (discovery != null) {
             stop()
@@ -97,12 +100,12 @@ abstract class NsdFinder(context: Context, private val serviceType: String, priv
     }
 
     @Synchronized
-    private fun forget(name: String, why: String) {
+    private fun forget(name: String, why: String, lost: Boolean = true) {
         leaving.remove(name)?.let(handler::removeCallbacks)
         seenAt.remove(name)
         val id = found.remove(name) ?: return
-        remove(id)
-        Log.d(tag, "Removed $name ($why)")
+        Log.d(tag, "Lost $name ($why)")
+        if (lost) lose(id) else remove(id)
     }
 
     companion object {

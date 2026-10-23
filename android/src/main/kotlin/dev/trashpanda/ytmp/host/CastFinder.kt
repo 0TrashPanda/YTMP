@@ -18,6 +18,8 @@ class CastFinder(context: Context, private val outputs: CastOutputs) : NsdFinder
 
     override fun remove(id: String) = outputs.remove(id)
 
+    override fun lose(id: String) = outputs.lost(id)
+
     companion object {
         private const val TAG = "YtmpCast"
     }

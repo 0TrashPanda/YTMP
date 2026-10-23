@@ -47,11 +47,15 @@ class SonosOutputs(
 
     fun add(device: SonosAddress) {
         known.update { it + (device.id to device) }
+        found(device.id)
     }
 
     fun remove(id: String) {
         known.update { it - id }
     }
+
+    /** The network search lost it: removed, once no room plays on it any more ([lose]). */
+    fun lost(id: String) = lose(id) { remove(id) }
 
     /** Adds a speaker by address, named after its room ("Woonkamer"). */
     fun addHost(host: String) {

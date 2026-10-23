@@ -78,7 +78,10 @@
   `MpdFinder`, `ZoneFinder`, all on `NsdFinder`) run while the app is on screen, or while a public room plays. A device leaves
   the list when mDNS says it's gone (after 30 s, in case it's back right away), when a new
   search doesn't find it within 20 s, and when the phone is on another Wi-Fi network
-  (`WifiWatch`: another address range or router, or off Wi-Fi for over a minute).
+  (`WifiWatch`: another address range or router, or off Wi-Fi for over a minute). A device a
+  room still plays on stays while the room reaches it (the phone's search sometimes loses
+  every device at once for a minute or two while they play on): it goes once its connection
+  fails or the room stops playing there (`DeviceDriver.lose`; not for zones).
 - **Cloning onto the phone** (bridge `cloneRoom`, version 6): from another host's page in the
   app, the page hands over a copy of the room; the app makes it on its own host and the page
   opens it there (`http://127.0.0.1:8765/room/CODE#owner=…`). From the phone's own page onto

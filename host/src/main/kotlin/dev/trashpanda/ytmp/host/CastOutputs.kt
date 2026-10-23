@@ -59,11 +59,15 @@ class CastOutputs(
 
     fun add(device: CastDeviceAddress) {
         known.update { it + (device.id to device) }
+        found(device.id)
     }
 
     fun remove(id: String) {
         known.update { it - id }
     }
+
+    /** The network search lost it: removed, once no room plays on it any more ([lose]). */
+    fun lost(id: String) = lose(id) { remove(id) }
 
     /** Where the device with [id] is, if it was found. */
     fun address(id: String): CastDeviceAddress? = known.value[id]

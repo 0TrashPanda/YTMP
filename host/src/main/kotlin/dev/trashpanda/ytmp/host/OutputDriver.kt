@@ -102,6 +102,39 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
     /** A session for device [id]. [resuming]: this room played there before (the connection dropped), so it doesn't take it from another app. */
     protected abstract fun session(id: String, resuming: Boolean): DeviceSession
 
+    /** Device id → how many rooms' sessions there synced fine last time. */
+    private val reached = HashMap<String, Int>()
+    /** Devices the search lost while a room still reached them: how to forget each once none does. */
+    private val lost = HashMap<String, () -> Unit>()
+
+    /**
+     * The network search lost device [id]: [forget] it, but only once no room reaches it any more.
+     * A phone's search sometimes loses every device at once for a minute while they play on fine;
+     * a device that's really gone fails its next sync, and then it's forgotten.
+     */
+    protected fun lose(id: String, forget: () -> Unit) {
+        val now = synchronized(reached) {
+            if ((reached[id] ?: 0) > 0) lost[id] = forget else lost.remove(id)
+            id !in lost
+        }
+        if (now) forget() else log.info("{} {}: the network search lost it, but a room still reaches it, so it stays", kind, name(id))
+    }
+
+    /** The search found device [id] (again): it isn't lost. */
+    protected fun found(id: String) {
+        synchronized(reached) { lost.remove(id) }
+    }
+
+    private fun reaches(id: String, yes: Boolean) {
+        val forget = synchronized(reached) {
+            val count = (reached[id] ?: 0) + if (yes) 1 else -1
+            if (count > 0) reached[id] = count else reached.remove(id)
+            if (count > 0) null else lost.remove(id)
+        } ?: return
+        log.info("{} {}: lost by the network search, and no room reaches it any more: removed", kind, name(id))
+        forget()
+    }
+
     final override suspend fun drive(room: OutputRoom) {
         val changed = Channel<Unit>(Channel.CONFLATED)
         room.addChangeListener { changed.trySend(Unit) }
@@ -110,12 +143,20 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
         val playedOn = HashSet<String>()
         // Devices that can't play an episode at the room's speed: they sit it out (paused).
         val sittingOut = HashSet<String>()
+        // Devices whose session here synced fine last time.
+        val reachedHere = HashSet<String>()
+        fun unreached(id: String) {
+            if (reachedHere.remove(id)) reaches(id, false)
+        }
         try {
             while (true) {
                 // React to changes right away, and check the devices regularly anyway.
                 withTimeoutOrNull(SYNC_INTERVAL_MS) { changed.receive() }
                 val view = room.view()
-                for (id in sessions.keys - view.activeOutputs.keys) sessions.remove(id)?.stop()
+                for (id in sessions.keys - view.activeOutputs.keys) {
+                    sessions.remove(id)?.stop()
+                    unreached(id)
+                }
                 // Switched off here: turning it on again takes it, also from another app.
                 playedOn.retainAll(view.activeOutputs.keys)
                 for ((id, volume) in view.activeOutputs) {
@@ -134,6 +175,7 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
                     try {
                         session.sync(view, volume, room, id)
                         if (session.loadedSomething) playedOn += id
+                        if (reachedHere.add(id)) reaches(id, true)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: OutputTakenOver) {
@@ -141,11 +183,13 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
                         log.info("{} {}: {}", kind, name(id), e.message)
                         session.takenOver()
                         sessions.remove(id)
+                        unreached(id)
                         playedOn -= id
                         room.outputTakenOver(id)
                     } catch (e: Exception) {
                         log.warn("{} {} failed: {}", kind, name(id), e.message)
                         if (session.failed()) sessions.remove(id)
+                        unreached(id)
                         // A new song doesn't wait for it.
                         if (view.starting) view.current?.let { room.outputReady(id, it.itemId) }
                     }
@@ -153,6 +197,7 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
             }
         } finally {
             sessions.values.forEach { it.end() }
+            reachedHere.toList().forEach(::unreached)
         }
     }
 

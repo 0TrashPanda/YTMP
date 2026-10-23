@@ -40,11 +40,15 @@ class MpdOutputs(
 
     fun add(device: MpdAddress) {
         known.update { it + (device.id to device) }
+        found(device.id)
     }
 
     fun remove(id: String) {
         known.update { it - id }
     }
+
+    /** The network search lost it: removed, once no room plays on it any more ([lose]). */
+    fun lost(id: String) = lose(id) { remove(id) }
 
     /** These MPDs (by id) aren't offered by themselves. */
     fun setHidden(ids: Set<String>) {

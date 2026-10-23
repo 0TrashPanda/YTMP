@@ -231,6 +231,41 @@ class CastOutputsTest {
         scope.cancel()
     }
 
+    @Test
+    fun `a device the network search loses stays while a room still plays on it`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        FakeCastDevice().use { device ->
+            val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
+            casts.add(CastDeviceAddress("cast:fake", "Fake TV", "127.0.0.1", device.port))
+            casts.add(CastDeviceAddress("cast:idle", "Kitchen", "127.0.0.1", device.port))
+            val rooms = RoomManager({ "https://stream/$it" }, scope, outputs = casts.devices)
+            casts.attach(rooms)
+            val room = rooms.create("Party")
+            val me = room.join(ClientMessage.Hello(PROTOCOL_VERSION, room.code, "Me", null, room.ownerToken), Outbox { })!!
+            suspend fun run(command: Command) = room.handle(me, ClientMessage.CommandMessage("c", command))
+            run(Command.AddSongs(listOf(song), QueuePosition.END))
+            eventually { casts.devices.value.size == 2 }
+            room.turnOn(me, "cast:fake")
+            // Asked how it plays: the room's sync there went fine before.
+            eventually { "GET_STATUS" in device.types(CastChannel.NS_MEDIA) }
+
+            // The phone's search loses both: the one nothing plays on goes, the playing one stays.
+            casts.lost("cast:idle")
+            casts.lost("cast:fake")
+            eventually { casts.devices.value.map { it.id } == listOf("cast:fake") }
+            delay(3_000)
+            assertEquals(listOf("cast:fake"), casts.devices.value.map { it.id })
+            assertTrue("cast:fake" in room.view().activeOutputs)
+
+            // Found again, and lost again: once the room stops playing there, it goes.
+            casts.add(CastDeviceAddress("cast:fake", "Fake TV", "127.0.0.1", device.port))
+            casts.lost("cast:fake")
+            run(Command.SetOutput("cast:fake", active = false))
+            eventually { casts.devices.value.isEmpty() }
+        }
+        scope.cancel()
+    }
+
     /** A room with a song playing on [device]. */
     private suspend fun playOn(device: FakeCastDevice, scope: CoroutineScope) {
         val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }

@@ -17,6 +17,8 @@ class SonosFinder(context: Context, private val outputs: SonosOutputs) : NsdFind
 
     override fun remove(id: String) = outputs.remove(id)
 
+    override fun lose(id: String) = outputs.lost(id)
+
     companion object {
         private const val TAG = "YtmpSonos"
     }
