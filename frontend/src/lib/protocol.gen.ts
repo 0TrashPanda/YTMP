@@ -312,6 +312,7 @@ export interface CommandUpdateSettings {
   maxSongsPerPerson: number | null;
   maxSongMinutes: number | null;
   noRepeatMinutes: number | null;
+  noDuplicates: boolean | null;
   startWaitSeconds: number | null;
   karaoke: boolean | null;
 }
@@ -594,6 +595,7 @@ export interface RoomSettings {
   maxSongsPerPerson: number;
   maxSongMinutes: number;
   noRepeatMinutes: number;
+  noDuplicates: boolean;
   startWaitSeconds: number;
   karaoke: boolean;
 }

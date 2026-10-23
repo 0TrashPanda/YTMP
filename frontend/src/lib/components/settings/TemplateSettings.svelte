@@ -132,6 +132,13 @@
 						</div>
 						<Switch checked={t.settings.voteSkip} label="Vote to skip" onchange={(on) => save({ ...t, settings: { ...t.settings, voteSkip: on } })} />
 					</div>
+					<div class="mt-6 flex items-center gap-4 border-t border-d-line pt-6">
+						<div class="min-w-0 flex-1">
+							<h3 class="text-base font-semibold text-d-head">No double songs</h3>
+							<p class="text-sm text-d-muted">A song that is in the queue already can't be added again.</p>
+						</div>
+						<Switch checked={t.settings.noDuplicates} label="No double songs" onchange={(on) => save({ ...t, settings: { ...t.settings, noDuplicates: on } })} />
+					</div>
 				{/if}
 			{:else if !error}
 				<p class="text-d-muted">Loading…</p>

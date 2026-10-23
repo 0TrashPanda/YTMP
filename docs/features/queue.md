@@ -25,6 +25,13 @@ Permissions are set by room admins. See [room management](room-management.md#per
 Songs can come from any enabled [source](sources.md), so one queue can mix, for
 example, YouTube Music tracks and local files.
 
+## No double songs ✅
+
+Room setting (*Queue*, and in your role template): a song that is in the queue already can't
+be added again. The ones left out are named in the message ("Not added: already in the
+queue"); the rest of what was added goes in. Admins aren't held to it, like the other queue
+limits, and it doesn't look at history or the autoplay queue.
+
 ## Undo ✅
 
 Removing a song from the queue, or clearing the queue, shows *Removed "…" · **Undo*** for 8

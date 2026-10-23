@@ -133,7 +133,7 @@
 	}
 
 	/** Null: the host leaves it as it is. */
-	const unchangedQueueSettings = { fairOrder: null, voteSkip: null, voteSkipPercent: null, maxSongsPerPerson: null, maxSongMinutes: null, noRepeatMinutes: null };
+	const unchangedQueueSettings = { fairOrder: null, voteSkip: null, voteSkipPercent: null, maxSongsPerPerson: null, maxSongMinutes: null, noRepeatMinutes: null, noDuplicates: null };
 
 	// --- queue: fair order, vote to skip, limits (docs/features/queue.md) ---
 	let fairOrder = $state(false);
@@ -142,9 +142,10 @@
 	let maxSongsPerPerson = $state(0);
 	let maxSongMinutes = $state(0);
 	let noRepeatMinutes = $state(0);
+	let noDuplicates = $state(false);
 	let queueBusy = $state(false);
 	function resetQueue() {
-		({ fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes } = rs.settings);
+		({ fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes, noDuplicates } = rs.settings);
 	}
 	resetQueue();
 	const queueDirty = $derived(
@@ -153,11 +154,12 @@
 			voteSkipPercent !== rs.settings.voteSkipPercent ||
 			maxSongsPerPerson !== rs.settings.maxSongsPerPerson ||
 			maxSongMinutes !== rs.settings.maxSongMinutes ||
-			noRepeatMinutes !== rs.settings.noRepeatMinutes
+			noRepeatMinutes !== rs.settings.noRepeatMinutes ||
+			noDuplicates !== rs.settings.noDuplicates
 	);
 	async function saveQueue() {
 		queueBusy = true;
-		await run({ kind: 'UpdateSettings', name: null, defaultGuestRole: null, defaultAccountRole: null, autoplay: null, alwaysOn: null, startWaitSeconds: null, karaoke: null, fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes });
+		await run({ kind: 'UpdateSettings', name: null, defaultGuestRole: null, defaultAccountRole: null, autoplay: null, alwaysOn: null, startWaitSeconds: null, karaoke: null, fairOrder, voteSkip, voteSkipPercent, maxSongsPerPerson, maxSongMinutes, noRepeatMinutes, noDuplicates });
 		queueBusy = false;
 	}
 	/** The highest a limit can be (Permissions.MAX_LIMIT) and the longest wait for the players (MAX_START_WAIT_SECONDS). */
@@ -451,6 +453,13 @@
 							</select>
 							<NumberField value={noRepeatMinutes} min={0} max={MAX_LIMIT} unit="min" label="Minutes before a song can play again (0: any time)" class="bg-d-deep py-2.5 text-d-text" onchange={(v) => (noRepeatMinutes = v)} />
 						</div>
+					</div>
+					<div class="mb-5 flex items-center gap-4">
+						<div class="min-w-0 flex-1">
+							<span class={label}>No double songs</span>
+							<p class="text-sm text-d-muted">A song that is in the queue already can't be added again.</p>
+						</div>
+						<Switch checked={noDuplicates} label="No double songs" onchange={(on) => (noDuplicates = on)} />
 					</div>
 					<p class="text-sm text-d-muted">Shuffle and repeat are next to the controls in the player.</p>
 				</div>

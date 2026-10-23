@@ -107,6 +107,7 @@
 			maxSongsPerPerson: null,
 			maxSongMinutes: null,
 			noRepeatMinutes: null,
+			noDuplicates: null,
 			startWaitSeconds: null
 		};
 		room.run({ ...unchanged, karaoke: on });

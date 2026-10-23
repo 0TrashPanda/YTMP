@@ -1084,6 +1084,7 @@ class Room(
             maxSongsPerPerson = command.maxSongsPerPerson ?: settings.maxSongsPerPerson,
             maxSongMinutes = command.maxSongMinutes ?: settings.maxSongMinutes,
             noRepeatMinutes = command.noRepeatMinutes ?: settings.noRepeatMinutes,
+            noDuplicates = command.noDuplicates ?: settings.noDuplicates,
             startWaitSeconds = command.startWaitSeconds ?: settings.startWaitSeconds,
             karaoke = command.karaoke ?: settings.karaoke,
         )
@@ -1425,7 +1426,11 @@ class Room(
      */
     private fun withinLimits(member: Member, songs: List<Song>, countPerPerson: Boolean): Pair<List<Song>, ErrorInfo?> {
         if (can(member, Permission.CHANGE_SETTINGS)) return songs to null
-        return limits.check(settings, songs, queuedByThem = if (countPerPerson) queue.count { it.addedBy == member.id } else null)
+        return limits.check(
+            settings, songs,
+            queuedByThem = if (countPerPerson) queue.count { it.addedBy == member.id } else null,
+            queued = if (countPerPerson) queue.mapTo(HashSet()) { it.song.id } else null,
+        )
     }
 
     // --- playback ---------------------------------------------------------------------

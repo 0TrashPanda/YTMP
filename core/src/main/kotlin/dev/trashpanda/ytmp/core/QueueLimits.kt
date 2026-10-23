@@ -23,11 +23,17 @@ internal class QueueLimits(private val clock: () -> Long) {
     /**
      * The songs of [songs] that may be added, and why the others were left out (null: none were).
      * [queuedByThem]: how many songs they have in the queue now, when the songs stay in the queue
-     * (adding), so the songs-per-person limit counts too; null otherwise.
+     * (adding), so the songs-per-person limit counts too; null otherwise. [queued]: the IDs of the
+     * songs in the queue, when adding (for [RoomSettings.noDuplicates]).
      */
-    fun check(settings: RoomSettings, songs: List<Song>, queuedByThem: Int?): Pair<List<Song>, ErrorInfo?> {
+    fun check(settings: RoomSettings, songs: List<Song>, queuedByThem: Int?, queued: Set<String>? = null): Pair<List<Song>, ErrorInfo?> {
         val reasons = ArrayList<Pair<Int, String>>()
         var ok = songs
+        if (settings.noDuplicates && queued != null) {
+            val (already, rest) = ok.partition { it.id in queued }
+            if (already.isNotEmpty()) reasons += already.size to "already in the queue"
+            ok = rest
+        }
         settings.maxSongMinutes.takeIf { it > 0 }?.let { minutes ->
             val (tooLong, rest) = ok.partition { it.durationMs > minutes * 60_000L }
             if (tooLong.isNotEmpty()) reasons += tooLong.size to "longer than $minutes min"

@@ -191,6 +191,20 @@ class RoomLifecycleTest {
     }
 
     @Test
+    fun `no double songs leaves out songs that are in the queue already`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        val ben = room.join("Ben")
+        room.run(anna, Command.AddSongs(listOf(song(1), song(2)), QueuePosition.END))
+        runCurrent()
+        room.run(anna, Command.UpdateSettings(noDuplicates = true))
+        // A listener's second try for song 2 is left out, a new song 3 is added.
+        room.run(anna, Command.AssignRole(ben.id, "dj"))
+        room.run(ben, Command.AddSongs(listOf(song(2), song(3)), QueuePosition.END))
+        assertEquals(listOf("ytm:song2", "ytm:song3"), room.save().queue.map { it.song.id })
+    }
+
+    @Test
     fun `removed songs can be put back where they were`() = runTest {
         val room = newRoom()
         val anna = room.join("Anna", owner = true)

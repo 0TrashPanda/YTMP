@@ -51,6 +51,7 @@ object Permissions {
                 maxSongsPerPerson = s.maxSongsPerPerson.coerceIn(0, MAX_LIMIT),
                 maxSongMinutes = s.maxSongMinutes.coerceIn(0, MAX_LIMIT),
                 noRepeatMinutes = s.noRepeatMinutes.coerceIn(0, MAX_LIMIT),
+                noDuplicates = s.noDuplicates,
                 startWaitSeconds = s.startWaitSeconds.coerceIn(0, MAX_START_WAIT_SECONDS),
                 karaoke = s.karaoke,
             ),

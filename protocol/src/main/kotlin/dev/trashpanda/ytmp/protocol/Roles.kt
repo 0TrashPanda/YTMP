@@ -88,6 +88,8 @@ data class RoomSettings(
     val maxSongMinutes: Int = 0,
     /** Songs played in the last this many minutes can't be added again; 0: no limit. */
     val noRepeatMinutes: Int = 0,
+    /** A song that is in the queue already can't be added again. */
+    val noDuplicates: Boolean = false,
     /**
      * A new song waits at most this many seconds for everyone's players to load it, so they
      * start it together ([PlaybackStatus.starting]); 0: it doesn't wait.
