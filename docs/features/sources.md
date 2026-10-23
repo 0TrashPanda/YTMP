@@ -91,7 +91,7 @@ computer: the left side). It shows when there's local music:
 
 The tab is like YouTube Music's library: **Albums** (the default, with covers), **Artists**,
 **Songs** (300 at a time, with *Load more*; see [songs per page](ui.md)), **Genres** and
-**Folders**, a search box that only searches this music (folders at any depth too), and
+**Folders** (when the top holds only one folder, like the phone's *Music*, the list starts inside it), a search box that only searches this music (folders at any depth too), and
 **Shuffle all** (plays everything mixed, the queue stays as it is). Albums, artists, genres and
 folders open their pages, with Play, Play next and Add to queue (a folder: also what's in the
 folders inside it); a folder page lists its folders, then its songs.

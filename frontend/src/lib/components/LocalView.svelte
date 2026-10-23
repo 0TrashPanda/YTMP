@@ -68,15 +68,29 @@
 	const artists = $derived(page ? fuzzyFind(cards(page.artists), query, text) : []);
 	const songs = $derived(page ? fuzzyFind(page.songs, query, (s: Song) => `${s.title} ${s.artists.map((a) => a.name).join(' ')} ${s.album?.name ?? ''}`) : []);
 	const genres = $derived(page ? fuzzyFind(page.genres, query, (g: LocalGroup) => g.name) : []);
-	// The top folders; searching finds folders at any depth (shown with their path).
+	/**
+	 * Where the folder list starts: the top, or - when the top holds nothing but one folder (the
+	 * phone's "Music", say) - inside that folder, and so on while it's the only one.
+	 */
+	const base = $derived.by(() => {
+		if (!page) return '';
+		let path = '';
+		for (;;) {
+			const subs = subfolders(page.folders, path);
+			const direct = page.folders.find((f) => f.name === path)?.songs.length ?? 0;
+			if (subs.length !== 1 || direct > 0) return path;
+			path = subs[0].path;
+		}
+	});
+	// The folders at that place; searching finds folders at any depth (shown with their path).
 	const folders = $derived.by(() => {
 		if (!page) return [];
-		if (!query.trim()) return subfolders(page.folders, '');
+		if (!query.trim()) return subfolders(page.folders, base);
 		const all = page.folders.filter((f) => f.name).map((f) => ({ path: f.name, name: f.name, songs: f.songs.length }));
 		return fuzzyFind(all, query, (f) => f.path);
 	});
-	/** Songs at the top of the music folder, outside any folder. */
-	const looseSongs = $derived(query.trim() ? [] : (page?.folders.find((f) => f.name === '')?.songs ?? []).map((i) => page!.songs[i]));
+	/** Songs right in that folder, outside any folder inside it. */
+	const looseSongs = $derived(query.trim() ? [] : (page?.folders.find((f) => f.name === base)?.songs ?? []).map((i) => page!.songs[i]));
 
 	// Back where you were: the chip picked is in view in its row (only sideways, the page stays).
 	let chipRow = $state<HTMLElement>();
@@ -189,6 +203,9 @@
 				<p class="px-2 text-muted">{query.trim() ? `No genres match “${query.trim()}”.` : 'No genres: the songs have none in their tags.'}</p>
 			{/if}
 		{:else if localPlace.chip === 'folders'}
+			{#if base && !query.trim()}
+				<p class="truncate px-2 text-sm text-muted">{base}</p>
+			{/if}
 			{#if folders.length || looseSongs.length}
 				<div class="flex flex-col gap-1">
 					{#each folders as folder (folder.path)}
