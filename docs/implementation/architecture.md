@@ -112,3 +112,13 @@ and the hashed files under `_app/immutable/` for a year (`webApp` in `host/.../A
 
 **The YouTube Music module** (`ytm-module/ytmp_ytm/`): `core.py` talks to YouTube Music and
 yt-dlp, `parse.py` turns its answers into YTMP's songs and pages, `http.py` is the HTTP API.
+
+## Web app as an installable app
+
+`frontend/static/manifest.webmanifest` and the icons (`icon-192.png`, `icon-512.png`,
+`icon-maskable-512.png`) make it installable; `src/service-worker.ts` (registered by hand in
+`src/routes/+layout.svelte`, only in a browser on https) keeps the app's own files
+(`immutable` and `assets` of `$app/manifest`, in a cache named after the build) and answers
+the page from the host first, from the cache when it can't be reached. It never touches
+`/api`, `/ws` or audio. The host already sends everything but `_app/immutable/` as `no-cache`,
+so a new service worker is picked up at once and an update reloads open pages as before.

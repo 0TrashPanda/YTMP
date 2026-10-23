@@ -101,19 +101,17 @@
 	});
 
 	/**
-	 * Keyboard shortcuts in a browser (not in the app): space or k play/pause, n next, p previous,
+	 * Keyboard shortcuts in a browser (not in the app; Space is in the room page): k play/pause, n next, p previous,
 	 * ← → 10 seconds back/ahead, ↑ ↓ volume, / search. Not while typing or with Ctrl/Alt/Cmd.
 	 */
 	function shortcut(e: KeyboardEvent) {
 		if (nativeBridge || e.ctrlKey || e.altKey || e.metaKey || e.defaultPrevented) return;
 		const target = e.target as HTMLElement | null;
 		if (target?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
-		// Space on a button is its click.
-		if (e.key === ' ' && target?.closest('button, a, [role="button"]')) return;
 		const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 		const seek = (delta: number) => room.run({ kind: 'Seek', positionMs: Math.max(0, Math.min(duration, Math.round(positionMs + delta))) });
 		let handled = true;
-		if (key === ' ' || key === 'k') {
+		if (key === 'k') {
 			if (current && room.can('play_pause')) room.run({ kind: playing ? 'Pause' : 'Play' });
 		} else if (key === 'n') {
 			if (current) room.next();

@@ -42,3 +42,12 @@ The Android app needs **Android 11 or newer**. A native Linux app is a [future i
   updates**. ✅
 - **Logs**: the app keeps a log of the last 7 days (at most 20 MB, deleted by itself);
   **Send logs** in the settings shares it, to report a problem. ✅
+
+## Install from the browser ✅
+
+On https (a server behind Caddy, say) the web app can be installed from the browser's menu
+(*Install* / *Add to Home screen*): it gets an icon and opens in its own window without the
+address bar. The app's own files are kept on the device, so it opens fast, and the page is
+still shown when the server can't be reached for a moment. Music and rooms always need the
+server. Not in the Android app (it has its own), and not on a TV's party screen. On plain
+http (`http://<ip>:8080`) browsers don't allow it.

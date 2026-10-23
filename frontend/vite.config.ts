@@ -21,7 +21,9 @@ export default defineConfig({
 			adapter: adapter({ fallback: 'index.html' }),
 			// An open page looks for a newer version every 10 minutes, besides when it comes back
 			// into view and after the host restarted (src/lib/appUpdate.svelte.ts reloads it).
-			version: { pollInterval: 10 * 60_000 }
+			version: { pollInterval: 10 * 60_000 },
+			// Registered by hand (src/routes/+layout.svelte), and not in the app's own WebView.
+			serviceWorker: { register: false }
 		})
 	],
 	// Also older Chromecasts (Chrome 90) showing the party screen: newer syntax is rewritten, and

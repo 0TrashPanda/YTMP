@@ -4,6 +4,8 @@
 	import { connectQuietly, identity } from '../lib/account';
 	import { getHost } from '../lib/api';
 	import { appUpdate, reloadOnUpdate } from '../lib/appUpdate.svelte';
+	import { dev } from '$app/env';
+	import { nativeBridge } from '../lib/native';
 	import { appLink, webLink } from '../lib/openInApp';
 
 	// Coming back from logging in on an auth server (/connect), or (the app) logged in on your server's pages?
@@ -27,6 +29,12 @@
 	}
 
 	let { children } = $props();
+
+	// Installable and quick to open (src/service-worker.ts): in a browser on https, not in the app's own
+	// WebView, and not on a TV's party screen.
+	if (!nativeBridge && !dev && !location.pathname.startsWith('/tv') && isSecureContext && 'serviceWorker' in navigator) {
+		navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+	}
 
 	// The host has a newer version of this page (the server was updated): reload to get it.
 	reloadOnUpdate();
