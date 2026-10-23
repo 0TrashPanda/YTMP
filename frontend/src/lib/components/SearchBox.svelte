@@ -199,6 +199,7 @@
 	<input
 		bind:this={input}
 		bind:value={text}
+		data-search
 		class="min-w-0 flex-1 bg-transparent outline-none {full ? 'text-lg' : ''}"
 		enterkeyhint="search"
 		autocomplete="off"

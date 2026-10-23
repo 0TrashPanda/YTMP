@@ -328,6 +328,13 @@ Open it with the **⋮** button or by **right-clicking** the song.
 - **Song menu** settings (order, show/hide) (planned)
 - **Party screen** ✅ for a TV, laptop or tablet (see [below](#party-screen))
 
+## Keyboard shortcuts ✅
+
+In a browser (not in the app): **Space** or **K** play/pause, **N** next, **P** previous,
+**←** / **→** 10 seconds back or ahead, **↑** / **↓** volume, **/** jumps to the search box.
+They do what the buttons do (so they need the same permissions), and aren't active while
+typing, in a dialog, or with Ctrl, Alt or Cmd held. Listed under *Settings → Playback*.
+
 ## Lyrics
 
 > Built.

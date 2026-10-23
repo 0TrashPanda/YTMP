@@ -222,6 +222,9 @@
 					}}
 				/>
 				<p class="text-xs text-muted">The sync adjustment for Bluetooth is under <em>Play on</em> in a room.</p>
+				{#if !nativeBridge}
+					<p class="text-xs text-muted">Keyboard: <kbd>Space</kbd> or <kbd>K</kbd> play/pause · <kbd>N</kbd> next · <kbd>P</kbd> previous · <kbd>←</kbd> <kbd>→</kbd> 10 seconds back or ahead · <kbd>↑</kbd> <kbd>↓</kbd> volume · <kbd>/</kbd> search.</p>
+				{/if}
 				{#if onThisPhone}
 					<DownloadsSection {onToast} />
 					<CacheSection load={getSongCache} clear={clearSongCache} change={setSongCache} {onToast} />

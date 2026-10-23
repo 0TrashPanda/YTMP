@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { wheelAdjust } from '../wheel';
+	import { nativeBridge } from '../native';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { getAlbum, prefetch } from '../api';
 	import { artistNames, formatTime } from '../format';
@@ -99,12 +100,49 @@
 		if (songId && wide.current) likes.load(songId);
 	});
 
+	/**
+	 * Keyboard shortcuts in a browser (not in the app): space or k play/pause, n next, p previous,
+	 * ← → 10 seconds back/ahead, ↑ ↓ volume, / search. Not while typing or with Ctrl/Alt/Cmd.
+	 */
+	function shortcut(e: KeyboardEvent) {
+		if (nativeBridge || e.ctrlKey || e.altKey || e.metaKey || e.defaultPrevented) return;
+		const target = e.target as HTMLElement | null;
+		if (target?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
+		// Space on a button is its click.
+		if (e.key === ' ' && target?.closest('button, a, [role="button"]')) return;
+		const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+		const seek = (delta: number) => room.run({ kind: 'Seek', positionMs: Math.max(0, Math.min(duration, Math.round(positionMs + delta))) });
+		let handled = true;
+		if (key === ' ' || key === 'k') {
+			if (current && room.can('play_pause')) room.run({ kind: playing ? 'Pause' : 'Play' });
+		} else if (key === 'n') {
+			if (current) room.next();
+		} else if (key === 'p') {
+			if (room.canPrevious) room.run({ kind: 'Previous' });
+		} else if (key === 'ArrowRight') {
+			if (current && room.can('seek')) seek(10_000);
+		} else if (key === 'ArrowLeft') {
+			if (current && room.can('seek')) seek(-10_000);
+		} else if (key === 'ArrowUp') {
+			player.setVolume(Math.min(1, Math.round((player.volume + 0.05) * 100) / 100));
+		} else if (key === 'ArrowDown') {
+			player.setVolume(Math.max(0, Math.round((player.volume - 0.05) * 100) / 100));
+		} else if (key === '/') {
+			document.querySelector<HTMLInputElement>('input[data-search]')?.focus();
+		} else {
+			handled = false;
+		}
+		if (handled) e.preventDefault();
+	}
+
 	/** Desktop: a click anywhere on the bar that isn't on a button or link opens (or closes) the full player, like YTM. */
 	function barClick(event: MouseEvent) {
 		if ((event.target as Element).closest('button, a, input')) return;
 		if (current || expanded) onExpand(!expanded);
 	}
 </script>
+
+<svelte:window onkeydown={shortcut} />
 
 <footer class="relative z-40 border-line bg-surface sm:border-t">
 	<!-- Phones: YTM's mini player. The song (tap or swipe up for the full player), play/pause, next. -->
