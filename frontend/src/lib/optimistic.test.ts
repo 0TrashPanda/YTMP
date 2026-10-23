@@ -148,12 +148,12 @@ describe('predict', () => {
 	it('starts a radio: the song plays now and the queue empties', () => {
 		const s = room();
 		const song = item('r').song;
-		predict(s, { kind: 'StartRadio', song, songs: null }, sender());
+		predict(s, { kind: 'StartRadio', song, songs: null, follows: false }, sender());
 		expect(s.nowPlaying?.item.song).toEqual(song);
 		expect(s.queue).toEqual([]);
 		expect(s.autoplay).toEqual([]);
 		const t = room();
-		predict(t, { kind: 'StartRadio', song: t.nowPlaying!.item.song, songs: null }, sender());
+		predict(t, { kind: 'StartRadio', song: t.nowPlaying!.item.song, songs: null, follows: false }, sender());
 		expect(t.nowPlaying?.item.itemId).toBe('now');
 	});
 
