@@ -11,6 +11,7 @@ import dev.trashpanda.ytmp.protocol.AccountListResponse
 import dev.trashpanda.ytmp.protocol.AdminRoomList
 import dev.trashpanda.ytmp.protocol.AdminSettings
 import dev.trashpanda.ytmp.protocol.AuditLogResponse
+import dev.trashpanda.ytmp.protocol.BackupInfo
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.DisableAccountRequest
 import dev.trashpanda.ytmp.protocol.CreateAccountRequest
@@ -88,7 +89,7 @@ class AdminApiTest {
                         }
                     },
                 ),
-                extraApi = { service.routes(this); AdminApi(service, rooms, settings, audit = AuditLog(db)).routes(this) },
+                extraApi = { service.routes(this); AdminApi(service, rooms, settings, audit = AuditLog(db), backups = Backups(db)).routes(this) },
             )
         }
         return Server(service, settings, rooms, db)
@@ -151,6 +152,39 @@ class AdminApiTest {
         assertEquals(listOf("Enabled account", "Disabled account", "Created account"), log.map { it.action }.take(3))
         assertEquals("jonah", log.first().actor)
         assertEquals(HttpStatusCode.Forbidden, client.send("GET", "/api/admin/audit", annaAgain).status)
+    }
+
+    @Test
+    fun `a backup can be downloaded and uploaded to replace the database at the next start`() = testApplication {
+        val dir = Files.createTempDirectory("ytmp-backup")
+        val dbFile = dir.resolve("ytmp.db").toString()
+        val server = setup(dbFile = dbFile)
+        val client = jsonClient()
+        val (admin, anna) = client.adminAndAnna()
+        assertEquals(HttpStatusCode.Forbidden, client.send("GET", "/api/admin/backup", anna).status)
+        val backup = client.send("GET", "/api/admin/backup", admin)
+        assertEquals(HttpStatusCode.OK, backup.status)
+        val bytes = backup.body<ByteArray>()
+        assertTrue(bytes.size > 4096 && String(bytes, 0, 15) == "SQLite format 3")
+
+        // Not a backup: refused, nothing waits.
+        val bad = client.post("/api/admin/restore") { bearerAuth(admin); setBody("not a database".toByteArray()) }
+        assertEquals(HttpStatusCode.BadRequest, bad.status)
+        assertFalse(java.io.File("$dbFile.restore").exists())
+
+        // A real one: accepted, kept for the next start, which swaps it in and keeps the old database aside.
+        client.send("POST", "/api/admin/accounts", admin, CreateAccountRequest("ben", "password123"))
+        val ok = client.post("/api/admin/restore") { bearerAuth(admin); setBody(bytes) }
+        assertEquals(HttpStatusCode.OK, ok.status)
+        assertEquals(2, ok.body<BackupInfo>().accounts)
+        assertTrue(java.io.File("$dbFile.restore").isFile)
+        // The server stops (closing its database) and starts again.
+        server.db.close()
+        val reopened = Database.open(DatabaseConfig(path = dbFile))
+        assertEquals(2, Accounts(reopened).count())
+        assertFalse(java.io.File("$dbFile.restore").exists())
+        assertTrue(java.io.File("$dbFile.before-restore").isFile)
+        assertEquals(3, Accounts(Database.open(DatabaseConfig(path = "$dbFile.before-restore"))).count())
     }
 
     @Test

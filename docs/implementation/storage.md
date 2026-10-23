@@ -200,3 +200,12 @@ cached in memory. That's unlikely to be needed at this scale.
 If the graph ever grows a lot, or we want more advanced graph queries (communities,
 "songs between A and B", …), a real graph database could be added as an optional
 backend. See [future ideas](../features/future-ideas.md#graph-database-maybe).
+
+## Backup and restore
+
+`Backups` (server): `VACUUM INTO` a temporary file for the download (`GET /api/admin/backup`);
+an upload (`POST /api/admin/restore`) is opened as a database, checked (`schema_version` no
+newer than the migrations here, an `accounts` table), and kept as `<db>.restore`.
+`Database.open` swaps it in before connecting: the old database (and its journal) is renamed
+`<db>.before-restore`. Migration 8 added `accounts.disabled_until` and `audit_log` (the
+admin page's Log, `AuditLog`: the newest 1000 entries).

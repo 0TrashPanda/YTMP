@@ -229,6 +229,11 @@ data class AdminRoomInfo(
 @SerialName("AdminRoomList")
 data class AdminRoomList(val rooms: List<AdminRoomInfo>)
 
+/** What an uploaded backup holds (`POST /api/admin/restore`). It replaces the database when the server starts again. */
+@Serializable
+@SerialName("BackupInfo")
+data class BackupInfo(val accounts: Int, val rooms: Int)
+
 /** `GET /api/admin/about`: versions. */
 @Serializable
 @SerialName("ServerAbout")
@@ -244,6 +249,10 @@ data class ServerAbout(
     val moduleOnline: Boolean = false,
     val accounts: Int = 0,
     val rooms: Int = 0,
+    /** The database can be backed up and restored here (SQLite). */
+    val backupSupported: Boolean = false,
+    /** An uploaded backup waits for the server to start again. */
+    val restorePending: Boolean = false,
 )
 
 /** An auth server whose accounts can join rooms on a host. */

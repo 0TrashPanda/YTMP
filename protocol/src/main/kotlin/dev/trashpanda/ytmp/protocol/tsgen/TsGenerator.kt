@@ -4,6 +4,7 @@ import dev.trashpanda.ytmp.protocol.ApiError
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.SongCacheStatus
 import dev.trashpanda.ytmp.protocol.UnmatchedSongs
+import dev.trashpanda.ytmp.protocol.BackupInfo
 import dev.trashpanda.ytmp.protocol.AuditLogResponse
 import dev.trashpanda.ytmp.protocol.DisableAccountRequest
 import dev.trashpanda.ytmp.protocol.DownloadItems
@@ -236,6 +237,7 @@ fun main(args: Array<String>) {
     generator.addRoot(SongCacheStatus.serializer().descriptor)
     generator.addRoot(SongCacheSettings.serializer().descriptor)
     generator.addRoot(UnmatchedSongs.serializer().descriptor)
+    generator.addRoot(BackupInfo.serializer().descriptor)
     generator.addRoot(AuditLogResponse.serializer().descriptor)
     generator.addRoot(DisableAccountRequest.serializer().descriptor)
     generator.addRoot(DownloadItems.serializer().descriptor)

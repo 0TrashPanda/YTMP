@@ -20,10 +20,15 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.http.ContentDisposition
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveStream
+import io.ktor.server.response.header
+import io.ktor.server.response.respondFile
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -50,6 +55,8 @@ class AdminApi(
     private val versions: Versions? = null,
     /** What admins do is written here (the admin page's Log). Null: not kept (tests). */
     private val audit: AuditLog? = null,
+    /** Null: no backups here (tests). */
+    private val backups: Backups? = null,
 ) {
     private val accounts get() = service.accounts
 
@@ -199,6 +206,34 @@ class AdminApi(
             call.respond(AuditLogResponse(audit?.recent().orEmpty()))
         }
 
+        get("/admin/backup") {
+            val admin = service.admin(call)
+            val backups = backups?.takeIf { it.supported } ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Backups here are for SQLite. With PostgreSQL, use pg_dump.")
+            val file = io { backups.create() }
+            audit?.record(admin.username, "Downloaded a backup")
+            val name = "ytmp-backup-${java.time.LocalDate.now()}.db"
+            call.response.header(HttpHeaders.ContentDisposition, ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, name).toString())
+            try {
+                call.respondFile(file)
+            } finally {
+                file.delete()
+            }
+        }
+
+        // The uploaded backup replaces the database when the server starts again.
+        post("/admin/restore") {
+            val admin = service.admin(call)
+            val backups = backups?.takeIf { it.supported } ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Restoring here is for SQLite")
+            val upload = call.receiveStream()
+            val info = try {
+                io { backups.stage(upload) }
+            } catch (e: IllegalArgumentException) {
+                throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "That isn't a YTMP backup")
+            }
+            audit?.record(admin.username, "Uploaded a backup to restore", detail = "${info.accounts} accounts, ${info.rooms} rooms; applies at the next start")
+            call.respond(info)
+        }
+
         get("/admin/about") {
             service.admin(call)
             val module = versions?.module()
@@ -211,6 +246,8 @@ class AdminApi(
                     moduleOnline = module != null,
                     accounts = io { accounts.count() },
                     rooms = rooms.count,
+                    backupSupported = backups?.supported == true,
+                    restorePending = backups?.restorePending == true,
                 ),
             )
         }

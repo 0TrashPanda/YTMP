@@ -984,6 +984,8 @@ export interface ServerAbout {
   moduleOnline: boolean;
   accounts: number;
   rooms: number;
+  backupSupported: boolean;
+  restorePending: boolean;
 }
 
 export interface LinkAuthServerRequest {
@@ -1257,6 +1259,11 @@ export interface UnmatchedSong {
 
 export interface UnmatchedSongs {
   songs: UnmatchedSong[];
+}
+
+export interface BackupInfo {
+  accounts: number;
+  rooms: number;
 }
 
 export interface AuditEntry {

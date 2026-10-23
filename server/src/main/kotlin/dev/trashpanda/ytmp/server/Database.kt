@@ -11,7 +11,7 @@ import java.sql.DriverManager
  * caller at a time. Plenty for a group of friends, and SQLite wants a single writer anyway.
  * Queries are plain SQL that both understand. See docs/implementation/storage.md.
  */
-class Database private constructor(private val url: String, private val user: String?, private val password: String?) {
+class Database private constructor(private val url: String, private val user: String?, private val password: String?, val sqlitePath: String? = null) {
     private var connection: Connection? = null
 
     /** Runs [block] with the connection; nobody else uses it meanwhile. */
@@ -53,8 +53,64 @@ class Database private constructor(private val url: String, private val user: St
         }
     }
 
+    /** Closes the connection (SQLite then folds its journal into the file). */
+    @Synchronized
+    fun close() {
+        connection?.runCatching { close() }
+        connection = null
+    }
+
+    /** A consistent copy of the whole database in [to] (SQLite only; PostgreSQL has pg_dump). */
+    fun backupTo(to: File) {
+        check(sqlitePath != null) { "Backups from here are for SQLite; PostgreSQL has pg_dump" }
+        to.delete()
+        use { c -> c.createStatement().use { it.execute("VACUUM INTO '${to.absolutePath.replace("'", "''")}'") } }
+    }
+
     companion object {
         private val log = LoggerFactory.getLogger(Database::class.java)
+
+        /** What a backup file holds. */
+        data class BackupInfo(val accounts: Int, val rooms: Int)
+
+        /** The file a restore waits in until the server starts again. */
+        fun restoreFile(path: String) = File("$path.restore")
+
+        /**
+         * Checks that [file] is a backup of this server (a YTMP SQLite database no newer than this
+         * version), and keeps it for the next start, which swaps it in ([applyPendingRestore]).
+         */
+        fun stageRestore(path: String, file: File): BackupInfo {
+            val info = try {
+                DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { c ->
+                    fun count(sql: String) = c.createStatement().use { s -> s.executeQuery(sql).use { it.next(); it.getInt(1) } }
+                    val version = count("SELECT MAX(version) FROM schema_version")
+                    require(version <= MIGRATIONS.size) { "This backup is from a newer YTMP (database version $version). Update this server first." }
+                    BackupInfo(count("SELECT COUNT(*) FROM accounts"), count("SELECT COUNT(*) FROM rooms"))
+                }
+            } catch (e: java.sql.SQLException) {
+                throw IllegalArgumentException("That isn't a YTMP backup")
+            }
+            val target = restoreFile(path)
+            target.delete()
+            if (!file.renameTo(target)) file.copyTo(target, overwrite = true).also { file.delete() }
+            return info
+        }
+
+        /** A restore waiting from before: the database goes aside (kept as `….before-restore`) and the backup takes its place. */
+        private fun applyPendingRestore(path: String) {
+            val waiting = restoreFile(path).takeIf { it.isFile } ?: return
+            val db = File(path)
+            val aside = File("$path.before-restore")
+            if (db.isFile) {
+                // With its journal, if the server stopped without closing the database.
+                for (suffix in listOf("", "-wal", "-shm")) File("$aside$suffix").delete()
+                for (suffix in listOf("", "-wal", "-shm")) File("$path$suffix").takeIf { it.exists() }?.renameTo(File("$aside$suffix"))
+            }
+            for (suffix in listOf("-wal", "-shm")) File("$path$suffix").delete()
+            waiting.renameTo(db)
+            log.info("Restored the database from a backup; the old one is kept as {}", aside)
+        }
 
         /** Add new migrations at the end; never change one that has shipped. */
         private val MIGRATIONS: List<List<String>> = listOf(
@@ -156,7 +212,8 @@ class Database private constructor(private val url: String, private val user: St
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {
             "sqlite" -> {
                 File(config.path).absoluteFile.parentFile?.mkdirs()
-                Database("jdbc:sqlite:${config.path}", null, null).apply {
+                applyPendingRestore(config.path)
+                Database("jdbc:sqlite:${config.path}", null, null, config.path).apply {
                     use { c -> c.createStatement().use { it.execute("PRAGMA journal_mode=WAL") } }
                 }
             }

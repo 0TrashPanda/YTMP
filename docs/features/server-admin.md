@@ -33,6 +33,16 @@ There is always at least one.
 - **Log** ✅: what admins did (created, renamed, disabled or deleted accounts, new passwords,
   invite links, settings, closed rooms), newest first, with who and when. The last 1000 are kept.
 
+## Backup and restore ✅
+
+*Settings → Server admin → About → Backup* (SQLite, which is the default): **Download a
+backup** gives a copy of the whole database: accounts (passwords hashed), rooms, listening
+history, settings and the song graph, but not the song cache or the logs. Keep it private.
+**Restore from a backup…** takes such a file, checks that it is a YTMP database no newer than
+this server, and keeps it until the server **restarts** (`docker compose restart ytmp`): then it
+replaces the database, and the old one stays next to it as `ytmp.db.before-restore`. With
+PostgreSQL, back up with `pg_dump`.
+
 ## Updates
 
 > Built differently: the server **updates itself** every night (Watchtower, with images

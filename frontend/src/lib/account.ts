@@ -22,6 +22,7 @@ import type {
 	UpdateAccountRequest,
 	AdminSettings,
 	AuditLogResponse,
+	BackupInfo,
 	ServerSettingOverrides,
 	AdminRoomList,
 	ServerAbout,
@@ -162,6 +163,27 @@ export const authServer = {
 	listRooms: async () => (await call<AdminRoomList>('/api/admin/rooms')).rooms,
 	closeRoom: (code: string) => call<null>(`/api/admin/rooms/${encodeURIComponent(code)}`, undefined, 'DELETE'),
 	about: () => call<ServerAbout>('/api/admin/about'),
+	/** Downloads a copy of the server's database (accounts, rooms, history, settings). */
+	async downloadBackup() {
+		const response = await fetch('/api/admin/backup', { headers: { Authorization: `Bearer ${session.current?.sessionToken}` } });
+		if (!response.ok) throw new ApiRequestError((await response.json().catch(() => null))?.message ?? `Backup failed (${response.status})`);
+		const link = document.createElement('a');
+		link.href = URL.createObjectURL(await response.blob());
+		link.download = `ytmp-backup-${new Date().toISOString().slice(0, 10)}.db`;
+		link.click();
+		URL.revokeObjectURL(link.href);
+	},
+	/** Uploads a backup; it replaces the database when the server starts again. */
+	async uploadBackup(file: File): Promise<BackupInfo> {
+		const response = await fetch('/api/admin/restore', {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${session.current?.sessionToken}`, 'Content-Type': 'application/octet-stream' },
+			body: file
+		});
+		const body = await response.json().catch(() => null);
+		if (!response.ok) throw new ApiRequestError(body?.message ?? `Restore failed (${response.status})`);
+		return body as BackupInfo;
+	},
 	/** The server's song cache: how full it is, and Clear cache (its size is in the server settings). */
 	songCache: () => call<SongCacheStatus>('/api/admin/cache'),
 	clearSongCache: () => call<SongCacheStatus>('/api/admin/cache/clear', {})

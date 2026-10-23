@@ -184,7 +184,7 @@ fun main(args: Array<String>) {
                 trusting = trustServers(auth, new.trusted, ownIssuer = issuer)
             }
         }
-        val admin = AdminApi(service, rooms, settings, Versions(http, config.ytm.url.trimEnd('/'), config.ytm.key), AuditLog(db))
+        val admin = AdminApi(service, rooms, settings, Versions(http, config.ytm.url.trimEnd('/'), config.ytm.key), AuditLog(db), Backups(db))
 
         ytmpModule(
             rooms,
