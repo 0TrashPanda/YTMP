@@ -3,6 +3,7 @@ import type {
 	LocalLinkRequest,
 	SongCacheSettings,
 	SongCacheStatus,
+	TakeoutPreview,
 	UnmatchedSongs,
 	AlbumPage,
 	ApiError,
@@ -515,6 +516,20 @@ export function setSongCache(settings: SongCacheSettings): Promise<SongCacheStat
 
 export function clearSongCache(): Promise<SongCacheStatus> {
 	return request('/api/cache/clear', { method: 'POST' });
+}
+
+/** A Google Takeout export (the zip, or the watch history in it): its YouTube Music plays, for the song cache. */
+export function importTakeout(file: File): Promise<SongCacheStatus> {
+	return request('/api/cache/takeout', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+}
+
+export function forgetTakeout(): Promise<SongCacheStatus> {
+	return request('/api/cache/takeout', { method: 'DELETE' });
+}
+
+/** Which Takeout songs [days] and [minPlays] would keep. */
+export function previewTakeout(days: number, minPlays: number): Promise<TakeoutPreview> {
+	return request('/api/cache/takeout/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days, minPlays }) });
 }
 
 export function getDownloadQueue(): Promise<DownloadItems> {

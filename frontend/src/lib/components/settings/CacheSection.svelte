@@ -7,6 +7,7 @@
 	import NumberField from '../NumberField.svelte';
 	import Choice from './Choice.svelte';
 	import LocalSongsSection from './LocalSongsSection.svelte';
+	import TakeoutSection from './TakeoutSection.svelte';
 
 	let {
 		load,
@@ -79,6 +80,9 @@
 			localCharging: null,
 			keepLiked: null,
 			fromHistory: null,
+			fromTakeout: null,
+			takeoutDays: null,
+			takeoutMinPlays: null,
 			...changes
 		});
 	}
@@ -98,8 +102,9 @@
 		['500', '500']
 	];
 
-	/** Liked songs are still coming in. */
-	const filling = (s: SongCacheStatus) => !!s.keepLiked && s.likedCached < s.likedOf && !s.fromYoutubeWaiting;
+	/** Liked songs or songs from Takeout are still coming in. */
+	const filling = (s: SongCacheStatus) =>
+		((!!s.keepLiked && s.likedCached < s.likedOf) || (s.fromTakeout && s.takeoutCached < s.takeoutOf)) && !s.fromYoutubeWaiting;
 
 	/** Why songs from YouTube Music aren't coming in now, in plain words. */
 	function fromYoutubeNote(s: SongCacheStatus): string | null {
@@ -189,12 +194,13 @@
 				</Choice>
 				<Choice
 					label="Songs from your YouTube Music history"
-					hint="The songs in your YouTube Music history (also from other devices) are downloaded to keep. YouTube Music only shows about your last 200 songs, so for now that's all of them, also songs played once. Importing your full history from Google Takeout, to keep only what you play most, may come later."
+					hint="The songs in your YouTube Music history (also from other devices) are downloaded to keep. YouTube Music only shows about your last 200 songs, so that's all of them, also songs played once. To keep only what you play most, use Google Takeout below."
 					options={[['0', 'Off'], ['1', 'On']]}
 					value={status.fromHistory ? '1' : '0'}
 					onchange={(v) => attempt(() => patch({ fromHistory: v === '1' }))}
 				/>
-				{#if (status.keepLiked || status.fromHistory) && fromYoutubeNote(status)}
+				<TakeoutSection {status} {busy} {patch} {attempt} {size} />
+				{#if (status.keepLiked || status.fromHistory || status.fromTakeout) && fromYoutubeNote(status)}
 					<p class="-mt-1 text-xs text-muted">{fromYoutubeNote(status)}</p>
 				{/if}
 			{/if}

@@ -88,8 +88,8 @@ the account when a setting changes, at app start and every 6 hours (after an err
   the song already has a play that day: plays here go into that history too
   ([`addToHistory`](../features/accounts.md)), and the history is read again. Every song in it
   is fetched, newest first: YouTube Music lists a song once (its last play) and only about 200,
-  so it can't tell what was played often (a [Takeout import](../features/future-ideas.md#song-cache-from-a-google-takeout-history)
-  could). The imported plays count in the keep score and toward [worth an extra download](#filling-it).
+  so it can't tell what was played often (a [Takeout import](#from-a-google-takeout-history)
+  can). The imported plays count in the keep score and toward [worth an extra download](#filling-it).
 
 Both go through `SongCache.fetch` (one song at a time, together with the background fetches),
 20 s apart, behind `fetchGate` (*Keep songs in the background*). They're ordinary entries: no
@@ -98,6 +98,41 @@ pinning. To not push songs out for songs nobody played here, it only fills free 
 90 %), else it stops the round and says `full`. The status has `keepLiked`, `likedOf`,
 `likedCached` (of the liked songs that can be cached, how many are here, downloads included),
 `fromHistory` and `fromYoutubeWaiting` (`Wi-Fi`, `full`, `signed out`, `error`).
+
+## From a Google Takeout history
+
+Phone only; no sign-in needed. *Choose Takeout export* in the settings sends the file
+(`<input type="file">`; in the app `MainActivity` answers the WebView's file chooser with
+Android's document picker) to `POST /api/cache/takeout` as is. `Takeout.read` (`host/`,
+`TakeoutHistory.kt`) takes the zip (any `watch-history.html` or `.json` in it, streamed) or one of
+those files, and keeps the plays with the product *YouTube Music* or a `music.youtube.com` link:
+
+- **HTML** (Takeout's default, 50 MB and more): read a cell (`outer-cell`) at a time. The
+  first link is the song (its video ID), the second its channel (`… - Topic` is the artist),
+  the last line the date, written in the account's language: `TakeoutDates` reads English,
+  Dutch, German, French, Spanish and Italian month names, US order with AM/PM, and numeric
+  dates, at the phone's time zone (the zone name is ignored). Entries without a readable date
+  are left out; when none can be read, the error asks for the JSON export.
+- **JSON**: `titleUrl`, `title` (without `Watched `), `subtitles[0].name`, `time` (ISO).
+
+`TakeoutHistory` keeps the result in `takeout-history.json` in the app's files (per song: ID,
+title, artist, the play times; about 1.5 MB for 31,000 plays) and replaces it on the next
+import; `DELETE /api/cache/takeout` removes it and switches the setting off.
+`TakeoutHistory.pick(days, minPlays, now)` gives the songs with at least `minPlays` plays in the
+last `days` days (0: all), by those plays, then the last play. `POST /api/cache/takeout/preview`
+(`TakeoutPreviewRequest` → `TakeoutPreview`) answers that count for the settings while you
+choose, with how many are here and about how much room they take (`SongCache.usualSongBytes`:
+the cached songs' average, 4 MB when empty).
+
+`CachePrefill` does the rest in its round, after likes and history (prefs `fromTakeout`,
+`takeoutDays` 0–3650 (365), `takeoutMinPlays` 1–1000 (5)): every Takeout play goes into
+`SongCache.importPlays` (the last 90 days count, once a day), and each picked song that's wanted
+is looked up first (`songInfo`: `ytm.song`, for its title, length and cover; the Takeout entry
+has only an ID and title), then fetched like the others: 20 s apart, only into free room. A
+song that turns out not to be kept (an episode, too long) or can't be looked up is left out
+until the app restarts; three failed lookups in a row stop the round (YouTube blocks it, likely:
+`error`). The status has `takeout` (`TakeoutSummary`), `fromTakeout`, `takeoutDays`,
+`takeoutMinPlays`, `takeoutOf` and `takeoutCached`.
 
 ## Using it
 

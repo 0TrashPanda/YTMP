@@ -15,6 +15,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -82,6 +83,13 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Picking a folder of music (Settings → Local music); the page hears the new list as onMusicFolders. */
+    /** A file the page asked for (`<input type="file">`, the Takeout export in Settings): where to give it. */
+    private var fileWanted: ValueCallback<Array<Uri>>? = null
+    private val filePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        fileWanted?.onReceiveValue(uri?.let { arrayOf(it) })
+        fileWanted = null
+    }
+
     private val musicFolderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
         if (tree != null) {
             app.host.musicFolders.add(tree)
@@ -159,6 +167,20 @@ class MainActivity : ComponentActivity() {
                     // The page's warnings and errors go to the log files too.
                     if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR || message.messageLevel() == ConsoleMessage.MessageLevel.WARNING) Log.i("YtmpWeb", line)
                     else Log.d("YtmpWeb", line)
+                    return true
+                }
+
+                override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
+                    fileWanted?.onReceiveValue(null)
+                    fileWanted = callback
+                    // The page's accept list has extensions too; the picker only takes MIME types.
+                    val types = params.acceptTypes.filter { '/' in it }.ifEmpty { listOf("*/*") }
+                    try {
+                        filePicker.launch(types.toTypedArray())
+                    } catch (e: Exception) {
+                        fileWanted = null
+                        return false
+                    }
                     return true
                 }
             }

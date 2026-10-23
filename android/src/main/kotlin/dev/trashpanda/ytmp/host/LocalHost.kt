@@ -168,7 +168,7 @@ class LocalHost(private val context: Context) {
         scope = scope,
     )
 
-    /** Songs from the owner's YouTube Music: recent likes, and from its history (Settings → Playback → Song cache). */
+    /** Songs from the owner's YouTube Music: recent likes, from its history, and from a Google Takeout export (Settings → Playback → Song cache). */
     private val prefill = CachePrefill(
         cache,
         likes = { count -> youtube.recentLikes(count) },
@@ -176,9 +176,15 @@ class LocalHost(private val context: Context) {
         signedIn = { youtube.account() != null },
         hold = { if (dataRules.fetchWifiOnly && !dataRules.onWifi()) "Wi-Fi" else null },
         scope = scope,
+        takeout = TakeoutHistory(File(context.filesDir, "takeout-history.json")),
+        songInfo = { id -> ytm.song(id) },
     )
 
-    private fun applyFromYoutube() = prefill.set(cacheSettings.getInt(CACHE_LIKED, 0), cacheSettings.getBoolean(CACHE_HISTORY, false))
+    private fun applyFromYoutube() = prefill.set(
+        cacheSettings.getInt(CACHE_LIKED, 0), cacheSettings.getBoolean(CACHE_HISTORY, false),
+        cacheSettings.getBoolean(CACHE_TAKEOUT, false),
+        cacheSettings.getInt(CACHE_TAKEOUT_DAYS, CachePrefill.DEFAULT_TAKEOUT_DAYS), cacheSettings.getInt(CACHE_TAKEOUT_MIN_PLAYS, CachePrefill.DEFAULT_TAKEOUT_MIN_PLAYS),
+    )
 
     /** The setting is on and Android lets us read the music. */
     private fun localSongsOn() = cacheSettings.getBoolean(CACHE_LOCAL, false) && phoneMusicOn
@@ -296,6 +302,9 @@ class LocalHost(private val context: Context) {
                 settings.localParallel?.let { putInt(CACHE_PARALLEL, it.coerceIn(1, LocalMatcher.MAX_PARALLEL)) }
                 settings.keepLiked?.let { putInt(CACHE_LIKED, it.coerceIn(0, CachePrefill.MAX_LIKED)) }
                 settings.fromHistory?.let { putBoolean(CACHE_HISTORY, it) }
+                settings.fromTakeout?.let { putBoolean(CACHE_TAKEOUT, it) }
+                settings.takeoutDays?.let { putInt(CACHE_TAKEOUT_DAYS, it.coerceIn(0, CachePrefill.MAX_TAKEOUT_DAYS)) }
+                settings.takeoutMinPlays?.let { putInt(CACHE_TAKEOUT_MIN_PLAYS, it.coerceIn(1, CachePrefill.MAX_TAKEOUT_MIN_PLAYS)) }
             }
             settings.fetchWifiOnly?.let { dataRules.fetchWifiOnly = it }
             settings.downloadsWifiOnly?.let { dataRules.downloadsWifiOnly = it }
@@ -306,7 +315,7 @@ class LocalHost(private val context: Context) {
             cache.setMaxBytes(settings.maxBytes)
             cache.moveTo(cacheDir(place))
             showCacheLibrary()
-            if (settings.keepLiked != null || settings.fromHistory != null) applyFromYoutube()
+            if (listOf(settings.keepLiked, settings.fromHistory, settings.fromTakeout, settings.takeoutDays, settings.takeoutMinPlays).any { it != null }) applyFromYoutube()
         }
     }
 
@@ -477,6 +486,9 @@ class LocalHost(private val context: Context) {
         private const val CACHE_PARALLEL = "localParallel"
         private const val CACHE_LIKED = "keepLiked"
         private const val CACHE_HISTORY = "fromHistory"
+        private const val CACHE_TAKEOUT = "fromTakeout"
+        private const val CACHE_TAKEOUT_DAYS = "takeoutDays"
+        private const val CACHE_TAKEOUT_MIN_PLAYS = "takeoutMinPlays"
         private const val PLACE_PHONE = "phone"
         private const val PLACE_SD = "sd"
         /** About 250 songs. */

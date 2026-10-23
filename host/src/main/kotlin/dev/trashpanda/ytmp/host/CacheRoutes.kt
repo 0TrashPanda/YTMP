@@ -7,9 +7,14 @@ import dev.trashpanda.ytmp.protocol.LocalLinkRequest
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.UnmatchedSongs
 import dev.trashpanda.ytmp.protocol.SongCacheStatus
+import dev.trashpanda.ytmp.protocol.TakeoutPreviewRequest
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveStream
+import io.ktor.server.routing.delete
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -30,7 +35,9 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
             fetchWifiOnly = settings.fetchWifiOnly(), downloadsWifiOnly = settings.downloadsWifiOnly(),
             localWifiOnly = settings.localWifiOnly(), localCharging = settings.localCharging(), localWaiting = settings.localWaiting()).let { s ->
                 val youtube = settings.fromYoutube() ?: return@let s
-                s.copy(keepLiked = youtube.liked, likedOf = youtube.likedOf, likedCached = youtube.likedCached, fromHistory = youtube.fromHistory, fromYoutubeWaiting = youtube.waiting)
+                s.copy(keepLiked = youtube.liked, likedOf = youtube.likedOf, likedCached = youtube.likedCached, fromHistory = youtube.fromHistory, fromYoutubeWaiting = youtube.waiting,
+                    takeout = youtube.takeoutSummary(), fromTakeout = youtube.fromTakeout, takeoutDays = youtube.takeoutDays, takeoutMinPlays = youtube.takeoutMinPlays,
+                    takeoutOf = if (youtube.fromTakeout) youtube.takeoutOf else 0, takeoutCached = if (youtube.fromTakeout) youtube.takeoutCached else 0)
             }
     }
     get { call.respond(call.status()) }
@@ -64,6 +71,36 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
             val wanted = call.receive<LocalLinkRequest>()
             phone.link(wanted.key, wanted.link)?.let { throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, it) }
             call.respond(call.status())
+        }
+    }
+    route("/takeout") {
+        suspend fun ApplicationCall.prefill(): CachePrefill {
+            status()
+            return settings?.fromYoutube() ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Only on a phone")
+        }
+        // A Google Takeout export (the zip, or the watch history in it): its YouTube Music plays.
+        post {
+            val prefill = call.prefill()
+            val upload = call.receiveStream()
+            try {
+                withContext(Dispatchers.IO) { prefill.importTakeout(upload) }
+            } catch (e: IllegalArgumentException) {
+                throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "That isn't a Takeout export")
+            } catch (e: java.util.zip.ZipException) {
+                throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Couldn't read this zip")
+            }
+            call.respond(call.status())
+        }
+        delete {
+            val prefill = call.prefill()
+            withContext(Dispatchers.IO) { prefill.forgetTakeout() }
+            settings?.change(SongCacheSettings(maxBytes = call.status().maxBytes, place = settings.place(), fromTakeout = false))
+            call.respond(call.status())
+        }
+        post("/preview") {
+            val prefill = call.prefill()
+            val wanted = call.receive<TakeoutPreviewRequest>()
+            call.respond(withContext(Dispatchers.Default) { prefill.preview(wanted.days, wanted.minPlays) })
         }
     }
     post("/clear") {

@@ -3,6 +3,8 @@ package dev.trashpanda.ytmp.protocol.tsgen
 import dev.trashpanda.ytmp.protocol.ApiError
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.SongCacheStatus
+import dev.trashpanda.ytmp.protocol.TakeoutPreview
+import dev.trashpanda.ytmp.protocol.TakeoutPreviewRequest
 import dev.trashpanda.ytmp.protocol.UnmatchedSongs
 import dev.trashpanda.ytmp.protocol.BackupInfo
 import dev.trashpanda.ytmp.protocol.AuditLogResponse
@@ -236,6 +238,8 @@ fun main(args: Array<String>) {
     generator.addRoot(LocalLibraryPage.serializer().descriptor)
     generator.addRoot(SongCacheStatus.serializer().descriptor)
     generator.addRoot(SongCacheSettings.serializer().descriptor)
+    generator.addRoot(TakeoutPreviewRequest.serializer().descriptor)
+    generator.addRoot(TakeoutPreview.serializer().descriptor)
     generator.addRoot(UnmatchedSongs.serializer().descriptor)
     generator.addRoot(BackupInfo.serializer().descriptor)
     generator.addRoot(AuditLogResponse.serializer().descriptor)

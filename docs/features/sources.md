@@ -156,16 +156,24 @@ without internet on the phone. It works by itself: there is nothing to pick.
 - **Songs played elsewhere are fetched only once they're played again**: from the 2nd play
   in 30 days. So one-off radio and autoplay songs don't cost an extra download each (and
   extra YouTube traffic), but your favourites end up cached.
-- **From your YouTube Music** (on the phone, signed in; both off by default, in *Settings →
-  Playback → Song cache*):
+- **From your YouTube Music** (on the phone; all off by default, in *Settings → Playback → Song
+  cache*):
   - **Keep your recent likes**: the songs you liked last (Off, 50, 100, 250, 500 or a number you
     type) are downloaded to keep, so they start at once and play offline.
   - **Songs from your YouTube Music history**: the songs in that history (also from other
     devices) are downloaded to keep. YouTube Music lists only about the last 200 songs, each
     once, so it can't tell what you played often: for now all of them are kept, also songs played
     once. The app reads it a few times a day, and its plays count like plays here (so they stay
-    longer). Importing the full history from Google Takeout, to keep only what you play most, is a
-    [future idea](future-ideas.md#song-cache-from-a-google-takeout-history).
+    longer). Likes and history need you signed in.
+  - **Songs from Google Takeout**: your whole YouTube Music history, years back. Export it at
+    takeout.google.com (*YouTube and YouTube Music*, with its history) and choose the zip (or the
+    `watch-history.html` or `.json` in it) here; it stays on the phone, and a new export replaces
+    the old one. Then choose how recent (played in the last month, 3 months, year, all of it, or
+    a number of days) and how often (at least 2, 3, 5, 10, 20 times or a number you type): while
+    you choose, it shows how many songs that is, about how much room they take, and how many are
+    here already. Switched on, they're downloaded most played first. Plain YouTube is left out,
+    and a play is any start (Takeout doesn't say how long you listened). Plays from the last 90
+    days count like plays here too. Works without signing in.
   - They're **ordinary cached songs**: they go like any other when the cache is full. Only free
     room is filled, nothing is pushed out for them; the setting says when the cache is full. They
     come in one at a time with a pause between (so YouTube doesn't block the network), and follow

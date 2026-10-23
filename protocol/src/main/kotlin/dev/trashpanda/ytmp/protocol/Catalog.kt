@@ -381,6 +381,15 @@ data class SongCacheStatus(
     val fromHistory: Boolean? = null,
     /** Why songs from YouTube Music aren't coming in right now: "Wi-Fi", "full", "signed out", "error"; or null. */
     val fromYoutubeWaiting: String? = null,
+    /** The imported Google Takeout history, or null (none yet, or not a setting here). */
+    val takeout: TakeoutSummary? = null,
+    /** Songs from it are kept: those played at least [takeoutMinPlays] times in the last [takeoutDays] days (0: all of it). */
+    val fromTakeout: Boolean = false,
+    val takeoutDays: Int = 0,
+    val takeoutMinPlays: Int = 0,
+    /** Of the songs those settings pick (that can be kept): how many, and how many are here. */
+    val takeoutOf: Int = 0,
+    val takeoutCached: Int = 0,
     /** Where it can be kept (a phone: its own storage, an SD card); empty where that isn't a setting. */
     val places: List<SongCachePlace> = emptyList(),
     val place: String? = null,
@@ -407,7 +416,25 @@ data class SongCacheSettings(
     val localCharging: Boolean? = null,
     val keepLiked: Int? = null,
     val fromHistory: Boolean? = null,
+    val fromTakeout: Boolean? = null,
+    val takeoutDays: Int? = null,
+    val takeoutMinPlays: Int? = null,
 )
+
+/** A Google Takeout history imported on a phone: its YouTube Music [plays] of [songs] songs, from [first] to [last] (ms). */
+@Serializable
+@SerialName("TakeoutSummary")
+data class TakeoutSummary(val songs: Int, val plays: Int, val first: Long, val last: Long)
+
+/** `POST /api/cache/takeout/preview`: which songs these Takeout settings would pick. */
+@Serializable
+@SerialName("TakeoutPreviewRequest")
+data class TakeoutPreviewRequest(val days: Int, val minPlays: Int)
+
+/** The [songs] they pick, [cached] of them already here, and about how much room all of them take ([bytes]). */
+@Serializable
+@SerialName("TakeoutPreview")
+data class TakeoutPreview(val songs: Int, val cached: Int, val bytes: Long)
 
 /** A phone song that has no YouTube Music match (`GET /api/cache/local/unmatched`), and why. */
 @Serializable

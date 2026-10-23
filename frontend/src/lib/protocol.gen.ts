@@ -1220,6 +1220,13 @@ export interface LocalLibraryPage {
   folders: LocalGroup[];
 }
 
+export interface TakeoutSummary {
+  songs: number;
+  plays: number;
+  first: number;
+  last: number;
+}
+
 export interface SongCachePlace {
   id: string;
   name: string;
@@ -1246,6 +1253,12 @@ export interface SongCacheStatus {
   likedCached: number;
   fromHistory: boolean | null;
   fromYoutubeWaiting: string | null;
+  takeout: TakeoutSummary | null;
+  fromTakeout: boolean;
+  takeoutDays: number;
+  takeoutMinPlays: number;
+  takeoutOf: number;
+  takeoutCached: number;
   places: SongCachePlace[];
   place: string | null;
   settable: boolean;
@@ -1263,6 +1276,20 @@ export interface SongCacheSettings {
   localCharging: boolean | null;
   keepLiked: number | null;
   fromHistory: boolean | null;
+  fromTakeout: boolean | null;
+  takeoutDays: number | null;
+  takeoutMinPlays: number | null;
+}
+
+export interface TakeoutPreviewRequest {
+  days: number;
+  minPlays: number;
+}
+
+export interface TakeoutPreview {
+  songs: number;
+  cached: number;
+  bytes: number;
 }
 
 export interface UnmatchedSong {

@@ -460,9 +460,14 @@ class SongCache(
      */
     fun hasRoom(): Boolean {
         if (maxBytes <= 0 || moving) return false
+        val total = synchronized(lock) { entries.values.sumOf { it.size } }
+        return total + usualSongBytes() <= maxBytes / 10 * 9
+    }
+
+    /** How big a song here usually is: the cached songs' average, 4 MB when there are none. */
+    fun usualSongBytes(): Long {
         val (total, count) = synchronized(lock) { entries.values.sumOf { it.size } to entries.size }
-        val usual = if (count > 0) total / count else USUAL_SONG_BYTES
-        return total + usual <= maxBytes / 10 * 9
+        return if (count > 0) total / count else USUAL_SONG_BYTES
     }
 
     /**

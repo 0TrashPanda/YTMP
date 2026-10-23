@@ -132,4 +132,45 @@ class CachePrefillTest {
         prefill.set(liked = 0, fromHistory = false)
         assertEquals(null, prefill.waiting)
     }
+
+    @Test
+    fun `songs from Takeout are looked up and kept, most played first, also signed out`() = runBlocking {
+        val youtube = FakeYoutube()
+        val cache = cache(youtube)
+        val takeout = TakeoutHistory(createTempDirectory("takeout").toFile().resolve("takeout.json"))
+        fun play(id: String, daysAgo: Int) =
+            """{"header":"YouTube Music","title":"Watched $id","titleUrl":"https://music.youtube.com/watch?v=$id","time":"${java.time.Instant.ofEpochMilli(now - daysAgo * day)}"}"""
+        val once = "once0000000"
+        val often = "often000000"
+        val episode = "episode0000"
+        val gone = "gone0000000"
+        val old = "old00000000"
+        val plays = listOf(play(once, 1), play(often, 1), play(often, 2), play(often, 3), play(episode, 1), play(episode, 2), play(gone, 1), play(old, 400), play(old, 401))
+        takeout.import(plays.joinToString(",", "[", "]").byteInputStream(), zone)
+        val looked = CopyOnWriteArrayList<String>()
+        val prefill = CachePrefill(
+            cache, { emptyList() }, { emptyList() }, { false }, scope, takeout = takeout,
+            songInfo = { id ->
+                looked += id
+                when (id) {
+                    gone -> throw IllegalStateException("This video is unavailable")
+                    episode -> song(id).copy(podcast = dev.trashpanda.ytmp.protocol.PodcastRef("p1", "A podcast"))
+                    else -> song(id)
+                }
+            },
+            clock = { now }, zone = zone, gapMs = 0, retryMs = 60_000, intervalMs = 60_000,
+        )
+        assertEquals(4, prefill.preview(days = 365, minPlays = 1).songs)
+        assertEquals(2, prefill.preview(days = 365, minPlays = 2).songs)
+        assertEquals(3, prefill.preview(days = 0, minPlays = 2).songs)
+        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutDays = 365, takeoutMinPlays = 1)
+        eventually { cache.has("ytm:$often") && cache.has("ytm:$once") }
+        assertEquals(listOf(often, episode, once, gone), looked.toList())
+        assertEquals(listOf("ytm:$often", "ytm:$once"), youtube.downloads.toList())
+        // The episode and the song that's gone don't count as still to come.
+        eventually { prefill.takeoutOf == 2 && prefill.takeoutCached == 2 }
+        // Their plays count here too (the recent ones).
+        assertTrue(cache.worth("ytm:$often"))
+        assertEquals(null, prefill.waiting)
+    }
 }
