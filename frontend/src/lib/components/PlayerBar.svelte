@@ -7,6 +7,7 @@
 	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
 	import { isYoutubeSong } from '../ownModule';
+	import { shows } from '../soloLook.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef } from '../protocol.gen';
 	import type { RoomPlayer } from '../player.svelte';
@@ -301,14 +302,16 @@
 				{/if}
 				<RepeatButton {room} size={20} class="hidden p-2 hover:bg-raised md:block" />
 				<ShuffleButton {room} {onToast} size={20} class="hidden p-2 hover:bg-raised md:block" />
-				<button
-					class="rounded-full p-2 hover:bg-raised {activeOutputs ? 'text-accent' : ''}"
-					aria-label="Play on"
-					title={activeOutputs ? `Playing on ${activeOutputs} speaker(s)` : 'Play on a speaker or TV'}
-					onclick={() => (showOutputs = true)}
-				>
-					<Icon name="cast" size={20} />
-				</button>
+				{#if shows(room, 'cast')}
+					<button
+						class="rounded-full p-2 hover:bg-raised {activeOutputs ? 'text-accent' : ''}"
+						aria-label="Play on"
+						title={activeOutputs ? `Playing on ${activeOutputs} speaker(s)` : 'Play on a speaker or TV'}
+						onclick={() => (showOutputs = true)}
+					>
+						<Icon name="cast" size={20} />
+					</button>
+				{/if}
 				<button
 					data-listen-toggle
 					class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium

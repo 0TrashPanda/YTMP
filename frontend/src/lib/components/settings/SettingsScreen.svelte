@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	export type SettingsSection = 'account' | 'youtube' | 'playback' | 'gestures' | 'menu' | 'home' | 'local' | 'look' | 'app' | 'server';
+	export type SettingsSection = 'account' | 'youtube' | 'playback' | 'solo' | 'gestures' | 'menu' | 'home' | 'local' | 'look' | 'app' | 'server';
 </script>
 
 <script lang="ts">
@@ -26,6 +26,7 @@
 	import LocalSection from './LocalSection.svelte';
 	import OwnModuleSection from './OwnModuleSection.svelte';
 	import ServerSection from './ServerSection.svelte';
+	import SoloSection from './SoloSection.svelte';
 	import SongMenuSection from './SongMenuSection.svelte';
 	import YoutubeSection from './YoutubeSection.svelte';
 
@@ -70,6 +71,7 @@
 				['account', 'Account', 'person', true],
 				['youtube', 'YouTube Music', 'library', true],
 				['playback', 'Playback', 'headphones', true],
+				['solo', 'Solo rooms', 'person', true],
 				['gestures', 'Taps and swipes', 'tune', true],
 				['menu', 'Song menu', 'more', true],
 				['home', 'Home', 'home', true],
@@ -251,6 +253,8 @@
 					<p class="text-xs text-muted">The song cache's settings are on this phone's own pages (the room list, rooms on this phone).</p>
 				{/if}
 				{/if}
+			{:else if section === 'solo'}
+				<SoloSection />
 			{:else if section === 'gestures'}
 				<GesturesSection />
 			{:else if section === 'menu'}

@@ -298,9 +298,15 @@ Open it with the **⋮** button or by **right-clicking** the song.
   `/account`: **Account** (logging in; on your server: listening history, your rooms on other
   devices, your roles, password, log out; on other hosts: who you're logged in as there),
   **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
-  bottom), **Playback** (equalizer; app: headphones, Back button), **Look** (image quality, video
+  bottom), **Playback** (equalizer; app: headphones, Back button), **Solo rooms** (what a solo room
+  leaves out, below), **Look** (image quality, video
   pictures, songs per page), **Local music**, **App** (version, updates, logs) and **Server** (the admin: invites, accounts).
   Desktop: the sections on the left; phones: the list, then a section.
+- **Solo rooms** ✅ (Settings → Solo rooms, saved on your YTMP account): switch off the party and sharing bits
+  you don't need when you listen alone: the room code and share button at the top, the room
+  name in the player, the Play on buttons (Play on stays in the avatar menu), "Playing on"
+  under the controls, Karaoke, and Party screen, Show on a TV and Clone room in the avatar
+  menu. Everything shows by default, and parties always show everything.
 - **Numbers you can type** ✅: every setting that is a number has a box to type it in, next to
   its slider or its choices: the volumes and the sync adjustment in *Play on*, the room's
   waiting and limits and the votes needed to skip (*Room settings*), songs per page, the song

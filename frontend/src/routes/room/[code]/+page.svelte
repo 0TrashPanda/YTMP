@@ -42,6 +42,7 @@
 	import { sleepTimer } from '../../../lib/sleepTimer.svelte';
 	import SleepTimerSheet from '../../../lib/components/SleepTimerSheet.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
+	import { shows } from '../../../lib/soloLook.svelte';
 	import { saved } from '../../../lib/storage';
 	import { nativeBridge } from '../../../lib/native';
 	import { identity, logInOnce, session } from '../../../lib/account';
@@ -552,17 +553,19 @@
 						<div class="ml-auto flex items-center gap-2">
 							<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
 							<!-- Phones: centered in the header. -->
-							<button
-								class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line max-sm:absolute max-sm:left-1/2 max-sm:-translate-x-1/2"
-								onclick={() => (sheet = { kind: 'share' })}
-								title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
-							>
-								{#if room.state?.room.visibility === 'private'}
-									<Icon name="headphones" size={16} class="text-muted" />
-								{/if}
-								{code}
-								<Icon name="share" size={16} class="text-muted" />
-							</button>
+							{#if shows(room, 'code')}
+								<button
+									class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line max-sm:absolute max-sm:left-1/2 max-sm:-translate-x-1/2"
+									onclick={() => (sheet = { kind: 'share' })}
+									title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
+								>
+									{#if room.state?.room.visibility === 'private'}
+										<Icon name="headphones" size={16} class="text-muted" />
+									{/if}
+									{code}
+									<Icon name="share" size={16} class="text-muted" />
+								</button>
+							{/if}
 							{#if !solo}
 								<button
 									class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"

@@ -9,6 +9,7 @@
 	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
 	import { isYoutubeSong } from '../ownModule';
+	import { shows } from '../soloLook.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { PageHandlers } from '../cards';
 	import type { RoomPlayer } from '../player.svelte';
@@ -223,7 +224,7 @@
 		<QueuePanel {room} {onMenu} title={false} />
 	{:else if tab === 'lyrics' && song}
 		<div class="flex h-full flex-col">
-			{#if room.can('change_settings')}
+			{#if room.can('change_settings') && shows(room, 'karaoke')}
 				<div class="flex shrink-0 justify-end px-3 pt-3">
 					<button
 						class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium {karaoke ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20'}"
@@ -271,7 +272,7 @@
 		<button class="rounded-full p-2 hover:bg-white/10" aria-label="Close the player" onclick={onClose}>
 			<Icon name="collapse" size={28} />
 		</button>
-		<div class="min-w-0 flex-1 truncate text-center text-sm text-muted lg:hidden">{room.state?.room.name}</div>
+		<div class="min-w-0 flex-1 truncate text-center text-sm text-muted lg:hidden">{shows(room, 'roomName') ? room.state?.room.name : ''}</div>
 		{#if sleepTimer.active}
 			<!-- While the sleep timer runs: how long is left (it opens the timer). -->
 			<button class="flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-sm hover:bg-white/20 lg:ml-auto" aria-label="Sleep timer" onclick={onSleepTimer}>
@@ -280,9 +281,11 @@
 			</button>
 		{/if}
 		<div class="ml-auto flex items-center lg:hidden">
-			<button class="rounded-full p-2 hover:bg-white/10 {activeOutputs.length ? 'text-accent' : ''}" aria-label="Play on" onclick={() => (showOutputs = true)}>
-				<Icon name="cast" />
-			</button>
+			{#if shows(room, 'cast')}
+				<button class="rounded-full p-2 hover:bg-white/10 {activeOutputs.length ? 'text-accent' : ''}" aria-label="Play on" onclick={() => (showOutputs = true)}>
+					<Icon name="cast" />
+				</button>
+			{/if}
 			{#if current}
 				<button class="rounded-full p-2 hover:bg-white/10" aria-label="More for {current.item.song.title}" onclick={moreButton}>
 					<Icon name="more" />
@@ -411,13 +414,15 @@
 							<RepeatButton {room} size={26} class="p-2" />
 						{/if}
 					</div>
-					<button
-						class="flex items-center justify-center gap-2 self-center rounded-full px-3 py-1.5 text-sm {playingOn ? 'text-accent' : 'bg-white/10 text-white'}"
-						onclick={() => (showOutputs = true)}
-					>
-						<Icon name={player.enabled ? 'headphones' : 'cast'} size={18} />
-						{playingOn ? `Playing on ${playingOn}` : 'Not playing here. Tap to listen'}
-					</button>
+					{#if shows(room, 'playingOn')}
+						<button
+							class="flex items-center justify-center gap-2 self-center rounded-full px-3 py-1.5 text-sm {playingOn ? 'text-accent' : 'bg-white/10 text-white'}"
+							onclick={() => (showOutputs = true)}
+						>
+							<Icon name={player.enabled ? 'headphones' : 'cast'} size={18} />
+							{playingOn ? `Playing on ${playingOn}` : 'Not playing here. Tap to listen'}
+						</button>
+					{/if}
 				</div>
 			{:else}
 				<p class="text-muted">Nothing playing. Search for a song to start the music.</p>

@@ -4,6 +4,7 @@
 	import { identity } from '../account';
 	import type { HostInfo } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
+	import { shows } from '../soloLook.svelte';
 	import { youtube } from '../youtube.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 
@@ -86,9 +87,11 @@
 			<p class="truncate px-3 pt-1 text-xs font-medium tracking-wide text-muted uppercase">{info.name} · {info.code}</p>
 			{@render item('share', info.visibility === 'private' ? 'Solo room: make it public' : 'Share room', onShare)}
 			{@render item('cast', 'Play on…', onPlayOn)}
-			{@render item('fullscreen', 'Party screen', onPartyScreen)}
-			{@render item('tv', 'Show on a TV', onShowOnTv)}
-			{@render item('copy', 'Clone room', room.can('clone_room') ? onClone : undefined)}
+			{#if shows(room, 'partyMenu')}
+				{@render item('fullscreen', 'Party screen', onPartyScreen)}
+				{@render item('tv', 'Show on a TV', onShowOnTv)}
+				{@render item('copy', 'Clone room', room.can('clone_room') ? onClone : undefined)}
+			{/if}
 			{@render item('people', 'Room settings', onRoomSettings)}
 			{@render item('logout', 'Leave room', onLeave, true)}
 		{/if}

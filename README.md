@@ -86,6 +86,8 @@ Music, without Premium, and not tied to a single music service.
   own volume slider: turn the laptop down from your phone. On a phone it's the media volume.
 - A sleep timer (in the playing song's ⋮ menu): after some minutes or at the end of the
   song the sound fades out, then a solo room pauses; in a party room only your device stops.
+- Solo rooms can leave out the party bits you don't need alone (room code, Play on, Karaoke,
+  Party screen…), in *Settings → Solo rooms*.
 - An equalizer (*Settings → Playback*): ten bands and presets (Bass boost, Spoken word, …).
   In the app the phone's speaker, wired headphones and each Bluetooth device keep their own.
 - A song menu (⋮, right-click or hold) you can arrange yourself (*Settings → Song menu*):
