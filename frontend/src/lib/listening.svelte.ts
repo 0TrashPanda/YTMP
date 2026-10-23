@@ -43,7 +43,8 @@ class ListeningHistory {
 		this.available = !!this.#access;
 	}
 
-	async #call<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+	/** A call to your account's server (also for your song menu's layout, which is kept the same way). */
+	async call<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
 		const access = this.#access;
 		if (!access) throw new ApiRequestError('Log in with your YTMP account to see your history');
 		let response: Response;
@@ -62,23 +63,23 @@ class ListeningHistory {
 		const params = new URLSearchParams({ limit: '50' });
 		if (before !== null) params.set('before', String(before));
 		if (query.trim()) params.set('q', query.trim());
-		return this.#call<HistoryPage>(`/api/account/history?${params}`);
+		return this.call<HistoryPage>(`/api/account/history?${params}`);
 	}
 
 	async remove(id: string): Promise<void> {
-		await this.#call<null>(`/api/account/history/${encodeURIComponent(id)}`, 'DELETE');
+		await this.call<null>(`/api/account/history/${encodeURIComponent(id)}`, 'DELETE');
 	}
 
 	/** How far you got in these podcast episodes (by song ID), for those that have any. */
 	async episodes(ids: string[]): Promise<Map<string, EpisodeProgress>> {
 		if (!ids.length) return new Map();
-		const list = await this.#call<EpisodeProgressList>(`/api/account/episodes?ids=${encodeURIComponent(ids.join(','))}`);
+		const list = await this.call<EpisodeProgressList>(`/api/account/episodes?ids=${encodeURIComponent(ids.join(','))}`);
 		return new Map(list.episodes.map((e) => [e.id, e]));
 	}
 
 	/** Marks an episode played, or unplayed (from the start). */
 	async markEpisode(id: string, played: boolean): Promise<void> {
-		await this.#call<null>(`/api/account/episodes/${encodeURIComponent(id)}`, 'PUT', { played } satisfies MarkEpisodeRequest);
+		await this.call<null>(`/api/account/episodes/${encodeURIComponent(id)}`, 'PUT', { played } satisfies MarkEpisodeRequest);
 	}
 }
 

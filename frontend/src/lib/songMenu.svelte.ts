@@ -1,7 +1,7 @@
 // The song menu's layout, as set in Settings → Song menu: the order of the actions, which are
-// hidden, where the dividers go, and the big buttons at the top of the phone's menu. Saved on
-// this device.
-import { read, write } from './storage';
+// hidden, where the dividers go, and the big buttons at the top of the phone's menu. One of your
+// preferences (preferences.svelte.ts): on your YTMP account, and in this browser.
+import { preferences } from './preferences.svelte';
 import type { IconName } from './components/Icon.svelte';
 
 export type MenuAction =
@@ -87,7 +87,7 @@ export interface MenuLayout {
 	buttons: (MenuAction | null)[];
 }
 
-const KEY = 'ytmp.songMenu';
+const KEY = 'songMenu';
 const isAction = (value: unknown): value is MenuAction => typeof value === 'string' && value in MENU_ACTIONS;
 
 export function defaultLayout(): MenuLayout {
@@ -95,74 +95,76 @@ export function defaultLayout(): MenuLayout {
 }
 
 /** Reads a saved layout, keeping what's still known; actions added since then go at the end. */
-export function parseLayout(text: string | null): MenuLayout {
+export function parseLayout(saved: unknown): MenuLayout {
 	const layout = defaultLayout();
-	if (!text) return layout;
-	try {
-		const stored = JSON.parse(text) as Partial<Record<keyof MenuLayout, unknown[]>>;
-		if (Array.isArray(stored.items)) {
-			const items = stored.items.filter((i): i is MenuItem => i === 'divider' || isAction(i));
-			const unique = items.filter((i, n) => i === 'divider' || items.indexOf(i) === n);
-			for (const action of Object.keys(MENU_ACTIONS) as MenuAction[]) if (!unique.includes(action)) unique.push(action);
-			layout.items = unique;
-		}
-		if (Array.isArray(stored.hidden)) layout.hidden = [...new Set(stored.hidden.filter(isAction))];
-		if (Array.isArray(stored.buttons)) {
-			const buttons = stored.buttons.slice(0, BUTTON_COUNT).map((b) => (isAction(b) ? b : null));
-			layout.buttons = buttons.map((b, i) => (b && buttons.indexOf(b) === i ? b : null));
-			while (layout.buttons.length < BUTTON_COUNT) layout.buttons.push(null);
-		}
-	} catch {
-		// Unreadable: the defaults.
+	if (!saved || typeof saved !== 'object') return layout;
+	const stored = saved as Partial<Record<keyof MenuLayout, unknown[]>>;
+	if (Array.isArray(stored.items)) {
+		const items = stored.items.filter((i): i is MenuItem => i === 'divider' || isAction(i));
+		const unique = items.filter((i, n) => i === 'divider' || items.indexOf(i) === n);
+		for (const action of Object.keys(MENU_ACTIONS) as MenuAction[]) if (!unique.includes(action)) unique.push(action);
+		layout.items = unique;
+	}
+	if (Array.isArray(stored.hidden)) layout.hidden = [...new Set(stored.hidden.filter(isAction))];
+	if (Array.isArray(stored.buttons)) {
+		const buttons = stored.buttons.slice(0, BUTTON_COUNT).map((b) => (isAction(b) ? b : null));
+		layout.buttons = buttons.map((b, i) => (b && buttons.indexOf(b) === i ? b : null));
+		while (layout.buttons.length < BUTTON_COUNT) layout.buttons.push(null);
 	}
 	return layout;
 }
 
-export const songMenu = $state(parseLayout(read(KEY)));
+let parsedFrom: unknown = null;
+let parsed = defaultLayout();
 
-function save(): void {
-	write(KEY, JSON.stringify(songMenu));
+/** Your layout. Reactive: it changes when your account answers, or in the settings. */
+export function songMenuLayout(): MenuLayout {
+	const saved = preferences.get(KEY);
+	if (saved !== parsedFrom) {
+		parsedFrom = saved;
+		parsed = parseLayout(saved);
+	}
+	return parsed;
 }
 
-export function isDefaultLayout(layout: MenuLayout = songMenu): boolean {
+function change(next: Partial<MenuLayout>): void {
+	preferences.set(KEY, { ...songMenuLayout(), ...next });
+}
+
+export function isDefaultLayout(layout: MenuLayout = songMenuLayout()): boolean {
 	return JSON.stringify(layout) === JSON.stringify(defaultLayout());
 }
 
 export function resetLayout(): void {
-	Object.assign(songMenu, defaultLayout());
-	save();
+	preferences.set(KEY, undefined);
 }
 
 export function setShown(action: MenuAction, shown: boolean): void {
-	songMenu.hidden = shown ? songMenu.hidden.filter((a) => a !== action) : [...songMenu.hidden, action];
-	save();
+	const { hidden } = songMenuLayout();
+	change({ hidden: shown ? hidden.filter((a) => a !== action) : [...hidden, action] });
 }
 
 /** Moves the item at [index] one place up (-1) or down (1). */
 export function moveItem(index: number, by: -1 | 1): void {
+	const items = [...songMenuLayout().items];
 	const to = index + by;
-	if (to < 0 || to >= songMenu.items.length) return;
-	const items = [...songMenu.items];
+	if (to < 0 || to >= items.length) return;
 	[items[index], items[to]] = [items[to], items[index]];
-	songMenu.items = items;
-	save();
+	change({ items });
 }
 
 export function addDivider(): void {
-	songMenu.items = [...songMenu.items, 'divider'];
-	save();
+	change({ items: [...songMenuLayout().items, 'divider'] });
 }
 
 export function removeDivider(index: number): void {
-	if (songMenu.items[index] !== 'divider') return;
-	songMenu.items = songMenu.items.filter((_, i) => i !== index);
-	save();
+	const { items } = songMenuLayout();
+	if (items[index] === 'divider') change({ items: items.filter((_, i) => i !== index) });
 }
 
 /** Puts [action] (or nothing) on big button [index]; it leaves any other button it was on. */
 export function setButton(index: number, action: MenuAction | null): void {
-	songMenu.buttons = songMenu.buttons.map((b, i) => (i === index ? action : b === action ? null : b));
-	save();
+	change({ buttons: songMenuLayout().buttons.map((b, i) => (i === index ? action : b === action ? null : b)) });
 }
 
 /**

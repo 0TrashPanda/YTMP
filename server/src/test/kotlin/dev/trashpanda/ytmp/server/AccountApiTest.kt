@@ -60,6 +60,7 @@ import io.ktor.client.request.put
 import io.ktor.client.request.delete
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -326,6 +327,28 @@ class AccountApiTest {
         assertEquals(EpisodeProgress("ytm:ep2", 0, hour, played = false), marked["ytm:ep2"])
         assertEquals(EpisodeProgress("ytm:ep1", 0, hour, played = true), marked["ytm:ep1"])
         assertEquals(HttpStatusCode.Unauthorized, client.get("/api/account/episodes?ids=ytm:ep1") { bearerAuth(friend) }.status)
+    }
+
+    @Test
+    fun `preferences are kept on the account, for pages that may read the history`() = testApplication {
+        setup(SignupMode.OPEN)
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>().sessionToken
+        val phone = client.postJson("/api/account/host-token", HostTokenRequest(PHONE_APP_ORIGIN), anna).body<HostTokenResponse>().token
+        val friend = client.postJson("/api/account/host-token", HostTokenRequest("http://192.168.1.50:8765"), anna).body<HostTokenResponse>().token
+        val scoped = client.post("/api/account/history-token") { bearerAuth(anna) }.body<HostTokenResponse>().token
+        suspend fun put(token: String, json: String) = client.put("/api/account/preferences") { bearerAuth(token); contentType(ContentType.Application.Json); setBody(json) }
+        suspend fun get(token: String) = client.get("/api/account/preferences") { bearerAuth(token) }.bodyAsText()
+
+        assertEquals("{}", get(anna))
+        assertEquals(HttpStatusCode.OK, put(phone, """{"songMenu":{"items":["radio"]},"soloHidden":["karaoke"]}""").status)
+        // A PUT changes only its own keys; null removes one.
+        put(scoped, """{"soloHidden":null,"other":1}""")
+        for (token in listOf(anna, phone, scoped)) assertEquals("""{"songMenu":{"items":["radio"]},"other":1}""", get(token))
+        // Every host you join has a token like this: it can't see or change them.
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/account/preferences") { bearerAuth(friend) }.status)
+        assertEquals(HttpStatusCode.BadRequest, put(anna, "[1]").status)
+        assertEquals(HttpStatusCode.BadRequest, put(anna, """{"big":"${"x".repeat(70_000)}"}""").status)
     }
 
     @Test

@@ -5,9 +5,9 @@ works without logging in.
 
 > Status: built are accounts and logging in, custom roles, listening history, the linked
 > YouTube Music account, moving your rooms between devices ([room sync](room-sync.md)) and
-> accounts-only servers. Not built yet: YTMP playlists, linked media servers, saved
-> preferences (song menu layout, theme, room defaults beyond roles) and per-room access
-> control.
+> accounts-only servers, and your song menu layout. Not built yet: YTMP playlists, linked
+> media servers, other saved preferences (theme, room defaults beyond roles) and per-room
+> access control.
 
 ## What an account is for
 
@@ -25,7 +25,7 @@ Edit the default roles and create your own. They are applied to rooms you create
 (see [roles](room-management.md#roles)).
 
 ### Playlists & preferences
-YTMP playlists, your [song menu](ui.md#song-menu) layout, your [theme](ui.md#themes)
+YTMP playlists, your [song menu](ui.md#customisable) layout ✅, your [theme](ui.md#themes)
 and your room defaults are saved to your account.
 
 ### YTMP playlists

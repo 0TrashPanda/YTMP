@@ -4,11 +4,11 @@ import { arrange, DEFAULT_ITEMS, defaultLayout, MENU_ACTIONS, parseLayout, type 
 describe('parseLayout', () => {
 	it('gives the defaults for nothing or something unreadable', () => {
 		expect(parseLayout(null)).toEqual(defaultLayout());
-		expect(parseLayout('not json')).toEqual(defaultLayout());
+		expect(parseLayout('not a layout')).toEqual(defaultLayout());
 	});
 
 	it('keeps known actions once, and adds new ones at the end', () => {
-		const layout = parseLayout(JSON.stringify({ items: ['remove', 'divider', 'gone', 'remove', 'playNext'], hidden: ['like', 'gone'], buttons: ['radio', 'radio', 'nope'] }));
+		const layout = parseLayout({ items: ['remove', 'divider', 'gone', 'remove', 'playNext'], hidden: ['like', 'gone'], buttons: ['radio', 'radio', 'nope'] });
 		expect(layout.items.slice(0, 3)).toEqual(['remove', 'divider', 'playNext']);
 		expect(layout.items.filter((i) => i !== 'divider').sort()).toEqual(Object.keys(MENU_ACTIONS).sort());
 		expect(layout.hidden).toEqual(['like']);

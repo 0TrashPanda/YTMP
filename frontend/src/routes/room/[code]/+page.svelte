@@ -30,6 +30,7 @@
 	import PodcastView from '../../../lib/components/PodcastView.svelte';
 	import SearchBox from '../../../lib/components/SearchBox.svelte';
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
+	import { preferences } from '../../../lib/preferences.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
 	import type { Link } from '../../../lib/links';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
@@ -222,6 +223,7 @@
 		room.connect();
 		youtube.load();
 		void listening.load();
+		void preferences.load();
 	}
 	if (initialName.trim()) {
 		// Logged in on this server's pages, but not yet for its rooms: that first (log in once).

@@ -127,6 +127,13 @@ Hosts report it as episodes are paused, skipped or end (`POST /api/auth/episodes
 token of the account, like plays), but reading it back to resume an episode
 (`GET /api/auth/episodes/{id}`) takes a token that only reaches the account's own devices.
 
+Your preferences work the same too, so they're the same in rooms everywhere
+(`GET`/`PUT /api/account/preferences`, kept as `preferences` account data): one JSON object in
+which each feature of the web app has its own keys (`songMenu`, …). A PUT sets only the keys it
+has (null removes one), so features don't overwrite each other; at most 64 KB.
+`frontend/src/lib/preferences.svelte.ts` keeps a copy in the browser (also without an account),
+takes the account's when it answers, and puts up what only the browser has.
+
 The same rule decides how much of the [song graph](storage.md#generating-a-radio) a host
 gets: `GET /api/auth/radio?id=` takes any host token of the account, but only those for the
 app's pages or the server's own include the account's own listening.

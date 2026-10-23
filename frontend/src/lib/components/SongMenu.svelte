@@ -37,7 +37,7 @@
 	import { canDownload, downloadSong } from '../downloads';
 	import { youtube } from '../youtube.svelte';
 	import { sleepTimer } from '../sleepTimer.svelte';
-	import { arrange, songMenu, type MenuAction } from '../songMenu.svelte';
+	import { arrange, songMenuLayout, type MenuAction } from '../songMenu.svelte';
 	import { artistNames } from '../format';
 	import Art from './Art.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
@@ -266,7 +266,7 @@
 
 	/** Phones: a sheet from the bottom, with the big buttons. */
 	const phone = new MediaQuery('max-width: 639px');
-	const layout = $derived(arrange(songMenu, entries, phone.current));
+	const layout = $derived(arrange(songMenuLayout(), entries, phone.current));
 
 	// Keep the menu on screen.
 	let menu = $state<HTMLElement>();

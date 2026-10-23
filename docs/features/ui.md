@@ -327,8 +327,9 @@ tap outside it or press Back to close it. Wider screens show the menu where you 
 move or remove **dividers**; pick the phone's **big buttons** (or none in a place). A big
 button isn't repeated in the list under it. An action still only shows where it can be used
 (*Like* needs YouTube Music, *Remove from this playlist* your own playlist, and so on).
-*Defaults* puts it all back. Saved **on this device** (saving it to your account comes with
-account preferences, planned).
+*Defaults* puts it all back. Saved to your **YTMP account** (logged in), so it's the same on
+all your devices, wherever your history can be shown too; otherwise on this device. The first
+time, the layout of the device you set it up on goes to your account.
 
 ### Share links
 

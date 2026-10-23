@@ -15,9 +15,12 @@ import dev.trashpanda.ytmp.protocol.SessionResponse
 import dev.trashpanda.ytmp.protocol.SignupMode
 import dev.trashpanda.ytmp.protocol.SignupRequest
 import io.ktor.http.HttpMethod
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -117,6 +120,10 @@ class AccountService(
             ?.let { runCatching { ProtocolJson.decodeFromString(AccountSettings.serializer(), it) }.getOrNull() }
             ?.copy(hasRoomPassword = roomPassword(account) != null)
             ?: AccountSettings(tracking = trackingDefault, hideFromOthers = false, hasRoomPassword = roomPassword(account) != null)
+
+    /** The account's preferences (see the `/account/preferences` route). */
+    fun preferences(account: Accounts.Account): JsonObject =
+        accounts.data(account.id, "preferences")?.let { runCatching { ProtocolJson.parseToJsonElement(it) as JsonObject }.getOrNull() } ?: JsonObject(emptyMap())
 
     /** A host reports a song [username] heard; kept only if they track their history (and learned by the song graph). */
     fun recordPlay(username: String, report: PlayReport) {
@@ -252,6 +259,37 @@ class AccountService(
                 else accounts.setData(account.id, "room_password", RoomPasswords.hash(password))
             }
             call.respond(io { settings(account) })
+        }
+
+        // Your preferences (a JSON object; each feature of the web app has its own keys, like
+        // "songMenu"): from every page that may read your history (CORS), so they're the same
+        // in rooms everywhere. A PUT sets the keys it has (null removes one) and keeps the rest.
+        route("/account/preferences") {
+            install(CORS) {
+                anyHost()
+                allowHeader(HttpHeaders.Authorization)
+                allowHeader(HttpHeaders.ContentType)
+                allowMethod(HttpMethod.Put)
+            }
+            get {
+                val account = call.historyAccount()
+                call.respond(io { preferences(account) })
+            }
+            put {
+                val account = call.historyAccount()
+                val change = runCatching { ProtocolJson.parseToJsonElement(call.receiveText()) as JsonObject }.getOrNull()
+                    ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Preferences are a JSON object")
+                val merged = io {
+                    synchronized(this@AccountService) {
+                        val next = JsonObject((preferences(account) + change).filterValues { it !is JsonNull })
+                        val text = next.toString()
+                        if (text.length > MAX_PREFERENCES) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Too many preferences")
+                        accounts.setData(account.id, "preferences", text)
+                        next
+                    }
+                }
+                call.respond(merged)
+            }
         }
 
         // Your history. Reading it and deleting single songs also works from the pages of your
@@ -497,6 +535,9 @@ const val YOUTUBE_SCOPE = "youtube"
 
 /** [AccountTokens.Claims.scope] of tokens that are only for reading an account's listening history (and deleting songs from it). */
 const val HISTORY_SCOPE = "history"
+
+/** How big an account's preferences may get (characters of JSON). */
+private const val MAX_PREFERENCES = 64 * 1024
 
 /** Where the app's own pages are, on every phone (android/.../LocalHost.kt): tokens for it only reach your own phone. */
 const val PHONE_APP_ORIGIN = "http://127.0.0.1:8765"
