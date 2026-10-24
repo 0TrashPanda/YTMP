@@ -361,6 +361,51 @@ class RoomLifecycleTest {
     }
 
     @Test
+    fun `a device whose connection briefly dropped still plays the music meanwhile`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        val ben = room.join("Ben")
+        room.run(anna, Command.AddSongs(listOf(longSong()), QueuePosition.END))
+        room.run(anna, Command.SetListening(true))
+        room.run(ben, Command.SetListening(true))
+        runCurrent()
+
+        // Anna's network drops; Ben switching off doesn't pause the music, since Anna's device still plays it.
+        room.disconnect(anna.id, anna)
+        room.run(ben, Command.SetListening(false))
+        runCurrent()
+        assertTrue(room.save().playing)
+
+        // Back and saying so: it keeps playing.
+        advanceTimeBy(20_000)
+        val back = room.join("Anna", owner = true, guestToken = anna.welcome.guestToken)
+        room.run(back, Command.SetListening(true))
+        advanceTimeBy(5 * 60_000L)
+        assertTrue(room.save().playing)
+    }
+
+    @Test
+    fun `a device back without saying it plays is forgotten after a minute`() = runTest {
+        val room = newRoom()
+        val anna = room.join("Anna", owner = true)
+        room.run(anna, Command.AddSongs(listOf(longSong()), QueuePosition.END))
+        room.run(anna, Command.SetListening(true))
+        runCurrent()
+
+        room.disconnect(anna.id, anna)
+        advanceTimeBy(10_000)
+        // A reload that waits for a tap before it plays.
+        val back = room.join("Anna", owner = true, guestToken = anna.welcome.guestToken)
+        assertTrue(back.welcome.state.participants.single().listening)
+        advanceTimeBy(49_000)
+        assertTrue(room.save().playing)
+
+        advanceTimeBy(2_000)
+        assertFalse(room.save().playing)
+        assertFalse(back.events.filterIsInstance<Event.ParticipantUpdated>().last().participant.listening)
+    }
+
+    @Test
     fun `switching off the last device that plays the music pauses it`() = runTest {
         val room = newRoom()
         val anna = room.join("Anna", owner = true)

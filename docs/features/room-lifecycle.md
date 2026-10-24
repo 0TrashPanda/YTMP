@@ -40,7 +40,8 @@ speaker or TV.
   speaker switched off, the last listener taps *Leave Room*, or another app takes the last
   speaker.
 - After a minute when the last listening device disconnects (a reload or a short network drop
-  isn't leaving).
+  isn't leaving). Until then that device still counts as playing the music, and when it's back
+  in time with *Play here* still on, it simply goes on.
 
 Everyone in the room sees *"Nothing is playing the music any more, so it paused"*. Press play
 to go on.

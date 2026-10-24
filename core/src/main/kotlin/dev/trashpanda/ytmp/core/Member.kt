@@ -22,6 +22,11 @@ internal class Member(
     var speakers: List<String> = emptyList(),
     var speakersStartTogether: Boolean = false,
     var offlineSince: Long? = null,
+    /**
+     * Their connection dropped while they played (listening or speakers): that's kept until
+     * then, unless the device says so again (a short network drop isn't stopping).
+     */
+    var heldUntil: Long? = null,
     var allow: Set<Permission> = emptySet(),
     var deny: Set<Permission> = emptySet(),
     var accountToken: String? = null,

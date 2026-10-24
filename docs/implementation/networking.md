@@ -91,5 +91,6 @@ Built (`RoomTimeouts` in `core/.../RoomManager.kt`):
 | Party room on a server without its owner or a top-role person connected → everyone is told they can clone it | **5 minutes** |
 | "Always on" room (a setting, servers) | Never deleted |
 | Client disconnects → their guest identity (name, role, songs) is kept for | **15 minutes** (recognised by their guest token) |
+| Client that played the music (*Play here*, speakers) disconnects → it still counts as playing; the page says so again when it reconnects (`Room.holdPlayer`, `reconnected()` in `player.svelte.ts`) | **1 minute**, then it's forgotten and the music pauses if nothing else plays it |
 
 Not configurable in `ytmp.toml` yet.

@@ -275,6 +275,18 @@
 		});
 	});
 
+	// Back after the connection dropped (a network hiccup): the host forgets this device plays
+	// the music unless it hears so again within a minute.
+	let reconnecting = false;
+	$effect(() => {
+		const status = room?.status;
+		if (status === 'reconnecting') reconnecting = true;
+		else if (status === 'connected' && reconnecting) {
+			reconnecting = false;
+			untrack(() => player?.reconnected());
+		}
+	});
+
 	let waitingForGesture = false;
 	function startOnFirstGesture() {
 		if (waitingForGesture) return;

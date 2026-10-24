@@ -454,16 +454,41 @@ class Room(
         lastActive = clock()
         // Still connected another way (the app's player while its page is frozen): still here.
         if (member.online) return@withLock
-        member.listening = false
-        member.speakers = emptyList()
         member.offlineSince = clock()
         emit(Event.ParticipantUpdated(member.toParticipant()))
-        pauseWhenNobodyHears(GONE_PAUSE_MS)
+        if (member.listening || member.speakers.isNotEmpty()) holdPlayer(member) else pauseWhenNobodyHears(GONE_PAUSE_MS)
         updateSkipVotes()
     }
 
-    /** Something plays the room's music: a device with "Play here" on, speakers near someone's phone, or a speaker or TV. */
-    private fun heard() = members.values.any { it.online && (it.listening || it.speakers.isNotEmpty()) } || outputs.active.isNotEmpty()
+    /**
+     * [member]'s device played the music and its connection dropped: it still counts as playing
+     * for [GONE_PAUSE_MS], so a short network drop or a reload doesn't pause the music. Back by
+     * then and saying it plays (Command.SetListening, SetSpeakers), it's kept; otherwise it's
+     * forgotten then, and the music pauses if nothing else plays it. Called with [mutex] held.
+     */
+    private fun holdPlayer(member: Member) {
+        val until = clock() + GONE_PAUSE_MS
+        member.heldUntil = until
+        scope.launch {
+            delay(GONE_PAUSE_MS)
+            mutex.withLock {
+                // Said it plays again, or dropped again later (that hold decides).
+                if (member.heldUntil != until) return@withLock
+                member.heldUntil = null
+                member.listening = false
+                member.speakers = emptyList()
+                if (members[member.id] === member) emit(Event.ParticipantUpdated(member.toParticipant()))
+                pauseWhenNobodyHears(0)
+            }
+        }
+    }
+
+    /**
+     * Something plays the room's music: a device with "Play here" on, speakers near someone's
+     * phone (also while its connection is briefly gone, see [holdPlayer]), or a speaker or TV.
+     */
+    private fun heard() = members.values.any { (it.online || it.heldUntil != null) && (it.listening || it.speakers.isNotEmpty()) } ||
+        outputs.active.isNotEmpty()
 
     /**
      * The last device or speaker playing the music went: the music pauses after [afterMs] (0
@@ -894,6 +919,7 @@ class Room(
                 if (command.on) need(member, Permission.LISTEN_LOCALLY)?.let { return it }
                 member.listening = command.on
                 member.startsTogether = command.on && command.startsTogether
+                member.heldUntil = null
                 emit(Event.ParticipantUpdated(member.toParticipant()))
                 if (command.on) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
@@ -902,6 +928,7 @@ class Room(
                 if (names.isNotEmpty()) need(member, Permission.LISTEN_LOCALLY)?.let { return it }
                 if (names.size > MAX_SPEAKERS) return invalid("Too many speakers")
                 member.speakersStartTogether = command.startsTogether
+                member.heldUntil = null
                 if (names == member.speakers) return null
                 member.speakers = names
                 emit(Event.ParticipantUpdated(member.toParticipant()))

@@ -23,6 +23,8 @@ export interface RoomPlayer {
 	enable(): Promise<void>;
 	/** [chosen]: you switched it off (not another app taking the audio), so a solo room remembers it. */
 	disable(chosen?: boolean): void;
+	/** Back after the connection to the host dropped: if it plays here, the host hears so again. */
+	reconnected(): void;
 	setVolume(value: number): void;
 	/** The sleep timer fades the sound out (0–1, on top of the volume); the app's player does that itself. */
 	setFade?(fraction: number): void;
@@ -150,6 +152,10 @@ class WebPlayer implements RoomPlayer {
 		this.timer = setInterval(() => this.sync(), 500);
 		// New songs wait for this player to load them (see reportReady).
 		await this.room.run({ kind: 'SetListening', on: true, startsTogether: true });
+	}
+
+	reconnected(): void {
+		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: true });
 	}
 
 	disable(chosen = true): void {
@@ -560,6 +566,10 @@ class NativePlayer implements RoomPlayer {
 		this.sync();
 		// The app says when it has loaded a new song (bridge version 9), so new songs wait for it.
 		await this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9 });
+	}
+
+	reconnected(): void {
+		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9 });
 	}
 
 	disable(chosen = true): void {

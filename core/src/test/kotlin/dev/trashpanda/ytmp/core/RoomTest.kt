@@ -220,8 +220,10 @@ class RoomTest {
         var anna = other.state.participants.single { it.id == me }
         assertTrue(anna.online && anna.listening)
 
-        // The player's connection goes too: now really gone.
+        // The player's connection goes too: offline now, and a minute later it doesn't play any more.
         room.disconnect(me, player)
+        assertFalse(other.state.participants.single { it.id == me }.online)
+        advanceTimeBy(Room.GONE_PAUSE_MS + 1)
         anna = other.state.participants.single { it.id == me }
         assertFalse(anna.online || anna.listening)
     }
@@ -239,10 +241,11 @@ class RoomTest {
         assertTrue(other.state.playback.playing)
         assertEquals(listOf("Woonkamer"), other.state.participants.single { it.id == page.participantId }.speakers)
 
-        // The phone goes: its speakers can't play the room any more.
+        // The phone goes: after a minute (it wasn't just a network hiccup) its speakers can't play the room any more.
         room.disconnect(page.participantId, page)
+        assertEquals(listOf("Woonkamer"), other.state.participants.single { it.id == page.participantId }.speakers)
+        advanceTimeBy(Room.GONE_PAUSE_MS + 1)
         assertEquals(emptyList(), other.state.participants.single { it.id == page.participantId }.speakers)
-        advanceTimeBy(5 * 60_000L)
         runCurrent()
         assertFalse(other.state.playback.playing)
     }
