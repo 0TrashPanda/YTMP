@@ -36,13 +36,16 @@ const { RoomConnection } = await import('./room.svelte');
 const item = (itemId: string): QueueItem =>
 	({ itemId, song: { id: itemId, title: itemId, durationMs: 200_000 }, addedBy: 'p1', addedByName: 'Anna', addedAt: 0, result: null, origin: 'manual' }) as QueueItem;
 
-function connected() {
+function connected(party = false) {
 	const room = new RoomConnection('ROOM', 'Anna');
 	room.connect();
 	const socket = FakeSocket.last;
 	const state = {
-		room: { code: 'ROOM', name: 'Room', visibility: 'private', hasPassword: false },
-		participants: [{ id: 'p1', name: 'Anna', isOwner: true, online: true, listening: false, allow: [], deny: [], roleId: 'owner' }],
+		room: { code: 'ROOM', name: 'Room', visibility: party ? 'public' : 'private', hasPassword: false },
+		participants: [
+			{ id: 'p1', name: 'Anna', isOwner: true, online: true, listening: false, speakers: [], allow: [], deny: [], roleId: 'owner' },
+			...(party ? [{ id: 'p2', name: 'Bram', isOwner: false, online: true, listening: true, speakers: [], allow: [], deny: [], roleId: 'owner' }] : [])
+		],
 		queue: [item('q1'), item('q2')],
 		history: [],
 		nowPlaying: { item: item('now'), streamUrl: 'https://stream' },
@@ -64,6 +67,29 @@ function connected() {
 }
 
 describe('RoomConnection', () => {
+	it('asks before pausing for the others in a party room', async () => {
+		const { room, socket } = connected(true);
+		const commands = () => socket.sent.filter((m) => m.type === 'command').length;
+		const no = room.run({ kind: 'Pause' });
+		expect(room.asking?.command.kind).toBe('Pause');
+		room.asking!.answer(false);
+		const error = await no;
+		expect(error && room.wasNoticed(error)).toBe(true);
+		expect(commands()).toBe(0);
+		expect(room.state?.playback.playing).toBe(true);
+
+		const once = room.run({ kind: 'Skip', play: true });
+		room.asking!.answer(true);
+		await Promise.resolve();
+		expect(commands()).toBe(1);
+		void once;
+		// Media buttons don't ask; adding songs never does.
+		void room.run({ kind: 'Pause' }, false);
+		void room.run({ kind: 'AddSongs', songs: [], position: 'end' });
+		expect(room.asking).toBeNull();
+		expect(commands()).toBe(3);
+	});
+
 	it('shows a command right away, and the host room once it answered', async () => {
 		const { room, socket, lastCommand } = connected();
 		const done = room.run({ kind: 'Pause' });

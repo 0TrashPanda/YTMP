@@ -316,8 +316,8 @@ Open it with the **⋮** button or by **right-clicking** the song.
     devices, your roles, password, log out; on other hosts: who you're logged in as there) and
     **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
     bottom).
-  - **Playing**: **Playback** (next while paused, start radio, your other devices, skip
-    silence in podcasts) and **Sound** (equalizer, headphones).
+  - **Playing**: **Playback** (next while paused, start radio, asking before interrupting a
+    party, your other devices, skip silence in podcasts) and **Sound** (equalizer, headphones).
   - **How it looks**: **Look** (image quality, video pictures, songs per page), **Player**
     (the tabs, the dislike button), **Home**, **Song menu**, **Taps and swipes** and **Solo
     rooms** (what a solo room leaves out, below).

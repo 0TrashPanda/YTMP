@@ -396,11 +396,12 @@ class WebPlayer implements RoomPlayer {
 		const session = navigator.mediaSession;
 		if (!session) return;
 		const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
-			['play', () => this.room.run({ kind: 'Play' })],
-			['pause', () => this.room.run({ kind: 'Pause' })],
-			['nexttrack', () => this.room.next()],
-			['previoustrack', () => this.room.run({ kind: 'Previous' })],
-			['seekto', (details) => details.seekTime != null && this.room.run({ kind: 'Seek', positionMs: Math.round(details.seekTime * 1000) })]
+			['play', () => this.room.run({ kind: 'Play' }, false)],
+			// Others listen along (headphones taken out, say): stop playing here, not for everyone.
+			['pause', () => (this.room.listeningAlone ? this.room.run({ kind: 'Pause' }, false) : this.disable())],
+			['nexttrack', () => this.room.next(false)],
+			['previoustrack', () => this.room.run({ kind: 'Previous' }, false)],
+			['seekto', (details) => details.seekTime != null && this.room.run({ kind: 'Seek', positionMs: Math.round(details.seekTime * 1000) }, false)]
 		];
 		for (const [action, handler] of handlers) {
 			try {
@@ -590,7 +591,7 @@ class NativePlayer implements RoomPlayer {
 		this.source = bridge.audioSource?.() ?? '';
 		window.__ytmpNative = {
 			...window.__ytmpNative,
-			onCommand: (command) => void this.room.run(command),
+			onCommand: (command) => void this.room.run(command, false),
 			onStatus: (status) => {
 				if (status.startsWith('source:')) {
 					this.source = status.slice('source:'.length);

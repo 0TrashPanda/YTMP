@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.pm.ServiceInfo
 import androidx.core.app.ServiceCompat
 import android.content.Intent
+import android.view.KeyEvent
 import android.database.ContentObserver
 import android.media.AudioManager
 import android.net.Uri
@@ -218,7 +219,7 @@ class PlaybackService : MediaSessionService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, RoomPlayer(exo)).setSessionActivity(openApp).build()
+        session = MediaSession.Builder(this, RoomPlayer(exo)).setSessionActivity(openApp).setCallback(HeadphoneButtons()).build()
 
         PlaybackHub.followerCommands = follower::command
         audioManager = getSystemService(AudioManager::class.java)
@@ -880,6 +881,25 @@ class PlaybackService : MediaSessionService() {
         exo.playWhenReady = false
         follower.command("""{"kind":"SetListening","on":false}""")
         PlaybackHub.status("stopped")
+    }
+
+    /**
+     * Earbuds taken out (or tapped) send pause. With others listening along, that stops playing
+     * here, like unplugging them, instead of pausing the room for everyone. The notification's
+     * and lock screen's pause still pause the room.
+     */
+    private inner class HeadphoneButtons : MediaSession.Callback {
+        override fun onMediaButtonEvent(session: MediaSession, controller: MediaSession.ControllerInfo, intent: Intent): Boolean {
+            val key = intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java) ?: return false
+            if (key.keyCode != KeyEvent.KEYCODE_MEDIA_PAUSE || session.isMediaNotificationController(controller)) return false
+            val target = current
+            if (target == null || !target.enabled || target.alone) return false
+            if (key.action == KeyEvent.ACTION_DOWN) {
+                Log.i(TAG, "headphones: pause -> others listen along, so stop playing here")
+                stopHere()
+            }
+            return true
+        }
     }
 
     /** Where the audio comes from: the host's link, a link this phone looked up, or the host streaming it. */

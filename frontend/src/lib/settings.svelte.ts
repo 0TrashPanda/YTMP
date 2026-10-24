@@ -156,6 +156,8 @@ export const settings = {
 	remotePlay: new Setting('remotePlay', true, bool, flag('ytmp.remotePlay')),
 	/** The app skips silent parts of podcast episodes, when you listen alone. */
 	skipSilence: new Setting('skipSilence', false, bool, flag('ytmp.skipSilence')),
+	/** In a party room, pausing, skipping, seeking or playing something else asks first while others listen along. */
+	askInParty: new Setting('askInParty', true, bool),
 
 	// Look
 	imageQuality: new Setting('imageQuality', 'high' as ImageQuality, imageQuality, word('ytmp.imageQuality', imageQuality)),

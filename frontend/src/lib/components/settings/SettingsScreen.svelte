@@ -291,6 +291,11 @@
 					setting={settings.radioClearsHistory}
 				/>
 				<Toggle
+					label="Ask before interrupting a party"
+					hint="In a party room, while others listen along: asks before you pause, skip, seek or play something else for everyone. Headphone and lock screen buttons don't ask."
+					setting={settings.askInParty}
+				/>
+				<Toggle
 					label="Your other devices can switch Play here on"
 					hint="Logged in with the same account and in the same room, your other devices can switch Play here on and off on this one, from Play on. A browser plays only after a click on its page."
 					setting={settings.remotePlay}

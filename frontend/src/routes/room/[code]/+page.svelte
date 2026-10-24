@@ -18,6 +18,7 @@
 	import AvatarMenu from '../../../lib/components/AvatarMenu.svelte';
 	import SettingsScreen, { type SettingsSection } from '../../../lib/components/settings/SettingsScreen.svelte';
 	import LeaveRoomDialog from '../../../lib/components/LeaveRoomDialog.svelte';
+	import InterruptDialog from '../../../lib/components/InterruptDialog.svelte';
 	import PartyScreen from '../../../lib/components/PartyScreen.svelte';
 	import TvLinkDialog from '../../../lib/components/TvLinkDialog.svelte';
 	import OutputsSheet from '../../../lib/components/OutputsSheet.svelte';
@@ -861,6 +862,10 @@
 		<OutputsSheet {room} {player} onClose={() => close('playOn')} onToast={toast} />
 	{:else if sheet?.kind === 'share'}
 		<ShareSheet {room} {host} onClose={() => close('share')} onToast={toast} onClone={room.can('clone_room') ? () => (sheet = { kind: 'clone' }) : undefined} />
+	{/if}
+
+	{#if room.asking}
+		<InterruptDialog {room} />
 	{/if}
 
 	<div class="pointer-events-none fixed inset-x-0 bottom-28 z-[80] flex flex-col items-center gap-2 px-4">

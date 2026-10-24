@@ -30,6 +30,15 @@ permissions say otherwise (permission: *Play audio locally*).
 - **Headphones disconnected** (unplugged, Bluetooth gone) is a setting in the app (profile
   menu): **Pause** (default; pauses the room like YTM when you're the only one listening,
   otherwise stops playing here), **Stop here**, or **Keep playing** on the speaker.
+- **Earbuds taken out** ✅: earbuds (and a tap on them) send *pause*. While others listen
+  along, that stops playing on your phone, like unplugging, and the music goes on for
+  everyone else; alone, it pauses the room like YTM. The notification's and lock screen's
+  pause still pause the room. (A browser's media keys do the same.)
+- **Ask before interrupting a party** ✅ (*Settings → Playback*, on by default): in a party
+  room, while others listen along and the music plays, pausing, seeking, skipping, going back
+  or playing something else (Play now, a song in Up next, Start radio) first asks *"Pause for
+  everyone?"* with **No**, **Just once** and **Always** (does it, and stops asking; the
+  setting switches it back on). Media buttons, the lock screen and the sleep timer don't ask.
 - Listening **alone**, a device that starts a song late (buffering) doesn't jump ahead: the
   room moves to where the device is, so there's no audible skip.
 - Other rooms remember your last choice in the app.

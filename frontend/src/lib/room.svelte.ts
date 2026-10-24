@@ -19,6 +19,9 @@ import { saved } from './storage';
 import { applyEvent } from './roomEvents';
 import { predict, type Sender } from './optimistic';
 
+/** What interrupts the music for everyone: in a party room it's asked first (see [RoomConnection.run]). */
+const INTERRUPTS = new Set<Command['kind']>(['Pause', 'Seek', 'Skip', 'Previous', 'JumpTo', 'PlayNow', 'StartRadio']);
+
 /** How long a host notice (e.g. "Couldn't play …") stays on screen. */
 const NOTICE_MS = 8000;
 
@@ -56,6 +59,8 @@ export class RoomConnection {
 	/** Only mine: takes my role along to a clone of this room (see [migrationLink]). */
 	migrationKey: string | null = null;
 	notices = $state<{ id: number; text: string }[]>([]);
+	/** A command waiting for "Pause for everyone?" (InterruptDialog): [answer] true runs it. */
+	asking = $state<{ command: Command; answer: (go: boolean) => void } | null>(null);
 
 	/** Host clock minus our clock, in ms. */
 	clockOffset = $state(0);
@@ -160,8 +165,8 @@ export class RoomConnection {
 	}
 
 	/** Next: skips (playing the next song also when paused, if this device's setting says so), or votes (a second press takes the vote back). */
-	next(): Promise<ErrorInfo | null> {
-		return this.run(this.skipMode === 'vote' ? { kind: 'VoteSkip', on: !this.votedToSkip } : { kind: 'Skip', play: settings.nextPlays.value });
+	next(ask = true): Promise<ErrorInfo | null> {
+		return this.run(this.skipMode === 'vote' ? { kind: 'VoteSkip', on: !this.votedToSkip } : { kind: 'Skip', play: settings.nextPlays.value }, ask);
 	}
 
 	/** What "play next" did, for a toast: with fair order a listener's song goes in their next turn. */
@@ -244,9 +249,32 @@ export class RoomConnection {
 		if (undo) void this.run({ kind: 'RestoreSongs', songs: undo.songs, index: undo.index });
 	}
 
-	/** Sends a command. Resolves with the host's error, or null when it worked. */
-	run(command: Command): Promise<ErrorInfo | null> {
+	/**
+	 * Sends a command. Resolves with the host's error, or null when it worked. What would
+	 * interrupt the music for the others in a party room is asked first, unless you said
+	 * Always (Settings → Playback); [ask] false: never (media buttons, the sleep timer), there's
+	 * no page to ask on. Not going ahead resolves with an error that counts as noticed.
+	 */
+	run(command: Command, ask = true): Promise<ErrorInfo | null> {
+		if (ask && this.interruptsOthers(command)) return this.askFirst(command);
 		return this.send(command).done;
+	}
+
+	/** [command] stops or changes what the others in this party room hear right now. */
+	interruptsOthers(command: Command): boolean {
+		const s = this.state;
+		if (!s || !INTERRUPTS.has(command.kind) || !settings.askInParty.value) return false;
+		return s.room.visibility !== 'private' && (s.playback.playing || s.playback.starting) && !this.listeningAlone;
+	}
+
+	private async askFirst(command: Command): Promise<ErrorInfo | null> {
+		this.asking?.answer(false);
+		const go = await new Promise<boolean>((answer) => (this.asking = { command, answer }));
+		this.asking = null;
+		if (go) return this.send(command).done;
+		const cancelled: ErrorInfo = { code: 'invalid', message: 'Not done' };
+		this.noticed.add(cancelled);
+		return cancelled;
 	}
 
 	/**

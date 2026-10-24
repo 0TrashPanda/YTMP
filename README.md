@@ -83,6 +83,8 @@ Music, without Premium, and not tied to a single music service.
   keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
   speakers near your phone (the phone looks the songs up and serves them).
 - Android: lock screen and notification controls, keeps playing with the screen off.
+- In a party room, taking your earbuds out only stops the music on your phone. Pause, seek,
+  skip or play something else while others listen asks first (*No*, *Just once*, *Always*).
 - Your other devices in the room (signed in to your account) show in *Play on* with their
   own volume slider: turn the laptop down from your phone. On a phone it's the media volume.
   A checkbox switches *Play here* on or off there (a browser after one click on its page).

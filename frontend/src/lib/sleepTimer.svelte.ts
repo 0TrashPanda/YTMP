@@ -117,7 +117,7 @@ class SleepTimer {
 		if (room.state?.room.visibility === 'private' && room.can('play_pause')) {
 			// Silent until the room has paused (the next song may be starting).
 			player?.setFade?.(0);
-			await room.run({ kind: 'Pause' });
+			await room.run({ kind: 'Pause' }, false);
 			await new Promise((resolve) => setTimeout(resolve, 500));
 		} else if (player?.enabled) {
 			player.disable();
