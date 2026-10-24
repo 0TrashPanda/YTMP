@@ -134,4 +134,30 @@ class LocalMatcherTest {
         matcher.stop()
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
+
+    @Test
+    fun `after the update only files whose tags now give an ID are looked up again`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val dir = createTempDirectory("matcher-v3").toFile().apply { deleteOnExit() }
+        val cache = SongCache(dir, 1_000_000, StreamResolver { error("not used") }, null, scope, coverOf = { null })
+        val found = track("1", "Halo", "Beyoncé", 261_000)
+        val tagged = track("2", "The Chapel", "Rock Band", 242_000)
+        val nothing = track("3", "My Own Demo", "Me", 120_000)
+        // What version 2 found, before tags were read whole.
+        cache.setLocalMatch("1", LocalMatch(LocalMatcher.signature(found, 2), song("ytm:halo", "Halo", "Beyoncé", 261_000)))
+        cache.setLocalMatch("2", LocalMatch(LocalMatcher.signature(tagged, 2), null, "No result with the same title, artist and length"))
+        cache.setLocalMatch("3", LocalMatch(LocalMatcher.signature(nothing, 2), null, "YouTube Music found nothing"))
+        val asked = ArrayList<String>()
+        val matcher = LocalMatcher(cache, { listOf(found, tagged, nothing) }, { asked += it; emptyList() },
+            tagged = { t -> if (t.key == "2") "0yJzontbSYg" else null },
+            lookup = { id -> asked += id; song(id, "The Chapel", "Rock Band", 242_000) }, scope = scope, gapMs = 0)
+        matcher.start()
+        withTimeout(5_000) { while (cache.localMatch("2")?.song == null) delay(10) }
+        assertEquals("ytm:0yJzontbSYg", cache.localMatch("2")?.song?.id)
+        assertEquals(listOf("ytm:0yJzontbSYg"), asked)
+        assertEquals("ytm:halo", cache.localMatch("1")?.song?.id)
+        assertEquals(LocalMatcher.signature(nothing), cache.localMatch("3")?.sig)
+        matcher.stop()
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+    }
 }

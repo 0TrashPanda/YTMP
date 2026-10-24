@@ -186,11 +186,12 @@ On a server this doesn't apply: downloads go to the browser.
 With the setting on (`ytmp.cache` pref `localSongs`; `SongCacheSettings.localSongs`), `LocalMatcher`
 (`host/`) goes through the phone's music (`PhoneLibrary.tracks()`, without `Music/YTMP`, under
 an hour, with a title and artist) and searches YouTube Music songs for "artist title", one
-search every 4 s per worker (`LocalMatcher.parallel`, 1–8 workers, the setting *Lookups at once*, pref `localParallel`). Before that, a YouTube video ID in the file's name (`[id]` at the end, or `-id`; `LocalMatcher.idInName`) or in a YouTube link in the first 128 KB of the file (a `PURL`/comment tag in any encoding; `idInBytes`) is looked up as a song (`ytm.song`); if its length is within 10 s of the file's it is the match, else the search below runs. A search result is a match when its normalised title (no accents, brackets or
+search every 4 s per worker (`LocalMatcher.parallel`, 1–8 workers, the setting *Lookups at once*, pref `localParallel`). Before that, a YouTube video ID in the file's name (`[id]` at the end, or `-id`; `LocalMatcher.idInName`) or in a YouTube link in the file's tags (a `PURL`/comment tag in any encoding; `idInBytes`), read whole by `TagArea` (the ID3v2 tag of an MP3, the `moov` box of an M4A wherever it is, else the first 1 MB, at most 16 MB: a big cover often comes before the link) is looked up as a song (`ytm.song`); if its length is within 10 s of the file's it is the match, else the search below runs. A search result is a match when its normalised title (no accents, brackets or
 punctuation) is the same, one of its artists is in the file's artist or album artist, and the
 length differs by at most 3 s. The answer, also "no match", is kept per file in the cache's
 `index.json` (`local`: media store ID → `LocalMatch(title|artist|length, song?)`), so it moves with
 the cache folder and survives *Clear cache*; a changed file is looked up again, a removed one forgotten.
+The signature starts with a version (`v3`). Answers from `v2` (tags read only in the first 128 KB) are kept as they are, except a "no match" whose tags now give an ID: that file is looked up again (`LocalMatcher.upgrade`).
 A failed search (bot check, no internet) stops the round and tries again in 10 minutes; it looks at the media
 store every 5 minutes.
 

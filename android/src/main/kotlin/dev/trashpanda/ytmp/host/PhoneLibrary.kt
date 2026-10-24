@@ -111,21 +111,10 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
         }
     }
 
-    /** The first [bytes] of song [key]'s file, where its tags are (null: can't read it). */
-    suspend fun head(key: String, bytes: Int = 128 * 1024): ByteArray? = withContext(Dispatchers.IO) {
+    /** The part of song [key]'s file where its tags are ([TagArea]; null: can't read it). */
+    suspend fun tagArea(key: String): ByteArray? = withContext(Dispatchers.IO) {
         val uri = uriOf(key) ?: return@withContext null
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                val buffer = ByteArray(bytes)
-                var got = 0
-                while (got < bytes) {
-                    val n = input.read(buffer, got, bytes - got)
-                    if (n < 0) break
-                    got += n
-                }
-                buffer.copyOf(got)
-            }
-        }.getOrNull()
+        runCatching { context.contentResolver.openInputStream(uri)?.use(TagArea::read) }.getOrNull()
     }
 
     /** Title, artist, album and length in seconds: the same song in two places. */

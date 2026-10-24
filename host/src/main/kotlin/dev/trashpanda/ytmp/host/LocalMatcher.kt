@@ -115,6 +115,7 @@ class LocalMatcher(
         current = valid
         total = files.size
         publish(valid)
+        for (f in files) upgrade(f)
         val todo = files.filter { f -> cache.localMatch(f.key).let { it == null || (!it.manual && it.sig != signature(f)) } }
         left.set(todo.size)
         val next = AtomicInteger()
@@ -143,6 +144,16 @@ class LocalMatcher(
         // Files that went: forget what was found.
         for (key in cache.localMatchKeys() - valid.keys) cache.setLocalMatch(key, null)
         return rescanMs
+    }
+
+    /**
+     * A file looked at before tags were read whole (v2): what was found stays, and so does "not
+     * found", unless its tags now give an ID (looked up in the next round, like a new file).
+     */
+    private suspend fun upgrade(track: LocalTrack) {
+        val old = cache.localMatch(track.key)?.takeIf { !it.manual && it.sig == signature(track, 2) } ?: return
+        if (old.song == null && idInName(track.file) == null && tagged(track) != null) return
+        cache.setLocalMatch(track.key, old.copy(sig = signature(track)))
     }
 
     /** Looks one file up: by an ID in its name or tags first, else by title and artist. */
@@ -226,8 +237,8 @@ class LocalMatcher(
         internal fun eligible(t: LocalTrack) =
             !t.folder.startsWith("Music/YTMP") && t.durationMs in 30_000..MAX_MS
 
-        // v2: IDs in names and tags count.
-        internal fun signature(t: LocalTrack) = "v2|${t.title}|${t.artist}|${t.durationMs}"
+        // v2: IDs in names and tags count. v3: the whole tag area is read (a link after a big cover).
+        internal fun signature(t: LocalTrack, version: Int = 3) = "v$version|${t.title}|${t.artist}|${t.durationMs}"
 
         private val ID = "[A-Za-z0-9_-]{11}"
         private val IN_BRACKETS = Regex("\\[($ID)]\\s*$")

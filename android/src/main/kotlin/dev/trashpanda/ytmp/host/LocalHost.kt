@@ -162,7 +162,7 @@ class LocalHost(private val context: Context) {
     private val matcher: LocalMatcher = LocalMatcher(
         cache, { phoneLibrary.tracks() },
         { query -> ytm.search(query, SearchType.SONGS).sections.flatMap { it.items }.filterIsInstance<SearchItem.SongResult>().filter { !it.video }.map { it.song } },
-        tagged = { track -> phoneLibrary.head(track.key)?.let(LocalMatcher::idInBytes) },
+        tagged = { track -> phoneLibrary.tagArea(track.key)?.let(LocalMatcher::idInBytes) },
         lookup = { id -> try { ytm.song(id) } catch (e: CancellationException) { throw e } catch (e: Exception) { null } },
         hold = dataRules::localHold,
         scope = scope,
