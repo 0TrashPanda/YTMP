@@ -30,10 +30,16 @@ permissions say otherwise (permission: *Play audio locally*).
 - **Headphones disconnected** (unplugged, Bluetooth gone) is a setting in the app (profile
   menu): **Pause** (default; pauses the room like YTM when you're the only one listening,
   otherwise stops playing here), **Stop here**, or **Keep playing** on the speaker.
-- **Earbuds taken out** ✅: earbuds (and a tap on them) send *pause*. While others listen
-  along, that stops playing on your phone, like unplugging, and the music goes on for
-  everyone else; alone, it pauses the room like YTM. The notification's and lock screen's
-  pause still pause the room. (A browser's media keys do the same.)
+- **Earbuds taken out, lock screen pause** ✅: earbuds (and a tap on them) send *pause*.
+  While others listen along, that and the notification's and lock screen's pause stop the
+  music on your phone only, like unplugging, and it goes on for everyone else; alone, they
+  pause the room like YTM. (A browser's media keys do the same.)
+- **Lock screen Next, Previous and seeking** ✅ only show for whoever may skip or seek right
+  away (the *Skip* and *Seek* permissions: the owner and DJs by default, not listeners).
+- **Pause only stops it here** ✅ (*Settings → Playback*, off by default): in a party room
+  while others listen along, YTMP's own Pause button stops the music on your device and it
+  goes on for everyone else. When it isn't playing on your device, Pause pauses the room
+  (asked first, below).
 - **Ask before interrupting a party** ✅ (*Settings → Playback*, on by default): in a party
   room, while others listen along and the music plays, pausing, seeking, skipping, going back
   or playing something else (Play now, a song in Up next, Start radio) first asks *"Pause for

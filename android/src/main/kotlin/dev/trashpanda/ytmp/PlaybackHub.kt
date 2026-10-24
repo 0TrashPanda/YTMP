@@ -41,6 +41,10 @@ data class PlaybackTarget(
     val nextPlays: Boolean = false,
     /** A solo room: the sleep timer pauses it (in a shared room it only stops playing here). */
     val solo: Boolean = false,
+    /** May skip right away (permission `skip`): the lock screen and notification show Next and Previous. */
+    val canSkip: Boolean = true,
+    /** May seek (permission `seek`): the lock screen and notification can seek. */
+    val canSeek: Boolean = true,
 )
 
 /**

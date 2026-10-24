@@ -158,6 +158,8 @@ export const settings = {
 	skipSilence: new Setting('skipSilence', false, bool, flag('ytmp.skipSilence')),
 	/** In a party room, pausing, skipping, seeking or playing something else asks first while others listen along. */
 	askInParty: new Setting('askInParty', true, bool),
+	/** In a party room where others listen along, Pause stops playing on this device instead (not playing here: it pauses, asked first). */
+	pauseStopsHere: new Setting('pauseStopsHere', false, bool),
 
 	// Look
 	imageQuality: new Setting('imageQuality', 'high' as ImageQuality, imageQuality, word('ytmp.imageQuality', imageQuality)),

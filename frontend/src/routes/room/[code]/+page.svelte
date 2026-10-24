@@ -38,7 +38,7 @@
 	import CloneSheet from '../../../lib/components/CloneSheet.svelte';
 	import { forgetHome, getHost, getRoom } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
-	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
+	import { createPlayer, pause, type RoomPlayer } from '../../../lib/player.svelte';
 	import { sleepTimer } from '../../../lib/sleepTimer.svelte';
 	import SleepTimerSheet from '../../../lib/components/SleepTimerSheet.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
@@ -255,6 +255,8 @@
 		void room?.clockOffset;
 		void room?.listeningAlone;
 		void room?.participantId;
+		// The lock screen's buttons follow what you may do.
+		void [room?.can('skip'), room?.can('seek')];
 		untrack(() => player?.sync());
 	});
 
@@ -398,7 +400,10 @@
 		if (target.closest('input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, select, [contenteditable]')) return;
 		if (target !== document.body && target.matches(':focus-visible')) return;
 		event.preventDefault();
-		if (!event.repeat) room.run({ kind: room.state.playback.playing || room.state.playback.starting || room.state.playback.loading ? 'Pause' : 'Play' });
+		if (!event.repeat) {
+			if (room.state.playback.playing || room.state.playback.starting || room.state.playback.loading) pause(room, player);
+			else room.run({ kind: 'Play' });
+		}
 	}
 
 	// A changed setting (e.g. what unplugging headphones does) goes to the app's player.

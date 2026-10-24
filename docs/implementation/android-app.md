@@ -12,10 +12,11 @@
   screen, notification, headphones, Bluetooth) are turned into **room commands**
   (`window.__ytmpNative.onCommand`), so they control the room, not just this phone.
 - Losing audio focus or unplugging headphones stops playback **on this phone only**.
-- A headphone/Bluetooth `KEYCODE_MEDIA_PAUSE` (earbuds taken out, or tapped) goes through
-  `MediaSession.Callback.onMediaButtonEvent` (`HeadphoneButtons`): when others listen along
-  (not `alone`) it stops playback here instead of pausing the room. The media notification's
-  own controller is left alone; the lock screen uses the session's `pause()`, not a key.
+- `RoomPlayer` (the session's `ForwardingPlayer`): with others listening along (not
+  `alone`), `pause()` (lock screen, notification, earbuds taken out or tapped) stops playback
+  here instead of pausing the room. Next, previous and seeking are only offered with
+  `PlaybackTarget.canSkip` / `canSeek` (the page's `skip` and `seek` permissions);
+  `updateCommands()` tells the session's listeners when that changes.
 - **The player follows the room itself** (`RoomFollower`). Android's WebView **freezes
   the page** after about 5 minutes hidden (screen off): timers, fetches and WebSocket
   messages stop, even with renderer priority *important* and the foreground services

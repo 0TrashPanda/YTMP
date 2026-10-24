@@ -67,6 +67,16 @@ interface EqGraph {
 type Source = 'direct' | 'own' | 'host';
 const SOURCE_NAMES: Record<Source, string> = { direct: 'the direct link', own: 'your own module', host: 'through the host' };
 
+/**
+ * Pause, from YTMP's own buttons. With *Pause only stops it here* on, in a party room where
+ * others listen along, it stops playing on this device instead; not playing here, it pauses
+ * the room (asked first, see [RoomConnection.run]).
+ */
+export function pause(room: RoomConnection, player: RoomPlayer | null | undefined): void {
+	if (player?.enabled && settings.pauseStopsHere.value && room.state?.room.visibility !== 'private' && !room.listeningAlone) player.disable();
+	else void room.run({ kind: 'Pause' });
+}
+
 /** [loose]: on a Chromecast, which can't be synced closely (see [looseCorrection]). */
 export function createPlayer(room: RoomConnection, options: { loose?: boolean } = {}): RoomPlayer {
 	return nativeBridge ? new NativePlayer(room, nativeBridge) : new WebPlayer(room, options.loose ?? false);
@@ -684,7 +694,10 @@ class NativePlayer implements RoomPlayer {
 				// So the app can follow the room itself while this page is frozen in the background.
 				room: this.followableRoom(),
 				// The sleep timer pauses a solo room (in a shared room it only stops playing here).
-				solo: state?.room.visibility === 'private'
+				solo: state?.room.visibility === 'private',
+				// The lock screen's Next, Previous and seeking only for whoever may do them right away.
+				canSkip: this.room.can('skip'),
+				canSeek: this.room.can('seek')
 			})
 		);
 	}

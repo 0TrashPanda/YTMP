@@ -13,7 +13,7 @@
 	import { shows } from '../soloLook.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { PageHandlers } from '../cards';
-	import type { RoomPlayer } from '../player.svelte';
+	import { pause, type RoomPlayer } from '../player.svelte';
 	import SourceBadge from './SourceBadge.svelte';
 	import type { CommandUpdateSettings, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -121,7 +121,7 @@
 	function artClick() {
 		const pausing = playing;
 		flash = { icon: pausing ? 'pause' : 'play' };
-		room.run({ kind: pausing ? 'Pause' : 'Play' });
+		(pausing ? pause(room, player) : room.run({ kind: 'Play' }));
 	}
 
 	// Thumbs up, with your YouTube Music sign-in.
@@ -443,7 +443,7 @@
 								class="mx-2 grid h-18 w-18 place-items-center rounded-full bg-white text-black disabled:opacity-40"
 								disabled={!room.can('play_pause')}
 								aria-label={playing ? 'Pause' : 'Play'}
-								onclick={() => room.run({ kind: playing ? 'Pause' : 'Play' })}
+								onclick={() => (playing ? pause(room, player) : room.run({ kind: 'Play' }))}
 							>
 								<Icon name={playing ? 'pause' : 'play'} size={40} />
 							</button>

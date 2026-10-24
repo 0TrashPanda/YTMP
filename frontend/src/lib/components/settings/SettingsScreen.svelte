@@ -292,8 +292,13 @@
 				/>
 				<Toggle
 					label="Ask before interrupting a party"
-					hint="In a party room, while others listen along: asks before you pause, skip, seek or play something else for everyone. Headphone and lock screen buttons don't ask."
+					hint="In a party room, while others listen along: asks before you pause, skip, seek or play something else for everyone. Headphone and lock screen buttons don't ask: their pause stops the music only on your phone."
 					setting={settings.askInParty}
+				/>
+				<Toggle
+					label="Pause only stops it here"
+					hint="In a party room, while others listen along, Pause stops the music on this device and it goes on for everyone else. When it isn't playing here, Pause pauses the room (asked first)."
+					setting={settings.pauseStopsHere}
 				/>
 				<Toggle
 					label="Your other devices can switch Play here on"

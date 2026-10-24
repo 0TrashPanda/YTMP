@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.content.pm.ServiceInfo
 import androidx.core.app.ServiceCompat
 import android.content.Intent
-import android.view.KeyEvent
 import android.database.ContentObserver
 import android.media.AudioManager
 import android.net.Uri
@@ -135,6 +134,7 @@ class PlaybackService : MediaSessionService() {
 
     /** Stopped here because another app took the audio; until the page has switched "Play here" off. */
     private var stoppedHere = false
+    private lateinit var roomPlayer: RoomPlayer
 
     /** Headphones were unplugged and the room was asked to pause: stay quiet until it has. */
     private var pausingRoom = false
@@ -219,7 +219,7 @@ class PlaybackService : MediaSessionService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, RoomPlayer(exo)).setSessionActivity(openApp).setCallback(HeadphoneButtons()).build()
+        session = MediaSession.Builder(this, RoomPlayer(exo).also { roomPlayer = it }).setSessionActivity(openApp).build()
 
         PlaybackHub.followerCommands = follower::command
         audioManager = getSystemService(AudioManager::class.java)
@@ -389,6 +389,7 @@ class PlaybackService : MediaSessionService() {
 
     private fun apply(target: PlaybackTarget?) {
         current = target
+        roomPlayer.updateCommands()
         lastTarget?.let { old ->
             if (target != null && (old.clockOffset != target.clockOffset || old.hostTimeMs != target.hostTimeMs)) {
                 val now = System.currentTimeMillis()
@@ -883,25 +884,6 @@ class PlaybackService : MediaSessionService() {
         PlaybackHub.status("stopped")
     }
 
-    /**
-     * Earbuds taken out (or tapped) send pause. With others listening along, that stops playing
-     * here, like unplugging them, instead of pausing the room for everyone. The notification's
-     * and lock screen's pause still pause the room.
-     */
-    private inner class HeadphoneButtons : MediaSession.Callback {
-        override fun onMediaButtonEvent(session: MediaSession, controller: MediaSession.ControllerInfo, intent: Intent): Boolean {
-            val key = intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java) ?: return false
-            if (key.keyCode != KeyEvent.KEYCODE_MEDIA_PAUSE || session.isMediaNotificationController(controller)) return false
-            val target = current
-            if (target == null || !target.enabled || target.alone) return false
-            if (key.action == KeyEvent.ACTION_DOWN) {
-                Log.i(TAG, "headphones: pause -> others listen along, so stop playing here")
-                stopHere()
-            }
-            return true
-        }
-    }
-
     /** Where the audio comes from: the host's link, a link this phone looked up, or the host streaming it. */
     private enum class Source(val label: String) {
         SAVED("from this phone"),
@@ -910,21 +892,63 @@ class PlaybackService : MediaSessionService() {
         HOST("through the host"),
     }
 
-    /** Turns media controls (lock screen, notification, headphones) into room commands. */
-    private class RoomPlayer(player: Player) : ForwardingPlayer(player) {
-        private val roomCommands = Player.Commands.Builder().addAll(
-            Player.COMMAND_PLAY_PAUSE,
+    /**
+     * Turns media controls (lock screen, notification, headphones) into room commands. With
+     * others listening along, pause (also earbuds taken out) stops playing here instead of
+     * pausing the room for everyone. Next, previous and seeking only show with the permission
+     * to skip or seek right away ([PlaybackTarget.canSkip], [PlaybackTarget.canSeek]).
+     */
+    private inner class RoomPlayer(player: Player) : ForwardingPlayer(player) {
+        private val listeners = mutableListOf<Player.Listener>()
+        private var shown: Player.Commands? = null
+
+        private fun roomCommands(): Player.Commands {
+            val target = current
+            return Player.Commands.Builder().add(Player.COMMAND_PLAY_PAUSE).apply {
+                if (target?.canSkip != false) addAll(
+                    Player.COMMAND_SEEK_TO_NEXT,
+                    Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+                    Player.COMMAND_SEEK_TO_PREVIOUS,
+                    Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+                )
+                if (target?.canSeek != false) add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+            }.build()
+        }
+
+        private val hidden = listOf(
             Player.COMMAND_SEEK_TO_NEXT,
             Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
             Player.COMMAND_SEEK_TO_PREVIOUS,
             Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
             Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
-        ).build()
+            Player.COMMAND_SEEK_BACK,
+            Player.COMMAND_SEEK_FORWARD,
+        )
 
-        override fun getAvailableCommands(): Player.Commands =
-            super.getAvailableCommands().buildUpon().addAll(roomCommands).build()
+        override fun getAvailableCommands(): Player.Commands {
+            val room = roomCommands()
+            return super.getAvailableCommands().buildUpon().removeAll(*hidden.filterNot(room::contains).toIntArray()).addAll(room).build()
+        }
 
-        override fun isCommandAvailable(command: Int): Boolean = roomCommands.contains(command) || super.isCommandAvailable(command)
+        override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
+
+        override fun addListener(listener: Player.Listener) {
+            listeners += listener
+            super.addListener(listener)
+        }
+
+        override fun removeListener(listener: Player.Listener) {
+            listeners -= listener
+            super.removeListener(listener)
+        }
+
+        /** The permissions changed: the lock screen and notification show other buttons. */
+        fun updateCommands() {
+            val now = availableCommands
+            if (now == shown) return
+            shown = now
+            listeners.toList().forEach { it.onAvailableCommandsChanged(now) }
+        }
 
         override fun play() {
             Log.d(TAG, "media session: play")
@@ -932,6 +956,12 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun pause() {
+            val target = current
+            if (target != null && target.enabled && !target.alone) {
+                Log.i(TAG, "media session: pause -> others listen along, so stop playing here")
+                stopHere()
+                return
+            }
             Log.d(TAG, "media session: pause")
             PlaybackHub.command("""{"kind":"Pause"}""")
         }
@@ -939,17 +969,22 @@ class PlaybackService : MediaSessionService() {
         override fun setPlayWhenReady(playWhenReady: Boolean) = if (playWhenReady) play() else pause()
 
         override fun seekToNext() {
+            if (current?.canSkip == false) return
             Log.d(TAG, "media session: next")
             PlaybackHub.command("""{"kind":"Skip","play":${PlaybackHub.target.value?.nextPlays == true}}""")
         }
 
         override fun seekToNextMediaItem() = seekToNext()
 
-        override fun seekToPrevious() = PlaybackHub.command("""{"kind":"Previous"}""")
+        override fun seekToPrevious() {
+            if (current?.canSkip != false) PlaybackHub.command("""{"kind":"Previous"}""")
+        }
 
         override fun seekToPreviousMediaItem() = seekToPrevious()
 
-        override fun seekTo(positionMs: Long) = PlaybackHub.command("""{"kind":"Seek","positionMs":$positionMs}""")
+        override fun seekTo(positionMs: Long) {
+            if (current?.canSeek != false) PlaybackHub.command("""{"kind":"Seek","positionMs":$positionMs}""")
+        }
     }
 
     companion object {
