@@ -63,7 +63,7 @@ Like YTM:
 - **Mini player** ✅ (phones): at the bottom of every page. The song, play/pause and
   next, and a thin progress line. **Tap it or swipe it up** to open the full player.
 - **Full player** ✅: the album art (with its blurred colours behind it), the song (the
-  artist, album and podcast open their page), the position (drag to seek), previous,
+  artist, album and podcast open their page), the position (click or drag to seek), previous,
   play/pause, next (and back 10 s / ahead 30 s for episodes), with **shuffle** and
   **repeat** on either side for music, like YTM. At the top: close (˅),
   **Play on** (cast icon) and the song menu (⋮). Below the controls it says where the
@@ -79,9 +79,11 @@ Like YTM:
   See [vote to skip](queue.md#vote-to-skip).
 - **Desktop** ✅: the player bar stays at the bottom (controls, the song, volume, repeat,
   shuffle, Play on, Play here, ˄ to open the full player); the full player opens above it. Like YTM,
-  **clicking anywhere on the bar** (not on a button) opens or closes the full player, and
-  the song shows **Artist • Album • Year**; the artist and album open their page. A **like**
-  button sits next to the song. With the full player open, the song is only in the bar (the
+  **clicking anywhere on the bar** (not on a button) opens or closes the full player,
+  the position line along its top seeks where you click it (or drag it; it takes clicks a few
+  pixels above and below the line too), and the song shows **Artist • Album • Year**; the
+  artist and album open their page. A **like** button sits next to the song.
+  With the full player open, the song is only in the bar (the
   full player shows the art and Up next / Related), the top bar (search) and the left side
   stay, and **clicking the
   art plays or pauses**, like YTM (a play or pause icon pops up on the art for a moment). The art is always square and never cut off at the top or
