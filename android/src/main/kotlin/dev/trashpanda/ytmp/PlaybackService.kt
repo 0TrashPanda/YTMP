@@ -902,33 +902,23 @@ class PlaybackService : MediaSessionService() {
         private val listeners = mutableListOf<Player.Listener>()
         private var shown: Player.Commands? = null
 
-        private fun roomCommands(): Player.Commands {
-            val target = current
-            return Player.Commands.Builder().add(Player.COMMAND_PLAY_PAUSE).apply {
-                if (target?.canSkip != false) addAll(
-                    Player.COMMAND_SEEK_TO_NEXT,
-                    Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
-                    Player.COMMAND_SEEK_TO_PREVIOUS,
-                    Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
-                )
-                if (target?.canSeek != false) add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
-            }.build()
-        }
-
-        private val hidden = listOf(
-            Player.COMMAND_SEEK_TO_NEXT,
-            Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
-            Player.COMMAND_SEEK_TO_PREVIOUS,
-            Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
-            Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
-            Player.COMMAND_SEEK_BACK,
-            Player.COMMAND_SEEK_FORWARD,
-        )
-
         override fun getAvailableCommands(): Player.Commands {
-            val room = roomCommands()
-            return super.getAvailableCommands().buildUpon().removeAll(*hidden.filterNot(room::contains).toIntArray()).addAll(room).build()
+            val skip = current?.canSkip != false
+            val seek = current?.canSeek != false
+            return super.getAvailableCommands().buildUpon()
+                .add(Player.COMMAND_PLAY_PAUSE)
+                .let { allow(it, Player.COMMAND_SEEK_TO_NEXT, skip) }
+                .let { allow(it, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, skip) }
+                .let { allow(it, Player.COMMAND_SEEK_TO_PREVIOUS, skip) }
+                .let { allow(it, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM, skip) }
+                .let { allow(it, Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM, seek) }
+                .removeIf(Player.COMMAND_SEEK_BACK, !seek)
+                .removeIf(Player.COMMAND_SEEK_FORWARD, !seek)
+                .build()
         }
+
+        private fun allow(builder: Player.Commands.Builder, @Player.Command command: Int, on: Boolean) =
+            if (on) builder.add(command) else builder.remove(command)
 
         override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
 
