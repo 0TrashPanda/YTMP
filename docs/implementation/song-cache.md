@@ -115,6 +115,11 @@ those files, and keeps the plays with the product *YouTube Music* or a `music.yo
   are left out; when none can be read, the error asks for the JSON export.
 - **JSON**: `titleUrl`, `title` (without `Watched `), `subtitles[0].name`, `time` (ISO).
 
+A zip that ends early (`EOFException`/`ZipException` while reading), or a file that isn't a zip's
+start and isn't text (the back part of a zip: a download saved in two files, seen from Discord),
+is refused with one message, `Takeout.INCOMPLETE`: download it again. Nothing is kept from it.
+The settings show why an export was refused under its button until the next one is chosen.
+
 `TakeoutHistory` keeps the result in `takeout-history.json` in the app's files (per song: ID,
 title, artist, the play times; about 1.5 MB for 31,000 plays) and replaces it on the next
 import; `DELETE /api/cache/takeout` removes it and switches the setting off.

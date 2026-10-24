@@ -99,4 +99,24 @@ class TakeoutHistoryTest {
         history.forget()
         assertNull(TakeoutHistory(file).summary())
     }
+
+    @Test
+    fun `a zip that didn't download completely says so, also its back part alone`() {
+        // Many cells, so the history is compressed over several kilobytes.
+        val big = "<html><body>" + (0 until 2000).joinToString("") { i ->
+            cell("YouTube Music", "https://music.youtube.com/watch?v=song${i.toString().padStart(7, '0')}", "Song $i", "Artist $i", "23 Oct 2026, 17:30:20 CEST")
+        } + "</body></html>"
+        val zip = ByteArrayOutputStream().also { out ->
+            ZipOutputStream(out).use { z ->
+                z.putNextEntry(ZipEntry("Takeout/YouTube and YouTube Music/history/watch-history.html"))
+                z.write(big.toByteArray())
+            }
+        }.toByteArray()
+        assertEquals(2000, Takeout.read(zip.inputStream(), zone).size)
+        val cut = zip.size / 2
+        for (part in listOf(zip.copyOfRange(0, cut), zip.copyOfRange(cut, zip.size))) {
+            val e = assertFailsWith<IllegalArgumentException> { Takeout.read(part.inputStream(), zone) }
+            assertEquals(Takeout.INCOMPLETE, e.message)
+        }
+    }
 }

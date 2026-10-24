@@ -239,7 +239,7 @@
 	/>
 {/if}
 {#if toastText}
-	<p class="fixed inset-x-0 bottom-8 z-50 mx-auto w-fit rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">{toastText}</p>
+	<p class="fixed inset-x-0 bottom-8 z-[80] mx-auto w-fit rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">{toastText}</p>
 {/if}
 
 {#snippet elsewhereList()}

@@ -86,8 +86,6 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
                 withContext(Dispatchers.IO) { prefill.importTakeout(upload) }
             } catch (e: IllegalArgumentException) {
                 throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "That isn't a Takeout export")
-            } catch (e: java.util.zip.ZipException) {
-                throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Couldn't read this zip")
             }
             call.respond(call.status())
         }

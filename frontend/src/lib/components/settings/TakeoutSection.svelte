@@ -25,6 +25,8 @@
 	} = $props();
 
 	let reading = $state(false);
+	// Why the last export couldn't be read: it stays until the next one is chosen.
+	let failed = $state<string | null>(null);
 	let input = $state<HTMLInputElement>();
 	// What's chosen right now: the count follows it at once, the setting is saved meanwhile.
 	let days = $state(untrack(() => status.takeoutDays));
@@ -74,7 +76,15 @@
 		(event.currentTarget as HTMLInputElement).value = '';
 		if (!file) return;
 		reading = true;
-		await attempt(() => importTakeout(file), 'Takeout history read');
+		failed = null;
+		await attempt(async () => {
+			try {
+				return await importTakeout(file);
+			} catch (e) {
+				failed = e instanceof Error ? e.message : "Couldn't read this export";
+				throw e;
+			}
+		}, 'Takeout history read');
 		reading = false;
 	}
 
@@ -110,7 +120,7 @@
 			<div class="rounded-lg bg-raised p-3">
 				<p class="text-sm font-medium">{number(preview.songs)} {preview.songs === 1 ? 'song' : 'songs'}, about {size(preview.bytes)}</p>
 				<p class="text-xs text-muted">
-					{#if preview.cached}{number(preview.cached)} of them are here already.{/if}
+					{#if preview.cached}{preview.cached === preview.songs ? (preview.songs === 1 ? "It's" : 'All of them are') : `${number(preview.cached)} of them are`} here already.{/if}
 					{#if tooBig}
 						That's more than the cache's {size(status.maxBytes)}: only what fits is kept, most played first. A bigger size keeps all of them.
 					{:else if status.fromTakeout}
@@ -121,6 +131,9 @@
 				</p>
 			</div>
 		{/if}
+	{/if}
+	{#if failed}
+		<p class="text-sm text-red-400" role="alert">{failed}</p>
 	{/if}
 	<div class="flex flex-wrap gap-2">
 		<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line disabled:opacity-40" disabled={busy || reading} onclick={() => input?.click()}>

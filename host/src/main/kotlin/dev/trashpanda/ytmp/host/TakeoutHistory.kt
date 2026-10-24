@@ -118,13 +118,28 @@ object Takeout {
         }
     }
 
-    fun read(input: InputStream, zone: ZoneId): List<TakeoutSong> {
+    /** A zip that ends early, or the back part of one: a download that didn't finish, or one saved in two files. */
+    const val INCOMPLETE = "This zip is incomplete: it didn't download completely. Download it again, straight from Google Takeout if you can"
+
+    fun read(input: InputStream, zone: ZoneId): List<TakeoutSong> = try {
+        readAll(input, zone)
+    } catch (e: java.io.EOFException) {
+        throw IllegalArgumentException(INCOMPLETE)
+    } catch (e: java.util.zip.ZipException) {
+        throw IllegalArgumentException(INCOMPLETE)
+    }
+
+    private fun readAll(input: InputStream, zone: ZoneId): List<TakeoutSong> {
         val plays = Plays()
         val stream = BufferedInputStream(input)
-        stream.mark(4)
-        val head = ByteArray(4).also { stream.read(it) }
+        stream.mark(1024)
+        val head = ByteArray(1024).let { buf ->
+            var n = 0
+            while (n < buf.size) n += stream.read(buf, n, buf.size - n).takeIf { it > 0 } ?: break
+            buf.copyOf(n)
+        }
         stream.reset()
-        if (head.contentEquals(byteArrayOf(0x50, 0x4b, 0x03, 0x04))) {
+        if (head.size >= 4 && head.copyOf(4).contentEquals(byteArrayOf(0x50, 0x4b, 0x03, 0x04))) {
             var found = false
             val zip = ZipInputStream(stream)
             while (true) {
@@ -135,6 +150,9 @@ object Takeout {
                 history(object : FilterInputStream(zip) { override fun close() {} }, plays, zone)
             }
             if (!found) throw IllegalArgumentException("There's no YouTube watch history in this zip: in Takeout, pick YouTube and YouTube Music with its history")
+        } else if (head.any { it in 0..8 || it in 14..31 && it != 27.toByte() }) {
+            // Not a zip's start and not text: compressed data, from the middle of a zip.
+            throw IllegalArgumentException(INCOMPLETE)
         } else {
             history(stream, plays, zone)
         }

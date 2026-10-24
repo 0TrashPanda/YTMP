@@ -817,7 +817,7 @@
 		<ShareSheet {room} {host} onClose={() => close('share')} onToast={toast} onClone={room.can('clone_room') ? () => (sheet = { kind: 'clone' }) : undefined} />
 	{/if}
 
-	<div class="pointer-events-none fixed inset-x-0 bottom-28 z-50 flex flex-col items-center gap-2 px-4">
+	<div class="pointer-events-none fixed inset-x-0 bottom-28 z-[80] flex flex-col items-center gap-2 px-4">
 		{#if room.undo}
 			<div class="pointer-events-auto flex items-center gap-3 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">
 				<span class="min-w-0 truncate">{room.undo.text}</span>

@@ -168,7 +168,7 @@ without internet on the phone. It works by itself: there is nothing to pick.
   - **Songs from Google Takeout**: your whole YouTube Music history, years back. Export it at
     takeout.google.com (*YouTube and YouTube Music*, with its history) and choose the zip (or the
     `watch-history.html` or `.json` in it) here; it stays on the phone, and a new export replaces
-    the old one. Then choose how recent (played in the last month, 3 months, year, all of it, or
+    the old one. A zip that didn't download completely says so (download it again). Then choose how recent (played in the last month, 3 months, year, all of it, or
     a number of days) and how often (at least 2, 3, 5, 10, 20 times or a number you type): while
     you choose, it shows how many songs that is, about how much room they take, and how many are
     here already. Switched on, they're downloaded most played first. Plain YouTube is left out,
