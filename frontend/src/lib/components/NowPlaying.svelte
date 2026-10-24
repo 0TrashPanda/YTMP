@@ -4,6 +4,7 @@
 	// over it. Swipe down (or the chevron, or Back) closes it. Desktop: above the player bar,
 	// which keeps the controls and the song; the art on the left, Up next and Related on the right.
 	import { fly } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { prefetch } from '../api';
 	import { images } from '../images.svelte';
@@ -154,13 +155,52 @@
 		return names.length > 2 ? `${names[0]} and ${names.length - 1} more` : names.join(' and ');
 	});
 
-	// Swipe down to close (phones).
-	let swipeStart: number | null = null;
+	// Swipe down to close (phones): the player follows the finger, springs back when let go
+	// early, and slides on down from where it is when far enough or flicked. Sideways (the
+	// seek bar, the art) doesn't move it.
+	let swipe: { x: number; y: number; t: number; down: boolean | null } | null = null;
 	let dragY = $state(0);
-	function onTouchEnd() {
-		if (dragY > 120) onClose();
-		dragY = 0;
-		swipeStart = null;
+	let dragging = $state(false);
+	let closing = false;
+
+	function onTouchStart(e: TouchEvent) {
+		if (closing) return;
+		swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: e.timeStamp, down: null };
+	}
+
+	function onTouchMove(e: TouchEvent) {
+		if (!swipe) return;
+		const dy = e.touches[0].clientY - swipe.y;
+		const dx = e.touches[0].clientX - swipe.x;
+		if (swipe.down === null) {
+			if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+			swipe.down = dy > 0 && dy > Math.abs(dx);
+			if (!swipe.down) return;
+			// Start from here, so it doesn't jump the first few pixels.
+			swipe.y = e.touches[0].clientY;
+			swipe.t = e.timeStamp;
+		}
+		if (!swipe.down) return;
+		dragging = true;
+		dragY = Math.max(0, e.touches[0].clientY - swipe.y);
+	}
+
+	function onTouchEnd(e: TouchEvent) {
+		const flick = swipe && dragY > 40 && dragY / Math.max(1, e.timeStamp - swipe.t) > 0.6;
+		swipe = null;
+		dragging = false;
+		if (dragY > 120 || flick) {
+			// Keep dragY: the slide out starts from where the finger left it.
+			closing = true;
+			onClose();
+		} else dragY = 0;
+	}
+
+	/** Slides in from below the screen, and out from where it was dragged to. */
+	function slideUp(_node: HTMLElement) {
+		const from = dragY;
+		const to = window.innerHeight;
+		return { duration: 250, easing: cubicOut, css: (t: number) => `transform: translateY(${from + (1 - t) * (to - from)}px)` };
 	}
 
 	// Swipe Up next / Related down to close it: from the handle and tabs, or from the list
@@ -249,9 +289,9 @@
 {/snippet}
 
 <div
-	class="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-bg lg:absolute lg:top-14 lg:z-30"
+	class="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-bg lg:absolute lg:top-14 lg:z-30 {dragging ? '' : 'transition-transform duration-200 ease-out'}"
 	style:transform={dragY ? `translateY(${dragY}px)` : undefined}
-	transition:fly={{ y: 600, duration: 250, opacity: 1 }}
+	transition:slideUp
 	role="dialog"
 	aria-label="Now playing"
 >
@@ -266,9 +306,10 @@
 	<div
 		class="flex h-14 shrink-0 touch-none items-center gap-2 px-2"
 		role="presentation"
-		ontouchstart={(e) => (swipeStart = e.touches[0].clientY)}
-		ontouchmove={(e) => swipeStart !== null && (dragY = Math.max(0, e.touches[0].clientY - swipeStart))}
+		ontouchstart={onTouchStart}
+		ontouchmove={onTouchMove}
 		ontouchend={onTouchEnd}
+		ontouchcancel={onTouchEnd}
 	>
 		<button class="rounded-full p-2 hover:bg-white/10" aria-label="Close the player" onclick={onClose}>
 			<Icon name="collapse" size={28} />
@@ -300,9 +341,10 @@
 		<div
 			class="flex min-h-0 min-w-0 flex-1 touch-pan-x flex-col items-center justify-center gap-5 px-6 pb-2"
 			role="presentation"
-			ontouchstart={(e) => (swipeStart = e.touches[0].clientY)}
-			ontouchmove={(e) => swipeStart !== null && (dragY = Math.max(0, e.touches[0].clientY - swipeStart))}
+			ontouchstart={onTouchStart}
+			ontouchmove={onTouchMove}
 			ontouchend={onTouchEnd}
+			ontouchcancel={onTouchEnd}
 		>
 			<!-- Always square: as big as both the width and the height allow (desktop: no other limit, the song is in the player bar). -->
 			<div class="flex min-h-0 w-full flex-1 items-center justify-center [container-type:size]" role="presentation" oncontextmenu={onSongMenu}>
