@@ -264,7 +264,13 @@ export class RoomConnection {
 	interruptsOthers(command: Command): boolean {
 		const s = this.state;
 		if (!s || !INTERRUPTS.has(command.kind) || !settings.askInParty.value) return false;
-		return s.room.visibility !== 'private' && (s.playback.playing || s.playback.starting) && !this.listeningAlone;
+		return s.room.visibility !== 'private' && (s.playback.playing || s.playback.starting) && !this.listeningAlone && !this.onlyMyDevices;
+	}
+
+	/** Everyone else here (party screens aside) is logged in with my account: my other devices. */
+	get onlyMyDevices(): boolean {
+		const mine = this.me?.accountId;
+		return !!mine && !!this.state?.participants.every((p) => p.id === this.participantId || !p.online || p.screen || p.accountId === mine);
 	}
 
 	private async askFirst(command: Command): Promise<ErrorInfo | null> {

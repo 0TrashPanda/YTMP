@@ -36,7 +36,7 @@ permissions say otherwise (permission: *Play audio locally*).
   pause the room like YTM. (A browser's media keys do the same.)
 - **Lock screen Next, Previous and seeking** ✅ only show for whoever may skip or seek right
   away (the *Skip* and *Seek* permissions: the owner and DJs by default, not listeners).
-- **Pause only stops it here** ✅ (*Settings → Playback*, off by default): in a party room
+- **Pause only stops it here** ✅ (*Settings → Playback*, on by default): in a party room
   while others listen along, YTMP's own Pause button stops the music on your device and it
   goes on for everyone else. When it isn't playing on your device, Pause pauses the room
   (asked first, below).
@@ -44,7 +44,8 @@ permissions say otherwise (permission: *Play audio locally*).
   room, while others listen along and the music plays, pausing, seeking, skipping, going back
   or playing something else (Play now, a song in Up next, Start radio) first asks *"Pause for
   everyone?"* with **No**, **Just once** and **Always** (does it, and stops asking; the
-  setting switches it back on). Media buttons, the lock screen and the sleep timer don't ask.
+  setting switches it back on). Not when everyone else in the room is logged in with
+  your account (your own devices). Media buttons, the lock screen and the sleep timer don't ask.
 - Listening **alone**, a device that starts a song late (buffering) doesn't jump ahead: the
   room moves to where the device is, so there's no audible skip.
 - Other rooms remember your last choice in the app.

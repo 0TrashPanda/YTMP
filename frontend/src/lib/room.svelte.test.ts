@@ -90,6 +90,15 @@ describe('RoomConnection', () => {
 		expect(commands()).toBe(3);
 	});
 
+	it("doesn't ask when everyone else is on my account", () => {
+		const { room, socket } = connected(true);
+		room.state!.participants[0].accountId = 'me';
+		room.state!.participants[1].accountId = 'me';
+		void room.run({ kind: 'Pause' });
+		expect(room.asking).toBeNull();
+		expect(socket.sent.filter((m) => m.type === 'command').length).toBe(1);
+	});
+
 	it('shows a command right away, and the host room once it answered', async () => {
 		const { room, socket, lastCommand } = connected();
 		const done = room.run({ kind: 'Pause' });
