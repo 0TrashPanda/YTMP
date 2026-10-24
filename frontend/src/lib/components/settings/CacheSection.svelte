@@ -44,8 +44,13 @@
 			onToast(e instanceof Error ? e.message : "Couldn't load the song cache");
 			return;
 		}
-		// While it moves to another place, look again in a moment.
+		schedule();
+	}
+
+	/** While it moves to another place, or songs come in, look again in a moment. */
+	function schedule() {
 		clearTimeout(timer);
+		if (!status) return;
 		if (status.moving) timer = setTimeout(refresh, 2000);
 		else if (status.checking || filling(status)) timer = setTimeout(refresh, 10000);
 	}
@@ -59,7 +64,7 @@
 		try {
 			status = await action();
 			if (done) onToast(done);
-			if (status.moving) timer = setTimeout(refresh, 2000);
+			schedule();
 		} catch (e) {
 			onToast(e instanceof Error ? e.message : 'Something went wrong');
 		} finally {
@@ -104,7 +109,7 @@
 
 	/** Liked songs or songs from Takeout are still coming in. */
 	const filling = (s: SongCacheStatus) =>
-		((!!s.keepLiked && s.likedCached < s.likedOf) || (s.fromTakeout && s.takeoutCached < s.takeoutOf)) && !s.fromYoutubeWaiting;
+		s.fromYoutubeBusy || (((!!s.keepLiked && s.likedCached < s.likedOf) || (s.fromTakeout && s.takeoutCached < s.takeoutOf)) && !s.fromYoutubeWaiting);
 
 	/** Why songs from YouTube Music aren't coming in now, in plain words. */
 	function fromYoutubeNote(s: SongCacheStatus): string | null {
@@ -200,7 +205,7 @@
 					onchange={(v) => attempt(() => patch({ fromHistory: v === '1' }))}
 				/>
 				<TakeoutSection {status} {busy} {patch} {attempt} {size} />
-				{#if (status.keepLiked || status.fromHistory || status.fromTakeout) && fromYoutubeNote(status)}
+				{#if (status.keepLiked || status.fromHistory) && !status.fromTakeout && fromYoutubeNote(status)}
 					<p class="-mt-1 text-xs text-muted">{fromYoutubeNote(status)}</p>
 				{/if}
 			{/if}

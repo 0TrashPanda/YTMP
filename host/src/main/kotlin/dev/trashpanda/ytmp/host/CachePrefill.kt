@@ -74,6 +74,31 @@ class CachePrefill(
     /** Takeout songs that turned out not to be kept (an episode, too long, gone from YouTube): not tried again until the app restarts. */
     private val unkeepable = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
+    /** Of [unkeepable]: the ones YouTube doesn't have (any more): "Video unavailable". */
+    private val gone = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** A song YouTube answered for lately: when lookups fail in a row, it tells gone songs from YouTube itself failing. */
+    @Volatile
+    private var answered: String? = null
+
+    /** Of the songs the Takeout settings pick: how many YouTube doesn't have any more (skipped). */
+    val takeoutGone: Int get() = if (takeout == null || gone.isEmpty()) 0 else takeout.pick(takeoutDays, takeoutMinPlays, clock()).count { it.song().id in gone }
+
+    /** Looking and fetching right now (between two songs too). */
+    @Volatile
+    var busy = false
+        private set
+
+    /** After an [waiting] "error": what went wrong, and when it tries again (ms). */
+    @Volatile
+    var error: String? = null
+        private set
+
+    /** When it looks again by itself (ms): after an error, or after a round that's done. Null while [busy]. */
+    @Volatile
+    var nextAt: Long? = null
+        private set
+
     /** Of the songs the Takeout settings pick (that can be cached): how many, and how many are here. */
     val takeoutOf: Int get() = takeoutPicks().size
 
@@ -91,6 +116,7 @@ class CachePrefill(
         val history = takeout ?: throw IllegalStateException("Not on this host")
         history.import(input)
         unkeepable.clear()
+        gone.clear()
         if (fromTakeout) wake.trySend(Unit)
     }
 
@@ -137,8 +163,11 @@ class CachePrefill(
 
     private suspend fun loop() {
         while (scope.isActive) {
+            busy = true
+            nextAt = null
             val wait = try {
                 round()
+                error = null
                 intervalMs
             } catch (e: CancellationException) {
                 throw e
@@ -146,8 +175,12 @@ class CachePrefill(
                 // A bot check, no internet: later.
                 log.info("Song cache from YouTube Music: {}; trying again later", e.message)
                 waiting = "error"
+                error = e.message ?: e.javaClass.simpleName
                 retryMs
+            } finally {
+                busy = false
             }
+            nextAt = clock() + wait
             withTimeoutOrNull(wait) { wake.receive() }
         }
     }
@@ -186,7 +219,10 @@ class CachePrefill(
         }
         val blocked = waiting
         var fetched = 0
-        var failed = 0
+        // Lookups that failed in a row: gone from YouTube, or YouTube itself (see youtubeAnswers).
+        val failed = ArrayList<String>()
+        // A song YouTube has: one it answered for, or else one already here.
+        answered = answered ?: wanted.values.firstOrNull { cache.has(it.id) }?.id
         for (picked in wanted.values) {
             if (!cache.wanted(picked) || picked.id in unkeepable) continue
             if (!cache.hasRoom()) {
@@ -200,14 +236,27 @@ class CachePrefill(
             }
             val song = if (picked.id in lookUp) {
                 try {
-                    songInfo(picked.id.removePrefix("ytm:")).also { failed = 0 }
+                    songInfo(picked.id.removePrefix("ytm:")).also {
+                        failed.clear()
+                        answered = picked.id
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    // Gone from YouTube, say; several in a row: YouTube itself (a bot check).
-                    if (++failed >= MAX_FAILED_LOOKUPS) throw e
+                    // Gone from YouTube, say ("Video unavailable"): old histories have many.
                     log.info("Song cache: couldn't look up {}: {}", picked.id, e.message)
                     unkeepable += picked.id
+                    gone += picked.id
+                    failed += picked.id
+                    if (failed.size >= MAX_FAILED_LOOKUPS) {
+                        // Several in a row: YouTube itself failing (a bot check, no internet), or just more gone songs?
+                        if (!youtubeAnswers()) {
+                            unkeepable -= failed.toSet()
+                            gone -= failed.toSet()
+                            throw e
+                        }
+                        failed.clear()
+                    }
                     delay(gapMs)
                     continue
                 }
@@ -224,6 +273,20 @@ class CachePrefill(
         if (fetched > 0) log.info("Song cache: {} song(s) kept from YouTube Music and Takeout", fetched)
     }
 
+    /** YouTube looks up a song it has ([answered]); false when it fails too, or there's none to try. */
+    private suspend fun youtubeAnswers(): Boolean {
+        val known = answered ?: return false
+        return try {
+            songInfo(known.removePrefix("ytm:"))
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.info("Song cache: YouTube didn't look up {} either: {}", known, e.message)
+            false
+        }
+    }
+
     /** About when a history song was played: the middle of that day (not later than now); unknown: a month ago. */
     private fun playedAt(daysAgo: Int?): Long {
         val now = clock()
@@ -238,7 +301,7 @@ class CachePrefill(
         const val MAX_TAKEOUT_MIN_PLAYS = 1000
         const val DEFAULT_TAKEOUT_DAYS = 365
         const val DEFAULT_TAKEOUT_MIN_PLAYS = 5
-        /** Takeout songs it couldn't look up in a row before it stops the round (YouTube blocks it, likely). */
+        /** Takeout songs it couldn't look up in a row before it checks YouTube itself still answers (else it stops the round). */
         private const val MAX_FAILED_LOOKUPS = 3
         /** Between two songs it fetches. */
         private const val GAP_MS = 20_000L

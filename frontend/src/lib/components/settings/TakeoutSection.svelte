@@ -89,6 +89,30 @@
 	}
 
 	const month = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+	/** "21:09", or "Sat 09:30" when it isn't today. */
+	function at(ms: number): string {
+		const when = new Date(ms);
+		const time = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+		return when.toDateString() === new Date().toDateString() ? time : `${when.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+	}
+
+	/** What it's doing now, and why not when it's paused, in plain words. */
+	const progress = $derived.by((): { text: string; paused: boolean } | null => {
+		if (!status.fromTakeout) return null;
+		const left = status.takeoutOf - status.takeoutCached;
+		const next = status.fromYoutubeNextAt ? ` Tries again at ${at(status.fromYoutubeNextAt)}.` : '';
+		switch (status.fromYoutubeWaiting) {
+			case 'Wi-Fi':
+				return { text: 'Paused: waiting for Wi-Fi (Keep songs in the background is set to Wi-Fi only). It goes on by itself on Wi-Fi.', paused: true };
+			case 'full':
+				return { text: `Paused: the cache is full. A bigger size keeps more.${next}`, paused: true };
+			case 'error':
+				return { text: `Paused: YouTube didn't answer${status.fromYoutubeError ? ` (${status.fromYoutubeError})` : ''}.${next}`, paused: true };
+		}
+		if (status.fromYoutubeBusy) return { text: `Downloading, one song every 20 seconds: ${number(status.takeoutCached)} of ${number(status.takeoutOf)} kept.`, paused: false };
+		if (left <= 0) return { text: `All ${number(status.takeoutOf)} kept.${status.fromYoutubeNextAt ? ` Looks for new ones at ${at(status.fromYoutubeNextAt)}.` : ''}`, paused: false };
+		return { text: `${number(status.takeoutCached)} of ${number(status.takeoutOf)} kept.${status.fromYoutubeNextAt ? ` Goes on at ${at(status.fromYoutubeNextAt)}.` : ''}`, paused: true };
+	});
 	const number = (n: number) => n.toLocaleString();
 	const tooBig = $derived(!!preview && status.maxBytes > 0 && preview.bytes > status.maxBytes * 0.9);
 </script>
@@ -124,11 +148,28 @@
 					{#if tooBig}
 						That's more than the cache's {size(status.maxBytes)}: only what fits is kept, most played first. A bigger size keeps all of them.
 					{:else if status.fromTakeout}
-						They're downloaded one at a time, most played first{status.takeoutOf ? ` (${number(status.takeoutCached)} of ${number(status.takeoutOf)} kept)` : ''}.
+						They're downloaded one at a time, most played first.
 					{:else}
 						Switch it on to keep them.
 					{/if}
 				</p>
+				{#if progress}
+					<div class="mt-2 flex items-center gap-3 border-t border-line pt-2">
+						<p class="min-w-0 flex-1 text-xs {progress.paused ? 'text-white' : 'text-muted'}" role="status">
+							{progress.text}
+							{#if status.takeoutGone}
+								{number(status.takeoutGone)} {status.takeoutGone === 1 ? "isn't" : "aren't"} on YouTube any more, so {status.takeoutGone === 1 ? "it's" : "they're"} skipped.
+							{/if}
+						</p>
+						{#if !status.fromYoutubeBusy}
+							<button
+								class="shrink-0 rounded-full bg-surface px-3 py-1.5 text-xs font-medium hover:bg-line disabled:opacity-40"
+								disabled={busy}
+								onclick={() => attempt(() => patch({ fromTakeout: true, takeoutDays: days, takeoutMinPlays: minPlays }))}>Retry now</button
+							>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/if}
 	{/if}

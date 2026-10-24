@@ -381,6 +381,12 @@ data class SongCacheStatus(
     val fromHistory: Boolean? = null,
     /** Why songs from YouTube Music aren't coming in right now: "Wi-Fi", "full", "signed out", "error"; or null. */
     val fromYoutubeWaiting: String? = null,
+    /** Looking at YouTube Music and fetching songs right now. */
+    val fromYoutubeBusy: Boolean = false,
+    /** After [fromYoutubeWaiting] "error": what went wrong. */
+    val fromYoutubeError: String? = null,
+    /** When it looks again by itself (ms): after an error, or once a round is done. Settings (or Retry) look at once. */
+    val fromYoutubeNextAt: Long? = null,
     /** The imported Google Takeout history, or null (none yet, or not a setting here). */
     val takeout: TakeoutSummary? = null,
     /** Songs from it are kept: those played at least [takeoutMinPlays] times in the last [takeoutDays] days (0: all of it). */
@@ -390,6 +396,8 @@ data class SongCacheStatus(
     /** Of the songs those settings pick (that can be kept): how many, and how many are here. */
     val takeoutOf: Int = 0,
     val takeoutCached: Int = 0,
+    /** Picked songs YouTube doesn't have any more ("Video unavailable"): skipped, not in [takeoutOf]. */
+    val takeoutGone: Int = 0,
     /** Where it can be kept (a phone: its own storage, an SD card); empty where that isn't a setting. */
     val places: List<SongCachePlace> = emptyList(),
     val place: String? = null,

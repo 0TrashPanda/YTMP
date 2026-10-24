@@ -135,9 +135,15 @@ the cached songs' average, 4 MB when empty).
 is looked up first (`songInfo`: `ytm.song`, for its title, length and cover; the Takeout entry
 has only an ID and title), then fetched like the others: 20 s apart, only into free room. A
 song that turns out not to be kept (an episode, too long) or can't be looked up is left out
-until the app restarts; three failed lookups in a row stop the round (YouTube blocks it, likely:
-`error`). The status has `takeout` (`TakeoutSummary`), `fromTakeout`, `takeoutDays`,
-`takeoutMinPlays`, `takeoutOf` and `takeoutCached`.
+until the app restarts. Old histories have many songs YouTube no longer plays ("Video
+unavailable"), so after three failed lookups in a row it looks up a song YouTube answered for
+(this round, or one already cached): if that works the three were gone songs and it goes on;
+otherwise YouTube itself fails (a bot check, no internet) and the round stops (`error`, again in
+30 minutes). The status has `takeout` (`TakeoutSummary`), `fromTakeout`, `takeoutDays`,
+`takeoutMinPlays`, `takeoutOf`, `takeoutCached` and `takeoutGone` (skipped as gone), and for
+all of it `fromYoutubeWaiting` (why not now), `fromYoutubeBusy`, `fromYoutubeError` and
+`fromYoutubeNextAt` (when it looks again by itself); saving the settings (*Retry now*) looks at
+once.
 
 ## Using it
 

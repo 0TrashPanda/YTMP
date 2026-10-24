@@ -173,4 +173,62 @@ class CachePrefillTest {
         assertTrue(cache.worth("ytm:$often"))
         assertEquals(null, prefill.waiting)
     }
+
+    /** A Takeout history with [ids] played once each, newest first (the order they're picked in). */
+    private fun takeoutOf(vararg ids: String): TakeoutHistory {
+        val takeout = TakeoutHistory(createTempDirectory("takeout").toFile().resolve("takeout.json"))
+        val plays = ids.mapIndexed { i, id ->
+            """{"header":"YouTube Music","title":"Watched $id","titleUrl":"https://music.youtube.com/watch?v=$id","time":"${java.time.Instant.ofEpochMilli(now - (i + 1) * 3_600_000L)}"}"""
+        }
+        takeout.import(plays.joinToString(",", "[", "]").byteInputStream(), zone)
+        return takeout
+    }
+
+    @Test
+    fun `many songs gone from YouTube in a row don't stop it`() = runBlocking {
+        val youtube = FakeYoutube()
+        val cache = cache(youtube)
+        val first = "first000000"
+        val gone = (1..5).map { "gone$it".padEnd(11, '0') }
+        val last = "last0000000"
+        val prefill = CachePrefill(
+            cache, { emptyList() }, { emptyList() }, { false }, scope, takeout = takeoutOf(first, *gone.toTypedArray(), last),
+            songInfo = { id -> if (id in gone) throw IllegalStateException("Video unavailable") else song(id) },
+            clock = { now }, zone = zone, gapMs = 0, retryMs = 60_000, intervalMs = 60_000,
+        )
+        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutDays = 365, takeoutMinPlays = 1)
+        eventually { cache.has("ytm:$last") }
+        eventually { !prefill.busy }
+        assertEquals(null, prefill.waiting)
+        assertEquals(5, prefill.takeoutGone)
+        assertEquals(2, prefill.takeoutOf)
+        assertEquals(now + 60_000, prefill.nextAt)
+    }
+
+    @Test
+    fun `when YouTube itself fails it pauses, says why and until when`() = runBlocking {
+        val youtube = FakeYoutube()
+        val cache = cache(youtube)
+        val ids = listOf("first000000", "b0000000000", "c0000000000", "d0000000000")
+        var down = false
+        val prefill = CachePrefill(
+            cache, { emptyList() }, { emptyList() }, { false }, scope, takeout = takeoutOf(*ids.toTypedArray()),
+            songInfo = { id -> if (down) throw IllegalStateException("Sign in to confirm you're not a bot") else song(id).also { if (id == ids[0]) down = true } },
+            clock = { now }, zone = zone, gapMs = 0, retryMs = 60_000, intervalMs = 60_000,
+        )
+        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutDays = 365, takeoutMinPlays = 1)
+        eventually { prefill.waiting == "error" && !prefill.busy }
+        assertEquals("Sign in to confirm you're not a bot", prefill.error)
+        assertEquals(now + 60_000, prefill.nextAt)
+        // Not counted as gone: they're tried again.
+        assertEquals(0, prefill.takeoutGone)
+        assertEquals(4, prefill.takeoutOf)
+
+        // YouTube is back; Retry looks at once.
+        down = false
+        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutDays = 365, takeoutMinPlays = 1)
+        eventually { ids.all { cache.has("ytm:$it") } }
+        eventually { !prefill.busy && prefill.waiting == null }
+        assertEquals(null, prefill.error)
+    }
 }

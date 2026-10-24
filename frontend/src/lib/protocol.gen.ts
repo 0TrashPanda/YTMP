@@ -1272,12 +1272,16 @@ export interface SongCacheStatus {
   likedCached: number;
   fromHistory: boolean | null;
   fromYoutubeWaiting: string | null;
+  fromYoutubeBusy: boolean;
+  fromYoutubeError: string | null;
+  fromYoutubeNextAt: number | null;
   takeout: TakeoutSummary | null;
   fromTakeout: boolean;
   takeoutDays: number;
   takeoutMinPlays: number;
   takeoutOf: number;
   takeoutCached: number;
+  takeoutGone: number;
   places: SongCachePlace[];
   place: string | null;
   settable: boolean;

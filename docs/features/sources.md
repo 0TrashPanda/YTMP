@@ -171,7 +171,11 @@ without internet on the phone. It works by itself: there is nothing to pick.
     the old one. A zip that didn't download completely says so (download it again). Then choose how recent (played in the last month, 3 months, year, all of it, or
     a number of days) and how often (at least 2, 3, 5, 10, 20 times or a number you type): while
     you choose, it shows how many songs that is, about how much room they take, and how many are
-    here already. Switched on, they're downloaded most played first. Plain YouTube is left out,
+    here already. Switched on, they're downloaded most played first, and the box says what it's
+    doing: downloading (how many of how many are kept), all kept, or **paused and why** (waiting
+    for Wi-Fi, the cache is full, YouTube didn't answer and what it said) **and until when**, with
+    **Retry now**. Songs YouTube doesn't have any more ("Video unavailable", common in an old
+    history) are skipped, and it says how many. Plain YouTube is left out,
     and a play is any start (Takeout doesn't say how long you listened). Plays from the last 90
     days count like plays here too. Works without signing in.
   - They're **ordinary cached songs**: they go like any other when the cache is full. Only free

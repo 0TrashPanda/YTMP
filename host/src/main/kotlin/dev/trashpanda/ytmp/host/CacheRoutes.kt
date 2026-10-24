@@ -36,6 +36,7 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
             localWifiOnly = settings.localWifiOnly(), localCharging = settings.localCharging(), localWaiting = settings.localWaiting()).let { s ->
                 val youtube = settings.fromYoutube() ?: return@let s
                 s.copy(keepLiked = youtube.liked, likedOf = youtube.likedOf, likedCached = youtube.likedCached, fromHistory = youtube.fromHistory, fromYoutubeWaiting = youtube.waiting,
+                    fromYoutubeBusy = youtube.busy, fromYoutubeError = youtube.error, fromYoutubeNextAt = youtube.nextAt, takeoutGone = if (youtube.fromTakeout) youtube.takeoutGone else 0,
                     takeout = youtube.takeoutSummary(), fromTakeout = youtube.fromTakeout, takeoutDays = youtube.takeoutDays, takeoutMinPlays = youtube.takeoutMinPlays,
                     takeoutOf = if (youtube.fromTakeout) youtube.takeoutOf else 0, takeoutCached = if (youtube.fromTakeout) youtube.takeoutCached else 0)
             }
