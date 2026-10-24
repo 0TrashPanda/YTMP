@@ -24,6 +24,9 @@ permissions say otherwise (permission: *Play audio locally*).
   (default, like YouTube Music) or **Stays paused** (the next song loads, the room stays
   paused). Also for the notification's, lock screen's and keyboard's Next. It needs *Play /
   pause*; without it Next only skips. (`Skip` with `play`; an older host just skips.)
+- **Start radio** ✅ (*Settings → Playback*, per device): **Keep played songs** (default) or
+  **Clear played songs**: Start radio also clears the history above the current song, like
+  YouTube Music (see [queue](queue.md#autoplay-queue)).
 - **Headphones disconnected** (unplugged, Bluetooth gone) is a setting in the app (profile
   menu): **Pause** (default; pauses the room like YTM when you're the only one listening,
   otherwise stops playing here), **Stop here**, or **Keep playing** on the speaker.

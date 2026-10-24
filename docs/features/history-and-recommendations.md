@@ -146,7 +146,8 @@ A radio is an endless list of songs similar to a starting point. There are two w
 it from the [song menu](ui.md#song-menu):
 
 - **Start radio**: **replaces the queue** with a radio from this song. The song starts right
-  away; the radio is loaded while it plays.
+  away; the radio is loaded while it plays. With *Settings → Playback → Start radio* on
+  *Clear played songs*, the songs that played before go too, like YouTube Music.
 - **Autoplay from here**: **replaces the autoplay queue**, the backup that plays when the
   queue is empty, without touching the queue (see [autoplay queue](queue.md#autoplay-queue)).
 

@@ -85,6 +85,36 @@ class RolesTest {
     }
 
     @Test
+    fun `start radio clears the history only for someone who may remove those songs`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        val guest = room.connect("Guest")
+        fun s(id: String) = song.copy(id = "ytm:$id")
+        room.run(owner, Command.AddSongs(listOf(s("1"), s("2")), QueuePosition.END))
+        room.run(owner, Command.Skip())
+        assertEquals(listOf("ytm:1"), room.state(owner).history.map { it.song.id })
+
+        // A listener allowed to start a radio, but not to remove others' songs: the history stays.
+        room.run(owner, Command.SetParticipantPermissions(guest.id, allow = listOf(Permission.START_RADIO), deny = emptyList()))
+        assertNull(room.run(guest, Command.StartRadio(s("3"), songs = listOf(s("4")), clearHistory = true)))
+        var state = room.state(owner)
+        assertEquals("ytm:3", state.nowPlaying?.item?.song?.id)
+        assertEquals(listOf("ytm:1", "ytm:2"), state.history.map { it.song.id })
+
+        // The owner may: the history goes, the song that played before too.
+        assertNull(room.run(owner, Command.StartRadio(s("5"), songs = listOf(s("6")), clearHistory = true)))
+        state = room.state(owner)
+        assertEquals("ytm:5", state.nowPlaying?.item?.song?.id)
+        assertTrue(state.history.isEmpty())
+        assertTrue(state.queue.isEmpty())
+        assertTrue(guest.events.any { it == Event.HistoryReplaced(emptyList()) })
+
+        // Without asking, it stays (as before).
+        room.run(owner, Command.StartRadio(s("7"), songs = listOf(s("8"))))
+        assertEquals(listOf("ytm:5"), room.state(owner).history.map { it.song.id })
+    }
+
+    @Test
     fun `per-person overrides allow and deny on top of the role`() = runTest {
         val room = newRoom()
         val owner = room.connect("Owner", owner = true)

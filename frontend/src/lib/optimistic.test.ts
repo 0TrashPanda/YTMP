@@ -148,13 +148,27 @@ describe('predict', () => {
 	it('starts a radio: the song plays now and the queue empties', () => {
 		const s = room();
 		const song = item('r').song;
-		predict(s, { kind: 'StartRadio', song, songs: null, follows: false }, sender());
+		predict(s, { kind: 'StartRadio', song, songs: null, follows: false, clearHistory: false }, sender());
 		expect(s.nowPlaying?.item.song).toEqual(song);
 		expect(s.queue).toEqual([]);
 		expect(s.autoplay).toEqual([]);
 		const t = room();
-		predict(t, { kind: 'StartRadio', song: t.nowPlaying!.item.song, songs: null, follows: false }, sender());
+		predict(t, { kind: 'StartRadio', song: t.nowPlaying!.item.song, songs: null, follows: false, clearHistory: false }, sender());
 		expect(t.nowPlaying?.item.itemId).toBe('now');
+	});
+
+	it('clears the history with a radio, when asked and allowed', () => {
+		const song = item('r').song;
+		const s = room();
+		predict(s, { kind: 'StartRadio', song, songs: null, follows: false, clearHistory: true }, sender());
+		expect(s.history).toEqual([]);
+		// Someone who may only remove their own songs: the history (others' songs) stays.
+		const t = room({ history: [item('h1', 'p2')] });
+		predict(t, { kind: 'StartRadio', song, songs: null, follows: false, clearHistory: true }, sender(['start_radio', 'remove_own']));
+		expect(t.history.map((i) => i.itemId)).toContain('h1');
+		const u = room();
+		predict(u, { kind: 'StartRadio', song, songs: null, follows: false, clearHistory: false }, sender());
+		expect(u.history.map((i) => i.itemId)).toContain('h1');
 	});
 
 	it('moves songs between the lists', () => {

@@ -86,7 +86,7 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `ClearQueue` ✅ | – | Remove own / others' songs |
 | `ClearAutoplay` ✅ | – | Autoplay from here |
 | `ShuffleQueue` ✅ | – (with fair order it keeps the rounds) | Reorder |
-| `StartRadio` ✅ (song only so far) | `song`, `songs?` (a radio the sender brings: their own account's, from their server; null: the room's), `follows` (the sender's radio isn't there yet: the song starts now and it follows in another `StartRadio` for the same song); later `seedId`. The song starts right away, the radio follows | Start radio |
+| `StartRadio` ✅ (song only so far) | `song`, `songs?` (a radio the sender brings: their own account's, from their server; null: the room's), `follows` (the sender's radio isn't there yet: the song starts now and it follows in another `StartRadio` for the same song), `clearHistory` (the history goes too, if the sender may remove those songs like *Clear queue*: their own, or others'; otherwise it stays; an older host ignores it); later `seedId`. The song starts right away, the radio follows | Start radio |
 | `AutoplayFromHere` ✅ (song only so far) | `song`; later `seedId` (song, artist, album or playlist) | Autoplay from here |
 | `AutoplaySongs` ✅ | `songs` (a playlist's "Add to autoplay": they replace the autoplay queue, radio continues after them) | Autoplay from here |
 | `LoadHistory` | `beforeItemId`, `limit` | – |

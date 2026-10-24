@@ -129,6 +129,11 @@ sealed interface Command {
          * failed and the room's will do).
          */
         val follows: Boolean = false,
+        /**
+         * Also clear the queue's history (the songs above the current one), like YouTube Music.
+         * Only when the sender may remove those songs (their own, or others'); otherwise it stays.
+         */
+        val clearHistory: Boolean = false,
     ) : Command
 
     /** Empties the upcoming queue. */

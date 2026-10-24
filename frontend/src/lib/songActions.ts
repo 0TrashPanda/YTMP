@@ -1,6 +1,7 @@
 // What songs do when you tap, swipe or hold them, pick something in the song menu, or press a
 // page's Play buttons, and what it says afterwards: the same everywhere.
 import { bringsOwnRadio, yourRadio } from './api';
+import { saved } from './storage';
 import type { Command, Song } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 
@@ -35,15 +36,16 @@ export const playNow = (room: RoomConnection, song: Song, onToast: Toast) => run
 /**
  * Start radio: the queue becomes a radio from [song] (your own account's, when you bring one).
  * [name]: what it's from. The song starts right away; your own radio follows once it's loaded.
+ * With the setting on, what played before (above the song) is cleared too.
  */
 export async function startRadio(room: RoomConnection, song: Song, onToast: Toast, name = quoted(song)) {
 	const own = bringsOwnRadio();
 	const radio = own ? yourRadio(song.id) : null;
-	const started = await runCommand(room, { kind: 'StartRadio', song, songs: null, follows: own }, onToast, `Starting a radio from ${name}`);
+	const started = await runCommand(room, { kind: 'StartRadio', song, songs: null, follows: own, clearHistory: saved.radioClearsHistory }, onToast, `Starting a radio from ${name}`);
 	if (!started || !radio) return started;
 	const songs = await radio;
 	// Unless something else was played meanwhile: then that keeps playing.
-	if (room.state?.nowPlaying?.item.song.id === song.id) await room.run({ kind: 'StartRadio', song, songs, follows: false });
+	if (room.state?.nowPlaying?.item.song.id === song.id) await room.run({ kind: 'StartRadio', song, songs, follows: false, clearHistory: false });
 	return started;
 }
 

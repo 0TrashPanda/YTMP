@@ -141,6 +141,8 @@ class Room(
     private val members = LinkedHashMap<String, Member>()
     private val queue = ArrayList<QueueItem>()
     private val history = ArrayList<QueueItem>()
+    /** Songs of a history that Start radio cleared, before [history]: for [recentSongIds]. */
+    private var cleared = emptyList<String>()
     private var seq = 0L
 
     private val autoplay = Autoplay(clock)
@@ -821,7 +823,10 @@ class Room(
             }
             is Command.StartRadio -> {
                 need(member, Permission.START_RADIO)?.let { return it }
-                startRadio(command.song, member.id to member.name, command.songs?.take(MAX_BROUGHT_RADIO), command.follows)
+                // The history goes too if they asked, and may remove those songs (like Clear queue).
+                val clearHistory = command.clearHistory &&
+                    can(member, if ((history + listOfNotNull(current)).all { it.addedBy == member.id }) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS)
+                startRadio(command.song, member.id to member.name, command.songs?.take(MAX_BROUGHT_RADIO), command.follows, clearHistory)
             }
             is Command.AutoplayFromHere -> {
                 need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
@@ -1732,9 +1737,9 @@ class Room(
         if (autoplay.clear()) emit(autoplay.changed())
     }
 
-    /** Songs that shouldn't come up again soon. */
+    /** Songs that shouldn't come up again soon (also from a history Start radio cleared). */
     private fun recentSongIds(): Set<String> =
-        (history.takeLast(RECENT_SONGS) + queue + autoplay.items + listOfNotNull(current)).map { it.song.id }.toSet()
+        ((cleared + history.map { it.song.id }).takeLast(RECENT_SONGS) + (queue + autoplay.items + listOfNotNull(current)).map { it.song.id }).toSet()
 
     /** Nothing plays and nothing is queued: start what autoplay has. */
     private fun startIfIdle() {
@@ -1751,7 +1756,7 @@ class Room(
      * away; the room's radio follows while it plays. [follows]: the one who starts it sends their
      * own radio in a moment (another Start radio for the same song): the room doesn't look up its own.
      */
-    private fun startRadio(song: Song, by: Pair<String, String>, brought: List<Song>? = null, follows: Boolean = false) {
+    private fun startRadio(song: Song, by: Pair<String, String>, brought: List<Song>? = null, follows: Boolean = false, clearHistory: Boolean = false) {
         val source = radio
         if (source == null && brought == null && !follows) return
         // The queue is cleared and the radio goes into autoplay, the song itself first: it plays
@@ -1760,6 +1765,12 @@ class Room(
         val keepPlaying = current?.song?.id == song.id
         if (!keepPlaying) retireCurrent(QueueItemResult.SKIPPED)
         if (queue.isNotEmpty()) replaceQueue(emptyList())
+        if (clearHistory && history.isNotEmpty()) {
+            // Out of sight, but radio and autoplay still don't bring those songs back soon.
+            cleared = (cleared + history.map { it.song.id }).takeLast(RECENT_SONGS)
+            history.clear()
+            emit(Event.HistoryReplaced(emptyList()))
+        }
         val radioSongs = listOf(song).takeUnless { keepPlaying }.orEmpty() + brought.orEmpty().filter { it.id != song.id }
         autoplay.replace(song, by, radioSongs, QueueItemOrigin.RADIO)
         // Set before the song starts, so autoplay doesn't top itself up from it in the meantime.

@@ -95,7 +95,10 @@ export function predict(s: RoomState, command: Command, by: Sender): boolean {
 			if (!by.can('start_radio') || command.song.podcast) return false;
 			// On the song that's playing it keeps playing; only the queue changes.
 			const keep = now?.item.song.id === command.song.id;
+			// The history too, if they asked and may remove those songs (the host decides the same way).
+			const clearHistory = command.clearHistory && by.can([...s.history, ...(now ? [now.item] : [])].every((i) => i.addedBy === by.id) ? 'remove_own' : 'remove_others');
 			if (!keep) retire(s);
+			if (clearHistory) s.history = [];
 			s.queue = [];
 			s.autoplay = [];
 			s.autoplaySeed = command.song;

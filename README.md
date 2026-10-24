@@ -64,7 +64,8 @@ Music, without Premium, and not tied to a single music service.
 - Artist, album, playlist and podcast pages.
 - Lyrics, synced line by line (from LRCLIB or YouTube Music), and a karaoke mode that shows
   them large on the party screen and in everyone's player.
-- Radio from a song, autoplay when the queue runs out, find similar. With a YTMP account they
+- Radio from a song (it can clear the songs that played before too, like YouTube Music),
+  autoplay when the queue runs out, find similar. With a YTMP account they
   learn which songs you (and everyone on your server) play after each other, and mix those
   in; local music gets a radio from it too.
 - Podcasts: subscribe, new episodes on Home, played marks and resume where you stopped (in

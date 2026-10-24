@@ -59,6 +59,11 @@ queue runs out.
 - **Start radio** clears the queue and puts the song's radio in the autoplay queue, the song
   itself first; it then plays from there, so the song is heard once and the radio follows.
   On the song that's **already playing**, it keeps playing (like YTM) and only the queue changes.
+- **Start radio clears played songs** ✅ (*Settings → Playback*, per device; off by default):
+  Start radio also clears the [history](#queue-history) above the current song, like YouTube
+  Music. Only when you may remove those songs (your own, or others' with *Remove others'
+  songs*); otherwise the history stays. Radio and autoplay still skip the cleared songs for
+  a while (they count among the last 50 songs).
 - **Autoplay this** (called *Autoplay from here* in older notes) replaces only the autoplay
   queue.
 - **Clear queue** and **Clear** (autoplay) empty the queue or the autoplay queue. A cleared

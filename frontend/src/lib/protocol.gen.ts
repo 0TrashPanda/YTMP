@@ -287,6 +287,7 @@ export interface CommandStartRadio {
   song: Song;
   songs: Song[] | null;
   follows: boolean;
+  clearHistory: boolean;
 }
 
 export interface CommandUnban {

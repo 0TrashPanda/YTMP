@@ -116,6 +116,7 @@
 		saved.pageSize = size;
 	}
 	let nextPlays = $state(saved.nextPlays);
+	let radioClearsHistory = $state(saved.radioClearsHistory);
 	let skipSilence = $state(saved.skipSilence);
 	const qualityOptions: [ImageQuality, string][] = [
 		['high', 'High'],
@@ -189,6 +190,19 @@
 						nextPlays = v === 'play';
 						saved.nextPlays = nextPlays;
 						window.dispatchEvent(new Event('ytmp:settings'));
+					}}
+				/>
+				<Choice
+					label="Start radio"
+					hint="Start radio always replaces what's up next. It can also clear the songs that played before, above the current song, like YouTube Music. In a party room that needs permission to remove other people's songs."
+					options={[
+						['keep', 'Keep played songs'],
+						['clear', 'Clear played songs']
+					] as ['keep' | 'clear', string][]}
+					value={radioClearsHistory ? 'clear' : 'keep'}
+					onchange={(v) => {
+						radioClearsHistory = v === 'clear';
+						saved.radioClearsHistory = radioClearsHistory;
 					}}
 				/>
 				{#if equalizer.available}

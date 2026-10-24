@@ -166,6 +166,13 @@ export const saved = {
 	set skipSilence(on: boolean) {
 		write('ytmp.skipSilence', on ? '1' : '0');
 	},
+	/** Start radio also clears the queue's history (the songs above the current one), like YouTube Music (Settings → Playback). */
+	get radioClearsHistory(): boolean {
+		return read('ytmp.radioClearsHistory') === '1';
+	},
+	set radioClearsHistory(on: boolean) {
+		write('ytmp.radioClearsHistory', on ? '1' : '0');
+	},
 	get nextPlays(): boolean {
 		return read('ytmp.nextPlays') !== '0';
 	},
