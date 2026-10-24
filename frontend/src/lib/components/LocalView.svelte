@@ -8,7 +8,7 @@
 	import { fuzzyFind } from '../format';
 	import { local, loadLocal, localPlace, subfolders, type LocalChip } from '../local.svelte';
 	import type { LocalGroup, LocalLibraryPage, SearchItem, Song } from '../protocol.gen';
-	import { saved } from '../storage';
+	import { settings } from '../settings.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import CardGrid, { type Card } from './CardGrid.svelte';
 	import Icon from './Icon.svelte';
@@ -41,7 +41,7 @@
 	let error = $state<string | null>(null);
 
 	/** Many songs make a long page: this many at first, and this many more with Load more. */
-	const pageSize = saved.pageSize;
+	const pageSize = settings.pageSize.value;
 	const shown = $derived(Math.max(localPlace.songsShown, pageSize));
 
 	$effect(() => {

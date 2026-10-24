@@ -5,7 +5,7 @@
 	import { songsUnder, subfolders } from '../local.svelte';
 	import type { LocalLibraryPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
-	import { saved } from '../storage';
+	import { settings } from '../settings.svelte';
 	import Icon from './Icon.svelte';
 	import PlayAllButtons from './PlayAllButtons.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
@@ -38,7 +38,7 @@
 			.catch((e) => (error = e instanceof Error ? e.message : "Couldn't load this music"));
 	});
 
-	const pageSize = saved.pageSize;
+	const pageSize = settings.pageSize.value;
 	let shown = $state(pageSize);
 
 	const title = $derived(genre ?? (folder ? folder.split('/').at(-1)! : 'Music folder'));

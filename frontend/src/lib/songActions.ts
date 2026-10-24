@@ -1,7 +1,7 @@
 // What songs do when you tap, swipe or hold them, pick something in the song menu, or press a
 // page's Play buttons, and what it says afterwards: the same everywhere.
 import { bringsOwnRadio, yourRadio } from './api';
-import { saved } from './storage';
+import { settings } from './settings.svelte';
 import type { Command, Song } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 
@@ -41,7 +41,7 @@ export const playNow = (room: RoomConnection, song: Song, onToast: Toast) => run
 export async function startRadio(room: RoomConnection, song: Song, onToast: Toast, name = quoted(song)) {
 	const own = bringsOwnRadio();
 	const radio = own ? yourRadio(song.id) : null;
-	const started = await runCommand(room, { kind: 'StartRadio', song, songs: null, follows: own, clearHistory: saved.radioClearsHistory }, onToast, `Starting a radio from ${name}`);
+	const started = await runCommand(room, { kind: 'StartRadio', song, songs: null, follows: own, clearHistory: settings.radioClearsHistory.value }, onToast, `Starting a radio from ${name}`);
 	if (!started || !radio) return started;
 	const songs = await radio;
 	// Unless something else was played meanwhile: then that keeps playing.

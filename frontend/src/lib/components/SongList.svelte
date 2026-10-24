@@ -138,7 +138,7 @@
 			{@const action = rows.actionFor(offset)}
 			<div
 				class="absolute inset-0 flex items-center gap-2 px-5 text-sm font-medium text-white transition-colors
-					{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(key) ? (action === 'remove' ? 'bg-accent' : 'bg-d-green') : 'bg-line'}"
+					{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(key) ? (action === 'remove' ? 'bg-accent' : 'bg-good') : 'bg-line'}"
 			>
 				<Icon name={ACTION_ICONS[action]} size={22} />
 				{ACTION_NAMES[action]}

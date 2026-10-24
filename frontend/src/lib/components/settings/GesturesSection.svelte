@@ -2,6 +2,9 @@
 	// Settings → Taps and swipes: what tapping, swiping and holding a song does, in song lists
 	// and in Up next (see gestures.svelte.ts).
 	import { ACTION_NAMES, ACTIONS, DEFAULTS, GESTURES, gestures, resetGestures, setGesture, type QueueAction, type Where } from '../../gestures.svelte';
+	import { settings } from '../../settings.svelte';
+	import DeviceNote from './DeviceNote.svelte';
+	import DeviceToggle from './DeviceToggle.svelte';
 
 	const groups: [Where, string, string][] = [
 		['list', 'Songs in lists', 'Search, albums, artists, playlists and Local.'],
@@ -19,6 +22,7 @@
 					<p class="text-sm font-medium">{title}</p>
 					<p class="text-xs text-muted">{hint}</p>
 				</div>
+				<DeviceToggle setting={where === 'list' ? settings.gesturesList : settings.gesturesQueue} label={title} />
 				{#if !isDefault(where)}
 					<button class="shrink-0 rounded-full px-3 py-1 text-xs text-muted hover:bg-raised hover:text-white" onclick={() => resetGestures(where)}>Defaults</button>
 				{/if}
@@ -37,9 +41,10 @@
 					</select>
 				</label>
 			{/each}
+			<DeviceNote setting={where === 'list' ? settings.gesturesList : settings.gesturesQueue} />
 		</section>
 	{/each}
 	<p class="text-xs text-muted">
-		Swipes are for touch screens. A right-click (or ⋮) always opens the song menu, also when Hold does something else. Saved on this device.
+		Swipes are for touch screens. A right-click (or ⋮) always opens the song menu, also when Hold does something else.
 	</p>
 </div>

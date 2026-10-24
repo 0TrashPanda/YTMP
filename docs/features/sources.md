@@ -104,7 +104,7 @@ artist), never YouTube. Copies of a song in the music folder show once. These so
 everywhere: this phone, browsers, Chromecasts, Sonos, MPD and the amplifier's rooms.
 
 Settings → **Local music** switches *Music on the network*, *Music on this phone* and
-*Remember where you were* on or off (on this device). Likes and YouTube Music playlists aren't for local songs, so those buttons
+*Remember where you were* on or off. Likes and YouTube Music playlists aren't for local songs, so those buttons
 don't show for them.
 
 ## Media servers
@@ -156,8 +156,8 @@ without internet on the phone. It works by itself: there is nothing to pick.
 - **Songs played elsewhere are fetched only once they're played again**: from the 2nd play
   in 30 days. So one-off radio and autoplay songs don't cost an extra download each (and
   extra YouTube traffic), but your favourites end up cached.
-- **From your YouTube Music** (on the phone; all off by default, in *Settings → Playback → Song
-  cache*):
+- **From your YouTube Music** (on the phone; all off by default, in *Settings → Song cache and
+  downloads*):
   - **Keep your recent likes**: the songs you liked last (Off, 50, 100, 250, 500 or a number you
     type) are downloaded to keep, so they start at once and play offline.
   - **Songs from your YouTube Music history**: the songs in that history (also from other
@@ -187,7 +187,7 @@ without internet on the phone. It works by itself: there is nothing to pick.
 - A cached song **stays the same YouTube Music song** (likes, radio, lyrics and history work
   as before); only its audio comes from the cache.
 - **A maximum size**, on by default: **5 GB on a server** (`ytmp.toml`), **1 GB on a phone**
-  (*Settings → Playback*; about 250 songs). Both show how full the cache is and have
+  (*Settings → Song cache and downloads*; about 250 songs). Both show how full the cache is and have
   **Clear cache** (on a server for the admin, under *Settings → Server admin*; see
   [server admin](server-admin.md)).
 - **Where it's kept is a setting**: a folder of your choice on a server (`ytmp.toml`), the
@@ -198,7 +198,7 @@ without internet on the phone. It works by itself: there is nothing to pick.
 - **Downloads show in the cache** (on the phone): a song you [download](ui.md#song-menu) is
   listed with the cached songs (in the folder *Downloaded*), and plays from the Music folder
   instead of streaming. It doesn't count toward the cache's size and is never removed: it's yours.
-- **Songs from this phone** (a setting in *Settings → Playback → Song cache*, off by default; needs
+- **Songs from this phone** (a setting in *Settings → Song cache and downloads*, off by default; needs
   *Music on this phone*): the music stored on the phone that is also on YouTube Music is
   listed in its own folder, *On this phone*, and plays as that YouTube Music song (likes, radio
   and history work) from the file, also offline. A file counts when a YouTube Music search finds a
@@ -214,7 +214,7 @@ without internet on the phone. It works by itself: there is nothing to pick.
   you chose yourself stays when matches are forgotten.
 - **Mobile data:** songs kept in the background (from their 2nd play) wait for Wi-Fi by default
   (*Keep songs in the background*); *Downloads* can wait for Wi-Fi too (the page says
-  "downloads when you're on Wi-Fi"); the app's update dialog warns when you're on mobile data. *Settings → Playback → Downloads* lists
+  "downloads when you're on Wi-Fi"); the app's update dialog warns when you're on mobile data. *Settings → Song cache and downloads* lists
   the phone's downloads that are going, waiting (for Wi-Fi) or failed, with **Download now** (this
   once, on mobile data), **Retry** and **Cancel**. The waiting ones carry on after the app is closed. Each file is looked up once and slowly (so YouTube doesn't block the
   network), and the answer is kept. *Lookups at once* (1, 2, 4 or 8; 1 by default) makes it faster, with more risk of YouTube's bot check. The setting shows how far it is ("120 of 800 phone songs looked up · 95 found on YouTube Music"). They don't count toward the cache's size and are never removed.

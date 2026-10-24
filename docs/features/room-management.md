@@ -14,7 +14,7 @@ An admin chooses who can join the room:
 - Private / solo: nobody else (see [rooms](rooms-and-roles.md#room-visibility))
 - **Password** ✅: people need the room's password to join (the join form asks). Not needed by
   the owner, people already in the room, the hosting phone itself, or people moved over from a
-  clone. Set, changed or removed in Room settings → Overview (*Manage room*); the share sheet
+  clone. Set, changed or removed in Settings → This room → Overview (*Manage room*); the share sheet
   says a room has one. Kept hashed, so nobody can read it back. After 5 wrong passwords within
   10 minutes nobody new can try one for 10 minutes ("Too many wrong passwords"), so it can't be guessed. **Default password** on your
   account (Settings → Account → *Room password*): every room you make starts with it, also
@@ -109,9 +109,9 @@ Roles exist on **two levels**:
 
 ## Room settings
 
-Built: name, visibility (owner), default roles, autoplay, password, "always on" (servers),
+In Settings, at the top while you're in the room (*This room*: Overview, Queue, People). Built: name, visibility (owner), default roles, autoplay, password, "always on" (servers),
 where the room opens from your other devices (owner, see [room sync](room-sync.md)), and under
-*Queue*: fair order, vote to skip and the queue limits. The rest is planned. The owner hands the room over with *Make Owner* (see
+*Queue*: fair order, vote to skip and the queue limits. The rest is planned. The owner hands the room over with *Make owner* (see
 [room lifecycle](room-lifecycle.md#changing-the-owner)).
 
 - **Room name**: shown in the room bar and in LAN discovery. The default is the

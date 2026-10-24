@@ -20,11 +20,11 @@ permissions say otherwise (permission: *Play audio locally*).
   your first tap or key press, since browsers only allow audio after one). Switching
   *this device* off in a solo room is remembered for that room. Another app taking the
   audio stops it for now but doesn't count as switching off.
-- **Next while paused** ✅ (*Settings → Playback*, per device): **Plays the next song**
+- **Next while paused** ✅ (*Settings → Playback*): **Plays the next song**
   (default, like YouTube Music) or **Stays paused** (the next song loads, the room stays
   paused). Also for the notification's, lock screen's and keyboard's Next. It needs *Play /
   pause*; without it Next only skips. (`Skip` with `play`; an older host just skips.)
-- **Start radio** ✅ (*Settings → Playback*, per device): **Keep played songs** (default) or
+- **Start radio** ✅ (*Settings → Playback*): **Keep played songs** (default) or
   **Clear played songs**: Start radio also clears the history above the current song, like
   YouTube Music (see [queue](queue.md#autoplay-queue)).
 - **Headphones disconnected** (unplugged, Bluetooth gone) is a setting in the app (profile
@@ -38,7 +38,7 @@ permissions say otherwise (permission: *Play audio locally*).
   only work on the internet connection of the host that asked for them, so elsewhere:
   - **the app** looks songs up itself, on the phone, and plays them straight from YouTube;
   - **a browser** does the same with **your own YouTube Music module** on your computer, if
-    you set one up (*Settings → Playback*: its address and key);
+    you set one up (*Settings → Your own module*: its address and key);
   - otherwise, or when that fails, the host streams the song to you (if the server allows
     that on your network, see [server admin](server-admin.md)).
   - When YouTube won't send a song for a while, the app tries it again a few times and the
@@ -64,7 +64,7 @@ The volume slider shows while it plays.
 - A browser may only start sound after a click or key press on its page (unless the site may
   autoplay). Until then its checkbox can't be ticked, and *Play on* says to click once in
   YTMP on that device. The app always can.
-- Each device decides: *Settings → Playback → Your other devices*, *Can switch it on*
+- Each device decides: *Settings → Playback → Your other devices can switch Play here on*
   (the default) or *Only from here*. Then it's listed only while it plays.
 
 ## Host outputs
@@ -160,7 +160,7 @@ slow one catches up, as before.
 
 ## Skip silence in podcasts ✅
 
-*Settings → Playback → Skip silence in podcasts* (the app, off by default) skips the quiet
+*Settings → Playback → Skip silence* (the app, off by default) skips the quiet
 parts of an episode. Only while you're the only one listening: the room's position follows
 your phone, as it does when your phone starts a song a moment late. With others listening,
 or music playing, nothing is skipped. Not tried on a phone yet (see

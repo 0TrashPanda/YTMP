@@ -2,10 +2,14 @@
 // same on all your devices, and in this browser: without an account, and to start with before
 // the account answers. Each feature has its own keys (like "songMenu"). The account is reached
 // the way your history is (listening.svelte.ts): this works where your history can be shown.
+// Coming back to the page asks the account again, so a change on another device shows up; what
+// came from the account is announced with a `ytmp:settings` event.
 import { listening } from './listening.svelte';
 import { read, write } from './storage';
 
 const KEY = 'ytmp.preferences';
+/** Coming back to the page asks the account again at most this often. */
+const REFRESH_MS = 10_000;
 
 function cached(): Record<string, unknown> {
 	try {
@@ -26,6 +30,14 @@ class Preferences {
 	/** Keys changed and not on the account yet. */
 	#changed = new Set<string>();
 	#saving: ReturnType<typeof setTimeout> | undefined;
+	#asked = 0;
+
+	constructor() {
+		if (typeof document === 'undefined') return;
+		document.addEventListener('visibilitychange', () => {
+			if (document.visibilityState === 'visible') void this.refresh();
+		});
+	}
 
 	/** The value of [key] (undefined: not set). Reactive: it changes when the account answers. */
 	get<T>(key: string): T | undefined {
@@ -70,16 +82,10 @@ class Preferences {
 				return;
 			}
 			try {
-				const stored = (await listening.call<Record<string, unknown> | null>('/api/account/preferences')) ?? {};
+				const stored = await this.#ask();
 				const mine = this.#values;
 				for (const k of Object.keys(mine)) if (!(k in stored) || this.#changed.has(k)) this.#changed.add(k);
-				const next = { ...stored };
-				for (const k of this.#changed) {
-					if (k in mine) next[k] = mine[k];
-					else delete next[k];
-				}
-				this.#values = next;
-				write(KEY, JSON.stringify(next));
+				this.#take(stored);
 				this.onAccount = true;
 				await this.#upload();
 			} catch {
@@ -87,6 +93,35 @@ class Preferences {
 				this.#loading = null;
 			}
 		})());
+	}
+
+	/** Asks the account again (a change made on another device); what changed here and isn't up yet stays. */
+	async refresh(): Promise<void> {
+		if (!this.onAccount || Date.now() - this.#asked < REFRESH_MS) return;
+		try {
+			this.#take(await this.#ask());
+		} catch {
+			// Next time.
+		}
+	}
+
+	async #ask(): Promise<Record<string, unknown>> {
+		this.#asked = Date.now();
+		return (await listening.call<Record<string, unknown> | null>('/api/account/preferences')) ?? {};
+	}
+
+	/** Takes the account's [stored] preferences, keeping the keys changed here. */
+	#take(stored: Record<string, unknown>): void {
+		const mine = this.#values;
+		const next = { ...stored };
+		for (const k of this.#changed) {
+			if (k in mine) next[k] = mine[k];
+			else delete next[k];
+		}
+		if (JSON.stringify(next) === JSON.stringify(mine)) return;
+		this.#values = next;
+		write(KEY, JSON.stringify(next));
+		if (typeof window !== 'undefined') window.dispatchEvent(new Event('ytmp:settings'));
 	}
 }
 

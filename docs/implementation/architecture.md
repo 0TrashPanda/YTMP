@@ -105,8 +105,11 @@ sheet, menu or dialog (`sheet`). Song lists use `SongList.svelte`; what tap, swi
 is `RowGestures` (`lib/gestures.svelte.ts`), and the actions themselves with their messages are
 `lib/songActions.ts`. The song menu is `SongMenu.svelte`: each action it can show for a song
 goes under its id, and `arrange` in `lib/songMenu.svelte.ts` lays them out as set in
-*Settings → Song menu* (a new action: an id in `MENU_ACTIONS` and `DEFAULT_ITEMS`). A setting
-that follows your account goes in `lib/preferences.svelte.ts` under a key of its own. Calls to the host are in `lib/api.ts`, to your account's server in
+*Settings → Song menu* (a new action: an id in `MENU_ACTIONS` and `DEFAULT_ITEMS`). A new setting
+goes in `settings` in `lib/settings.svelte.ts` (a `Setting`: it follows your account and can be
+kept different on a device; `Choice` and `Toggle` in `components/settings/` show it with the
+phone icon), or in `saved` (`lib/storage.ts`) when it only makes sense on one device. Its page
+in Settings is in `SettingsScreen.svelte`; a room's own settings in `RoomSections.svelte`. Calls to the host are in `lib/api.ts`, to your account's server in
 `lib/account.ts` and `lib/listening.svelte.ts`.
 A new version on the host: SvelteKit sees that `_app/version.json` changed (on focus, every
 10 minutes, and when the room's WebSocket reconnects), and `lib/appUpdate.svelte.ts` reloads

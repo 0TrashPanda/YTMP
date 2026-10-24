@@ -18,9 +18,7 @@
 	import Icon from '../Icon.svelte';
 	import Switch from './Switch.svelte';
 
-	import { preferences } from '../../preferences.svelte';
 
-	$effect(() => void preferences.load());
 	const songMenu = $derived(songMenuLayout());
 
 	const actions = Object.keys(MENU_ACTIONS) as MenuAction[];
@@ -96,13 +94,4 @@
 			<Icon name="add" size={18} /> Add a divider
 		</button>
 	</section>
-	<p class="text-xs {preferences.error ? 'text-accent' : 'text-muted'}">
-		{#if preferences.error}
-			Couldn't save it to your account; it's saved on this device for now.
-		{:else if preferences.onAccount}
-			Saved to your YTMP account: the same menu on all your devices.
-		{:else}
-			Saved on this device. Log in with your YTMP account to keep it there.
-		{/if}
-	</p>
 </div>

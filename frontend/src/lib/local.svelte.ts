@@ -1,8 +1,9 @@
-// The Local tab's settings on this device, and whether it has anything to show.
+// The Local tab's settings, and whether it has anything to show.
 import { getLocalLibraries } from './api';
 import { nativeBridge } from './native';
 import type { LocalGroup, LocalLibrarySummary } from './protocol.gen';
-import { read, saved, write } from './storage';
+import { settings } from './settings.svelte';
+import { read, write } from './storage';
 
 function readFolders(): { id: string; name: string }[] {
 	try {
@@ -13,8 +14,6 @@ function readFolders(): { id: string; name: string }[] {
 }
 
 export const local = $state({
-	/** Show the music on the network (a Raspberry Pi's). */
-	network: saved.localNetwork,
 	/** The app shows the music on this phone (in rooms on this phone). */
 	phone: nativeBridge?.phoneMusic?.() ?? false,
 	/** Folders picked as music on this phone (for music the phone's own scan doesn't know). */
@@ -71,9 +70,9 @@ export function forgetLocalPlace(): void {
 	Object.assign(localPlace, START);
 }
 
+/** Show the music on the network (a Raspberry Pi's): one of your settings (settings.svelte.ts). */
 export function setLocalNetwork(on: boolean): void {
-	local.network = on;
-	saved.localNetwork = on;
+	settings.localNetwork.set(on);
 	void loadLocal();
 }
 
@@ -99,7 +98,7 @@ export async function loadLocal(fresh = false): Promise<void> {
 	try {
 		const all = (await getLocalLibraries(fresh)).libraries;
 		// The phone's own music and its cached songs always; music on the network when that's on.
-		local.libraries = all.filter((l) => (l.kind === 'mpd' ? local.network : true));
+		local.libraries = all.filter((l) => (l.kind === 'mpd' ? settings.localNetwork.value : true));
 	} catch {
 		local.libraries = [];
 	}

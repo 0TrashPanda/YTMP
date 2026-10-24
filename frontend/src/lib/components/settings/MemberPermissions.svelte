@@ -54,29 +54,29 @@
 </script>
 
 <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" role="presentation" onclick={(e) => e.target === e.currentTarget && close()}>
-	<div class="flex max-h-full w-full max-w-xl flex-col rounded-lg bg-d-bg text-d-text shadow-2xl" role="dialog" aria-modal="true" aria-label="Permissions for {person.name}">
+	<div class="flex max-h-full w-full max-w-xl flex-col rounded-lg bg-bg text-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Permissions for {person.name}">
 		<div class="flex items-start gap-3 p-4 pb-2">
 			<div class="min-w-0 flex-1">
-				<h2 class="text-xl font-semibold text-d-head">Permissions for {person.name}</h2>
-				<p class="mt-1 text-sm text-d-muted">
+				<h2 class="text-xl font-medium text-white">Permissions for {person.name}</h2>
+				<p class="mt-1 text-sm text-muted">
 					On top of their role
 					<span class="font-medium" style:color={role?.color}>{role?.name ?? '—'}</span>.
 					✓ allows, ✗ denies, / follows the role.
 				</p>
 			</div>
-			<button class="rounded p-1 text-d-muted hover:text-d-head" aria-label="Close" onclick={close}>
+			<button class="rounded p-1 text-muted hover:text-white" aria-label="Close" onclick={close}>
 				<svg viewBox="0 0 24 24" class="h-6 w-6"><path fill="currentColor" d="M18.4 4 12 10.4 5.6 4 4 5.6 10.4 12 4 18.4 5.6 20 12 13.6 18.4 20 20 18.4 13.6 12 20 5.6z" /></svg>
 			</button>
 		</div>
 		<div class="min-h-0 flex-1 overflow-y-auto px-4">
 			{#each PERMISSION_GROUPS as group (group.name)}
-				<h4 class="mt-5 mb-1 text-xs font-bold tracking-wide text-d-muted uppercase">{group.name} Permissions</h4>
+				<h4 class="mt-5 mb-1 text-sm font-medium">{group.name} Permissions</h4>
 				{#each group.permissions as permission (permission.id)}
 					{@const fromRole = role?.permissions.includes(permission.id)}
-					<div class="flex items-center gap-4 border-b border-d-line py-3">
+					<div class="flex items-center gap-4 border-b border-line py-3">
 						<div class="min-w-0 flex-1">
-							<p class="font-medium text-d-head">{permission.name}</p>
-							<p class="text-xs text-d-faint">Role: {fromRole ? 'allowed' : 'not allowed'}</p>
+							<p class="font-medium text-white">{permission.name}</p>
+							<p class="text-xs text-muted">Role: {fromRole ? 'allowed' : 'not allowed'}</p>
 						</div>
 						<TriState
 							value={value(permission.id)}

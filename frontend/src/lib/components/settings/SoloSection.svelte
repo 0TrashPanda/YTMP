@@ -1,10 +1,7 @@
 <script lang="ts">
 	// Settings → Solo rooms: the party and sharing bits a solo room leaves out (see soloLook.svelte.ts).
-	import { preferences } from '../../preferences.svelte';
 	import { setSoloHidden, SOLO_PARTS, soloHidden } from '../../soloLook.svelte';
 	import Switch from './Switch.svelte';
-
-	$effect(() => void preferences.load());
 </script>
 
 <div class="flex flex-col gap-4">
@@ -18,13 +15,4 @@
 			<Switch {label} checked={!soloHidden(part)} onchange={(on) => setSoloHidden(part, !on)} />
 		</div>
 	{/each}
-	<p class="text-xs {preferences.error ? 'text-accent' : 'text-muted'}">
-		{#if preferences.error}
-			Couldn't save it to your account; it's saved on this device for now.
-		{:else if preferences.onAccount}
-			Saved to your YTMP account: the same on all your devices.
-		{:else}
-			Saved on this device. Log in with your YTMP account to keep it there.
-		{/if}
-	</p>
 </div>

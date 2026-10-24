@@ -3,9 +3,10 @@
 // covers, paging sideways). The sections are YTM's own,
 // your Pinned section (tiles of what you pinned) and the pins shown with their songs, each its
 // own section. YTM names its sections itself ("Quick picks", "Listen again"…), so they're known
-// by name; a name not seen before goes after the section YTM shows it after. Saved on this device.
+// by name; a name not seen before goes after the section YTM shows it after. One of your settings
+// (settings.svelte.ts).
 import type { HomeSection } from './protocol.gen';
-import { read, write } from './storage';
+import { settings } from './settings.svelte';
 
 export type Layout = 'carousel' | 'list' | 'dial';
 const LAYOUTS: string[] = ['carousel', 'list', 'dial'];
@@ -64,8 +65,6 @@ function pins(value: unknown): Pin[] {
 			: []
 	);
 }
-
-const KEY = 'ytmp.home';
 
 function layouts(value: unknown): Record<string, Layout> {
 	if (!value || typeof value !== 'object') return {};
@@ -140,13 +139,22 @@ export function arrange(sections: HomeSection[] | null, prefs: HomePrefs): Block
 }
 
 export const home = $state<HomePrefs & { podcastSections: string[] }>({
-	...loadPrefs(read(KEY)),
+	...loadPrefs(JSON.stringify(settings.home.value)),
 	podcastSections: []
 });
 
 function save() {
 	const { order, hidden, layouts, hidePodcasts, pins } = home;
-	write(KEY, JSON.stringify({ order, hidden, layouts, hidePodcasts, pins }));
+	settings.home.set({ order, hidden, layouts, hidePodcasts, pins });
+}
+
+// Changed on another device (or this one went back to your account's).
+if (typeof window !== 'undefined') {
+	window.addEventListener('ytmp:settings', () => {
+		const next = loadPrefs(JSON.stringify(settings.home.value));
+		const { order, hidden, layouts, hidePodcasts, pins } = home;
+		if (JSON.stringify(next) !== JSON.stringify({ order, hidden, layouts, hidePodcasts, pins })) Object.assign(home, next);
+	});
 }
 
 /** [order] with the sections of [prefs]' pins in it, without those of pins that are gone. */

@@ -110,6 +110,6 @@
 		{/each}
 	</section>
 	<p class="text-xs text-muted">
-		YouTube Music picks its sections and can rename them; a new one shows where YouTube Music puts it. Every section's ⋮ on Home does the same. Saved on this device.
+		YouTube Music picks its sections and can rename them; a new one shows where YouTube Music puts it. Every section's ⋮ on Home does the same.
 	</p>
 </div>

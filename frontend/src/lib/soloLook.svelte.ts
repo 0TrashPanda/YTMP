@@ -1,7 +1,6 @@
 // What a solo room leaves out: the party and sharing bits you don't need when you listen
-// alone, as set in Settings → Solo rooms. One of your preferences (preferences.svelte.ts): on
-// your YTMP account, and in this browser. Everything shows by default.
-import { preferences } from './preferences.svelte';
+// alone, as set in Settings → Solo rooms. One of your settings (settings.svelte.ts). Everything shows by default.
+import { settings } from './settings.svelte';
 import type { RoomConnection } from './room.svelte';
 
 export type SoloPart = 'code' | 'roomName' | 'cast' | 'playingOn' | 'karaoke' | 'partyMenu';
@@ -15,17 +14,15 @@ export const SOLO_PARTS: [SoloPart, string, string][] = [
 	['partyMenu', 'Party items in the menu', 'Party screen, Show on a TV and Clone room, behind your picture. Making the room public stays there.']
 ];
 
-const KEY = 'soloHidden';
-
 /** [part] is hidden in solo rooms. */
 export function soloHidden(part: SoloPart): boolean {
-	const hidden = preferences.get<unknown>(KEY);
+	const hidden = settings.soloHidden.value;
 	return Array.isArray(hidden) && hidden.includes(part);
 }
 
 export function setSoloHidden(part: SoloPart, hidden: boolean): void {
 	const parts = SOLO_PARTS.map(([p]) => p).filter((p) => (p === part ? hidden : soloHidden(p)));
-	preferences.set(KEY, parts.length ? parts : undefined);
+	settings.soloHidden.set(parts.length ? parts : undefined);
 }
 
 /** [part] shows in [room]: always in a party, in a solo room unless hidden. */

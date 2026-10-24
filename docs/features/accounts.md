@@ -106,7 +106,7 @@ every browser where you're logged in. Only you see them.
 - **Dislike** (thumbs down, next to thumbs up in the full player and the player bar, and in
   the song menu): like YouTube Music, it suggests fewer songs like it. In a **solo** room the
   playing song is also skipped (if you may skip); in a party it keeps playing, it's everyone's
-  music. Settings → Look can dim or hide the dislike button in the player bar.
+  music. Settings → Player can dim or hide the dislike button in the player bar.
 - **Your own playlists** (opened from your Library): remove songs (song menu → *Remove from
   this playlist*), drag them to another place, **rename** and **delete** the playlist (the ⋮
   next to its name). In Liked music, *Remove from Liked music* takes the like away.

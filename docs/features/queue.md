@@ -59,7 +59,7 @@ queue runs out.
 - **Start radio** clears the queue and puts the song's radio in the autoplay queue, the song
   itself first; it then plays from there, so the song is heard once and the radio follows.
   On the song that's **already playing**, it keeps playing (like YTM) and only the queue changes.
-- **Start radio clears played songs** ✅ (*Settings → Playback*, per device; off by default):
+- **Start radio clears played songs** ✅ (*Settings → Playback*; off by default):
   Start radio also clears the [history](#queue-history) above the current song, like YouTube
   Music. Only when you may remove those songs (your own, or others' with *Remove others'
   songs*); otherwise the history stays. Radio and autoplay still skip the cleared songs for
@@ -159,7 +159,7 @@ with *Skip* (DJs, Admins, the owner) still skip right away. A new song starts a 
 
 ## Queue limits ✅
 
-Room settings (*Queue*), **all off by default**:
+Settings → This room → *Queue*, **all off by default**:
 
 - **Max songs per person** in the queue at the same time
 - **Max song length** (for example no 1-hour mixes)

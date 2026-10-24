@@ -132,7 +132,18 @@ Your preferences work the same too, so they're the same in rooms everywhere
 which each feature of the web app has its own keys (`songMenu`, …). A PUT sets only the keys it
 has (null removes one), so features don't overwrite each other; at most 64 KB.
 `frontend/src/lib/preferences.svelte.ts` keeps a copy in the browser (also without an account),
-takes the account's when it answers, and puts up what only the browser has.
+takes the account's when it answers, and puts up what only the browser has. Coming back to
+the page (`visibilitychange`, at most every 10 s) asks the account again, so a change made on
+another device shows up; what came in is announced with a `ytmp:settings` window event (the
+app's player and Home follow it).
+
+Settings (`frontend/src/lib/settings.svelte.ts`) are preferences with a device override: each
+`Setting` has its key in the preferences (the account's value), and a device that keeps its own
+has it in `localStorage['ytmp.deviceSettings']` instead (`keepHere`). Its value is this device's,
+else the account's, else the default. Settings that used to be kept in the browser only (their
+old `ytmp.*` keys) were collected once into `ytmp.settingsToMove`; once the account answers
+they go up when it has none for that key, or become this device's own when it has a different
+one (without an account they just stay in the browser).
 
 The same rule decides how much of the [song graph](storage.md#generating-a-radio) a host
 gets: `GET /api/auth/radio?id=` takes any host token of the account, but only those for the

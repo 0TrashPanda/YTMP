@@ -21,7 +21,7 @@
 		unit?: string;
 		label: string;
 		disabled?: boolean;
-		/** The box's colours (it sits in YTM-style settings and Discord-style room settings). */
+		/** The box's colours (most sit in the settings, on bg-raised). */
 		class?: string;
 		onchange: (value: number) => void;
 	} = $props();

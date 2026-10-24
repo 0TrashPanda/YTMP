@@ -1,6 +1,6 @@
 <script lang="ts">
-	// Discord's role editor: the ranked role list on the left (drag to reorder), the selected
-	// role on the right with Display / Permissions / Manage Members tabs, and the unsaved
+	// The role editor: the ranked role list on the left (drag to reorder), the selected
+	// role on the right with Display / Permissions / Members tabs, and the unsaved
 	// changes bar. Used for a room's roles and for the role template on /account.
 	import { untrack } from 'svelte';
 	import { DEFAULT_ROLE_COLOR, PERMISSION_GROUPS, ROLE_COLORS } from '../../permissions';
@@ -21,7 +21,7 @@
 		onCreate: () => Promise<boolean>;
 		onDelete: (roleId: string) => Promise<boolean>;
 		onMove: (roleId: string, toIndex: number) => void;
-		/** Room only: people, for the Manage Members tab. */
+		/** Room only: people, for the Members tab. */
 		members?: Participant[];
 		canAssign?: (person: Participant, roleId: string) => boolean;
 		onAssign?: (participantId: string, roleId: string) => void;
@@ -53,7 +53,7 @@
 		return a.name === b.name && a.color === b.color && [...a.permissions].sort().join() === [...b.permissions].sort().join();
 	}
 
-	// Keep a selection, and pick up the new role after "Create Role".
+	// Keep a selection, and pick up the new role after "Create role".
 	$effect(() => {
 		if (selectNewAfter !== null && roles.length > selectNewAfter) {
 			selectedId = roles[roles.length - 1].id;
@@ -165,16 +165,16 @@
 		return 0;
 	}
 
-	const label = 'mb-2 block text-xs font-bold tracking-wide text-d-muted uppercase';
-	const input = 'w-full rounded bg-d-deep px-3 py-2.5 text-d-text outline-none placeholder:text-d-faint disabled:opacity-60';
+	const label = 'mb-2 block text-sm font-medium';
+	const input = 'w-full rounded bg-raised px-3 py-2.5 text-white outline-none placeholder:text-muted disabled:opacity-60';
 </script>
 
-<div class="flex h-full min-h-0 text-d-text">
+<div class="flex h-full min-h-0 text-white">
 	<!-- Role list -->
-	<div class="{editing ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col md:w-56 md:border-r md:border-d-line md:pr-3">
+	<div class="{editing ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col md:w-56 md:border-r md:border-line md:pr-3">
 		<div class="flex items-center justify-between px-2 pb-2">
-			<span class="text-xs font-bold tracking-wide text-d-muted uppercase">Roles — {roles.length}</span>
-			<button class="rounded p-1 text-d-muted hover:bg-d-hover hover:text-d-head" aria-label="Create role" title="Create Role" onclick={create}>
+			<span class="text-sm font-medium">Roles — {roles.length}</span>
+			<button class="rounded p-1 text-muted hover:bg-raised hover:text-white" aria-label="Create role" title="Create role" onclick={create}>
 				<svg viewBox="0 0 24 24" class="h-[18px] w-[18px]"><path fill="currentColor" d="M13 5h-2v6H5v2h6v6h2v-6h6v-2h-6z" /></svg>
 			</button>
 		</div>
@@ -183,13 +183,13 @@
 				{@const dragging = drag?.id === role.id}
 				<div
 					class="group flex h-9 shrink-0 items-center gap-2 rounded px-2 select-none
-						{role.id === selectedId ? 'bg-d-active text-d-head' : 'text-d-muted hover:bg-d-hover hover:text-d-text'}
-						{dragging ? 'relative z-10 bg-d-active shadow-lg' : 'transition-transform'}"
+						{role.id === selectedId ? 'bg-line text-white' : 'text-muted hover:bg-raised hover:text-white'}
+						{dragging ? 'relative z-10 bg-line shadow-lg' : 'transition-transform'}"
 					style:transform="translateY({dragging ? drag!.offset : shift(index)}px)"
 				>
 					{#if canManage(index)}
 						<span
-							class="cursor-grab touch-none text-d-faint opacity-0 group-hover:opacity-100 max-md:opacity-100"
+							class="cursor-grab touch-none text-muted opacity-0 group-hover:opacity-100 max-md:opacity-100"
 							aria-hidden="true"
 							onpointerdown={(e) => startDrag(e, role, index)}
 							onpointermove={(e) => drag && (drag.offset = e.clientY - drag.startY)}
@@ -199,7 +199,7 @@
 							<Icon name="drag" size={16} />
 						</span>
 					{:else}
-						<svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 text-d-faint" aria-label="Above your role"><path fill="currentColor" d="M17 9V7A5 5 0 0 0 7 7v2a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-7a3 3 0 0 0-3-3zM9 7a3 3 0 1 1 6 0v2H9z" /></svg>
+						<svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 text-muted" aria-label="Above your role"><path fill="currentColor" d="M17 9V7A5 5 0 0 0 7 7v2a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-7a3 3 0 0 0-3-3zM9 7a3 3 0 1 1 6 0v2H9z" /></svg>
 					{/if}
 					<button class="flex min-w-0 flex-1 items-center gap-2 text-left" onclick={() => select(role.id)}>
 						<span class="h-3 w-3 shrink-0 rounded-full" style:background={role.color}></span>
@@ -214,16 +214,16 @@
 	{#if draft && original}
 		<div class="{editing ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col md:pl-6">
 			<div class="flex items-center gap-2 pb-3">
-				<button class="rounded p-1 text-d-muted hover:text-d-head md:hidden" aria-label="Back to roles" onclick={() => (dirty ? warn() : (editing = false))}>
+				<button class="rounded p-1 text-muted hover:text-white md:hidden" aria-label="Back to roles" onclick={() => (dirty ? warn() : (editing = false))}>
 					<svg viewBox="0 0 24 24" class="h-5 w-5"><path fill="currentColor" d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" /></svg>
 				</button>
-				<h3 class="truncate text-xs font-bold tracking-wide text-d-muted uppercase">Edit Role — {original.name}</h3>
+				<h3 class="truncate text-sm font-medium">Edit role — {original.name}</h3>
 			</div>
 
-			<div class="flex gap-5 border-b border-d-line">
-				{#each [['display', 'Display'], ['permissions', 'Permissions'], ...(members ? [['members', `Manage Members (${(members ?? []).filter((m) => m.roleId === selectedId).length})`]] : [])] as [id, name] (id)}
+			<div class="flex gap-5 border-b border-line">
+				{#each [['display', 'Display'], ['permissions', 'Permissions'], ...(members ? [['members', `Members (${(members ?? []).filter((m) => m.roleId === selectedId).length})`]] : [])] as [id, name] (id)}
 					<button
-						class="-mb-px border-b-2 pb-2.5 text-[15px] font-medium {tab === id ? 'border-d-blurple text-d-head' : 'border-transparent text-d-muted hover:text-d-text'}"
+						class="-mb-px border-b-2 pb-2.5 text-[15px] font-medium {tab === id ? 'border-white text-white' : 'border-transparent text-muted hover:text-white'}"
 						onclick={() => (tab = id as typeof tab)}
 					>
 						{name}
@@ -232,7 +232,7 @@
 			</div>
 
 			{#if !editable}
-				<p class="mt-4 flex items-center gap-2 rounded bg-d-deep px-3 py-2 text-sm text-d-muted">
+				<p class="mt-4 flex items-center gap-2 rounded bg-raised px-3 py-2 text-sm text-muted">
 					<svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0"><path fill="currentColor" d="M17 9V7A5 5 0 0 0 7 7v2a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-7a3 3 0 0 0-3-3zM9 7a3 3 0 1 1 6 0v2H9z" /></svg>
 					You can only edit roles below your own.
 				</p>
@@ -241,15 +241,15 @@
 			<div class="min-h-0 flex-1 overflow-y-auto py-5 pr-1">
 				{#if tab === 'display'}
 					<label class="mb-6 block">
-						<span class={label}>Role Name <span class="text-d-red">*</span></span>
+						<span class={label}>Role name <span class="text-accent">*</span></span>
 						<input class={input} bind:value={draft.name} maxlength="32" disabled={!editable} />
 					</label>
 
-					<span class={label}>Role Color <span class="text-d-red">*</span></span>
-					<p class="mb-3 text-sm text-d-muted">People with this role show their name in this color.</p>
+					<span class={label}>Role colour <span class="text-accent">*</span></span>
+					<p class="mb-3 text-sm text-muted">People with this role show their name in this color.</p>
 					<div class="mb-8 flex flex-wrap gap-3">
 						<button
-							class="relative h-[50px] w-[66px] rounded border border-d-line"
+							class="relative h-[50px] w-[66px] rounded border border-line"
 							style:background={DEFAULT_ROLE_COLOR}
 							title="Default"
 							aria-label="Default color"
@@ -278,11 +278,11 @@
 					</div>
 
 					{#if editable}
-						<div class="border-t border-d-line pt-6">
+						<div class="border-t border-line pt-6">
 							{#if defaultRoleIds.includes(original.id)}
-								<p class="text-sm text-d-muted">New people get this role, so it can't be deleted.</p>
+								<p class="text-sm text-muted">New people get this role, so it can't be deleted.</p>
 							{:else if roles.length > 1}
-								<button class="rounded bg-d-red px-4 py-2 text-sm font-medium text-white hover:bg-[#a12828]" onclick={remove}>Delete Role</button>
+								<button class="rounded-full px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10" onclick={remove}>Delete role</button>
 							{/if}
 						</div>
 					{/if}
@@ -294,12 +294,12 @@
 						{/if}
 					</div>
 					{#each groups as group (group.name)}
-						<h4 class="mt-6 mb-1 text-xs font-bold tracking-wide text-d-muted uppercase first:mt-2">{group.name} Permissions</h4>
+						<h4 class="mt-6 mb-1 text-sm font-medium first:mt-2">{group.name} Permissions</h4>
 						{#each group.permissions as permission (permission.id)}
 							{@const on = draft.permissions.includes(permission.id)}
-							<div class="border-b border-d-line py-4">
+							<div class="border-b border-line py-4">
 								<div class="flex items-center justify-between gap-4">
-									<span class="text-base font-medium text-d-head">{permission.name}</span>
+									<span class="text-base font-medium text-white">{permission.name}</span>
 									<Switch
 										checked={on}
 										label={permission.name}
@@ -307,44 +307,44 @@
 										onchange={(v) => toggle(permission.id, v)}
 									/>
 								</div>
-								<p class="mt-1 pr-14 text-sm text-d-muted">{permission.description}</p>
+								<p class="mt-1 pr-14 text-sm text-muted">{permission.description}</p>
 							</div>
 						{/each}
 					{:else}
-						<p class="py-8 text-center text-d-muted">No permissions match.</p>
+						<p class="py-8 text-center text-muted">No permissions match.</p>
 					{/each}
 				{:else if tab === 'members'}
 					<div class="mb-4 flex items-center gap-3">
 						<input class="{input} py-1.5" placeholder="Search members" bind:value={memberSearch} />
 						{#if addable.length > 0}
-							<button class="shrink-0 rounded bg-d-blurple px-4 py-1.5 text-sm font-medium text-white hover:bg-[#4752c4]" onclick={() => (adding = !adding)}>
+							<button class="shrink-0 rounded bg-white px-4 py-1.5 text-sm font-medium text-white hover:bg-[#4752c4]" onclick={() => (adding = !adding)}>
 								Add Members
 							</button>
 						{/if}
 					</div>
 					{#if adding}
-						<div class="mb-4 flex flex-col rounded bg-d-deep p-1">
+						<div class="mb-4 flex flex-col rounded bg-raised p-1">
 							{#each addable as person (person.id)}
 								<button
-									class="flex items-center gap-3 rounded px-2 py-1.5 text-left hover:bg-d-hover"
+									class="flex items-center gap-3 rounded px-2 py-1.5 text-left hover:bg-raised"
 									onclick={() => {
 										onAssign?.(person.id, selectedId!);
 										adding = false;
 									}}
 								>
-									<span class="flex h-6 w-6 items-center justify-center rounded-full bg-d-active text-xs font-bold">{person.name[0]?.toUpperCase()}</span>
+									<span class="flex h-6 w-6 items-center justify-center rounded-full bg-line text-xs font-bold">{person.name[0]?.toUpperCase()}</span>
 									{person.name}
 								</button>
 							{/each}
 						</div>
 					{/if}
 					{#each roleMembers as person (person.id)}
-						<div class="group flex items-center gap-3 rounded px-2 py-2 hover:bg-d-hover">
+						<div class="group flex items-center gap-3 rounded px-2 py-2 hover:bg-raised">
 							<span class="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white" style:background={original.color}>{person.name[0]?.toUpperCase()}</span>
-							<span class="min-w-0 flex-1 truncate">{person.name} <span class="text-sm text-d-faint">{person.accountId ?? 'guest'}</span></span>
+							<span class="min-w-0 flex-1 truncate">{person.name} <span class="text-sm text-muted">{person.accountId ?? 'guest'}</span></span>
 							{#if fallbackRoleId && fallbackRoleId !== selectedId && canAssign?.(person, fallbackRoleId)}
 								<button
-									class="rounded-full p-1 text-d-faint opacity-0 group-hover:opacity-100 hover:text-d-head max-md:opacity-100"
+									class="rounded-full p-1 text-muted opacity-0 group-hover:opacity-100 hover:text-white max-md:opacity-100"
 									aria-label="Remove from role"
 									title="Remove from role"
 									onclick={() => onAssign?.(person.id, fallbackRoleId)}
@@ -354,7 +354,7 @@
 							{/if}
 						</div>
 					{:else}
-						<p class="py-8 text-center text-d-muted">Nobody has this role yet.</p>
+						<p class="py-8 text-center text-muted">Nobody has this role yet.</p>
 					{/each}
 				{/if}
 			</div>

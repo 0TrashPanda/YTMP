@@ -5,13 +5,13 @@
 	let { value, disabled = false, canAllow = true, onchange }: { value: Override; disabled?: boolean; canAllow?: boolean; onchange: (v: Override) => void } = $props();
 
 	const options: { v: Override; label: string; on: string }[] = [
-		{ v: 'deny', label: 'Deny', on: 'bg-d-red text-white' },
+		{ v: 'deny', label: 'Deny', on: 'bg-accent text-white' },
 		{ v: 'inherit', label: 'Follow role', on: 'bg-[#4e5058] text-white' },
-		{ v: 'allow', label: 'Allow', on: 'bg-d-green text-white' }
+		{ v: 'allow', label: 'Allow', on: 'bg-good text-white' }
 	];
 </script>
 
-<div class="flex shrink-0 overflow-hidden rounded border border-d-deep">
+<div class="flex shrink-0 overflow-hidden rounded border border-line">
 	{#each options as o (o.v)}
 		<button
 			type="button"
@@ -19,8 +19,8 @@
 			aria-label={o.label}
 			aria-pressed={value === o.v}
 			disabled={disabled || (o.v === 'allow' && !canAllow && value !== 'allow')}
-			class="flex h-7 w-8 items-center justify-center border-d-deep transition-colors not-first:border-l disabled:cursor-not-allowed
-				{value === o.v ? o.on : 'text-d-faint hover:bg-d-hover'}"
+			class="flex h-7 w-8 items-center justify-center border-line transition-colors not-first:border-l disabled:cursor-not-allowed
+				{value === o.v ? o.on : 'text-muted hover:bg-raised'}"
 			onclick={() => onchange(o.v)}
 		>
 			{#if o.v === 'deny'}

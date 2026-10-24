@@ -63,7 +63,7 @@ song whose own link fails too. Songs that aren't YouTube's (`ytm:` IDs) keep the
   have 10 min left; the next song (queue, else autoplay, from `RoomFollower`) is looked up
   as soon as one starts.
 - **Browser** (`WebPlayer`, `ownModule.ts`): a YTM module the listener runs on their own
-  computer, set in *Settings → Playback* (`saved.ownModule`: address and key, checked with
+  computer, set in *Settings → Your own module* (`saved.ownModule`: address and key, checked with
   `GET /info`). The player calls `GET /songs/{id}/stream` there and prefetches the next
   song. The module answers pages from any origin only when it has a key (CORS, including
   Chrome's private network preflight; see [module API](module-api.md)).

@@ -35,7 +35,6 @@
 	import type { Link } from '../../../lib/links';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import CloneSheet from '../../../lib/components/CloneSheet.svelte';
-	import RoomSettings from '../../../lib/components/settings/RoomSettings.svelte';
 	import { forgetHome, getHost, getRoom } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
 	import { createPlayer, type RoomPlayer } from '../../../lib/player.svelte';
@@ -43,6 +42,7 @@
 	import SleepTimerSheet from '../../../lib/components/SleepTimerSheet.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
 	import { shows } from '../../../lib/soloLook.svelte';
+	import { load as loadSettings, settings } from '../../../lib/settings.svelte';
 	import { saved } from '../../../lib/storage';
 	import { appUpdate } from '../../../lib/appUpdate.svelte';
 	import { ListenRequests } from '../../../lib/listenRequests';
@@ -87,7 +87,6 @@
 	type Sheet =
 		| { kind: 'menu'; target: MenuTarget }
 		| { kind: 'save'; song: Song }
-		| { kind: 'roomSettings'; start: 'list' | 'members' }
 		| { kind: 'settings'; start: SettingsSection | null }
 		| { kind: 'avatar' | 'share' | 'clone' | 'leave' | 'playOn' | 'partyScreen' | 'linkTv' | 'sleep' };
 	let sheet = $state<Sheet | null>(null);
@@ -150,7 +149,6 @@
 		void loadLocal();
 	});
 	let settingsScreen = $state<SettingsScreen>();
-	let roomSettings = $state<RoomSettings>();
 
 	// The full player (album art, controls, Up next) over everything. A history entry, so
 	// the phone's Back button closes it.
@@ -226,7 +224,7 @@
 		room.connect();
 		youtube.load();
 		void listening.load();
-		void preferences.load();
+		void loadSettings();
 	}
 	if (initialName.trim()) {
 		// Logged in on this server's pages, but not yet for its rooms: that first (log in once).
@@ -293,7 +291,7 @@
 
 	// Your other devices may switch "Play here" on this one (Settings → Playback): the host hears
 	// whether, and whether sound can start here now (a browser only after a click on its page).
-	let remotePlay = $state(saved.remotePlay);
+	let remotePlay = $state(settings.remotePlay.value);
 	let clicked = $state(false);
 	$effect(() => {
 		const click = () => (clicked = true);
@@ -372,7 +370,6 @@
 	function onBack(): 'handled' | 'exit' | 'default' {
 		if (!room || room.status === 'rejected') return 'default';
 		// Settings go back a step first (a section to the list, a role to the roles).
-		if (sheet?.kind === 'roomSettings' && roomSettings?.back()) return 'handled';
 		if (sheet?.kind === 'settings' && settingsScreen?.back()) return 'handled';
 		if (sheet) {
 			sheet = null;
@@ -405,7 +402,7 @@
 
 	// A changed setting (e.g. what unplugging headphones does) goes to the app's player.
 	const onSettings = () => {
-		remotePlay = saved.remotePlay;
+		remotePlay = settings.remotePlay.value;
 		player?.sync();
 	};
 	onMount(() => {
@@ -621,7 +618,7 @@
 								<button
 									class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
 									aria-label="People in this room"
-									onclick={() => (sheet = { kind: 'roomSettings', start: 'members' })}
+									onclick={() => (sheet = { kind: 'settings', start: 'room-people' })}
 									title={room.state?.participants
 										.filter((p: Participant) => p.online && !p.screen)
 										.map((p: Participant) => p.name + (p.accountId ? ` (${p.accountId})` : '') + (p.listening ? ' 🎧' : '') + (p.speakers.length ? ` 🔊 ${p.speakers.join(', ')}` : ''))
@@ -834,8 +831,6 @@
 		/>
 	{:else if sheet?.kind === 'save'}
 		<SaveSheet song={sheet.song} onClose={() => close('save')} onToast={toast} />
-	{:else if sheet?.kind === 'roomSettings' && room.state}
-		<RoomSettings bind:this={roomSettings} {room} {host} start={sheet.start} onClose={() => close('roomSettings')} onClone={() => (sheet = { kind: 'clone' })} />
 	{:else if sheet?.kind === 'clone' && room.state}
 		<CloneSheet {room} {host} onClose={() => close('clone')} onToast={toast} />
 	{:else if sheet?.kind === 'avatar'}
@@ -847,13 +842,13 @@
 			onShare={() => (sheet = { kind: 'share' })}
 			onPlayOn={player ? () => (sheet = { kind: 'playOn' }) : undefined}
 			onClone={() => (sheet = { kind: 'clone' })}
-			onRoomSettings={room.can('change_settings') || room.can('edit_roles') || room.can('kick') || room.can('ban') ? () => (sheet = { kind: 'roomSettings', start: 'list' }) : undefined}
+			onRoomSettings={room.can('change_settings') || room.can('edit_roles') || room.can('kick') || room.can('ban') ? () => (sheet = { kind: 'settings', start: null }) : undefined}
 			onPartyScreen={() => (sheet = { kind: 'partyScreen' })}
 			onShowOnTv={() => (sheet = { kind: 'linkTv' })}
 			onLeave={() => (sheet = { kind: 'leave' })}
 		/>
 	{:else if sheet?.kind === 'settings'}
-		<SettingsScreen bind:this={settingsScreen} start={sheet.start} onClose={() => close('settings')} onToast={toast} />
+		<SettingsScreen bind:this={settingsScreen} start={sheet.start} {room} roomHost={host} onClone={() => (sheet = { kind: 'clone' })} onClose={() => close('settings')} onToast={toast} />
 	{:else if sheet?.kind === 'leave' && room.state}
 		<LeaveRoomDialog {room} onClose={() => close('leave')} />
 	{:else if sheet?.kind === 'linkTv'}

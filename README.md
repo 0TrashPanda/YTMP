@@ -91,16 +91,19 @@ Music, without Premium, and not tied to a single music service.
   song the sound fades out, then a solo room pauses; in a party room only your device stops.
 - Solo rooms can leave out the party bits you don't need alone (room code, Play on, Karaoke,
   Party screen…), in *Settings → Solo rooms*.
-- An equalizer (*Settings → Playback*): ten bands and presets (Bass boost, Spoken word, …).
+- One Settings screen in YouTube Music's style, with the room's own settings at the top when
+  you're in a room. Your settings are kept on your YTMP account, so all your devices have them;
+  the phone icon next to one keeps it different on that device.
+- An equalizer (*Settings → Sound*): ten bands and presets (Bass boost, Spoken word, …).
   In the app the phone's speaker, wired headphones and each Bluetooth device keep their own.
 - A song menu (⋮, right-click or hold) you can arrange yourself (*Settings → Song menu*):
-  order, hide actions, dividers, saved to your YTMP account. On a phone it slides up from the bottom like YouTube
+  order, hide actions, dividers. On a phone it slides up from the bottom like YouTube
   Music's, with three big buttons at the top that you pick.
 - Download a song or episode from its menu: a music file with its title, artist, album and
   cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app
   looks songs up itself, and a browser can use a YouTube Music module on your own computer
-  (*Settings → Playback*), instead of streaming through the server.
+  (*Settings → Your own module*), instead of streaming through the server.
 - A *Local* tab with your own music: a Raspberry Pi's music folder (shared with MPD) and the
   music on your phone, with albums, artists, songs, genres, folders, search and Shuffle all.
   It remembers where you were.
@@ -108,7 +111,7 @@ Music, without Premium, and not tied to a single music service.
   start at once without asking YouTube, and on the phone they play without internet (*Local →
   Cached on this phone*, with your downloads). Songs streamed anyway are kept for free, others
   from their second play; podcast episodes aren't. 5 GB on a server (admin page), 1 GB on a
-  phone (*Settings → Playback*, on the phone or its SD card), with *Clear cache*. Optionally the
+  phone (*Settings → Song cache and downloads*, on the phone or its SD card), with *Clear cache*. Optionally the
   phone's own music that is also on YouTube Music is listed there too and plays offline. On the
   phone it can also keep the songs you liked last, the songs in your YouTube Music history, and
   the songs you played most from a Google Takeout export (how recent and how often is yours to
@@ -196,7 +199,7 @@ server's own internet connection. Elsewhere they fall back to streaming through 
 To keep music off a slow upload, set `[audio] proxy = "lan"` in `ytmp.toml`: then only
 devices on the server's network (like speakers at home) may do that. See the guide.
 The app doesn't need the server for that: it looks songs up itself. In a browser, run the
-YouTube Music module on your own computer and enter it under *Settings → Playback*:
+YouTube Music module on your own computer and enter it under *Settings → Your own module*:
 `docker run -d -p 127.0.0.1:8401:8401 -e YTMP_MODULE_KEY=<a key you choose> ghcr.io/0trashpanda/ytmp-ytm`.
 
 ## Development

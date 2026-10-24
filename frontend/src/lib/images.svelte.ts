@@ -1,45 +1,30 @@
-// Which size of each picture (album art, artists, playlists) to load, and this device's
-// picture settings: "Image quality" (High looks sharp on big screens, Low saves data and
-// battery) and "Video pictures" (wide pictures cropped to the square, or whole; see Art.svelte).
+// Which size of each picture (album art, artists, playlists) to load, and the look settings
+// (settings.svelte.ts): "Image quality" (High looks sharp on big screens, Low saves data and
+// battery), "Video pictures" (wide pictures cropped to the square, or whole; see Art.svelte),
+// the dislike button in the player bar and the full player's tabs.
 import type { Thumbnail } from './protocol.gen';
-import { saved, type DislikeButton, type ImageQuality, type SwipeOpens, type TabOrder, type VideoArt } from './storage';
+import { settings } from './settings.svelte';
 
-export const images = $state({
-	quality: saved.imageQuality,
-	videoArt: saved.videoArt,
-	dislikeButton: saved.dislikeButton,
-	swipeOpens: saved.swipeOpens,
-	tabOrder: saved.tabOrder
-});
-
-/** Swiping up on the full player's tabs: the tab under the finger, or always Up next. */
-export function setSwipeOpens(value: SwipeOpens): void {
-	images.swipeOpens = value;
-	saved.swipeOpens = value;
-}
-
-/** Up next first (like YTM), or Related first. */
-export function setTabOrder(value: TabOrder): void {
-	images.tabOrder = value;
-	saved.tabOrder = value;
-}
-
-/** The dislike button in the player bar: as bright as the others, dimmed, or not there. */
-export function setDislikeButton(look: DislikeButton): void {
-	images.dislikeButton = look;
-	saved.dislikeButton = look;
-}
-
-export function setImageQuality(quality: ImageQuality): void {
-	images.quality = quality;
-	saved.imageQuality = quality;
-}
-
-/** Wide pictures (songs from a music video): cropped to a square, or shown whole with bars. */
-export function setVideoArt(videoArt: VideoArt): void {
-	images.videoArt = videoArt;
-	saved.videoArt = videoArt;
-}
+export const images = {
+	get quality() {
+		return settings.imageQuality.value;
+	},
+	get videoArt() {
+		return settings.videoArt.value;
+	},
+	/** The dislike button in the player bar: as bright as the others, dimmed, or not there. */
+	get dislikeButton() {
+		return settings.dislikeButton.value;
+	},
+	/** Swiping up on the full player's tabs: the tab under the finger, or always Up next. */
+	get swipeOpens() {
+		return settings.swipeOpens.value;
+	},
+	/** Up next first (like YTM), or Related first. */
+	get tabOrder() {
+		return settings.tabOrder.value;
+	}
+};
 
 /** Low quality: no picture is loaded bigger than this (px). */
 const LOW_MAX = 300;

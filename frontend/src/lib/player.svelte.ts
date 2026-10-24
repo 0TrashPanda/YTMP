@@ -8,6 +8,7 @@ import { nativeBridge, type NativeBridge } from './native';
 import { forgetOwnStream, isYoutubeSong, ownStreamUrl, prefetchOwnStream } from './ownModule';
 import type { NowPlaying } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
+import { settings } from './settings.svelte';
 import { saved } from './storage';
 import { correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
 
@@ -666,7 +667,7 @@ class NativePlayer implements RoomPlayer {
 						: null,
 				streamUrl: now?.streamUrl ?? null,
 				// The notification's and lock screen's Next plays the next song while paused (Settings → Playback).
-				nextPlays: saved.nextPlays,
+				nextPlays: settings.nextPlays.value,
 				proxyUrl: song ? new URL(proxiedAudioUrl(song.id), location.href).href : null,
 				playing: state?.playback.playing ?? false,
 				starting: state?.playback.starting ?? false,
@@ -678,7 +679,7 @@ class NativePlayer implements RoomPlayer {
 				alone: this.room.listeningAlone,
 				volume: this.volume,
 				headphones: saved.headphonesAction,
-				skipSilence: saved.skipSilence,
+				skipSilence: settings.skipSilence.value,
 				// So the app can follow the room itself while this page is frozen in the background.
 				room: this.followableRoom(),
 				// The sleep timer pauses a solo room (in a shared room it only stops playing here).

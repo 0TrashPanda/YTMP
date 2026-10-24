@@ -3,7 +3,7 @@
 	// Yours (Liked music too) load in parts: more songs as you scroll down.
 	import { thumbUrl } from '../images.svelte';
 	import { deletePlaylist, getPlaylist, getPlaylistPart, movePlaylistItem, renamePlaylist } from '../api';
-	import { saved } from '../storage';
+	import { settings } from '../settings.svelte';
 	import Icon from './Icon.svelte';
 	import { youtube } from '../youtube.svelte';
 	import { formatTime } from '../format';
@@ -66,7 +66,7 @@
 
 	// Long lists: this many songs at first, this many more each time you scroll to the end;
 	// your own playlists load the next part from YouTube Music when it's needed.
-	const pageSize = saved.pageSize;
+	const pageSize = settings.pageSize.value;
 	let shown = $state(pageSize);
 	let loadingPart = $state<Promise<void> | null>(null);
 	let partFailed = $state(false);

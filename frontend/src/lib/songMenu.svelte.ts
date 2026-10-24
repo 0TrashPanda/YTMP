@@ -1,7 +1,7 @@
 // The song menu's layout, as set in Settings → Song menu: the order of the actions, which are
 // hidden, where the dividers go, and the big buttons at the top of the phone's menu. One of your
-// preferences (preferences.svelte.ts): on your YTMP account, and in this browser.
-import { preferences } from './preferences.svelte';
+// settings (settings.svelte.ts).
+import { settings } from './settings.svelte';
 import type { IconName } from './components/Icon.svelte';
 
 export type MenuAction =
@@ -87,7 +87,6 @@ export interface MenuLayout {
 	buttons: (MenuAction | null)[];
 }
 
-const KEY = 'songMenu';
 const isAction = (value: unknown): value is MenuAction => typeof value === 'string' && value in MENU_ACTIONS;
 
 export function defaultLayout(): MenuLayout {
@@ -119,7 +118,7 @@ let parsed = defaultLayout();
 
 /** Your layout. Reactive: it changes when your account answers, or in the settings. */
 export function songMenuLayout(): MenuLayout {
-	const saved = preferences.get(KEY);
+	const saved = settings.songMenu.value;
 	if (saved !== parsedFrom) {
 		parsedFrom = saved;
 		parsed = parseLayout(saved);
@@ -128,7 +127,7 @@ export function songMenuLayout(): MenuLayout {
 }
 
 function change(next: Partial<MenuLayout>): void {
-	preferences.set(KEY, { ...songMenuLayout(), ...next });
+	settings.songMenu.set({ ...songMenuLayout(), ...next });
 }
 
 export function isDefaultLayout(layout: MenuLayout = songMenuLayout()): boolean {
@@ -136,7 +135,7 @@ export function isDefaultLayout(layout: MenuLayout = songMenuLayout()): boolean 
 }
 
 export function resetLayout(): void {
-	preferences.set(KEY, undefined);
+	settings.songMenu.reset();
 }
 
 export function setShown(action: MenuAction, shown: boolean): void {

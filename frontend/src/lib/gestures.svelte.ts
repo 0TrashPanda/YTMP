@@ -1,6 +1,6 @@
 // What tapping, swiping and holding a song does, in song lists (search, albums, artists,
-// playlists, Local) and in Up next, as set in Settings → Taps and swipes. Saved on this device.
-import { read, write } from './storage';
+// playlists, Local) and in Up next, as set in Settings → Taps and swipes: one of your settings (settings.svelte.ts).
+import { settings } from './settings.svelte';
 
 export type Gesture = 'tap' | 'right' | 'left' | 'hold';
 export type SongAction = 'playNow' | 'playNext' | 'addToQueue' | 'radio' | 'menu' | 'none';
@@ -34,30 +34,33 @@ export const DEFAULTS: Record<Where, Record<Gesture, QueueAction>> = {
 	queue: { tap: 'playNow', right: 'playNext', left: 'remove', hold: 'menu' }
 };
 
-function load(where: Where): Record<Gesture, QueueAction> {
+function parse(where: Where, stored: Record<string, unknown>): Record<Gesture, QueueAction> {
 	const out = { ...DEFAULTS[where] };
-	try {
-		const stored = JSON.parse(read(`ytmp.gestures.${where}`) ?? '{}') as Record<string, unknown>;
-		for (const [gesture] of GESTURES) {
-			const action = stored[gesture];
-			if (typeof action === 'string' && (ACTIONS[where] as string[]).includes(action)) out[gesture] = action as QueueAction;
-		}
-	} catch {
-		// Unreadable: the defaults.
+	for (const [gesture] of GESTURES) {
+		const action = stored[gesture];
+		if (typeof action === 'string' && (ACTIONS[where] as string[]).includes(action)) out[gesture] = action as QueueAction;
 	}
 	return out;
 }
 
-export const gestures = $state({ list: load('list'), queue: load('queue') });
+const setting = (where: Where) => (where === 'list' ? settings.gesturesList : settings.gesturesQueue);
+
+/** What each gesture does, in lists and in Up next. Reactive. */
+export const gestures = {
+	get list() {
+		return parse('list', settings.gesturesList.value);
+	},
+	get queue() {
+		return parse('queue', settings.gesturesQueue.value);
+	}
+};
 
 export function setGesture(where: Where, gesture: Gesture, action: QueueAction): void {
-	gestures[where][gesture] = action;
-	write(`ytmp.gestures.${where}`, JSON.stringify(gestures[where]));
+	setting(where).set({ ...gestures[where], [gesture]: action });
 }
 
 export function resetGestures(where: Where): void {
-	gestures[where] = { ...DEFAULTS[where] };
-	write(`ytmp.gestures.${where}`, JSON.stringify(gestures[where]));
+	setting(where).reset();
 }
 
 /** How far (part of the row's width) a song must be swiped before letting go does it. */

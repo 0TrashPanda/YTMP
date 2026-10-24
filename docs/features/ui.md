@@ -32,7 +32,7 @@ Like YTM:
   mixes and playlists (cards that scroll sideways and open their page). Without a linked
   YouTube account these are YTM's general suggestions for the host's country; with one,
   your own (see [accounts](accounts.md#linked-youtube-account)).
-- **Your own Home** ✅ (*Settings → Home*, saved on the device): **pin** a playlist (Liked
+- **Your own Home** ✅ (*Settings → Home*): **pin** a playlist (Liked
   music too), album, artist or podcast with *Pin to Home* on its page. A pin is a **tile** in
   the **Pinned** section (a **speed dial** like YTM's: covers in a 3×3 grid, the next nine a
   swipe to the side), or a **section of its own with its songs** (the first 20, a
@@ -96,19 +96,19 @@ Like YTM:
   stay, and **clicking the
   art plays or pauses**, like YTM (a play or pause icon pops up on the art for a moment). The art is always square and never cut off at the top or
   bottom, as big as the space allows.
-- **Image quality** ✅ (Settings → Look, per device): **High** (default) loads sharp pictures, on
+- **Image quality** ✅ (Settings → Look): **High** (default) loads sharp pictures, on
   big screens bigger than YTM lists them (like YTM, Google's pictures are asked for at the
   size shown, e.g. 1200 px album art in the desktop player); **Low** loads at most 300 px
   pictures, to save data.
-- **Dislike button in the player bar** ✅ (Settings → Look, per device): Normal, Dimmed
+- **Dislike button in the player bar** ✅ (Settings → Player): Normal, Dimmed
   (darker until you point at it) or Hidden.
-- **Swiping up on the player's tabs** ✅ (Settings → Look, per device): opens **that tab**
+- **Swiping up on the player's tabs** ✅ (Settings → Player): opens **that tab**
   (default) or **always Up next**, wherever on the tabs you swipe.
-- **Order of the player's tabs** ✅ (Settings → Look, per device): **Up next first** (default,
+- **Order of the player's tabs** ✅ (Settings → Player): **Up next first** (default,
   like YTM: Up next · Lyrics · Related) or **Related first** (Related · Lyrics · Up next).
 - **Up next opens at the current song** ✅, right away (no scrolling down to it); when the
   song changes while it's open, it glides along.
-- **Video pictures** ✅ (Settings → Look, per device): songs from a music video only have a
+- **Video pictures** ✅ (Settings → Look): songs from a music video only have a
   wide picture. **Crop** (default, like YTM) fills the square; **Fit** shows all of it, with
   bars above and below.
 - **The logo** ✅ always goes to Home (closing the full player); on Home already, it loads new
@@ -302,31 +302,53 @@ Open it with the **⋮** button or by **right-clicking** the song.
   room list).
 - The **avatar** (top right, in rooms and on the room list) opens a short menu, like YTM's:
   who you are (your YTMP account and YouTube Music), then in a room its actions (**Share
-  room**, **Play on…**, **Clone room**, **Room settings** for those who may change them,
+  room**, **Play on…**, **Clone room**, **Room settings** (Settings at *This room*) for those who may change them,
   **Leave room**), and **Settings**. The people icon is hidden in solo rooms.
 - **Settings** ✅ is one full screen, the same in rooms, on the room list and at your server's
-  `/account`: **Account** (logging in; on your server: listening history, your rooms on other
-  devices, your roles, password, log out; on other hosts: who you're logged in as there),
-  **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
-  bottom), **Playback** (equalizer; app: headphones, Back button), **Solo rooms** (what a solo room
-  leaves out, below), **Look** (image quality, video
-  pictures, songs per page), **Local music**, **App** (version, updates, logs) and **Server** (the admin: invites, accounts).
-  Desktop: the sections on the left; phones: the list, then a section.
-- **Solo rooms** ✅ (Settings → Solo rooms, saved on your YTMP account): switch off the party and sharing bits
+  `/account`, in YouTube Music's style: a list of pages under a few headings (desktop: the
+  list on the left; phones: the list, then a page). No deeper menus: a page groups its
+  settings under small headings.
+  - **This room** (in a room): **Overview** (name, code, roles when joining, autoplay,
+    karaoke, starting a song, password, always on, opening it on your other device),
+    **Queue** (fair order, vote to skip, limits) and **People** (members, roles and bans),
+    then *Clone room* and *Leave room*. A room's changes wait for **Save**.
+  - **You**: **Account** (logging in; on your server: listening history, your rooms on other
+    devices, your roles, password, log out; on other hosts: who you're logged in as there) and
+    **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
+    bottom).
+  - **Playing**: **Playback** (next while paused, start radio, your other devices, skip
+    silence in podcasts) and **Sound** (equalizer, headphones).
+  - **How it looks**: **Look** (image quality, video pictures, songs per page), **Player**
+    (the tabs, the dislike button), **Home**, **Song menu**, **Taps and swipes** and **Solo
+    rooms** (what a solo room leaves out, below).
+  - **Music and storage**: **Local music**, **Song cache and downloads** (the app) and
+    **Your own module** (browsers).
+  - **App** (version, updates, logs, the Back button) and **Server admin** (invites, accounts).
+- **Your settings on all your devices** ✅: logged in with your YTMP account, almost every
+  setting is kept on your account, so all your devices have it, and a change on one shows up
+  on the others (when you come back to the app). A phone icon next to a setting keeps it
+  **only on this device**: it turns blue (*This phone*), and under the setting is what your
+  account has, with *Use that* to follow the account again. Pages that are one setting as a
+  whole (Home, Song menu, Solo rooms) have the icon next to their title. What belongs to one
+  device stays on it and has no icon: the equalizer, headphones, the Bluetooth sync
+  adjustment, the song cache and downloads, your own module and the Back button. Without an
+  account, settings are kept on the device. Settings from before were moved once: onto your
+  account when it had none yet, else kept on that device when they were different.
+- **Solo rooms** ✅ (Settings → Solo rooms): switch off the party and sharing bits
   you don't need when you listen alone: the room code and share button at the top, the room
   name in the player, the Play on buttons (Play on stays in the avatar menu), "Playing on"
   under the controls, Karaoke, and Party screen, Show on a TV and Clone room in the avatar
   menu. Everything shows by default, and parties always show everything.
 - **Numbers you can type** ✅: every setting that is a number has a box to type it in, next to
   its slider or its choices: the volumes and the sync adjustment in *Play on*, the room's
-  waiting and limits and the votes needed to skip (*Room settings*), songs per page, the song
+  waiting and limits and the votes needed to skip (*This room*), songs per page, the song
   cache's size and the playback speed. Enter (or leaving the box) takes it, kept within what
   the setting allows.
 - **Pull Home down** to load new suggestions (only a pull down: swiping a row sideways never
   refreshes). Rows that scroll sideways have **page dots**.
 - **Long lists** come in pages: Liked music and your own playlists load more as you scroll
   down; songs in Local have **Load more**. How many songs a page has (100, 300 or 1000, or a
-  number from 10 to 5000 typed in) is a setting in *Settings → Look* (on the device).
+  number from 10 to 5000 typed in) is a setting in *Settings → Look*.
 - Phones: the mini player's progress line is at its **bottom**, between it and the bottom bar.
 - Actions that need a room permission (for example adding songs) are **disabled** when you
   don't have that permission.
