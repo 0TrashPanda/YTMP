@@ -29,13 +29,20 @@
 		room.run({ kind: 'SetOutputVolume', outputId, volume });
 	}
 
-	// Your other devices (the same account) that play this room: their volume, from here
-	// (docs/features/playback-and-outputs.md#your-devices).
+	// Your other devices (the same account) in this room: switch "Play here" there on or off when
+	// they allow it, and their volume while they play (docs/features/playback-and-outputs.md#your-devices).
 	const myDevices = $derived.by(() => {
 		const me = room.me;
 		if (!me?.accountId) return [];
-		return (room.state?.participants ?? []).filter((p) => p.id !== me.id && p.accountId === me.accountId && !p.screen && p.online && p.listening);
+		return (room.state?.participants ?? []).filter(
+			(p) => p.id !== me.id && p.accountId === me.accountId && !p.screen && p.online && (p.listening || p.remotePlay)
+		);
 	});
+
+	async function setDeviceListening(participantId: string, on: boolean) {
+		const error = await room.run({ kind: 'SetDeviceListening', participantId, on });
+		if (error) onToast(error.message);
+	}
 
 	async function setDeviceVolume(participantId: string, volume: number) {
 		const error = await room.run({ kind: 'SetDeviceVolume', volume, participantId });
@@ -237,11 +244,26 @@
 		{#each myDevices as device (device.id)}
 			{@const name = device.device || 'Another device'}
 			<div class="flex flex-col gap-2 rounded-xl bg-raised p-3">
-				<div class="flex items-center gap-3">
-					<Icon name={/ on (Windows|Mac|Linux|ChromeOS)$/.test(name) ? 'computer' : 'phone'} size={20} class="text-accent" />
+				<label class="flex items-center gap-3">
+					<Icon name={/ on (Windows|Mac|Linux|ChromeOS)$/.test(name) ? 'computer' : 'phone'} size={20} class={device.listening ? 'text-accent' : 'text-muted'} />
 					<span class="min-w-0 flex-1 truncate">{name}</span>
-				</div>
-				{#if device.volume !== null}
+					{#if device.remotePlay}
+						<input
+							type="checkbox"
+							class="h-5 w-5 accent-accent"
+							checked={device.listening}
+							disabled={!device.listening && !device.canStartSound}
+							aria-label="Play on {name}"
+							onchange={(e) => setDeviceListening(device.id, e.currentTarget.checked)}
+						/>
+					{/if}
+				</label>
+				{#if device.remotePlay && !device.listening && !device.canStartSound}
+					<p class="pl-8 text-xs text-muted">Click once in YTMP on that device first: a browser only plays sound after that.</p>
+				{/if}
+				{#if !device.listening}
+					<!-- Not playing: no volume to set. -->
+				{:else if device.volume !== null}
 					<input
 						type="range"
 						class="w-full accent-white"

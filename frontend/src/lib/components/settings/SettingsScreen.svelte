@@ -117,6 +117,7 @@
 	}
 	let nextPlays = $state(saved.nextPlays);
 	let radioClearsHistory = $state(saved.radioClearsHistory);
+	let remotePlay = $state(saved.remotePlay);
 	let skipSilence = $state(saved.skipSilence);
 	const qualityOptions: [ImageQuality, string][] = [
 		['high', 'High'],
@@ -203,6 +204,20 @@
 					onchange={(v) => {
 						radioClearsHistory = v === 'clear';
 						saved.radioClearsHistory = radioClearsHistory;
+					}}
+				/>
+				<Choice
+					label="Your other devices"
+					hint="Logged in with the same account and in the same room, your other devices can switch Play here on and off on this one, from Play on. A browser plays only after a click on its page."
+					options={[
+						['on', 'Can switch it on'],
+						['off', 'Only from here']
+					] as ['on' | 'off', string][]}
+					value={remotePlay ? 'on' : 'off'}
+					onchange={(v) => {
+						remotePlay = v === 'on';
+						saved.remotePlay = remotePlay;
+						window.dispatchEvent(new Event('ytmp:settings'));
 					}}
 				/>
 				{#if equalizer.available}

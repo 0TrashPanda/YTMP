@@ -40,6 +40,11 @@ internal class Member(
     /** The device's volume and how often another device of theirs set it (Participant.volume, volumeChanges). */
     var volume: Double? = null,
     var volumeChanges: Int = 0,
+    /** Participant.remotePlay, canStartSound, listenRequest and listenRequests. */
+    var remotePlay: Boolean = false,
+    var canStartSound: Boolean = false,
+    var listenRequest: Boolean = false,
+    var listenRequests: Int = 0,
 ) {
     /** Only for them: proves who they were in a clone of this room ([dev.trashpanda.ytmp.protocol.Migrant]). */
     val migrationKey: String by lazy { Ids.sha256("ytmp-migrate:$token") }
@@ -81,6 +86,7 @@ internal class Member(
         id, name, isOwner, online = online, listening = listening, accountId = accountId,
         roleId = roleId, allow = allow.sorted(), deny = deny.sorted(), tag = tag, screen = screen, speakers = speakers,
         device = device, volume = volume, volumeChanges = volumeChanges,
+        remotePlay = remotePlay, canStartSound = canStartSound, listenRequest = listenRequest, listenRequests = listenRequests,
     )
 }
 

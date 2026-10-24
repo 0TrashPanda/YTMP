@@ -85,6 +85,8 @@ Music, without Premium, and not tied to a single music service.
 - Android: lock screen and notification controls, keeps playing with the screen off.
 - Your other devices in the room (signed in to your account) show in *Play on* with their
   own volume slider: turn the laptop down from your phone. On a phone it's the media volume.
+  A checkbox switches *Play here* on or off there (a browser after one click on its page).
+- The player shows where the song comes from: YouTube, the server (or host phone), or this phone.
 - A sleep timer (in the playing song's ⋮ menu): after some minutes or at the end of the
   song the sound fades out, then a solo room pauses; in a party room only your device stops.
 - Solo rooms can leave out the party bits you don't need alone (room code, Play on, Karaoke,

@@ -156,6 +156,12 @@ inside the WebView.
   connection, and turns the media volume to what another device of yours set (`RemoteVolume`,
   watching `Participant.volumeChanges`), also with the page frozen. The page tells the room
   the phone's name (bridge `deviceName`, version 15: Android's device name, or the model).
+  Switching *Play here* from another device is the page's (`lib/listenRequests.ts`): the
+  phone is only listed while its page is connected.
+- **Where the song comes from** ✅: `PlaybackService` tells the page on every load
+  (`PlaybackHub.audioSource`: `onStatus("source:…")`, and bridge `audioSource`, version 17,
+  after a reload): saved on the phone or served by itself as host → `device`, through the host
+  or the host's own `/api/audio/…` → `host`, otherwise `youtube`.
 - The **sync logic** (clock offset, drift correction, see
   [playback-sync](playback-sync.md)) is implemented twice: in TypeScript for browsers, and in
   Kotlin for the native player.

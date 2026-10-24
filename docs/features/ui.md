@@ -69,6 +69,11 @@ Like YTM:
   **Play on** (cast icon) and the song menu (⋮). Below the controls it says where the
   music plays ("Playing on this device and Kitchen", or *Not playing here. Tap to
   listen*). **Swipe down**, the ˅ or the phone's **Back** closes it.
+- **Where the song comes from** ✅: while it plays on this device, a small label next to
+  *Added by* (desktop: next to the time in the player bar): **YouTube** (straight from
+  YouTube), **Server** or **Host phone** (the host sends it: saved there, its music files, or
+  YouTube's link through it when the direct one doesn't work here), or **This phone** (saved
+  on the phone, or its own music when it hosts the room).
 - **Up next / Related** ✅ tabs: at the bottom of the full player on phones (tapping one
   slides it up over the player, and so does **swiping a tab up**; swipe it down, from the tabs or from the list once it is
   scrolled to the top, or tap the handle to close it), next to the album art on desktop. *Up next* is the queue

@@ -425,6 +425,10 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun bridgeVersion(): Int = BRIDGE_VERSION
 
+        /** Where the song the app plays comes from (bridge version 17), see [PlaybackHub.audioSource]. */
+        @JavascriptInterface
+        fun audioSource(): String = PlaybackHub.audioSource ?: ""
+
         /** The phone's name, to tell your devices apart in a room (bridge version 15). */
         @JavascriptInterface
         fun deviceName(): String =
@@ -773,7 +777,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 16
+        const val BRIDGE_VERSION = 17
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

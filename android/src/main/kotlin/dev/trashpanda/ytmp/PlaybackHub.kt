@@ -126,4 +126,15 @@ object PlaybackHub {
     fun status(status: String) {
         statusSink?.invoke(status)
     }
+
+    /** Where the song playing here comes from ("youtube", "host", "device"), for the page's player; null: nothing plays. */
+    @Volatile
+    var audioSource: String? = null
+        private set
+
+    fun audioSource(kind: String?) {
+        if (kind == audioSource) return
+        audioSource = kind
+        status("source:" + (kind ?: ""))
+    }
 }

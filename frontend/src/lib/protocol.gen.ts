@@ -199,6 +199,12 @@ export interface CommandSendMigration {
   mode: MigrationMode;
 }
 
+export interface CommandSetDeviceListening {
+  kind: "SetDeviceListening";
+  participantId: string;
+  on: boolean;
+}
+
 export interface CommandSetDeviceVolume {
   kind: "SetDeviceVolume";
   volume: number;
@@ -241,6 +247,12 @@ export interface CommandSetParticipantPermissions {
 export interface CommandSetPassword {
   kind: "SetPassword";
   password: string | null;
+}
+
+export interface CommandSetRemotePlay {
+  kind: "SetRemotePlay";
+  allowed: boolean;
+  canStart: boolean;
 }
 
 export type RepeatMode = "off" | "queue" | "one";
@@ -358,6 +370,7 @@ export type Command =
   | CommandRestoreSongs
   | CommandSeek
   | CommandSendMigration
+  | CommandSetDeviceListening
   | CommandSetDeviceVolume
   | CommandSetListening
   | CommandSetOpenElsewhere
@@ -365,6 +378,7 @@ export type Command =
   | CommandSetOutputVolume
   | CommandSetParticipantPermissions
   | CommandSetPassword
+  | CommandSetRemotePlay
   | CommandSetRepeat
   | CommandSetRoomCode
   | CommandSetSpeakers
@@ -518,6 +532,10 @@ export interface Participant {
   device: string;
   volume: number | null;
   volumeChanges: number;
+  remotePlay: boolean;
+  canStartSound: boolean;
+  listenRequest: boolean;
+  listenRequests: number;
 }
 
 export interface EventParticipantJoined {

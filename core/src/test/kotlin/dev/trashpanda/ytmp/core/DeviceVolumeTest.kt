@@ -99,4 +99,40 @@ class DeviceVolumeTest {
         assertEquals(ErrorCode.INVALID, room.run(ben, Command.SetDeviceVolume(Double.NaN))?.code)
         assertNull(room.participant(annasPhone, annasPhone.id).volume)
     }
+
+    @Test
+    fun `you switch "Play here" on and off on another of your devices that allows it`() = runTest {
+        val room = newRoom()
+        val phone = room.connect("Anna", device = "Pixel 8", account = anna)
+        val laptop = room.connect("Anna", device = "Firefox on Linux", account = anna)
+
+        // The laptop doesn't say it allows it (an older version, or its setting is off).
+        assertEquals(ErrorCode.PERMISSION_DENIED, room.run(phone, Command.SetDeviceListening(laptop.id, true))?.code)
+
+        // It allows it, but nobody clicked in it yet: a browser can't start sound then.
+        assertNull(room.run(laptop, Command.SetRemotePlay(allowed = true, canStart = false)))
+        assertEquals(ErrorCode.INVALID, room.run(phone, Command.SetDeviceListening(laptop.id, true))?.code)
+        // Off works anyway.
+        assertNull(room.run(phone, Command.SetDeviceListening(laptop.id, false)))
+
+        room.run(laptop, Command.SetRemotePlay(allowed = true, canStart = true))
+        assertNull(room.run(phone, Command.SetDeviceListening(laptop.id, true)))
+        val seen = room.participant(laptop, laptop.id)
+        assertEquals(true, seen.remotePlay)
+        assertEquals(true, seen.listenRequest)
+        assertEquals(2, seen.listenRequests)
+    }
+
+    @Test
+    fun `nobody else switches your device on`() = runTest {
+        val room = newRoom()
+        val laptop = room.connect("Anna", account = anna)
+        val ben = room.connect("Ben", account = AccountIdentity("ben@x", "Ben"))
+        room.run(laptop, Command.SetRemotePlay(allowed = true, canStart = true))
+
+        assertEquals(ErrorCode.PERMISSION_DENIED, room.run(ben, Command.SetDeviceListening(laptop.id, true))?.code)
+        assertEquals(ErrorCode.PERMISSION_DENIED, room.run(laptop, Command.SetDeviceListening(laptop.id, true))?.code)
+        assertEquals(ErrorCode.NOT_FOUND, room.run(ben, Command.SetDeviceListening("nobody", true))?.code)
+        assertEquals(0, room.participant(laptop, laptop.id).listenRequests)
+    }
 }

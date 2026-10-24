@@ -11,6 +11,7 @@
 	import { youtube } from '../youtube.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef } from '../protocol.gen';
 	import type { RoomPlayer } from '../player.svelte';
+	import SourceBadge from './SourceBadge.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
@@ -214,6 +215,7 @@
 				<span class="pl-2 text-xs text-muted tabular-nums">
 					{formatTime(Math.min(positionMs, duration))} / {formatTime(duration)}
 				</span>
+				<SourceBadge source={player.audioSource} />
 			</div>
 
 			<div class="flex max-w-xl min-w-0 items-center gap-3 justify-self-center" role="presentation" oncontextmenu={onSongMenu}>

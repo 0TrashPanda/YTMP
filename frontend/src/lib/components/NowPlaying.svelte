@@ -13,6 +13,7 @@
 	import { youtube } from '../youtube.svelte';
 	import type { PageHandlers } from '../cards';
 	import type { RoomPlayer } from '../player.svelte';
+	import SourceBadge from './SourceBadge.svelte';
 	import type { CommandUpdateSettings, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -347,8 +348,9 @@
 							• <button class="hover:text-white hover:underline" onclick={() => open.onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
 						{/if}
 					</p>
-					<p class="mt-0.5 truncate text-xs text-muted">
-						Added by {current.item.addedByName}{loading ? ' • loading…' : player.buffering ? ' • buffering…' : ''}
+					<p class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted">
+						<span class="truncate">Added by {current.item.addedByName}{loading ? ' • loading…' : player.buffering ? ' • buffering…' : ''}</span>
+						<SourceBadge source={player.audioSource} />
 					</p>
 					{#if player.error}
 						<p class="mt-0.5 text-xs text-accent">{player.error}</p>

@@ -972,6 +972,27 @@ class Room(
                 target.volume = volume
                 emit(Event.ParticipantUpdated(target.toParticipant()))
             }
+            is Command.SetRemotePlay -> {
+                if (member.remotePlay == command.allowed && member.canStartSound == command.canStart) return null
+                member.remotePlay = command.allowed
+                member.canStartSound = command.canStart
+                emit(Event.ParticipantUpdated(member.toParticipant()))
+            }
+            is Command.SetDeviceListening -> {
+                val target = members[command.participantId] ?: return notFoundPerson()
+                // Only your own devices: someone else here with the same account.
+                if (target === member || member.accountId == null || target.accountId != member.accountId || target.screen || !target.online) {
+                    return ErrorInfo(ErrorCode.PERMISSION_DENIED, "That's not one of your devices")
+                }
+                if (!target.remotePlay) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "That device doesn't allow it (its Settings → Playback)")
+                if (command.on) {
+                    need(target, Permission.LISTEN_LOCALLY)?.let { return it }
+                    if (!target.canStartSound) return invalid("Click or tap in YTMP on that device once first: a browser only plays sound after that")
+                }
+                target.listenRequest = command.on
+                target.listenRequests++
+                emit(Event.ParticipantUpdated(target.toParticipant()))
+            }
             is Command.SetOpenElsewhere -> {
                 if (!member.isOwner) return ErrorInfo(ErrorCode.PERMISSION_DENIED, "Only the owner can change this")
                 if (settings.openElsewhere != command.mode) {

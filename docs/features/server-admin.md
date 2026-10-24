@@ -58,9 +58,11 @@ PostgreSQL, back up with `pg_dump`.
 - The admin page shows when a new YTMP release is available on GitHub.
 - **Open pages** ✅ get the new version by themselves: a browser that still shows the old
   page reloads it soon after the update (when it comes back into view, when it reconnects to
-  the restarted server, or within 10 minutes). Not while sound plays in that browser (it
-  would need a tap to play again) or while you're typing: then it waits, and says a tap
-  reloads it now. Nobody has to clear their browser's cache.
+  the restarted server, or within 10 minutes). Not while you're typing. With *Play here* on
+  in that browser it reloads between two songs and plays on, when the browser lets a page
+  start sound by itself (Firefox: the site's *Autoplay* permission set to *Allow Audio and
+  Video*); otherwise a reloaded page would need a tap to play again, so it waits and says a
+  tap reloads it now. Nobody has to clear their browser's cache.
 
 ## Logs ✅
 

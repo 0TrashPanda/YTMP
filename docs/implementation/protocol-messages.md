@@ -52,7 +52,8 @@ aren't built yet. Repeat (`repeat`) and the skip vote (`skipVotes`) are built, a
   "room":        { "id", "code", "name", "visibility", "ownerId", "settings": { ... } },
   "me":          { "participantId", "roleId", "permissions": [...] },
   "participants":[ { "id", "name", "accountId?", "roleId", "listening": true,
-                     "device", "volume", "volumeChanges" } ],   // accountId ✅, device/volume ✅ (your devices)
+                     "device", "volume", "volumeChanges",
+                     "remotePlay", "canStartSound", "listenRequest", "listenRequests" } ],   // accountId ✅, device/volume/remote play ✅ (your devices)
   "roles":       [ { "id", "name", "permissions": [...] } ],
   "queue":       [ QueueItem ],
   "autoplay":    { "seed": Song | Artist | Album | Playlist, "items": [ QueueItem ] },
@@ -110,6 +111,8 @@ Each command lists the permission it needs (see [room management](../features/ro
 |---------|--------|------------|
 | `SetListening` ✅ | `on`, `startsTogether` (the player sends `PlayerReady`) | Play audio locally |
 | `SetSpeakers` ✅ | `names` (speakers near the phone that play the room, from the app; empty: none), `startsTogether` | Play audio locally |
+| `SetRemotePlay` ✅ | `allowed`, `canStart`. A device with an account says whether your other devices may switch its *Play here* (its setting) and whether it can start sound now without a tap (`Participant.remotePlay`, `canStartSound`) | — (yourself) |
+| `SetDeviceListening` ✅ | `participantId`, `on`. Switches *Play here* on another participant **with the same account** that allows it; on only when it can start sound and may listen (`listen_locally`). Sets their `listenRequest` and bumps `listenRequests`; that device switches itself (`lib/listenRequests.ts`). See [your devices](../features/playback-and-outputs.md#your-devices) | — (only your own devices) |
 | `SetDeviceVolume` ✅ | `volume` (0–1), `participantId` (null: this device). A device says its own volume whenever it changes (`Participant.volume`); with the id of another participant **with the same account** it sets theirs, which bumps their `volumeChanges`, and that device turns its volume to it. See [your devices](../features/playback-and-outputs.md#your-devices) | — (only your own devices) |
 | `SetRoomCode` ✅ | `code` (3–12 letters and digits; the old codes keep leading to the room) | Change settings |
 | `PlayerReady` ✅ | `itemId`, `speakers` (this player, or all the phone's speakers, loaded a starting song; see [starting together](playback-sync.md#starting-a-song-together)) | — |
@@ -176,7 +179,7 @@ network) gets its screen from `POST /api/screens/cast` instead, and leaves with
 | Event | Fields | Sent to |
 |-------|--------|---------|
 | `ParticipantJoined` ✅ / `ParticipantLeft` ✅ | participant / `participantId` | everyone |
-| `ParticipantUpdated` ✅ | participant (role, permissions, name, online, listening, `device`, `volume`, `volumeChanges`) | everyone |
+| `ParticipantUpdated` ✅ | participant (role, permissions, name, online, listening, `device`, `volume`, `volumeChanges`, `remotePlay`, `canStartSound`, `listenRequest`, `listenRequests`) | everyone |
 | `YouWereKicked` / `YouWereBanned` (done as `rejected` with reason `kicked` / `banned` ✅) | – | that participant |
 | `QueueItemsAdded` ✅ | `items`, `index` | everyone |
 | `QueueItemRemoved` ✅ | `itemId` | everyone |

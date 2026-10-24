@@ -44,6 +44,8 @@
 	import { RoomConnection } from '../../../lib/room.svelte';
 	import { shows } from '../../../lib/soloLook.svelte';
 	import { saved } from '../../../lib/storage';
+	import { appUpdate } from '../../../lib/appUpdate.svelte';
+	import { ListenRequests } from '../../../lib/listenRequests';
 	import { nativeBridge } from '../../../lib/native';
 	import { identity, logInOnce, session } from '../../../lib/account';
 	import type { Participant } from '../../../lib/protocol.gen';
@@ -266,7 +268,9 @@
 		const visibility = room?.state?.room.visibility;
 		if (room?.status !== 'connected' || !player || !visibility || autoStarted) return;
 		autoStarted = true;
-		const wanted = visibility === 'private' ? !saved.soloOff(code) : player.canStartWithoutGesture && saved.listening;
+		// Reloaded between two songs for a new version: it played here, so it plays on.
+		const wanted =
+			appUpdate.resumes(code) || (visibility === 'private' ? !saved.soloOff(code) : player.canStartWithoutGesture && saved.listening);
 		if (!wanted) return;
 		untrack(() => {
 			if (player!.enabled) return;
@@ -285,6 +289,38 @@
 			reconnecting = false;
 			untrack(() => player?.reconnected());
 		}
+	});
+
+	// Your other devices may switch "Play here" on this one (Settings → Playback): the host hears
+	// whether, and whether sound can start here now (a browser only after a click on its page).
+	let remotePlay = $state(saved.remotePlay);
+	let clicked = $state(false);
+	$effect(() => {
+		const click = () => (clicked = true);
+		addEventListener('pointerdown', click, { capture: true, once: true });
+		addEventListener('keydown', click, { capture: true, once: true });
+		return () => {
+			removeEventListener('pointerdown', click, { capture: true });
+			removeEventListener('keydown', click, { capture: true });
+		};
+	});
+	$effect(() => {
+		const me = room?.me;
+		void [clicked, player?.enabled, player?.buffering];
+		if (!room || !player || room.status !== 'connected' || !me?.accountId || me.screen) return;
+		const allowed = remotePlay;
+		const canStart = untrack(() => player!.canStartSound());
+		if (me.remotePlay !== allowed || me.canStartSound !== canStart) untrack(() => room!.run({ kind: 'SetRemotePlay', allowed, canStart }));
+	});
+	// And another device of yours switched it.
+	const listenRequests = new ListenRequests();
+	$effect(() => {
+		const want = listenRequests.update(room?.me ?? null);
+		if (!want || !player || !remotePlay) return;
+		untrack(() => {
+			if (want === 'on' && !player!.enabled) player!.enable();
+			else if (want === 'off' && player!.enabled) player!.disable();
+		});
 	});
 
 	let waitingForGesture = false;
@@ -368,7 +404,10 @@
 	}
 
 	// A changed setting (e.g. what unplugging headphones does) goes to the app's player.
-	const onSettings = () => player?.sync();
+	const onSettings = () => {
+		remotePlay = saved.remotePlay;
+		player?.sync();
+	};
 	onMount(() => {
 		// Speakers near the phone that play this room (the app drives them) tell about problems here.
 		const onNearbyNotice = (text: string) => toast(text);

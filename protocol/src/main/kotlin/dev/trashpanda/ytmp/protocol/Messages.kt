@@ -270,6 +270,25 @@ sealed interface Command {
     @SerialName("SetDeviceVolume")
     data class SetDeviceVolume(val volume: Double, val participantId: String? = null) : Command
 
+    /**
+     * This device says whether your other devices (the same account) may switch its "Play here"
+     * on and off ([allowed], its own setting), and whether it can start sound now without a tap
+     * ([canStart]: a browser only after a tap on its page). Shown as [Participant.remotePlay],
+     * [Participant.canStartSound].
+     */
+    @Serializable
+    @SerialName("SetRemotePlay")
+    data class SetRemotePlay(val allowed: Boolean, val canStart: Boolean) : Command
+
+    /**
+     * Switches "Play here" on or off on another device of yours (the same account) that allows
+     * it ([Participant.remotePlay]); on only when it can start sound ([Participant.canStartSound]).
+     * The device does it itself when [Participant.listenRequests] goes up.
+     */
+    @Serializable
+    @SerialName("SetDeviceListening")
+    data class SetDeviceListening(val participantId: String, val on: Boolean) : Command
+
     /** Owner only. Makes a solo room public, or a public room solo again. */
     @Serializable
     @SerialName("SetVisibility")

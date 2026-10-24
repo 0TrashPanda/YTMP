@@ -117,6 +117,16 @@ data class Participant(
      * turns its volume to [volume] when this goes up.
      */
     val volumeChanges: Int = 0,
+    /** Your other devices may switch its "Play here" on and off ([Command.SetRemotePlay]). */
+    val remotePlay: Boolean = false,
+    /** It can start sound now without a tap ([Command.SetRemotePlay]). */
+    val canStartSound: Boolean = false,
+    /**
+     * "Play here" on or off, as another device of the same account last asked
+     * ([Command.SetDeviceListening]): the device does so when [listenRequests] goes up.
+     */
+    val listenRequest: Boolean = false,
+    val listenRequests: Int = 0,
 )
 
 @Serializable

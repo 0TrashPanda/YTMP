@@ -57,6 +57,16 @@ laptop down from your phone, like Spotify Connect.
 - Only your own devices: someone else's, or a guest's, isn't listed. It needs no permission.
 - Only devices in the same room. A device on an older version of YTMP shows without a slider.
 
+**Switch *Play here* there** ✅: each of your other devices in the room has a checkbox that
+switches *Play here* on or off on it, also when it doesn't play yet, like Spotify Connect.
+The volume slider shows while it plays.
+
+- A browser may only start sound after a click or key press on its page (unless the site may
+  autoplay). Until then its checkbox can't be ticked, and *Play on* says to click once in
+  YTMP on that device. The app always can.
+- Each device decides: *Settings → Playback → Your other devices*, *Can switch it on*
+  (the default) or *Only from here*. Then it's listed only while it plays.
+
 ## Host outputs
 
 The host can also send audio to **output modules**. Outputs are **modular**.

@@ -173,6 +173,13 @@ export const saved = {
 	set radioClearsHistory(on: boolean) {
 		write('ytmp.radioClearsHistory', on ? '1' : '0');
 	},
+	/** Your other devices may switch "Play here" on and off on this one (Settings → Playback). */
+	get remotePlay(): boolean {
+		return read('ytmp.remotePlay') !== '0';
+	},
+	set remotePlay(on: boolean) {
+		write('ytmp.remotePlay', on ? '1' : '0');
+	},
 	get nextPlays(): boolean {
 		return read('ytmp.nextPlays') !== '0';
 	},

@@ -426,6 +426,13 @@ class PlaybackService : MediaSessionService() {
             val keep = item.song?.takeIf { from != Source.SAVED && cache.takes(it) }
             if (keep != null) copying[keep.id] = keep
             Log.i(TAG, "load ${item.songId} \"${item.title}\" ${from.label} (${describe(url)})")
+            PlaybackHub.audioSource(
+                when {
+                    from == Source.SAVED || url.startsWith(LocalHost.LOCAL_URL) -> "device"
+                    from == Source.HOST || (from == Source.DIRECT && target.streamUrl?.startsWith("/") == true) -> "host"
+                    else -> "youtube"
+                },
+            )
             if (from == Source.OWN) lookUpNext()
             bufferingSince = null
             exo.setMediaItem(
@@ -684,6 +691,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun unload() {
+        PlaybackHub.audioSource(null)
         if (loadedItemId == null) return
         leaveSong()
         loadedItemId = null

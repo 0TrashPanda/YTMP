@@ -71,8 +71,9 @@
 {/if}
 
 {#if appUpdate.waiting && !location.pathname.startsWith('/tv')}
-	<!-- It reloads by itself once the sound stops here; or now, with a tap (and a tap to play again).
-	     A TV can't be tapped: it just waits. -->
+	<!-- It reloads by itself once "Play here" is off, or between two songs when this browser may
+	     play on by itself (see appUpdate); or now, with a tap (and a tap to play again).
+	     A TV plays on by itself: it reloads between two songs. -->
 	<div class="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4">
 		<button class="pointer-events-auto rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg" onclick={appUpdate.reload}>
 			A new version of YTMP is ready. Tap to reload

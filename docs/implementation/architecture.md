@@ -110,7 +110,9 @@ that follows your account goes in `lib/preferences.svelte.ts` under a key of its
 `lib/account.ts` and `lib/listening.svelte.ts`.
 A new version on the host: SvelteKit sees that `_app/version.json` changed (on focus, every
 10 minutes, and when the room's WebSocket reconnects), and `lib/appUpdate.svelte.ts` reloads
-the page at a calm moment. The host serves `index.html` and `version.json` with `no-cache`
+the page at a calm moment: not typing, and not with *Play here* on, unless the browser's
+autoplay policy (`lib/autoplay.ts`) lets the reloaded page play on; then the player reloads it
+when the next song starts and the room page switches *Play here* back on (`appUpdate.resumes`). The host serves `index.html` and `version.json` with `no-cache`
 and the hashed files under `_app/immutable/` for a year (`webApp` in `host/.../Application.kt`).
 
 **The YouTube Music module** (`ytm-module/ytmp_ytm/`): `core.py` talks to YouTube Music and

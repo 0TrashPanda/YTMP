@@ -1,5 +1,6 @@
 import { proxiedAudioUrl, reportProblem } from './api';
 import { appUpdate } from './appUpdate.svelte';
+import { autoplayAllowed, mayPlayWithoutTap } from './autoplay';
 import { DeviceVolume } from './deviceVolume';
 import { artUrl, artistNames } from './format';
 import { EQ_BANDS, EQ_Q, eqHeadroom, equalizer, type EqSettings } from './equalizer.svelte';
@@ -11,15 +12,22 @@ import { saved } from './storage';
 import { correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
 
 /** Plays the room's audio on this device. */
+/** Where the sound playing here comes from: YouTube, the host streaming it, or this phone itself. */
+export type AudioSource = 'youtube' | 'host' | 'device';
+
 export interface RoomPlayer {
 	readonly enabled: boolean;
+	/** Where the song playing here comes from (shown in the player); null when nothing plays here. */
+	readonly audioSource: AudioSource | null;
 	readonly volume: number;
 	readonly buffering: boolean;
 	readonly error: string | null;
 	/** Sync adjustment for this device in ms; positive plays earlier (for speaker/Bluetooth delay). */
 	readonly syncOffsetMs: number;
-	/** True when playback can start without a click (the Android app). */
+	/** True when playback can start without a click, also right after loading (the Android app, a TV, a browser that allows autoplay). */
 	readonly canStartWithoutGesture: boolean;
+	/** Sound can start now without a tap here: for another device of yours switching "Play here" on (Command.SetDeviceListening). */
+	canStartSound(): boolean;
 	enable(): Promise<void>;
 	/** [chosen]: you switched it off (not another app taking the audio), so a solo room remembers it. */
 	disable(chosen?: boolean): void;
@@ -72,7 +80,11 @@ export function createPlayer(room: RoomConnection, options: { loose?: boolean } 
  * (see docs/implementation/playback-sync.md).
  */
 class WebPlayer implements RoomPlayer {
-	readonly canStartWithoutGesture = false;
+	get canStartWithoutGesture(): boolean {
+		return this.loose || autoplayAllowed();
+	}
+	/** Sound has played on this page: its audio may play again without a tap. */
+	private unlocked = false;
 	enabled = $state(false);
 	volume = $state(saved.volume);
 	syncOffsetMs = $state(saved.syncOffsetMs);
@@ -88,7 +100,7 @@ class WebPlayer implements RoomPlayer {
 	/** Where songs in this room come from, after what worked so far. */
 	private preferred: Source = 'direct';
 	/** Where the loaded song comes from. */
-	private source: Source = 'direct';
+	private source = $state<Source>('direct');
 	/** This item goes through the host: its own link didn't work. */
 	private hostItemId: string | null = null;
 	/** Counts loads, so a lookup that finishes after the song changed is ignored. */
@@ -120,6 +132,7 @@ class WebPlayer implements RoomPlayer {
 			this.watchStall();
 		});
 		this.audio.addEventListener('playing', () => {
+			this.unlocked = true;
 			this.buffering = false;
 			clearTimeout(this.stallTimer);
 			// It plays after all (e.g. after a tap): the "tap to allow audio" is done.
@@ -128,9 +141,6 @@ class WebPlayer implements RoomPlayer {
 		});
 		// Paused while waiting: that time isn't buffering.
 		this.audio.addEventListener('pause', () => (this.waitingSince = null));
-		// A new version of the page waits while sound plays here.
-		this.audio.addEventListener('play', () => (appUpdate.soundHere = true));
-		for (const stopped of ['pause', 'ended', 'emptied']) this.audio.addEventListener(stopped, () => (appUpdate.soundHere = false));
 		this.audio.addEventListener('canplay', () => this.sync());
 		this.audio.addEventListener('error', () => this.onError());
 		// Not on a Chromecast (the TV's party screen).
@@ -138,8 +148,23 @@ class WebPlayer implements RoomPlayer {
 	}
 
 	/** Must be called from a click: browsers only allow audio after a user gesture. */
+	canStartSound(): boolean {
+		return this.loose || mayPlayWithoutTap(this.unlocked);
+	}
+
+	get audioSource(): AudioSource | null {
+		const now = this.room.state?.nowPlaying;
+		if (!this.enabled || !now?.streamUrl) return null;
+		if (this.source === 'host') return 'host';
+		if (this.source === 'own') return 'youtube';
+		// The room's link: YouTube's, or the host's own (`/api/audio/…`: saved there, music files).
+		return now.streamUrl.startsWith('/') ? 'host' : 'youtube';
+	}
+
 	async enable(): Promise<void> {
 		this.enabled = true;
+		// A new version of the page waits while it plays (see appUpdate).
+		appUpdate.playingHere = true;
 		saved.listening = true;
 		saved.setSoloOff(this.room.roomCode, false);
 		this.error = null;
@@ -160,6 +185,7 @@ class WebPlayer implements RoomPlayer {
 
 	disable(chosen = true): void {
 		this.enabled = false;
+		appUpdate.playingHere = false;
 		saved.listening = false;
 		if (chosen && this.room.state?.room.visibility === 'private') saved.setSoloOff(this.room.roomCode, true);
 		clearInterval(this.timer);
@@ -207,6 +233,7 @@ class WebPlayer implements RoomPlayer {
 	}
 
 	destroy(): void {
+		appUpdate.playingHere = false;
 		clearInterval(this.timer);
 		this.stopEqualizer();
 		this.eq?.context.close().catch(() => {});
@@ -234,6 +261,8 @@ class WebPlayer implements RoomPlayer {
 		// Made without a tap, the equalizer's sound path waits for one (browsers allow sound after a tap).
 		if (this.eq?.context.state === 'suspended' && state.playback.playing) this.eq.context.resume().catch(() => {});
 		if (this.loadedItemId !== now.item.itemId) {
+			// A new version of the page: between two songs is the moment, if the new page can play on by itself.
+			if (this.loadedItemId !== null && appUpdate.betweenSongs(this.room.roomCode, this.canStartWithoutGesture)) return;
 			this.loadedItemId = now.item.itemId;
 			this.error = null;
 			this.showMetadata();
@@ -530,11 +559,20 @@ class WebPlayer implements RoomPlayer {
  */
 class NativePlayer implements RoomPlayer {
 	readonly canStartWithoutGesture = true;
+	canStartSound(): boolean {
+		return true;
+	}
+
+	get audioSource(): AudioSource | null {
+		return this.enabled ? this.source : null;
+	}
 	enabled = $state(false);
 	volume = $state(saved.volume);
 	syncOffsetMs = $state(saved.syncOffsetMs);
 	buffering = $state(false);
 	error = $state<string | null>(null);
+	/** What the app's player says it plays from (bridge version 17). */
+	private source = $state<AudioSource | null>(null);
 	/** The song [error] is about: the next one starts without it. */
 	private errorItemId: string | null = null;
 
@@ -542,10 +580,16 @@ class NativePlayer implements RoomPlayer {
 		private readonly room: RoomConnection,
 		private readonly bridge: NativeBridge
 	) {
+		// What it plays from already (the page reloaded); changes come as onStatus("source:…").
+		this.source = (bridge.audioSource?.() || null) as AudioSource | null;
 		window.__ytmpNative = {
 			...window.__ytmpNative,
 			onCommand: (command) => void this.room.run(command),
 			onStatus: (status) => {
+				if (status.startsWith('source:')) {
+					this.source = (status.slice('source:'.length) || null) as AudioSource | null;
+					return;
+				}
 				this.buffering = status === 'buffering';
 				// Another app took the audio, or headphones were unplugged (see saved.headphonesAction):
 				// not a choice to stop listening here.
