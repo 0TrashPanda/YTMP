@@ -564,15 +564,20 @@ class NativePlayer implements RoomPlayer {
 	}
 
 	get audioSource(): AudioSource | null {
-		return this.enabled ? this.source : null;
+		// Only for the song it's about: the next one's link can take seconds, and until the app
+		// loads it, what it said is about the last song.
+		const at = this.source.indexOf(':');
+		const itemId = this.room.state?.nowPlaying?.item.itemId;
+		if (!this.enabled || at < 0 || this.source.slice(at + 1) !== itemId) return null;
+		return this.source.slice(0, at) as AudioSource;
 	}
 	enabled = $state(false);
 	volume = $state(saved.volume);
 	syncOffsetMs = $state(saved.syncOffsetMs);
 	buffering = $state(false);
 	error = $state<string | null>(null);
-	/** What the app's player says it plays from (bridge version 17). */
-	private source = $state<AudioSource | null>(null);
+	/** What the app's player says it loaded ("kind:itemId", bridge version 17). */
+	private source = $state('');
 	/** The song [error] is about: the next one starts without it. */
 	private errorItemId: string | null = null;
 
@@ -581,13 +586,13 @@ class NativePlayer implements RoomPlayer {
 		private readonly bridge: NativeBridge
 	) {
 		// What it plays from already (the page reloaded); changes come as onStatus("source:…").
-		this.source = (bridge.audioSource?.() || null) as AudioSource | null;
+		this.source = bridge.audioSource?.() ?? '';
 		window.__ytmpNative = {
 			...window.__ytmpNative,
 			onCommand: (command) => void this.room.run(command),
 			onStatus: (status) => {
 				if (status.startsWith('source:')) {
-					this.source = (status.slice('source:'.length) || null) as AudioSource | null;
+					this.source = status.slice('source:'.length);
 					return;
 				}
 				this.buffering = status === 'buffering';
@@ -637,6 +642,8 @@ class NativePlayer implements RoomPlayer {
 	}
 
 	sync(): void {
+		// Asked again: a page Android froze for a while missed what the app said meanwhile.
+		if (this.bridge.audioSource) this.source = this.bridge.audioSource();
 		const state = this.room.state;
 		const now = state?.nowPlaying ?? null;
 		const song = now?.item.song;

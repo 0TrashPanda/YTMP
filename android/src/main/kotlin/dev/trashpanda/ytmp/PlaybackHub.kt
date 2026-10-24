@@ -127,14 +127,19 @@ object PlaybackHub {
         statusSink?.invoke(status)
     }
 
-    /** Where the song playing here comes from ("youtube", "host", "device"), for the page's player; null: nothing plays. */
+    /**
+     * Where the song loaded here comes from, for the page's player: `kind:itemId`, with kind
+     * "youtube", "host" or "device" and the queue item it's about (the page shows it only for
+     * that song: the next one may take seconds to load); null: nothing loaded.
+     */
     @Volatile
     var audioSource: String? = null
         private set
 
-    fun audioSource(kind: String?) {
-        if (kind == audioSource) return
-        audioSource = kind
-        status("source:" + (kind ?: ""))
+    fun audioSource(kind: String?, itemId: String?) {
+        val value = if (kind != null && itemId != null) "$kind:$itemId" else null
+        if (value == audioSource) return
+        audioSource = value
+        status("source:" + (value ?: ""))
     }
 }

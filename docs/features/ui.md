@@ -73,7 +73,10 @@ Like YTM:
   *Added by* (desktop: next to the time in the player bar): **YouTube** (straight from
   YouTube), **Server** or **Host phone** (the host sends it: saved there, its music files, or
   YouTube's link through it when the direct one doesn't work here), or **This phone** (saved
-  on the phone, or its own music when it hosts the room).
+  on the phone, or its own music when it hosts the room). It shows once the song has loaded
+  here (a new song's YouTube link can take a few seconds). In the app it can change during a
+  song: *YouTube* becomes *This phone* when the whole song is saved on the phone, which it then
+  plays from.
 - **Up next / Related** ✅ tabs: at the bottom of the full player on phones (tapping one
   slides it up over the player, and so does **swiping a tab up**; swipe it down, from the tabs or from the list once it is
   scrolled to the top, or tap the handle to close it), next to the album art on desktop. *Up next* is the queue

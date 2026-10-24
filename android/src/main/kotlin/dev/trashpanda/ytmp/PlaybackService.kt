@@ -432,6 +432,7 @@ class PlaybackService : MediaSessionService() {
                     from == Source.HOST || (from == Source.DIRECT && target.streamUrl?.startsWith("/") == true) -> "host"
                     else -> "youtube"
                 },
+                item.itemId,
             )
             if (from == Source.OWN) lookUpNext()
             bufferingSince = null
@@ -691,7 +692,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun unload() {
-        PlaybackHub.audioSource(null)
+        PlaybackHub.audioSource(null, null)
         if (loadedItemId == null) return
         leaveSong()
         loadedItemId = null

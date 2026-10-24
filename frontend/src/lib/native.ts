@@ -59,9 +59,9 @@ export interface NativeBridge {
 	/** 0–1. */
 	setNearbyVolume?(deviceId: string, volume: number): void;
 	/**
-	 * Where the song the app plays comes from (bridge version 17): "youtube", "host" or "device"
-	 * (saved on this phone, or its own music); empty when nothing plays. Changes come as
-	 * onStatus("source:…").
+	 * Where the song the app loaded comes from (bridge version 17): "kind:itemId", kind
+	 * "youtube", "host" or "device" (saved on this phone, or its own music); empty when nothing
+	 * is loaded. Changes come as onStatus("source:…").
 	 */
 	audioSource?(): string;
 	/** The music on this phone shows in the Local tab (bridge version 10). */

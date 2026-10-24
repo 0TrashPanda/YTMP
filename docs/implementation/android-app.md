@@ -159,9 +159,12 @@ inside the WebView.
   Switching *Play here* from another device is the page's (`lib/listenRequests.ts`): the
   phone is only listed while its page is connected.
 - **Where the song comes from** ✅: `PlaybackService` tells the page on every load
-  (`PlaybackHub.audioSource`: `onStatus("source:…")`, and bridge `audioSource`, version 17,
-  after a reload): saved on the phone or served by itself as host → `device`, through the host
-  or the host's own `/api/audio/…` → `host`, otherwise `youtube`.
+  (`PlaybackHub.audioSource`, `kind:itemId`: `onStatus("source:…")`, and bridge `audioSource`,
+  version 17, which the page asks again on every room change since a frozen page misses
+  statuses): saved on the phone or served by itself as host → `device`, through the host or the
+  host's own `/api/audio/…` → `host`, otherwise `youtube`. The page shows it only while that
+  item is the room's current one: the next song's link can take seconds, and the app loads it
+  only then.
 - The **sync logic** (clock offset, drift correction, see
   [playback-sync](playback-sync.md)) is implemented twice: in TypeScript for browsers, and in
   Kotlin for the native player.
