@@ -196,6 +196,7 @@ class MainActivity : ComponentActivity() {
 
         PlaybackHub.commandSink = commandSink
         PlaybackHub.statusSink = statusSink
+        PlaybackHub.askSink = askSink
         // The sleep timer changed (also when it went off in the player): the page shows it.
         lifecycleScope.launch {
             PlaybackHub.sleep.collect { setting ->
@@ -318,11 +319,15 @@ class MainActivity : ComponentActivity() {
     // This screen's own hooks: when Android replaces the screen, the old one's onDestroy can
     // come after the new one's onCreate, and must not unhook the new one.
     private val commandSink: (String) -> Unit = { command -> js("window.__ytmpNative && window.__ytmpNative.onCommand && window.__ytmpNative.onCommand($command)") }
+    private val askSink: (String) -> Unit = { command ->
+        js("window.__ytmpNative && window.__ytmpNative.onAskCommand && window.__ytmpNative.onAskCommand($command, ${System.currentTimeMillis()})")
+    }
     private val statusSink: (String) -> Unit = { status -> js("window.__ytmpNative && window.__ytmpNative.onStatus && window.__ytmpNative.onStatus(${JSONObject.quote(status)})") }
 
     override fun onDestroy() {
         if (PlaybackHub.commandSink === commandSink) PlaybackHub.commandSink = null
         if (PlaybackHub.statusSink === statusSink) PlaybackHub.statusSink = null
+        if (PlaybackHub.askSink === askSink) PlaybackHub.askSink = null
         if (isFinishing) PlaybackHub.target.value = null
         webView.destroy()
         super.onDestroy()

@@ -24,6 +24,9 @@
   with the page frozen (`resumedHere` until the page's target has "Play here" on again), and
   status `resumed`, on which the page calls `enable()`. The page switching "Play here" on or
   off, or any other stop, clears it.
+- `pause()` while not playing here goes to the page (`PlaybackHub.askCommand` →
+  `onAskCommand(command, at)`), which runs it if it doesn't interrupt anyone, asks when the
+  page is visible and the press is under 5 s old, and otherwise drops it.
 - **The player follows the room itself** (`RoomFollower`). Android's WebView **freezes
   the page** after about 5 minutes hidden (screen off): timers, fetches and WebSocket
   messages stop, even with renderer priority *important* and the foreground services

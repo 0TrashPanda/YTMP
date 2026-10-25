@@ -1008,6 +1008,12 @@ class PlaybackService : MediaSessionService() {
                 stopHere()
                 return
             }
+            // Not playing here: the page asks first if that pauses the others in a party room.
+            if (target != null && !target.enabled && target.room != null) {
+                Log.d(TAG, "media session: pause, not playing here")
+                PlaybackHub.askCommand("""{"kind":"Pause"}""")
+                return
+            }
             Log.d(TAG, "media session: pause")
             PlaybackHub.command("""{"kind":"Pause"}""")
         }

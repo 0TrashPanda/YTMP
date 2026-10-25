@@ -115,6 +115,12 @@ export interface DetectedSong {
 export interface NativeCallbacks {
 	/** A media button (lock screen, notification, headphones) was pressed. */
 	onCommand?(command: Command): void;
+	/**
+	 * A media button's command while this phone doesn't play the room (pause from earbuds or
+	 * the lock screen), pressed at [at] (epoch ms): asked first when it would interrupt the
+	 * others in a party room.
+	 */
+	onAskCommand?(command: Command, at: number): void;
 	/** "buffering" | "ready" | "stopped" | "resumed" (earbuds back in: play here again) | "error" */
 	onStatus?(status: string): void;
 	/** The sleep timer changed (set, turned off, or it went off): JSON SleepSetting, or null. */

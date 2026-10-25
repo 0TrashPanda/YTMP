@@ -35,7 +35,9 @@ permissions say otherwise (permission: *Play audio locally*).
   music on your phone only, like unplugging, and it goes on for everyone else; alone, they
   pause the room like YTM. (A browser's media keys do the same.) **Putting the earbuds back
   in** plays it on your phone again, unless you switched *Play here* on or off yourself in
-  between; after the lock screen's pause it stays off.
+  between; after the lock screen's pause it stays off. **Not playing on your phone**, the
+  earbuds' and lock screen's pause ask first like YTMP's own Pause (below) when that would
+  pause the others: with the app open the question shows, otherwise nothing happens.
 - **Lock screen Next, Previous and seeking** ✅ only show for whoever may skip or seek right
   away (the *Skip* and *Seek* permissions: the owner and DJs by default, not listeners).
 - **Pause only stops it here** ✅ (*Settings → Playback*, on by default): in a party room

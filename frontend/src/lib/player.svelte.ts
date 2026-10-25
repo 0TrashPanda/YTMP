@@ -77,6 +77,9 @@ export function pause(room: RoomConnection, player: RoomPlayer | null | undefine
 	else void room.run({ kind: 'Pause' });
 }
 
+/** A media button pressed longer ago than this (ms) isn't asked about any more: the page was frozen meanwhile. */
+const ASK_MAX_AGE_MS = 5000;
+
 /** [loose]: on a Chromecast, which can't be synced closely (see [looseCorrection]). */
 export function createPlayer(room: RoomConnection, options: { loose?: boolean } = {}): RoomPlayer {
 	return nativeBridge ? new NativePlayer(room, nativeBridge) : new WebPlayer(room, options.loose ?? false);
@@ -602,6 +605,11 @@ class NativePlayer implements RoomPlayer {
 		window.__ytmpNative = {
 			...window.__ytmpNative,
 			onCommand: (command) => void this.room.run(command, false),
+			// Only asked while the app is on screen, about a press just now; otherwise it doesn't happen.
+			onAskCommand: (command, at) => {
+				if (!this.room.interruptsOthers(command)) void this.room.run(command, false);
+				else if (document.visibilityState === 'visible' && Date.now() - at < ASK_MAX_AGE_MS) void this.room.run(command);
+			},
 			onStatus: (status) => {
 				if (status.startsWith('source:')) {
 					this.source = status.slice('source:'.length);
@@ -714,6 +722,6 @@ class NativePlayer implements RoomPlayer {
 	destroy(): void {
 		this.enabled = false;
 		this.sync();
-		if (window.__ytmpNative) window.__ytmpNative = { ...window.__ytmpNative, onCommand: undefined, onStatus: undefined };
+		if (window.__ytmpNative) window.__ytmpNative = { ...window.__ytmpNative, onCommand: undefined, onAskCommand: undefined, onStatus: undefined };
 	}
 }
