@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.pm.ServiceInfo
 import androidx.core.app.ServiceCompat
+import androidx.core.content.IntentCompat
 import android.content.Intent
+import android.view.KeyEvent
 import android.database.ContentObserver
 import android.media.AudioManager
 import android.net.Uri
@@ -134,6 +136,14 @@ class PlaybackService : MediaSessionService() {
 
     /** Stopped here because another app took the audio; until the page has switched "Play here" off. */
     private var stoppedHere = false
+    /**
+     * The earbuds' pause (taken out) stopped playing here while others listened: the next play
+     * (back in) plays here again. Not after the lock screen's pause, or once "Play here" was
+     * switched on or off on the page.
+     */
+    private var resumable = false
+    /** Playing here again ([resumeHere]) until the page has switched "Play here" back on itself. */
+    private var resumedHere = false
     private lateinit var roomPlayer: RoomPlayer
 
     /** Headphones were unplugged and the room was asked to pause: stay quiet until it has. */
@@ -219,7 +229,7 @@ class PlaybackService : MediaSessionService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, RoomPlayer(exo).also { roomPlayer = it }).setSessionActivity(openApp).build()
+        session = MediaSession.Builder(this, RoomPlayer(exo).also { roomPlayer = it }).setSessionActivity(openApp).setCallback(Earbuds()).build()
 
         PlaybackHub.followerCommands = follower::command
         audioManager = getSystemService(AudioManager::class.java)
@@ -242,7 +252,11 @@ class PlaybackService : MediaSessionService() {
         scope.launch {
             PlaybackHub.target.collect { target ->
                 if (target?.enabled != true) stoppedHere = false
-                follower.follow(target?.room?.takeIf { target.enabled })
+                if (target?.enabled == true) {
+                    resumable = false
+                    resumedHere = false
+                }
+                follower.follow(target?.room?.takeIf { target.enabled || resumedHere })
             }
         }
         scope.launch {
@@ -368,7 +382,11 @@ class PlaybackService : MediaSessionService() {
         } else {
             target
         }
-        return if (stoppedHere) followed.copy(enabled = false) else followed
+        return when {
+            stoppedHere -> followed.copy(enabled = false)
+            resumedHere -> followed.copy(enabled = true)
+            else -> followed
+        }
     }
 
     private var lastTarget: PlaybackTarget? = null
@@ -873,6 +891,7 @@ class PlaybackService : MediaSessionService() {
 
     /** Stops playing on this device (not in the room). */
     private fun stopHere() {
+        resumable = false
         // Stop right away: the page (which switches "Play here" off) may be frozen for a while.
         stoppedHere = true
         current = current?.copy(enabled = false)
@@ -882,6 +901,42 @@ class PlaybackService : MediaSessionService() {
         exo.playWhenReady = false
         follower.command("""{"kind":"SetListening","on":false}""")
         PlaybackHub.status("stopped")
+    }
+
+    /**
+     * The earbuds' own pause (taken out, or tapped), apart from the lock screen's: with others
+     * listening along it stops playing here, and their play (back in) plays here again.
+     */
+    private inner class Earbuds : MediaSession.Callback {
+        override fun onMediaButtonEvent(session: MediaSession, controller: MediaSession.ControllerInfo, intent: Intent): Boolean {
+            val key = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_KEY_EVENT, KeyEvent::class.java) ?: return false
+            if (key.keyCode != KeyEvent.KEYCODE_MEDIA_PAUSE || session.isMediaNotificationController(controller)) return false
+            val target = current
+            if (target == null || !target.enabled || target.alone) return false
+            if (key.action == KeyEvent.ACTION_DOWN) {
+                Log.i(TAG, "earbuds: pause -> others listen along, so stop playing here (until they play again)")
+                stopHere()
+                resumable = true
+            }
+            return true
+        }
+    }
+
+    /**
+     * Earbuds back in: plays here again, right away (the page may be frozen, screen off), and
+     * the page switches "Play here" back on when it runs (status "resumed").
+     */
+    private fun resumeHere() {
+        val target = PlaybackHub.target.value ?: return
+        val room = target.room ?: return
+        Log.i(TAG, "media session: play -> playing here again")
+        resumable = false
+        stoppedHere = false
+        resumedHere = true
+        follower.follow(room)
+        follower.command("""{"kind":"SetListening","on":true,"startsTogether":true}""")
+        PlaybackHub.status("resumed")
+        merge(target, follower.room.value)?.let(::apply)
     }
 
     /** Where the audio comes from: the host's link, a link this phone looked up, or the host streaming it. */
@@ -941,6 +996,7 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun play() {
+            if (resumable && current?.enabled != true) return resumeHere()
             Log.d(TAG, "media session: play")
             PlaybackHub.command("""{"kind":"Play"}""")
         }

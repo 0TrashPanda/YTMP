@@ -17,6 +17,13 @@
   here instead of pausing the room. Next, previous and seeking are only offered with
   `PlaybackTarget.canSkip` / `canSeek` (the page's `skip` and `seek` permissions);
   `updateCommands()` tells the session's listeners when that changes.
+- The earbuds' own `KEYCODE_MEDIA_PAUSE` goes through `MediaSession.Callback.onMediaButtonEvent`
+  (`Earbuds`; the media notification's controller is left alone): it stops playback here and
+  marks it `resumable`, so their next play (`RoomPlayer.play()`, earbuds back in) calls
+  `resumeHere()`: `SetListening on` over the follower's connection, playing right away even
+  with the page frozen (`resumedHere` until the page's target has "Play here" on again), and
+  status `resumed`, on which the page calls `enable()`. The page switching "Play here" on or
+  off, or any other stop, clears it.
 - **The player follows the room itself** (`RoomFollower`). Android's WebView **freezes
   the page** after about 5 minutes hidden (screen off): timers, fetches and WebSocket
   messages stop, even with renderer priority *important* and the foreground services

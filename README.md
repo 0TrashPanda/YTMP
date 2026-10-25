@@ -84,7 +84,7 @@ Music, without Premium, and not tied to a single music service.
   speakers near your phone (the phone looks the songs up and serves them).
 - Android: lock screen and notification controls, keeps playing with the screen off.
 - In a party room, taking your earbuds out or pausing on the lock screen only stops the music
-  on your phone; the lock screen's Next is only there for whoever may skip. Pause, seek, skip
+  on your phone, and putting them back in plays it there again; the lock screen's Next is only there for whoever may skip. Pause, seek, skip
   or play something else while others listen asks first (*No*, *Just once*, *Always*), and
   *Pause only stops it here* makes YTMP's Pause button stop it just on your device.
 - Your other devices in the room (signed in to your account) show in *Play on* with their

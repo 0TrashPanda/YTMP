@@ -95,7 +95,7 @@ class RoomFollower {
     fun command(json: String): Boolean {
         val session = session
         if (session == null || _room.value == null) {
-            if (link != null && (json.contains("\"Play\"") || json.contains("\"Pause\""))) pending = json to System.currentTimeMillis()
+            if (link != null && (json.contains("\"Play\"") || json.contains("\"Pause\"") || json.contains("\"SetListening\""))) pending = json to System.currentTimeMillis()
             return false
         }
         return session.sendCommand(json)

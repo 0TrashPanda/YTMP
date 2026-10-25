@@ -611,6 +611,8 @@ class NativePlayer implements RoomPlayer {
 				// Another app took the audio, or headphones were unplugged (see saved.headphonesAction):
 				// not a choice to stop listening here.
 				if (status === 'stopped') this.disable(false);
+				// Earbuds back in after their pause stopped it here: the app plays here again already.
+				if (status === 'resumed') void this.enable();
 				if (status === 'retrying' || status === 'error') this.errorItemId = this.room.state?.nowPlaying?.item.itemId ?? null;
 				if (status === 'retrying') this.error = "YouTube won't send this song right now. Trying again…";
 				if (status === 'error') this.error = "Can't play this song on this device: YouTube won't send it right now.";

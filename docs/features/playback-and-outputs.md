@@ -33,7 +33,9 @@ permissions say otherwise (permission: *Play audio locally*).
 - **Earbuds taken out, lock screen pause** ✅: earbuds (and a tap on them) send *pause*.
   While others listen along, that and the notification's and lock screen's pause stop the
   music on your phone only, like unplugging, and it goes on for everyone else; alone, they
-  pause the room like YTM. (A browser's media keys do the same.)
+  pause the room like YTM. (A browser's media keys do the same.) **Putting the earbuds back
+  in** plays it on your phone again, unless you switched *Play here* on or off yourself in
+  between; after the lock screen's pause it stays off.
 - **Lock screen Next, Previous and seeking** ✅ only show for whoever may skip or seek right
   away (the *Skip* and *Seek* permissions: the owner and DJs by default, not listeners).
 - **Pause only stops it here** ✅ (*Settings → Playback*, on by default): in a party room
