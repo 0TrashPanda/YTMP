@@ -328,7 +328,8 @@ Open it with the **⋮** button or by **right-clicking** the song.
   setting is kept on your account, so all your devices have it, and a change on one shows up
   on the others (when you come back to the app). A phone icon next to a setting keeps it
   **only on this device**: it turns blue (*This phone*), and under the setting is what your
-  account has, with *Use that* to follow the account again. Pages that are one setting as a
+  account has, with *Use that* to follow the account again (the device's own value is kept:
+  tapping the icon again brings it back). Pages that are one setting as a
   whole (Home, Song menu, Solo rooms) have the icon next to their title. What belongs to one
   device stays on it and has no icon: the equalizer, headphones, the Bluetooth sync
   adjustment, the song cache and downloads, your own module and the Back button. Without an

@@ -63,6 +63,20 @@ describe('settings', () => {
 		expect(settings.imageQuality.value).toBe('high');
 	});
 
+	it("keep this device's own value for when it's kept here again", async () => {
+		account = { imageQuality: 'high' };
+		let settings = await start();
+		settings.imageQuality.keepHere(true);
+		settings.imageQuality.set('low');
+		settings.imageQuality.keepHere(false);
+		expect(settings.imageQuality.value).toBe('high');
+		// Also after the app was closed.
+		settings = await start();
+		settings.imageQuality.keepHere(true);
+		expect(settings.imageQuality.value).toBe('low');
+		expect(account).toEqual({ imageQuality: 'high' });
+	});
+
 	it("move this browser's old values onto the account, or keep them here when the account has others", async () => {
 		account = { nextPlays: true };
 		localStorage.setItem('ytmp.nextPlays', '0');

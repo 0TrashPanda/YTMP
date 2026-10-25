@@ -13,6 +13,7 @@ import type { DislikeButton, ImageQuality, SwipeOpens, TabOrder, VideoArt } from
 import { PAGE_SIZES, read, write } from './storage';
 
 const DEVICE_KEY = 'ytmp.deviceSettings';
+const PARKED_KEY = 'ytmp.deviceSettingsParked';
 const MOVE_KEY = 'ytmp.settingsToMove';
 
 function readObject(key: string): Record<string, unknown> {
@@ -34,6 +35,8 @@ function remove(key: string): void {
 
 /** This device's own values. */
 let device = $state<Record<string, unknown>>(readObject(DEVICE_KEY));
+/** This device's own values while it follows your account again, for when it keeps its own once more. */
+let parked = $state<Record<string, unknown>>(readObject(PARKED_KEY));
 /** Values from before, not moved yet (they count as this device's until then). */
 let toMove = $state<Record<string, unknown>>(readObject(MOVE_KEY));
 
@@ -104,14 +107,21 @@ export class Setting<T> {
 		changed();
 	}
 
-	/** [on]: this device keeps its own value from now (starting with the current one); off: it follows your account again. */
+	/**
+	 * [on]: this device keeps its own value from now (the one it had before, else the current
+	 * one); off: it follows your account again (its own value is kept for next time).
+	 */
 	keepHere(on: boolean): void {
 		if (on === this.onlyHere) return;
-		setDevice(this.key, on ? $state.snapshot(this.value) : undefined);
+		const before = this.parse(parked[this.key]);
+		const { [this.key]: _, ...rest } = parked;
+		parked = on ? rest : { ...rest, [this.key]: device[this.key] };
+		write(PARKED_KEY, JSON.stringify(parked));
+		setDevice(this.key, on ? (before ?? $state.snapshot(this.value)) : undefined);
 		if (!on && this.key in toMove) {
-			const { [this.key]: _, ...rest } = toMove;
-			toMove = rest;
-			write(MOVE_KEY, JSON.stringify(rest));
+			const { [this.key]: _, ...others } = toMove;
+			toMove = others;
+			write(MOVE_KEY, JSON.stringify(others));
 		}
 		changed();
 	}
