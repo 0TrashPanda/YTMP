@@ -10,8 +10,9 @@ import dev.trashpanda.ytmp.protocol.RoomSettings
 /** Roles a room starts with when its creator has no template. See docs/features/room-management.md. */
 object DefaultRoles {
     // Listeners skip by voting when the room votes to skip (and right away when it doesn't); DJs always right away.
-    private val listener = listOf(ADD_SONGS, REMOVE_OWN, PLAY_PAUSE, VOTE_SKIP, LISTEN_LOCALLY, CLONE_ROOM)
-    private val dj = listener - VOTE_SKIP + listOf(SKIP, PLAY_NOW, REORDER, REMOVE_OTHERS, SEEK, REPEAT, CHANGE_OUTPUTS, OUTPUT_VOLUME, START_RADIO, AUTOPLAY_FROM_HERE)
+    // Listeners don't pause the party: their Pause stops the music on their own device.
+    private val listener = listOf(ADD_SONGS, REMOVE_OWN, VOTE_SKIP, LISTEN_LOCALLY, CLONE_ROOM)
+    private val dj = listener - VOTE_SKIP + listOf(PLAY_PAUSE, SKIP, PLAY_NOW, REORDER, REMOVE_OTHERS, SEEK, REPEAT, CHANGE_OUTPUTS, OUTPUT_VOLUME, START_RADIO, AUTOPLAY_FROM_HERE)
 
     val template = RoleTemplate(
         roles = listOf(

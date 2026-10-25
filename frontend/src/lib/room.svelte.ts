@@ -20,7 +20,7 @@ import { applyEvent } from './roomEvents';
 import { predict, type Sender } from './optimistic';
 
 /** What interrupts the music for everyone: in a party room it's asked first (see [RoomConnection.run]). */
-const INTERRUPTS = new Set<Command['kind']>(['Pause', 'Seek', 'Skip', 'Previous', 'JumpTo', 'PlayNow', 'StartRadio']);
+const INTERRUPTS = new Set<Command['kind']>(['Pause', 'Seek', 'Skip', 'Previous', 'JumpTo', 'PlayNow', 'StartRadio', 'SetSpeed', 'SetOutput']);
 
 /** How long a host notice (e.g. "Couldn't play …") stays on screen. */
 const NOTICE_MS = 8000;
@@ -264,13 +264,22 @@ export class RoomConnection {
 	interruptsOthers(command: Command): boolean {
 		const s = this.state;
 		if (!s || !INTERRUPTS.has(command.kind) || !settings.askInParty.value) return false;
+		// Switching a speaker on interrupts nobody; off, it stops the music for whoever is near it.
+		if (command.kind === 'SetOutput' && (command.active || !s.outputs.some((o) => o.id === command.outputId && o.active))) return false;
+		// Only an episode changes speed (music waits for the next one).
+		if (command.kind === 'SetSpeed' && !s.nowPlaying?.item.song.podcast) return false;
 		return s.room.visibility !== 'private' && (s.playback.playing || s.playback.starting) && !this.listeningAlone && !this.onlyMyDevices;
 	}
 
-	/** Everyone else here (party screens aside) is logged in with my account: my other devices. */
+	/**
+	 * Everyone else here (party screens aside) is logged in with my account: my other devices.
+	 * Not while a speaker or TV plays: whoever is near it hears it too.
+	 */
 	get onlyMyDevices(): boolean {
+		const s = this.state;
 		const mine = this.me?.accountId;
-		return !!mine && !!this.state?.participants.every((p) => p.id === this.participantId || !p.online || p.screen || p.accountId === mine);
+		if (!s || !mine || s.outputs.some((o) => o.active) || s.participants.some((p) => p.speakers.length > 0)) return false;
+		return s.participants.every((p) => p.id === this.participantId || !p.online || p.screen || p.accountId === mine);
 	}
 
 	private async askFirst(command: Command): Promise<ErrorInfo | null> {
@@ -449,7 +458,8 @@ export class RoomConnection {
 		if (this.guesses.length) this.show();
 		else if (this.state) applyEvent(this.state, structuredClone(e));
 		if (e.kind === 'RoomUpdated') this.followCode(s);
-		else if (e.kind === 'Notice') this.addNotice(e.message);
+		// Not what I did myself ("Anna paused").
+		else if (e.kind === 'Notice' && e.notFor !== this.participantId) this.addNotice(e.message);
 	}
 
 	private addNotice(text: string): void {

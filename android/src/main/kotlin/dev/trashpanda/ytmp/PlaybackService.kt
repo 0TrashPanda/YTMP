@@ -137,11 +137,13 @@ class PlaybackService : MediaSessionService() {
     /** Stopped here because another app took the audio; until the page has switched "Play here" off. */
     private var stoppedHere = false
     /**
-     * The earbuds' pause (taken out) stopped playing here while others listened: the next play
-     * (back in) plays here again. Not after the lock screen's pause, or once "Play here" was
-     * switched on or off on the page.
+     * Whose pause stopped playing here while others listened: then the next play plays here
+     * again, for [RESUME_WINDOW_MS] (the song stays on the lock screen, paused). The earbuds'
+     * play (back in) only after their own pause. Cleared once "Play here" was switched on or
+     * off on the page, or anything else stopped it.
      */
-    private var resumable = false
+    private var stoppedBy: StoppedBy? = null
+    private var resumeWindow: Job? = null
     /** Playing here again ([resumeHere]) until the page has switched "Play here" back on itself. */
     private var resumedHere = false
     private lateinit var roomPlayer: RoomPlayer
@@ -253,7 +255,7 @@ class PlaybackService : MediaSessionService() {
             PlaybackHub.target.collect { target ->
                 if (target?.enabled != true) stoppedHere = false
                 if (target?.enabled == true) {
-                    resumable = false
+                    stoppedBy = null
                     resumedHere = false
                 }
                 follower.follow(target?.room?.takeIf { target.enabled || resumedHere })
@@ -430,7 +432,8 @@ class PlaybackService : MediaSessionService() {
         val url = target?.let { if (item != null) urlFor(it, item, from) else null }
         if (target == null || !target.enabled || item == null || url == null) {
             exo.playWhenReady = false
-            if (target == null || !target.enabled || item == null) unload()
+            // Stopped by a pause that Play undoes: the song stays on the lock screen.
+            if (target == null || item == null || !target.enabled && stoppedBy == null) unload()
             return
         }
 
@@ -890,8 +893,15 @@ class PlaybackService : MediaSessionService() {
     }
 
     /** Stops playing on this device (not in the room). */
-    private fun stopHere() {
-        resumable = false
+    private fun stopHere(by: StoppedBy? = null) {
+        stoppedBy = by
+        resumeWindow?.cancel()
+        if (by != null) resumeWindow = scope.launch {
+            delay(RESUME_WINDOW_MS)
+            Log.d(TAG, "stopped here too long ago: play no longer plays here again")
+            stoppedBy = null
+            current?.let(::apply)
+        }
         // Stop right away: the page (which switches "Play here" off) may be frozen for a while.
         stoppedHere = true
         current = current?.copy(enabled = false)
@@ -910,27 +920,32 @@ class PlaybackService : MediaSessionService() {
     private inner class Earbuds : MediaSession.Callback {
         override fun onMediaButtonEvent(session: MediaSession, controller: MediaSession.ControllerInfo, intent: Intent): Boolean {
             val key = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_KEY_EVENT, KeyEvent::class.java) ?: return false
-            if (key.keyCode != KeyEvent.KEYCODE_MEDIA_PAUSE || session.isMediaNotificationController(controller)) return false
-            val target = current
-            if (target == null || !target.enabled || target.alone) return false
-            if (key.action == KeyEvent.ACTION_DOWN) {
+            if (session.isMediaNotificationController(controller)) return false
+            val target = current ?: return false
+            when (key.keyCode) {
+                KeyEvent.KEYCODE_MEDIA_PAUSE -> if (!target.enabled || target.alone) return false
+                // Back in after the lock screen's pause: that pause meant it, so nothing happens.
+                KeyEvent.KEYCODE_MEDIA_PLAY -> if (stoppedBy != StoppedBy.LOCK_SCREEN || target.enabled) return false
+                else -> return false
+            }
+            if (key.action == KeyEvent.ACTION_DOWN && key.keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
                 Log.i(TAG, "earbuds: pause -> others listen along, so stop playing here (until they play again)")
-                stopHere()
-                resumable = true
+                stopHere(StoppedBy.EARBUDS)
             }
             return true
         }
     }
 
     /**
-     * Earbuds back in: plays here again, right away (the page may be frozen, screen off), and
+     * Play after a pause that stopped it here (earbuds back in, the lock screen): plays here again, right away (the page may be frozen, screen off), and
      * the page switches "Play here" back on when it runs (status "resumed").
      */
     private fun resumeHere() {
         val target = PlaybackHub.target.value ?: return
         val room = target.room ?: return
         Log.i(TAG, "media session: play -> playing here again")
-        resumable = false
+        stoppedBy = null
+        resumeWindow?.cancel()
         stoppedHere = false
         resumedHere = true
         follower.follow(room)
@@ -938,6 +953,8 @@ class PlaybackService : MediaSessionService() {
         PlaybackHub.status("resumed")
         merge(target, follower.room.value)?.let(::apply)
     }
+
+    private enum class StoppedBy { EARBUDS, LOCK_SCREEN }
 
     /** Where the audio comes from: the host's link, a link this phone looked up, or the host streaming it. */
     private enum class Source(val label: String) {
@@ -996,7 +1013,7 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun play() {
-            if (resumable && current?.enabled != true) return resumeHere()
+            if (stoppedBy != null && current?.enabled != true) return resumeHere()
             Log.d(TAG, "media session: play")
             PlaybackHub.command("""{"kind":"Play"}""")
         }
@@ -1005,13 +1022,13 @@ class PlaybackService : MediaSessionService() {
             val target = current
             if (target != null && target.enabled && !target.alone) {
                 Log.i(TAG, "media session: pause -> others listen along, so stop playing here")
-                stopHere()
+                stopHere(StoppedBy.LOCK_SCREEN)
                 return
             }
             // Not playing here: the page asks first if that pauses the others in a party room.
             if (target != null && !target.enabled && target.room != null) {
                 Log.d(TAG, "media session: pause, not playing here")
-                PlaybackHub.askCommand("""{"kind":"Pause"}""")
+                if (!PlaybackHub.askCommand("""{"kind":"Pause"}""")) Log.d(TAG, "the app isn't on screen to ask: not pausing the others")
                 return
             }
             Log.d(TAG, "media session: pause")
@@ -1023,19 +1040,24 @@ class PlaybackService : MediaSessionService() {
         override fun seekToNext() {
             if (current?.canSkip == false) return
             Log.d(TAG, "media session: next")
-            PlaybackHub.command("""{"kind":"Skip","play":${PlaybackHub.target.value?.nextPlays == true}}""")
+            orAsk("""{"kind":"Skip","play":${PlaybackHub.target.value?.nextPlays == true}}""")
         }
 
         override fun seekToNextMediaItem() = seekToNext()
 
         override fun seekToPrevious() {
-            if (current?.canSkip != false) PlaybackHub.command("""{"kind":"Previous"}""")
+            if (current?.canSkip != false) orAsk("""{"kind":"Previous"}""")
         }
 
         override fun seekToPreviousMediaItem() = seekToPrevious()
 
         override fun seekTo(positionMs: Long) {
-            if (current?.canSeek != false) PlaybackHub.command("""{"kind":"Seek","positionMs":$positionMs}""")
+            if (current?.canSeek != false) orAsk("""{"kind":"Seek","positionMs":$positionMs}""")
+        }
+
+        /** With the app on screen (the notification pulled down) the page asks first in a party; else it just happens. */
+        private fun orAsk(json: String) {
+            if (!PlaybackHub.askCommand(json)) PlaybackHub.command(json)
         }
     }
 
@@ -1045,6 +1067,8 @@ class PlaybackService : MediaSessionService() {
         private const val BUTTON_NOTIFICATION = 7
         private const val PAUSED_TOLERANCE_MS = 250L
         private const val PAUSE_WAIT_MS = 3000L
+        /** After a pause stopped it here, Play plays here again for this long (ms). */
+        private const val RESUME_WINDOW_MS = 30 * 60_000L
         /** Without data this long (ms) in the middle of a song, and alone, the room waits for this phone. */
         private const val STALL_REPORT_MS = 600L
 

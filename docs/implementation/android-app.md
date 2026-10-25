@@ -19,11 +19,15 @@
   `updateCommands()` tells the session's listeners when that changes.
 - The earbuds' own `KEYCODE_MEDIA_PAUSE` goes through `MediaSession.Callback.onMediaButtonEvent`
   (`Earbuds`; the media notification's controller is left alone): it stops playback here and
-  marks it `resumable`, so their next play (`RoomPlayer.play()`, earbuds back in) calls
+  sets `stoppedBy` (`EARBUDS`; the lock screen's pause sets `LOCK_SCREEN`, and the earbuds'
+  `KEYCODE_MEDIA_PLAY` is then swallowed). The song stays loaded, paused, so the lock screen
+  keeps it; `RESUME_WINDOW_MS` (30 min) later it's unloaded. The next play (`RoomPlayer.play()`) calls
   `resumeHere()`: `SetListening on` over the follower's connection, playing right away even
   with the page frozen (`resumedHere` until the page's target has "Play here" on again), and
   status `resumed`, on which the page calls `enable()`. The page switching "Play here" on or
   off, or any other stop, clears it.
+- Next, previous and seek go to the page too while the app is on screen (`askSink` is set
+  from `onStart` to `onStop`), else straight to the room.
 - `pause()` while not playing here goes to the page (`PlaybackHub.askCommand` →
   `onAskCommand(command, at)`), which runs it if it doesn't interrupt anyone, asks when the
   page is visible and the press is under 5 s old, and otherwise drops it.

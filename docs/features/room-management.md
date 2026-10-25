@@ -64,9 +64,10 @@ YTMP gets new permissions, roles that had every permission (Admin) get them all,
 default roles nobody changed get what that default role has now; other roles are left
 alone.
 
-Default roles: **Admin** (everything), **DJ** (Listener + play now, reorder, remove others'
-songs, seek, speakers and volume, start radio, autoplay from here) and **Listener** (add songs, remove own songs, play/pause,
-skip, play on own device, clone room). New guests and account holders get *Listener*. Only
+Default roles: **Admin** (everything), **DJ** (Listener + play/pause, play now, reorder, remove others'
+songs, seek, speakers and volume, start radio, autoplay from here) and **Listener** (add songs, remove own songs,
+vote to skip, play on own device, clone room; their Pause stops the music on their own device).
+Rooms made before keep their roles as they were. New guests and account holders get *Listener*. Only
 Admin can *Move everyone*.
 
 ### All planned permissions
@@ -90,8 +91,8 @@ set individual permissions.
 Roles exist on **two levels**:
 
 - **Account role templates**: YTMP ships with **default roles** (*Admin*: everything;
-  *DJ*: also play now, reorder and shuffle, remove anyone's songs, skip right away, seek,
-  repeat, speakers, radio; *Listener*: add songs, remove their own, play/pause, vote to skip,
+  *DJ*: also play/pause, play now, reorder and shuffle, remove anyone's songs, skip right away, seek,
+  repeat, speakers, radio; *Listener*: add songs, remove their own, vote to skip,
   play on their own device, clone the room). Users with a **YTMP account** can edit them and create their own, on their
   account page (*Your roles*), in the same Discord-style editor.
   These are saved to the account and applied to every room they create, so nobody is

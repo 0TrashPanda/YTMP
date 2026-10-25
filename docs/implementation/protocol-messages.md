@@ -192,7 +192,7 @@ network) gets its screen from `POST /api/screens/cast` instead, and leaves with
 | `HistoryItemRemoved` ✅ | `itemId` (when jumping back) | everyone |
 | `HistoryReplaced` ✅ | `items` (a song moved in or out of the history) | everyone |
 | `PlaybackChanged` ✅ | `playback: { playing, positionMs, hostTimeMs, starting, speed, loading }` (on every change; `starting`: a new song waits for the players; `speed`: an episode played faster or slower, else 1; `loading`: it should play, but its stream is still being looked up) | everyone |
-| `Notice` ✅ | `message` (for example a song that can't be played) | everyone |
+| `Notice` ✅ | `message` (for example a song that can't be played, or who paused or skipped in a party room), `notFor` (who did it: their page doesn't show it) | everyone |
 | `RepeatChanged` ✅ | `mode` | everyone |
 | `SkipVotesChanged` ✅ | `skipVotes` (`voters`, `needed`, or null): after a vote, when people come or go, or the settings change | everyone |
 | `OutputsChanged` ✅ | `outputs` (id, name, kind, active, volume) | everyone |

@@ -8,14 +8,19 @@
 	let { room }: { room: RoomConnection } = $props();
 
 	const asking = $derived(room.asking!);
-	const title = $derived(
-		({
-			Pause: 'Pause for everyone?',
-			Seek: 'Jump to another point for everyone?',
-			Skip: 'Skip this song for everyone?',
-			Previous: 'Go back for everyone?'
-		} as Record<string, string>)[asking.command.kind] ?? 'Play this now for everyone?'
-	);
+	const title = $derived.by(() => {
+		const command = asking.command;
+		if (command.kind === 'SetOutput') return `Stop the music on ${room.state?.outputs.find((o) => o.id === command.outputId)?.name ?? 'this speaker'}?`;
+		if (command.kind === 'SetSpeed') return `Play at ${command.speed}× for everyone?`;
+		return (
+			({
+				Pause: 'Pause for everyone?',
+				Seek: 'Jump to another point for everyone?',
+				Skip: 'Skip this song for everyone?',
+				Previous: 'Go back for everyone?'
+			} as Record<string, string>)[command.kind] ?? 'Play this now for everyone?'
+		);
+	});
 	const others = $derived.by(() => {
 		const s = room.state;
 		if (!s) return 0;
@@ -39,7 +44,7 @@
 	>
 		<h2 class="text-lg font-bold">{title}</h2>
 		<p class="text-sm text-muted">
-			{others === 1 ? 'Someone else is' : others > 1 ? `${others} others are` : 'Others are'} listening along. Always does it and stops asking; you can switch asking back on in Settings → Playback.
+			{asking.command.kind === 'SetOutput' ? 'Whoever is near it stops hearing it.' : others === 1 ? 'Someone else is listening along.' : others > 1 ? `${others} others are listening along.` : 'Others are listening along.'} Always does it and stops asking; you can switch asking back on in Settings → Playback.
 		</p>
 		<div class="flex justify-end gap-2">
 			<button class="rounded-full px-4 py-2 text-sm font-medium hover:bg-raised" onclick={() => asking.answer(false)}>No</button>

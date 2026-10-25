@@ -129,16 +129,17 @@ object PlaybackHub {
 
     /**
      * Runs a media button's command on the page, which asks first when it would interrupt the
-     * others in a party room: only while the app is on screen, else it doesn't happen.
+     * others in a party room. Set only while the app is on screen.
      */
     @Volatile
     var askSink: ((String) -> Unit)? = null
 
-    fun askCommand(json: String) {
-        val sink = askSink
-        if (sink == null) Log.w("YtmpPlayback", "Media control $json to ask about, but the app's page isn't there")
-        else Log.d("YtmpPlayback", "Media control $json (the page asks first)")
-        sink?.invoke(json)
+    /** False when the app isn't on screen to ask: the caller decides (do it anyway, or not). */
+    fun askCommand(json: String): Boolean {
+        val sink = askSink ?: return false
+        Log.d("YtmpPlayback", "Media control $json (the page asks first)")
+        sink(json)
+        return true
     }
 
     fun status(status: String) {

@@ -22,7 +22,7 @@
 
 	async function toggle(outputId: string, active: boolean, screen = false) {
 		const error = await room.run({ kind: 'SetOutput', outputId, active, screen });
-		if (error) onToast(error.message);
+		if (error && !room.wasNoticed(error)) onToast(error.message);
 	}
 
 	function setVolume(outputId: string, volume: number) {

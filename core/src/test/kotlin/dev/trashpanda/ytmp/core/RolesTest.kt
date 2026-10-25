@@ -72,7 +72,8 @@ class RolesTest {
         assertEquals("listener", room.state(owner).participants.first { it.id == guest.id }.roleId)
 
         assertNull(room.run(guest, Command.AddSongs(listOf(song, song), QueuePosition.END)))
-        assertNull(room.run(guest, Command.Pause))
+        // Pause stops the music for everyone: their Pause only stops it on their own device.
+        assertDenied(room.run(guest, Command.Pause))
         assertDenied(room.run(guest, Command.PlayNow(song)))
         assertDenied(room.run(guest, Command.Seek(1000)))
         assertDenied(room.run(guest, Command.Kick(owner.id)))
@@ -82,6 +83,20 @@ class RolesTest {
         val queue = room.state(owner).queue
         assertNull(room.run(guest, Command.RemoveQueueItem(queue.first { it.addedBy == guest.id }.itemId)))
         assertDenied(room.run(guest, Command.RemoveQueueItem(queue.first { it.addedBy == owner.id }.itemId)))
+    }
+
+    @Test
+    fun `the others hear who paused or skipped, not the one who did it`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        val guest = room.connect("Guest")
+        room.run(owner, Command.AddSongs(listOf(song, song.copy(id = "ytm:two", title = "Two")), QueuePosition.END))
+        testScheduler.runCurrent()
+        assertNull(room.run(owner, Command.Pause))
+        assertNull(room.run(owner, Command.Skip(play = true)))
+        val heard = { c: Client -> c.events.filterIsInstance<Event.Notice>().filter { it.notFor != c.id }.map { it.message } }
+        assertEquals(listOf("Owner paused", "Owner skipped “${song.title}”"), heard(guest))
+        assertEquals(emptyList(), heard(owner))
     }
 
     @Test

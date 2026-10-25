@@ -34,22 +34,32 @@ permissions say otherwise (permission: *Play audio locally*).
   While others listen along, that and the notification's and lock screen's pause stop the
   music on your phone only, like unplugging, and it goes on for everyone else; alone, they
   pause the room like YTM. (A browser's media keys do the same.) **Putting the earbuds back
-  in** plays it on your phone again, unless you switched *Play here* on or off yourself in
-  between; after the lock screen's pause it stays off. **Not playing on your phone**, the
+  in** plays it on your phone again, and so does the lock screen's Play after its own pause
+  (the song stays there, paused): for 30 minutes, and not once you switched *Play here* on or
+  off yourself. After the lock screen's pause the earbuds don't start it. **Not playing on your phone**, the
   earbuds' and lock screen's pause ask first like YTMP's own Pause (below) when that would
   pause the others: with the app open the question shows, otherwise nothing happens.
 - **Lock screen Next, Previous and seeking** ✅ only show for whoever may skip or seek right
   away (the *Skip* and *Seek* permissions: the owner and DJs by default, not listeners).
+  With the app open (the notification pulled down over it) they ask first like YTMP's own
+  buttons; from the lock screen they just happen. A browser's media keys likewise: asked with
+  the tab on screen.
 - **Pause only stops it here** ✅ (*Settings → Playback*, on by default): in a party room
   while others listen along, YTMP's own Pause button stops the music on your device and it
   goes on for everyone else. When it isn't playing on your device, Pause pauses the room
-  (asked first, below).
+  (asked first, below). Without the *Play / pause* permission (the default Listener), Pause
+  always works this way.
 - **Ask before interrupting a party** ✅ (*Settings → Playback*, on by default): in a party
   room, while others listen along and the music plays, pausing, seeking, skipping, going back
-  or playing something else (Play now, a song in Up next, Start radio) first asks *"Pause for
-  everyone?"* with **No**, **Just once** and **Always** (does it, and stops asking; the
-  setting switches it back on). Not when everyone else in the room is logged in with
-  your account (your own devices). Media buttons, the lock screen and the sleep timer don't ask.
+  or playing something else (Play now, a song in Up next, Start radio), an episode's speed,
+  and switching off a speaker or TV that plays, first asks *"Pause for everyone?"* with
+  **No**, **Just once** and **Always** (does it, and stops asking; the setting switches it
+  back on). Not when everyone else in the room is logged in with your account (your own
+  devices), unless a speaker or TV plays: whoever is near it hears it. The lock screen and the
+  sleep timer don't ask.
+- **Who did it** ✅: in a party room the others see a short note, like *Anna paused*, *Bram
+  skipped "Song"*, *Anna jumped to 1:23*, *Bram is playing "Song" now* or *Anna stopped the
+  music on Living room* (not when everyone else is on your account).
 - Listening **alone**, a device that starts a song late (buffering) doesn't jump ahead: the
   room moves to where the device is, so there's no audible skip.
 - Other rooms remember your last choice in the app.

@@ -73,9 +73,22 @@ const SOURCE_NAMES: Record<Source, string> = { direct: 'the direct link', own: '
  * the room (asked first, see [RoomConnection.run]).
  */
 export function pause(room: RoomConnection, player: RoomPlayer | null | undefined): void {
-	if (player?.enabled && settings.pauseStopsHere.value && room.state?.room.visibility !== 'private' && !room.listeningAlone) player.disable();
+	if (stopsHere(room, player)) player!.disable();
 	else void room.run({ kind: 'Pause' });
 }
+
+/** Pause only stops the music on this device: the setting, or you may not pause the party (the default Listener). */
+function stopsHere(room: RoomConnection, player: RoomPlayer | null | undefined): boolean {
+	if (!player?.enabled || room.state?.room.visibility === 'private' || room.listeningAlone) return false;
+	return settings.pauseStopsHere.value || !room.can('play_pause');
+}
+
+/** The Pause button works: you may pause the room, or it stops the music on this device ([pause]). */
+export function canPause(room: RoomConnection, player: RoomPlayer | null | undefined): boolean {
+	return room.can('play_pause') || stopsHere(room, player);
+}
+
+const onScreen = () => document.visibilityState === 'visible';
 
 /** A media button pressed longer ago than this (ms) isn't asked about any more: the page was frozen meanwhile. */
 const ASK_MAX_AGE_MS = 5000;
@@ -412,9 +425,10 @@ class WebPlayer implements RoomPlayer {
 			['play', () => this.room.run({ kind: 'Play' }, false)],
 			// Others listen along (headphones taken out, say): stop playing here, not for everyone.
 			['pause', () => (this.room.listeningAlone ? this.room.run({ kind: 'Pause' }, false) : this.disable())],
-			['nexttrack', () => this.room.next(false)],
-			['previoustrack', () => this.room.run({ kind: 'Previous' }, false)],
-			['seekto', (details) => details.seekTime != null && this.room.run({ kind: 'Seek', positionMs: Math.round(details.seekTime * 1000) }, false)]
+			// With the page on screen these ask first like YTMP's own buttons; in the background there's no one to ask.
+			['nexttrack', () => this.room.next(onScreen())],
+			['previoustrack', () => this.room.run({ kind: 'Previous' }, onScreen())],
+			['seekto', (details) => details.seekTime != null && this.room.run({ kind: 'Seek', positionMs: Math.round(details.seekTime * 1000) }, onScreen())]
 		];
 		for (const [action, handler] of handlers) {
 			try {

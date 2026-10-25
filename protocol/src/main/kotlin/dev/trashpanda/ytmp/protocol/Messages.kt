@@ -599,10 +599,13 @@ sealed interface Event {
     @SerialName("BansChanged")
     data class BansChanged(val bans: List<BanInfo>) : Event
 
-    /** Something went wrong that everyone should know about, e.g. a song that can't be played. */
+    /**
+     * Something everyone should know about, e.g. a song that can't be played, or who paused.
+     * [notFor]: a participant who doesn't need it (they did it themselves).
+     */
     @Serializable
     @SerialName("Notice")
-    data class Notice(val message: String) : Event
+    data class Notice(val message: String, val notFor: String? = null) : Event
 
     /** Someone invited everyone to another room, or took it back (null). */
     @Serializable

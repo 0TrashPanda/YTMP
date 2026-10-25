@@ -521,10 +521,12 @@ class Room(
                 is ClientMessage.Ping -> outbox.send(ServerMessage.Pong(message.clientTime, clock()))
                 is ClientMessage.RequestSnapshot -> outbox.send(ServerMessage.Snapshot(seq, snapshot()))
                 is ClientMessage.CommandMessage -> {
+                    val before = Before(wantPlaying, current?.itemId, current?.song?.title, playback.rate, outputs.active.keys.toSet())
                     val error = runCatching { execute(member, message.command) }
                         .fold({ it }, { e -> if (e is CancellationException) throw e else ErrorInfo(ErrorCode.INVALID, e.message ?: "error") })
                     // Who's here, their permissions or the settings may have changed what a vote needs.
                     updateSkipVotes()
+                    if (error == null) announce(member, message.command, before)
                     outbox.send(ServerMessage.Result(message.id, error))
                 }
                 is ClientMessage.Hello, is ClientMessage.Attach -> Unit
@@ -718,6 +720,39 @@ class Room(
         } else {
             history.lastOrNull()?.let { jumpTo(it.itemId) }
         }
+    }
+
+    /** The room just before a command, to tell what it changed ([announce]). */
+    private data class Before(val playing: Boolean, val itemId: String?, val title: String?, val rate: Double, val outputs: Set<String>)
+
+    /**
+     * In a party room, tells the others who paused, skipped, seeked or played something else
+     * (docs/features/playback-and-outputs.md): the music changed for them too. Not the one who
+     * did it, nor when everyone else is on their account.
+     */
+    private fun announce(member: Member, command: Command, before: Before) {
+        if (visibility == RoomVisibility.PRIVATE) return
+        val others = members.values.filter { it.id != member.id && it.online && !it.screen }
+        if (others.isEmpty() || (member.accountId != null && others.all { it.accountId == member.accountId })) return
+        val who = member.name
+        val message = when (command) {
+            Command.Pause -> if (before.playing && !wantPlaying) "$who paused" else null
+            // A vote that's not enough yet changes nothing; one that is, isn't theirs alone.
+            is Command.Skip -> if (current?.itemId != before.itemId && can(member, Permission.SKIP)) "$who skipped “${before.title}”" else null
+            Command.Previous -> "$who went back"
+            is Command.Seek -> "$who jumped to ${minutes(command.positionMs)}"
+            is Command.JumpTo, is Command.PlayNow -> current?.takeIf { it.itemId != before.itemId }?.let { "$who is playing “${it.song.title}” now" }
+            is Command.StartRadio -> "$who started a radio"
+            is Command.SetSpeed -> if (playback.rate != before.rate) "$who set the speed to ${"%.2f".format(java.util.Locale.ROOT, command.speed).trimEnd('0').trimEnd('.')}×" else null
+            is Command.SetOutput -> if (!command.active && command.outputId in before.outputs) "$who stopped the music on ${outputs.device(command.outputId)?.name ?: "a speaker"}" else null
+            else -> null
+        } ?: return
+        emit(Event.Notice(message, notFor = member.id))
+    }
+
+    private fun minutes(ms: Long): String {
+        val s = ms / 1000
+        return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
     }
 
     // --- commands ---------------------------------------------------------------------

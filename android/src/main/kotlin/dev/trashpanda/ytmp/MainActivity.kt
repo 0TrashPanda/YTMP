@@ -196,7 +196,6 @@ class MainActivity : ComponentActivity() {
 
         PlaybackHub.commandSink = commandSink
         PlaybackHub.statusSink = statusSink
-        PlaybackHub.askSink = askSink
         // The sleep timer changed (also when it went off in the player): the page shows it.
         lifecycleScope.launch {
             PlaybackHub.sleep.collect { setting ->
@@ -270,6 +269,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         app.visible.value = true
+        // On screen: a media button that would interrupt a party can be asked about.
+        PlaybackHub.askSink = askSink
         app.nearby.startDiscovery()
         nearbyUpdates = lifecycleScope.launch {
             app.nearby.rooms.collect { rooms ->
@@ -303,6 +304,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         app.visible.value = false
+        if (PlaybackHub.askSink === askSink) PlaybackHub.askSink = null
         nearbyUpdates?.cancel()
         castUpdates?.cancel()
         app.nearby.stopDiscovery()
@@ -327,7 +329,6 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         if (PlaybackHub.commandSink === commandSink) PlaybackHub.commandSink = null
         if (PlaybackHub.statusSink === statusSink) PlaybackHub.statusSink = null
-        if (PlaybackHub.askSink === askSink) PlaybackHub.askSink = null
         if (isFinishing) PlaybackHub.target.value = null
         webView.destroy()
         super.onDestroy()

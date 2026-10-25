@@ -157,8 +157,10 @@ class NearbySpeakersTest {
             refresh()
             nearby.turnOn(room.code, "cast:fake", "Woonkamer") { source }
             // What the app does with the phone's commands: they go to the room.
-            eventually { source.commands.any { it is Command.SetSpeakers } }
-            room.handle(me, ClientMessage.CommandMessage("s", source.commands.first { it is Command.SetSpeakers }))
+            // The first may come before the speaker is on (no names yet).
+            val withSpeaker = { c: Command -> c is Command.SetSpeakers && c.names.isNotEmpty() }
+            eventually { source.commands.any(withSpeaker) }
+            room.handle(me, ClientMessage.CommandMessage("s", source.commands.first(withSpeaker)))
 
             room.handle(me, ClientMessage.CommandMessage("a", Command.AddSongs(listOf(song), QueuePosition.END)))
             eventually { refresh(); state?.nowPlaying?.streamUrl != null }

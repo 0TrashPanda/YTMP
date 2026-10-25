@@ -493,6 +493,7 @@ export interface EventMigrationChanged {
 export interface EventNotice {
   kind: "Notice";
   message: string;
+  notFor: string | null;
 }
 
 export interface EventNowPlayingChanged {

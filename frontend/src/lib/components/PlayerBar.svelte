@@ -10,7 +10,7 @@
 	import { shows } from '../soloLook.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef } from '../protocol.gen';
-	import { pause, type RoomPlayer } from '../player.svelte';
+	import { canPause, pause, type RoomPlayer } from '../player.svelte';
 	import SourceBadge from './SourceBadge.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -114,7 +114,7 @@
 		const seek = (delta: number) => room.run({ kind: 'Seek', positionMs: Math.max(0, Math.min(duration, Math.round(positionMs + delta))) });
 		let handled = true;
 		if (key === 'k') {
-			if (current && room.can('play_pause')) (playing ? pause(room, player) : room.run({ kind: 'Play' }));
+			if (current && (playing ? canPause(room, player) : room.can('play_pause'))) (playing ? pause(room, player) : room.run({ kind: 'Play' }));
 		} else if (key === 'n') {
 			if (current) room.next();
 		} else if (key === 'p') {
@@ -170,7 +170,7 @@
 			</button>
 			<button
 				class="shrink-0 rounded-full p-1.5 disabled:opacity-40"
-				disabled={!room.can('play_pause')}
+				disabled={playing ? !canPause(room, player) : !room.can('play_pause')}
 				aria-label={playing ? 'Pause' : 'Play'}
 				onclick={() => (playing ? pause(room, player) : room.run({ kind: 'Play' }))}
 			>
@@ -195,7 +195,7 @@
 				{#snippet playPause()}
 					<button
 						class="rounded-full p-2 hover:bg-raised disabled:opacity-40"
-						disabled={!room.can('play_pause')}
+						disabled={playing ? !canPause(room, player) : !room.can('play_pause')}
 						aria-label={playing ? 'Pause' : 'Play'}
 						onclick={() => (playing ? pause(room, player) : room.run({ kind: 'Play' }))}
 					>

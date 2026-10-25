@@ -90,6 +90,24 @@ describe('RoomConnection', () => {
 		expect(commands()).toBe(3);
 	});
 
+	it('asks before turning off a speaker that plays, and counts it as someone listening', () => {
+		const { room } = connected(true);
+		room.state!.participants[0].accountId = 'me';
+		room.state!.participants[1].accountId = 'me';
+		room.state!.outputs = [{ id: 'tv', name: 'Living room', kind: 'chromecast', active: true }] as RoomState['outputs'];
+		expect(room.onlyMyDevices).toBe(false);
+		void room.run({ kind: 'SetOutput', outputId: 'tv', active: false, screen: false });
+		expect(room.asking?.command.kind).toBe('SetOutput');
+		room.asking!.answer(false);
+	});
+
+	it("doesn't show my own notice", () => {
+		const { room, socket } = connected(true);
+		socket.receive({ type: 'event', seq: 2, event: { kind: 'Notice', message: 'Anna paused', notFor: 'p1' } });
+		socket.receive({ type: 'event', seq: 3, event: { kind: 'Notice', message: 'Bram skipped', notFor: 'p2' } });
+		expect(room.notices.map((n) => n.text)).toEqual(['Bram skipped']);
+	});
+
 	it("doesn't ask when everyone else is on my account", () => {
 		const { room, socket } = connected(true);
 		room.state!.participants[0].accountId = 'me';

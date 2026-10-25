@@ -409,7 +409,7 @@ class RoomTest {
     fun `when the source is blocked for a while, the room pauses on the song instead of skipping`() = runTest {
         class Blocked : Exception("YouTube is blocking requests from this network for now (bot check)."), SourceBlocked
         var blocked = true
-        val room = Room("ABCD", "Test", "t", RoomVisibility.PUBLIC, { id -> if (blocked) throw Blocked() else "https://stream/$id" }, backgroundScope) {
+        val room = Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> if (blocked) throw Blocked() else "https://stream/$id" }, backgroundScope) {
             testScheduler.currentTime
         }
         val client = room.connect()
