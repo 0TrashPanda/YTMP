@@ -9,6 +9,7 @@
 	import { youtube } from '../lib/youtube.svelte';
 	import { nativeBridge, type NearbyRoom } from '../lib/native';
 	import type { HostInfo, RoomInfo, RoomOpenMode, RoomVisibility, SyncedRoom } from '../lib/protocol.gen';
+	import { settings } from '../lib/settings.svelte';
 	import { saved } from '../lib/storage';
 
 	let name = $state(saved.displayName);
@@ -48,6 +49,7 @@
 	const defaultRoomName = $derived(name.trim() ? `${name.trim()}'s room` : 'Room name');
 
 	onMount(async () => {
+		if (await reopen()) return;
 		try {
 			host = await getHost();
 			me = await logInOnce(host);
@@ -65,6 +67,23 @@
 			youtube.load();
 		}
 	});
+
+	/**
+	 * The app was closed in a room: back into it, if that's set for its kind (Settings → App) and
+	 * it's still there. True when it goes there.
+	 */
+	async function reopen(): Promise<boolean> {
+		const last = saved.lastRoom;
+		saved.lastRoom = null;
+		if (!nativeBridge || !last || !(last.solo ? settings.reopenSolo.value : settings.reopenParty.value)) return false;
+		try {
+			const room = await getRoom(last.code);
+			await goto(`/room/${room.code}`, { replaceState: true });
+			return true;
+		} catch {
+			return false;
+		}
+	}
 
 	function closeSettings() {
 		settingsAt = undefined;

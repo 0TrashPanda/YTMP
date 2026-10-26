@@ -182,6 +182,10 @@ export const settings = {
 	nextPlays: new Setting('nextPlays', true, bool, flag('ytmp.nextPlays')),
 	/** Start radio also clears the songs that played before (above the current one). */
 	radioClearsHistory: new Setting('radioClearsHistory', false, bool, flag('ytmp.radioClearsHistory')),
+	/** Opening the app goes back into the solo room you were in, instead of the room list. */
+	reopenSolo: new Setting('reopenSolo', true, bool),
+	/** The same for party rooms. */
+	reopenParty: new Setting('reopenParty', false, bool),
 	/** Your other devices may switch "Play here" on and off on this one. */
 	remotePlay: new Setting('remotePlay', true, bool, flag('ytmp.remotePlay')),
 	/** The app skips silent parts of podcast episodes, when you listen alone. */
@@ -222,6 +226,8 @@ export const settings = {
 	/** Taps and swipes on songs in lists, and in Up next (gestures.svelte.ts). */
 	gesturesList: new Setting<Record<string, unknown>>('gesturesList', {}, object, json('ytmp.gestures.list', object)),
 	gesturesQueue: new Setting<Record<string, unknown>>('gesturesQueue', {}, object, json('ytmp.gestures.queue', object)),
+	/** Home and your library load new ones after this many minutes (0: only when you pull down). */
+	homeRefresh: new Setting('homeRefresh', 6 * 60, count(0, 7 * 24 * 60)),
 	/** How Home looks (home.svelte.ts). */
 	home: new Setting<Record<string, unknown>>('home', {}, object, json('ytmp.home', object)),
 	/** The song menu's layout (songMenu.svelte.ts). */

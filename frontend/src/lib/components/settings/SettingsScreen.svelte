@@ -474,6 +474,19 @@
 					] as [DislikeButton, string][]}
 				/>
 			{:else if section === 'home'}
+				<Choice
+					label="New suggestions after"
+					hint="Home and Library show what they had right away, and only load new ones from YouTube Music once they're this old. Pulling down (or the logo on Home) always loads new ones."
+					setting={settings.homeRefresh}
+					options={[
+						[30, '30 min'],
+						[6 * 60, '6 h'],
+						[24 * 60, '1 day'],
+						[0, 'Only by hand']
+					]}
+				>
+					<NumberField value={settings.homeRefresh.value} min={0} max={7 * 24 * 60} unit="min" label="New suggestions after" onchange={(v) => settings.homeRefresh.set(v)} />
+				</Choice>
 				<HomeSection />
 			{:else if section === 'menu'}
 				<SongMenuSection />
@@ -507,6 +520,16 @@
 					</div>
 					<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => nativeBridge?.shareLogs?.()}>Send logs</button>
 				</div>
+				<Toggle
+					label="Open the solo room you were in"
+					hint="Opening the app goes straight back into the solo room you were in when you closed it, instead of the room list."
+					setting={settings.reopenSolo}
+				/>
+				<Toggle
+					label="Open the party room you were in"
+					hint="The same for party rooms (if the room is still there)."
+					setting={settings.reopenParty}
+				/>
 				<Choice
 					label="Back button in a solo room"
 					hint="Where the phone's Back button stops once you're on Home."

@@ -36,7 +36,7 @@
 	import type { Link } from '../../../lib/links';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import CloneSheet from '../../../lib/components/CloneSheet.svelte';
-	import { forgetHome, getHost, getRoom } from '../../../lib/api';
+	import { forgetHome, forgetLibrary, getHost, getRoom } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
 	import { createPlayer, pause, type RoomPlayer } from '../../../lib/player.svelte';
 	import { sleepTimer } from '../../../lib/sleepTimer.svelte';
@@ -243,7 +243,14 @@
 		const clock = setInterval(() => (now = Date.now()), 250);
 		return () => clearInterval(clock);
 	});
+	// The room you're in, to open again when the app starts (Settings → App). Leaving it for
+	// the room list forgets it; closing the app doesn't.
+	$effect(() => {
+		const info = room?.state?.room;
+		if (info) saved.lastRoom = { code: info.code, solo: info.visibility === 'private' };
+	});
 	onDestroy(() => {
+		saved.lastRoom = null;
 		sleepTimer.attach(null, null);
 		player?.destroy();
 		room?.close();
@@ -424,8 +431,9 @@
 		};
 	});
 
-	// Phones: pull Home down to load new suggestions.
+	// Phones: pull Home down to load new suggestions (Library: your playlists and podcasts again).
 	let homeVersion = $state(0);
+	let libraryVersion = $state(0);
 	let pullStart: { x: number; y: number } | null = null;
 	/** Null until the finger has moved enough to tell a pull down from a sideways swipe (a row of songs). */
 	let pullDown: boolean | null = null;
@@ -433,7 +441,7 @@
 	const PULL_TO_REFRESH = 72;
 	function pullStartAt(event: TouchEvent) {
 		const t = event.touches[0];
-		pullStart = top.kind === 'home' && (scroller?.scrollTop ?? 1) <= 0 ? { x: t.clientX, y: t.clientY } : null;
+		pullStart = (top.kind === 'home' || top.kind === 'library') && (scroller?.scrollTop ?? 1) <= 0 ? { x: t.clientX, y: t.clientY } : null;
 		pullDown = null;
 	}
 	function pullMove(event: TouchEvent) {
@@ -453,7 +461,10 @@
 		pull = Math.min(PULL_TO_REFRESH * 1.5, distance * 0.5);
 	}
 	function pullEnd() {
-		if (pull >= PULL_TO_REFRESH) {
+		if (pull >= PULL_TO_REFRESH && top.kind === 'library') {
+			forgetLibrary();
+			libraryVersion++;
+		} else if (pull >= PULL_TO_REFRESH) {
 			forgetHome();
 			homeVersion++;
 		}
@@ -748,6 +759,7 @@
 								onFolder={(library, path) => show({ kind: 'folder', library, path })}
 							/>
 						{:else if top.kind === 'library'}
+							{#key libraryVersion}
 							<LibraryView
 								onToast={toast}
 								onHistory={() => show({ kind: 'history' })}
@@ -756,6 +768,7 @@
 								onPlaylist={(p) => openPlaylist(p, true)}
 								onPodcast={openPodcast}
 							/>
+							{/key}
 						{:else}
 							<!-- Signing in or out changes the suggestions. -->
 							{#key `${youtube.version}:${homeVersion}`}

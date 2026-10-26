@@ -341,7 +341,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
     rooms** (what a solo room leaves out, below).
   - **Music and storage**: **Local music**, **Song cache and downloads** (the app) and
     **Your own module** (browsers).
-  - **App** (version, updates, logs, the Back button) and **Server admin** (invites, accounts).
+  - **App** (version, updates, logs, opening the room you were in, the Back button) and **Server admin** (invites, accounts).
 - **Your settings on all your devices** ✅: logged in with your YTMP account, almost every
   setting is kept on your account, so all your devices have it, and a change on one shows up
   on the others (when you come back to the app). A phone icon next to a setting keeps it
@@ -363,8 +363,14 @@ Open it with the **⋮** button or by **right-clicking** the song.
   waiting and limits and the votes needed to skip (*This room*), songs per page, the song
   cache's size and the playback speed. Enter (or leaving the box) takes it, kept within what
   the setting allows.
-- **Pull Home down** to load new suggestions (only a pull down: swiping a row sideways never
-  refreshes). Rows that scroll sideways have **page dots**.
+- **Home and Library** show what they had right away (also after the app was closed) and only
+  load new ones from YouTube Music once they're **6 hours** old (*Settings → Home*: 30 min to a
+  week, or only by hand). **Pull Home or Library down** (or tap the logo on Home) to load new
+  ones now (only a pull down: swiping a row sideways never refreshes). Your own changes (a new
+  playlist, renaming) show right away. Rows that scroll sideways have **page dots**.
+- **Back where you were**: opening the app goes straight back into the solo room you were in
+  when you closed it (*Settings → App*, on by default); the same for party rooms is a separate
+  setting (off by default). Going to the room list yourself means it starts there next time.
 - **Long lists** come in pages: playlists (Liked music and your own too) load more as you
   scroll down; songs in Local have **Load more**. How many songs a page has (100, 300 or 1000, or a
   number from 10 to 5000 typed in) is a setting in *Settings → Look*.

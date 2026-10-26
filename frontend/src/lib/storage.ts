@@ -131,6 +131,19 @@ export const saved = {
 		write('ytmp.volume', String(value));
 	},
 	/** Back at a room's home page: stay (the app goes to the background) or go to the room list. */
+	/** The room this page is in (null: none, e.g. back on the room list), to open again when the app starts. */
+	get lastRoom(): { code: string; solo: boolean } | null {
+		try {
+			const room = JSON.parse(read('ytmp.lastRoom') ?? 'null') as { code?: unknown; solo?: unknown } | null;
+			return room && typeof room.code === 'string' ? { code: room.code, solo: room.solo === true } : null;
+		} catch {
+			return null;
+		}
+	},
+	set lastRoom(room: { code: string; solo: boolean } | null) {
+		if (room) write('ytmp.lastRoom', JSON.stringify(room));
+		else remove('ytmp.lastRoom');
+	},
 	backLimit: (solo: boolean): BackLimit => pick(solo ? 'ytmp.backLimit.solo' : 'ytmp.backLimit.party', ['home', 'rooms'], solo ? 'home' : 'rooms'),
 	setBackLimit: (solo: boolean, limit: BackLimit) => write(solo ? 'ytmp.backLimit.solo' : 'ytmp.backLimit.party', limit),
 	/** Pause the music (when you're the only one listening), stop playing here, or keep playing on the speaker. */

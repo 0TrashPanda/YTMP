@@ -52,6 +52,7 @@ import type {
 } from './protocol.gen';
 
 import { identity } from './account';
+import { settings } from './settings.svelte';
 import { read, saved, write } from './storage';
 
 export class ApiRequestError extends Error {
@@ -330,26 +331,47 @@ export async function setPodcastSaved(id: string, saved: boolean): Promise<void>
 /** Suggestions for the home page: quick picks, new releases, mixes (yours, with your YouTube Music). */
 export function getHome(): Promise<HomePage> {
 	const path = youtubeFrom ? '/api/me/home' : `/api/home${refreshHome ? '?fresh=1' : ''}`;
-	return keepLast('home', cached('home', () => request<HomePage>(path).finally(() => (refreshHome = false))));
+	const forced = refreshHome;
+	return cached('home', () => sinceLast('home', forced, () => request<HomePage>(path).finally(() => (refreshHome = false))));
 }
 
-// The last Home and library are kept in this browser: the next time they show right away,
-// while the new ones load (YouTube Music takes a second or two for them).
+// The last Home and library are kept in this browser: they show right away, and new ones are
+// only loaded once they're older than set in Settings → Home (or when you pull down).
 type Last = 'home' | 'me:library';
+type Kept = { at: number; page: HomePage };
 const lastKey = (key: Last) => `ytmp.last.${youtubeFrom?.server ?? ''}:${key}`;
 
-/** The [key] page as it was last loaded here (null: never, or since signing out). */
-export function lastSeen<T extends HomePage>(key: Last): T | null {
+function kept(key: Last): Kept | null {
 	try {
-		return JSON.parse(read(lastKey(key)) ?? 'null') as T | null;
+		const value = JSON.parse(read(lastKey(key)) ?? 'null') as Kept | HomePage | null;
+		// Kept before they had a time: as old as can be.
+		return value && 'sections' in value ? { at: 0, page: value } : value;
 	} catch {
 		return null;
 	}
 }
 
-function keepLast<T>(key: Last, value: Promise<T>): Promise<T> {
-	value.then((v) => write(lastKey(key), JSON.stringify(v))).catch(() => {});
-	return value;
+/** The [key] page as it was last loaded here (null: never, or since signing out). */
+export function lastSeen<T extends HomePage>(key: Last): T | null {
+	return (kept(key)?.page as T | undefined) ?? null;
+}
+
+/** The kept [key] page while it's new enough (and not [forced]); else [load]s a new one and keeps that. */
+async function sinceLast<T extends HomePage>(key: Last, forced: boolean, load: () => Promise<T>): Promise<T> {
+	const last = kept(key);
+	const wait = settings.homeRefresh.value * 60_000;
+	if (last && !forced && (wait === 0 || Date.now() - last.at < wait)) return last.page as T;
+	const page = await load();
+	write(lastKey(key), JSON.stringify({ at: Date.now(), page } satisfies Kept));
+	return page;
+}
+
+let refreshLibrary = false;
+
+/** Your library changed (or you pulled it down): load it again next time (the kept one shows meanwhile). */
+export function forgetLibrary(): void {
+	cache.delete('me:library');
+	refreshLibrary = true;
 }
 
 /**
@@ -403,7 +425,8 @@ export function getLocalLibrary(id: string): Promise<LocalLibraryPage> {
 }
 
 export function getLibrary(): Promise<HomePage> {
-	return keepLast('me:library', cached('me:library', () => request('/api/me/library')));
+	const forced = refreshLibrary;
+	return cached('me:library', () => sinceLast('me:library', forced, () => request<HomePage>('/api/me/library').finally(() => (refreshLibrary = false))));
 }
 
 /** Your thumbs on a song in YouTube Music: up (liked), down (disliked), or neither. */
@@ -448,13 +471,13 @@ export async function renamePlaylist(playlistId: string, title: string): Promise
 		body: JSON.stringify({ title } satisfies RenamePlaylistRequest)
 	});
 	cache.delete(`me:playlist:${playlistId}`);
-	cache.delete('me:library');
+	forgetLibrary();
 }
 
 export async function deletePlaylist(playlistId: string): Promise<void> {
 	await request<null>(`/api/me/playlists/${encodeURIComponent(playlistId)}`, { method: 'DELETE' });
 	cache.delete(`me:playlist:${playlistId}`);
-	cache.delete('me:library');
+	forgetLibrary();
 }
 
 /** Your own playlists, to save songs to. */
@@ -478,7 +501,7 @@ export async function createPlaylist(title: string, songIds: string[]): Promise<
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ title, songIds } satisfies CreatePlaylistRequest)
 	});
-	cache.delete('me:library');
+	forgetLibrary();
 	return response.id;
 }
 
