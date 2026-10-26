@@ -23,6 +23,8 @@ android {
             .let { (it + listOf(0, 0, 0)).take(3) }
             .let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
             .coerceAtLeast(1)
+        // The port of the phone's own host (LocalHost.PORT).
+        buildConfigField("int", "HOST_PORT", "8765")
 
         ndk {
             // Real phones, and the x86_64 emulator.
@@ -41,7 +43,17 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
+        // A debug build installs next to the real app ("YTMP debug", its own data), with its
+        // host on another port, so both can run on one phone.
+        debug {
+            applicationIdSuffix = ".debug"
+            buildConfigField("int", "HOST_PORT", "8766")
+        }
         release {
             isMinifyEnabled = false
             if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")

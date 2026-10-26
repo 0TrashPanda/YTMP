@@ -7,6 +7,7 @@ import androidx.core.content.edit
 import android.os.Build
 import android.os.Environment
 import android.net.ConnectivityManager
+import dev.trashpanda.ytmp.BuildConfig
 import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.OnDeviceYtm
 import dev.trashpanda.ytmp.core.CatalogSource
@@ -477,7 +478,7 @@ class LocalHost(private val context: Context) {
     }
 
     companion object {
-        const val PORT = 8765
+        const val PORT = BuildConfig.HOST_PORT
         private const val PHONE_MUSIC = "phoneMusic"
         private const val MEDIA_SCAN = "mediaScan"
         private const val CACHE_SIZE = "size"

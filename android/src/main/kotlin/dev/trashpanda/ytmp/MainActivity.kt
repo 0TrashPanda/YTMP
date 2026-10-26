@@ -431,6 +431,10 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun bridgeVersion(): Int = BRIDGE_VERSION
 
+        /** The app's own pages, e.g. `http://127.0.0.1:8765` (a debug build has another port). */
+        @JavascriptInterface
+        fun homeOrigin(): String = LocalHost.LOCAL_URL
+
         /** Where the song the app plays comes from (bridge version 17), see [PlaybackHub.audioSource]. */
         @JavascriptInterface
         fun audioSource(): String = PlaybackHub.audioSource ?: ""

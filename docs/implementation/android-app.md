@@ -190,6 +190,14 @@ inside the WebView.
 
 In the browser, the frontend plays audio itself with HTML audio / the Web Audio API.
 
+## Debug builds next to the real app ✅
+
+A debug build (`./gradlew :android:assembleDebug`) is its own app, *YTMP debug*
+(`dev.trashpanda.ytmp.debug`, `applicationIdSuffix`), with its own data, and its host on port
+**8766** instead of 8765 (`BuildConfig.HOST_PORT`), so it installs and runs next to a release
+build on one phone. The web app asks the app for its own pages' address
+(`YtmpNative.homeOrigin()`) instead of assuming port 8765.
+
 ## App updates ✅
 
 `Updates.kt`: at app start (once per process, not in debug builds: they're signed with

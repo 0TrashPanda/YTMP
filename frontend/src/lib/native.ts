@@ -3,6 +3,8 @@ import type { Command } from './protocol.gen';
 /** The Android app's JS bridge (android/.../MainActivity.kt). Null in a normal browser. */
 export interface NativeBridge {
 	bridgeVersion(): number;
+	/** The app's own pages, e.g. `http://127.0.0.1:8765` (newer apps; a debug build has another port). */
+	homeOrigin?(): string;
 	serverUrl(): string;
 	changeServer(): void;
 	/** Opens the configured server (or asks for one). */

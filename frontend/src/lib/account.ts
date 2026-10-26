@@ -318,7 +318,7 @@ export async function connectQuietly(host: HostInfo): Promise<boolean> {
 // --- log in once ---------------------------------------------------------------------------
 
 /** The app's own pages (the phone's built-in host, android/.../LocalHost.kt). */
-export const APP_HOME_ORIGIN = 'http://127.0.0.1:8765';
+export const APP_HOME_ORIGIN = nativeBridge?.homeOrigin?.() ?? 'http://127.0.0.1:8765';
 
 /** An identity this close to running out is renewed. */
 const RENEW_MS = 7 * 24 * 3600_000;
