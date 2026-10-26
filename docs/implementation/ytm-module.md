@@ -92,7 +92,9 @@ anonymous (it doesn't use the cookies).
 
 **Playlists in parts:** playlists (public ones, Liked music and your own) load part by part
 (YouTube Music's own parts, ~100 songs), so a long one opens as fast as a short one; the
-artist page's songs are the first part of the artist's songs playlist. ytmusicapi's `limit`
+artist page has YouTube Music's 5 top songs (no second request); the web app loads the
+artist's songs playlist (`songsPlaylistId`) when it needs more (*Add top songs*, a pinned
+artist): 1.5 s → 0.55 s for an artist page on a Pixel 7. ytmusicapi's `limit`
 doesn't count the first part (`limit=20` still loads a second part of 100). ytmusicapi's `get_playlist`
 loads all parts itself and doesn't hand out the token for the next one, so `core.py` wraps
 its `get_continuations_2025`: with `limit=0` it stops after the first part and keeps that
@@ -105,7 +107,11 @@ initial_data`): that's chapters, comments and the heatmap, ~0.8 s per song whose
 never uses. At start the module gets YouTube Music's visitor ID in the background
 (`warm_up()`), so the first search or page doesn't wait for that 650 KB page (and doesn't
 fetch it three times over for a search's three parallel lookups). A personal Home loads the
-new episodes and YouTube Music's home at the same time.
+new episodes and YouTube Music's home at the same time. yt-dlp instances are kept between
+stream lookups (`_YdlPool`: one lookup per instance at a time, dropped after a failure,
+renewed after 30 min): ~0.3 s less per song on a Pixel 7 (3.6 → 3.3 s). Measured and left out:
+skipping yt-dlp's watch page (`player_skip: webpage`) makes YouTube turn the usual player away,
+so the mobile web player with its ad answers instead: 7–8 s per song.
 
 ## Android on-device variant ✅ (Chaquopy)
 

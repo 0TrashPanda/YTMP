@@ -131,8 +131,11 @@
 
 	// Thumbs up, with your YouTube Music sign-in.
 	const liked = $derived(likes.get(song?.id));
+	// The next song's too, so its button is right as soon as it starts.
+	const nextId = $derived(room.state?.queue[0]?.song.id);
 	$effect(() => {
 		if (song?.id) likes.load(song.id);
+		if (nextId) likes.load(nextId);
 	});
 
 	function toggleLike() {

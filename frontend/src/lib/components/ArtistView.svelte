@@ -2,7 +2,8 @@
 	import { hideIfBroken } from '../pictures';
 	// An artist page: top songs, albums and singles.
 	import { thumbUrl } from '../images.svelte';
-	import { getArtist } from '../api';
+	import { getArtist, topSongs } from '../api';
+	import { whileBusy } from '../busy.svelte';
 	import { addToQueue, playNext, startRadio } from '../songActions';
 	import type { AlbumSummary, ArtistPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -54,9 +55,11 @@
 	}
 
 	async function addAll(position: 'next' | 'end') {
-		if (!artist?.songs.length) return;
-		const name = `${artist.songs.length} songs by ${artist.name}`;
-		await (position === 'next' ? playNext : addToQueue)(room, artist.songs, name, onToast);
+		const a = artist;
+		if (!a?.songs.length) return;
+		const songs = await whileBusy(`Adding songs by ${a.name}…`, topSongs(a));
+		const name = `${songs.length} songs by ${a.name}`;
+		await (position === 'next' ? playNext : addToQueue)(room, songs, name, onToast);
 	}
 </script>
 

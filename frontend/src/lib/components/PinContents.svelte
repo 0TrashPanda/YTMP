@@ -1,7 +1,7 @@
 <script lang="ts">
 	// A pin shown on Home with its songs (Settings → Home): the first songs of the playlist or
 	// album, the artist's top songs, or the podcast's newest episodes. More opens its page.
-	import { getAlbum, getArtist, getPlaylist, getPodcast } from '../api';
+	import { getAlbum, getArtist, getPlaylist, getPodcast, topSongs } from '../api';
 	import type { Layout, Pin } from '../home.svelte';
 	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -32,7 +32,7 @@
 			case 'album':
 				return (await getAlbum(pin.id)).songs;
 			case 'artist':
-				return (await getArtist(pin.id)).songs;
+				return topSongs(await getArtist(pin.id));
 			case 'podcast':
 				return (await getPodcast(pin.id)).episodes.map((e) => e.song);
 		}

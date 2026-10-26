@@ -6,6 +6,7 @@ See docs/implementation/module-api.md.
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import logging
 import re
@@ -163,6 +164,7 @@ class YtmCore:
         self._bot_check = _BotCheck()
         self._streams: dict[str, StreamInfo] = {}
         self._lock = threading.Lock()
+        self._ydls = _YdlPool()
         self._language = language
         self._location = location
         # The signed-in YouTube Music account (the phone owner's), next to the anonymous one
@@ -300,16 +302,9 @@ class YtmCore:
         except Exception as e:
             raise NotFound(str(e)) from e
         songs_section = a.get("songs") or {}
-        songs: list[dict] = []
-        # The artist's songs are a playlist; read more of it than the 5 on the page.
-        if songs_section.get("browseId"):
-            try:
-                playlist = _first_part_of(self._ytm, songs_section["browseId"])[0]
-                songs = [s for t in playlist.get("tracks") or [] if (s := parse.song_from_search(t))]
-            except Exception:
-                songs = []
-        if not songs:
-            songs = [s for t in songs_section.get("results") or [] if (s := parse.song_from_search(t))]
+        # The top songs on the page (5, like YTM shows them). All their songs are a playlist
+        # (songsPlaylistId): the page loads it when it needs more, so it opens a request sooner.
+        songs = [s for t in songs_section.get("results") or [] if (s := parse.song_from_search(t))]
         return {
             "id": artist_id,
             "name": a.get("name") or "",
@@ -622,7 +617,7 @@ class YtmCore:
             opts["extractor_args"] = dict(opts.get("extractor_args") or {}, youtube={**_PLAYER_SKIP, **_PO_TOKEN_ARGS})
         started = time.monotonic()
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
+            with self._ydls.get(opts) as ydl:
                 info = ydl.extract_info(f"https://music.youtube.com/watch?v={vid}", download=False)
         except yt_dlp.utils.DownloadError as e:
             log.warning("stream %s: yt-dlp failed after %.1f s: %s\n%s", vid, time.monotonic() - started, e, steps.text())
@@ -669,6 +664,43 @@ class YtmCore:
         """Drops a cached stream URL that stopped working, so the next lookup resolves it again."""
         with self._lock:
             self._streams.pop(video_id(song_id), None)
+
+
+class _YdlPool:
+    """yt-dlp, kept between lookups: a new one starts over (YouTube's player code, its own
+    settings), which makes each song ~0.5 s slower to look up on a phone. One lookup per
+    instance at a time; an instance is dropped after a failure, and renewed after a while."""
+
+    _MAX_AGE_S = 30 * 60
+    _MAX_IDLE = 4
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._idle: list[tuple[str, float, yt_dlp.YoutubeDL]] = []
+
+    @contextlib.contextmanager
+    def get(self, opts: dict):
+        """An instance for [opts] (its logger is this lookup's)."""
+        key = repr(sorted((k, repr(v)) for k, v in opts.items() if k != "logger"))
+        now = time.monotonic()
+        found = None
+        with self._lock:
+            for i, (k, at, ydl) in enumerate(self._idle):
+                if k == key and now - at < self._MAX_AGE_S:
+                    found = self._idle.pop(i)
+                    break
+        key, at, ydl = found or (key, now, yt_dlp.YoutubeDL(opts))
+        ydl.params["logger"] = opts.get("logger")
+        try:
+            yield ydl
+        except BaseException:
+            ydl.close()
+            raise
+        with self._lock:
+            if now - at < self._MAX_AGE_S and len(self._idle) < self._MAX_IDLE:
+                self._idle.append((key, at, ydl))
+                return
+        ydl.close()
 
 
 _REPEAT_WARNING_S = 3600
@@ -736,9 +768,8 @@ def _first_part_of(ytm: YTMusic, playlist_id: str) -> tuple[dict, str | None]:
     """A playlist with only its first part of songs, and the token for the next part (None: no more).
 
     ytmusicapi's own limit doesn't count the first part: limit=20 loads a second part anyway.
+    Only with [_first_part_only].
     """
-    if not _first_part_only:
-        return ytm.get_playlist(playlist_id, limit=_ARTIST_SONGS), None
     _first_part.token = None
     p = ytm.get_playlist(playlist_id, limit=0)
     return p, _first_part.token

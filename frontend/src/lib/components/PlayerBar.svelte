@@ -98,8 +98,11 @@
 		const solo = room.state?.room.visibility === 'private';
 		if ((await likes.rate(id, disliking ? 'dislike' : 'none', onToast)) && disliking && solo && room.can('skip')) await room.run({ kind: 'Skip', play: false });
 	}
+	// The next song's too, so its button is right as soon as it starts.
+	const nextId = $derived(room.state?.queue[0]?.song.id);
 	$effect(() => {
 		if (songId && wide.current) likes.load(songId);
+		if (nextId && wide.current) likes.load(nextId);
 	});
 
 	/**

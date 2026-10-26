@@ -279,6 +279,17 @@ export function getArtist(id: string): Promise<ArtistPage> {
 	return cached(`artist:${id}`, () => request(`/api/artists/${encodeURIComponent(id)}`));
 }
 
+/** An artist's top 20 songs: from their songs playlist (the page itself has the first 5). */
+export async function topSongs(artist: ArtistPage): Promise<Song[]> {
+	if (!artist.songsPlaylistId || artist.songs.length >= TOP_SONGS) return artist.songs;
+	try {
+		return (await getPlaylist(artist.songsPlaylistId)).songs.slice(0, TOP_SONGS);
+	} catch {
+		return artist.songs;
+	}
+}
+const TOP_SONGS = 20;
+
 export function getAlbum(id: string): Promise<AlbumPage> {
 	return cached(`album:${id}`, () => request(`/api/albums/${encodeURIComponent(id)}`));
 }

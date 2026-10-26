@@ -49,6 +49,7 @@ def _bare_core() -> core.YtmCore:
     ytm._ydl_opts = {"extractor_args": {"youtube": core._PLAYER_SKIP}}
     ytm._pot_url = None
     ytm._bot_check = core._BotCheck()
+    ytm._ydls = core._YdlPool()
     return ytm
 
 
@@ -58,9 +59,12 @@ class FakeYdl:
     available_at: float | None = None
     opts: list[dict] = []
 
-    def __init__(self, opts): FakeYdl.opts.append(opts)
-    def __enter__(self): return self
-    def __exit__(self, *_): return False
+    def __init__(self, opts):
+        FakeYdl.opts.append(opts)
+        self.params = dict(opts)
+        self.closed = False
+
+    def close(self): self.closed = True
 
     def extract_info(self, _url, download):
         if isinstance(FakeYdl.result, Exception):
@@ -76,6 +80,25 @@ def test_fresh_stream_skips_the_cache(monkeypatch):
     assert ytm.stream("ytm:abc").url == "https://old"
     assert ytm.stream("ytm:abc", fresh=True).url == "https://new?expire=9999999999"
     assert ytm.stream("ytm:abc").url == "https://new?expire=9999999999"
+
+
+def test_yt_dlp_is_kept_between_lookups(monkeypatch):
+    monkeypatch.setattr(core.yt_dlp, "YoutubeDL", FakeYdl)
+    monkeypatch.setattr(FakeYdl, "opts", [])
+    monkeypatch.setattr(FakeYdl, "result", "https://new?expire=9999999999")
+    ytm = _bare_core()
+    ytm.stream("ytm:a")
+    ytm.stream("ytm:b")
+    # One instance for both, each lookup with its own log.
+    assert len(FakeYdl.opts) == 1
+
+    # One that failed isn't used again.
+    monkeypatch.setattr(FakeYdl, "result", core.yt_dlp.utils.DownloadError("ERROR: gone"))
+    with pytest.raises(core.Unavailable):
+        ytm.stream("ytm:c")
+    monkeypatch.setattr(FakeYdl, "result", "https://new?expire=9999999999")
+    ytm.stream("ytm:d")
+    assert len(FakeYdl.opts) == 2
 
 
 def test_bot_check_pauses_lookups_for_longer_each_time(monkeypatch):
