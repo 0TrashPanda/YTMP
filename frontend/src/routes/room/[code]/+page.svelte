@@ -156,8 +156,16 @@
 	// the phone's Back button closes it.
 	const expanded = $derived(!!page.state.player);
 
+	/**
+	 * Each time it opens, a new full player: one that's still sliding away (swiped down a
+	 * moment ago) finishes on its own, instead of coming back from halfway, stuck there.
+	 */
+	let playerOpened = $state(0);
+
 	function openPlayer() {
-		if (!page.state.player) pushState('', { player: true });
+		if (page.state.player) return;
+		playerOpened++;
+		pushState('', { player: true });
 	}
 
 	function closePlayer() {
@@ -789,6 +797,7 @@
 				</div>
 
 				{#if expanded && player}
+					{#key playerOpened}
 					<NowPlaying
 						{room}
 						{player}
@@ -803,6 +812,7 @@
 						onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
 						onPodcast={openPodcast}
 					/>
+					{/key}
 				{/if}
 			</div>
 		</div>
