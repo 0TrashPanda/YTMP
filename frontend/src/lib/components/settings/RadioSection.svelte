@@ -17,15 +17,16 @@
 	let { onToast, onThisPhone = false, onGraph }: { onToast: (text: string) => void; onThisPhone?: boolean; onGraph?: () => void } = $props();
 
 	const r = $derived(radioDefaults());
-	// The choices edit a copy; each change is saved.
-	let picked = $state<RadioOptions>(radioDefaults());
-	$effect(() => {
-		const p = picked;
-		const d = radioDefaults();
-		if (p.from !== d.from || p.discover !== d.discover || p.withAccount !== d.withAccount || p.myTaste !== d.myTaste) {
+	// The choices are your saved defaults themselves: a change is saved, and defaults that
+	// arrive from your account later show as they are (nothing old is written over them).
+	const picked = {
+		get value() {
+			return radioDefaults();
+		},
+		set value(p: RadioOptions) {
 			setRadioDefaults({ from: p.from, discover: p.discover, withAccount: p.withAccount, myTaste: p.myTaste });
 		}
-	});
+	};
 
 	onMount(() => void listening.load());
 
@@ -35,7 +36,7 @@
 <section class={card}>
 	<h3 class="font-bold">Every radio</h3>
 	<p class="text-xs text-muted">Start radio, Autoplay this and autoplay. Hold Start radio (or right-click it) to choose differently for one radio.</p>
-	<RadioChoices bind:value={picked} hasAccount={!!youtube.account} party />
+	<RadioChoices bind:value={() => picked.value, (v) => (picked.value = v)} hasAccount={!!youtube.account} party />
 </section>
 
 <section class={card}>

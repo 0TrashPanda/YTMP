@@ -526,7 +526,7 @@ class AccountService(
     /**
      * Whose history this request may read: a login here, a token just for that ([HISTORY_SCOPE],
      * for the pages of rooms on other hosts), or a host token made for your phone's own app
-     * ([PHONE_APP_ORIGIN]) or this server's pages: those never reach another host. A host token
+     * ([PHONE_APP_ORIGIN], or the debug app's) or this server's pages: those never reach another host. A host token
      * for another host is not enough: every host you join has one.
      */
     private suspend fun ApplicationCall.historyAccount(): Accounts.Account {
@@ -540,7 +540,7 @@ class AccountService(
     /** A host token that only reaches the account's own devices: for the phone's own app, or this server's pages. */
     private fun mayReadHistory(claims: AccountTokens.Claims): Boolean {
         val origin = normalizeOrigin(claims.aud) ?: return false
-        return origin == PHONE_APP_ORIGIN || isOwnOrigin(origin)
+        return origin == PHONE_APP_ORIGIN || origin == PHONE_DEBUG_APP_ORIGIN || isOwnOrigin(origin)
     }
 
     /** A host token signed by us (made for any host), from `Authorization: Bearer`. */
@@ -645,6 +645,9 @@ private const val MAX_PREFERENCES = 64 * 1024
 
 /** Where the app's own pages are, on every phone (android/.../LocalHost.kt): tokens for it only reach your own phone. */
 const val PHONE_APP_ORIGIN = "http://127.0.0.1:8765"
+
+/** The same for "YTMP debug", which installs next to the app with its host on its own port. */
+const val PHONE_DEBUG_APP_ORIGIN = "http://127.0.0.1:8766"
 
 /** Tuning within sensible bounds (the sliders' ranges). */
 private fun GraphTuning.sane() = GraphTuning(
