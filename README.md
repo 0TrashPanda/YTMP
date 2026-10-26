@@ -46,7 +46,8 @@ Music, without Premium, and not tied to a single music service.
   Chromecast shows it from *Play on* (it plays the music too), also a TV at your place in a
   room on a server, from the app.
 - Long playlists (like Liked music) add at most 200 songs at once, the first or picked at
-  random, asking first above 100 (all set in *Settings → Adding songs*). What takes a moment
+  random, asking first above 100 with your own choices (*Add 100*, *Add 200*, *Add all*; all
+  set in *Settings → Adding songs*). What takes a moment
   says so ("Adding Liked music…", then "Added 200 songs from Liked music").
 - Feels fast: the next song is looked up while one plays, playlists open after their first
   part, the last Home shows right away, and pages show placeholders while they load.

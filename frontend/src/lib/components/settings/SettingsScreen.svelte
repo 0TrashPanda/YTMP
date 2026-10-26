@@ -35,7 +35,7 @@
 	import { preferences } from '../../preferences.svelte';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
-	import { ADD_LIMITS, BUSY_DELAYS, load as loadSettings, onAccount, settings, type PlaylistPick, type Setting } from '../../settings.svelte';
+	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type PlaylistPick, type Setting } from '../../settings.svelte';
 	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type VideoArt } from '../../storage';
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
@@ -44,6 +44,7 @@
 	import AccountSection from './AccountSection.svelte';
 	import CacheSection from './CacheSection.svelte';
 	import Choice from './Choice.svelte';
+	import CountList from './CountList.svelte';
 	import DeviceNote from './DeviceNote.svelte';
 	import DeviceToggle from './DeviceToggle.svelte';
 	import DownloadsSection from './DownloadsSection.svelte';
@@ -320,7 +321,7 @@
 			{:else if section === 'adding'}
 				<Choice
 					label="Most songs from one playlist"
-					hint="Play, Play next and Add on a playlist or album add at most this many songs at once. Long playlists (like Liked music) then only load the part that's needed."
+					hint="Play, Play next and Add on a playlist or album add at most this many songs when they don't ask. Long playlists (like Liked music) then only load the part that's needed."
 					setting={settings.playlistMax}
 					options={[
 						[100, '100'],
@@ -342,7 +343,7 @@
 				/>
 				<Choice
 					label="Ask first above"
-					hint="A playlist with more songs than this asks how many: this many, or all of it (up to the most above)."
+					hint="A playlist with more songs than this asks how many, with the choices below."
 					setting={settings.playlistAskOver}
 					options={[
 						[0, 'Never ask'],
@@ -353,6 +354,20 @@
 				>
 					<NumberField value={settings.playlistAskOver.value} min={0} max={ADD_LIMITS.max} unit="songs" label="Ask first above" onchange={(v) => settings.playlistAskOver.set(v)} />
 				</Choice>
+				<CountList
+					label="Choices when it asks"
+					hint="A button for each number (up to {MAX_ASK_COUNTS}); the ones the playlist is shorter than are left out."
+					setting={settings.playlistAskCounts}
+					min={1}
+					max={ADD_LIMITS.max}
+					most={MAX_ASK_COUNTS}
+					unit="songs"
+				/>
+				<Toggle
+					label="Also: add all of it"
+					hint="When it asks, a button for the whole playlist, however long (Liked music can take a while to load)."
+					setting={settings.playlistAskAll}
+				/>
 				<Choice
 					label="Say what's going on after"
 					hint="Something that takes a moment (adding a long playlist, saving to a playlist) says so (“Adding Liked music…”) when it isn't done after this long, and what it did when it's done."

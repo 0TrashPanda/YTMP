@@ -179,9 +179,12 @@ radio goes on after its last song. Albums keep *Add to queue*.
 ## Long playlists ✅
 
 Nobody listens to 2000 songs in one queue. *Play*, *Play next*, *Add to queue* and *Add to
-autoplay* on a playlist or album add **at most 200 songs** at once, and a playlist of **more
-than 100** asks first: *Add 100* or *Add all 150* (up to the most). Which songs: **the first**
-ones (default), or **picked at random** from all of it (in the playlist's order). Only the
-part of a long playlist that's needed is loaded, so the first 200 of Liked music go in about
-as fast as a short playlist. All of it is set in *Settings → Adding songs* (the most: 10 to
-5000; asking: never, or above any number).
+autoplay* on a playlist or album add **at most 200 songs** without asking, and a playlist of
+**more than 100** asks first how many. Its choices are a setting: by default *Add 100*,
+*Add 200* and *Add all 1,081* (all of it, however long); a choice the playlist is shorter than
+is left out, and one as long as the playlist or longer becomes *Add all*. Which songs: **the
+first** ones (default), or **picked at random** from all of it (in the playlist's order). Only
+the part of a long playlist that's needed is loaded, so the first 200 of Liked music go in
+about as fast as a short playlist. All of it is set in *Settings → Adding songs*: the most
+without asking (10 to 5000), asking (never, or above any number), up to 6 choices, and
+whether *Add all* shows.

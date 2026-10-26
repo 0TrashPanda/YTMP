@@ -15,6 +15,8 @@ import { PAGE_SIZES, read, write } from './storage';
 export type PlaylistPick = 'first' | 'random';
 /** How many songs of one playlist may be added at most (Settings → Adding songs). */
 export const ADD_LIMITS = { min: 10, max: 5000 };
+/** At most this many choices when it asks how many. */
+export const MAX_ASK_COUNTS = 6;
 /** The wait before "Adding …" shows, in ms. */
 export const BUSY_DELAYS = { max: 5000 };
 
@@ -161,6 +163,13 @@ const count = (min: number, max: number) => (raw: unknown) => {
 	return n >= min && n <= max ? n : undefined;
 };
 
+/** A few song counts, each within ADD_LIMITS, smallest first. */
+const counts = (raw: unknown) => {
+	if (!Array.isArray(raw)) return undefined;
+	const valid = raw.filter((n) => count(1, ADD_LIMITS.max)(n) === n) as number[];
+	return valid.length === raw.length && valid.length <= MAX_ASK_COUNTS ? [...new Set(valid)].sort((a, b) => a - b) : undefined;
+};
+
 const imageQuality = oneOf<ImageQuality>('high', 'low');
 const videoArt = oneOf<VideoArt>('crop', 'fit');
 const dislikeButton = oneOf<DislikeButton>('normal', 'dim', 'hidden');
@@ -183,10 +192,14 @@ export const settings = {
 	pauseStopsHere: new Setting('pauseStopsHere', true, bool),
 
 	// Adding songs
-	/** At most this many songs of one playlist (or album) go into the queue at once. */
+	/** At most this many songs of one playlist (or album) go into the queue without asking. */
 	playlistMax: new Setting('playlistMax', 200, count(ADD_LIMITS.min, ADD_LIMITS.max)),
 	/** More songs than this: asks first how many (0: never asks). */
 	playlistAskOver: new Setting('playlistAskOver', 100, count(0, ADD_LIMITS.max)),
+	/** The choices when it asks: add this many (the ones below the playlist's length show). */
+	playlistAskCounts: new Setting<number[]>('playlistAskCounts', [100, 200], counts),
+	/** When it asks, also: add all of it, however long. */
+	playlistAskAll: new Setting('playlistAskAll', true, bool),
 	/** Which songs of a longer playlist: the first ones, or picked at random from all of it. */
 	playlistPick: new Setting('playlistPick', 'first' as PlaylistPick, oneOf<PlaylistPick>('first', 'random')),
 	/** Something that takes a moment says what's going on after this many milliseconds (busy.svelte.ts). */
