@@ -138,6 +138,22 @@
 		if (handled) e.preventDefault();
 	}
 
+	/**
+	 * Phones: a tap on the song opens the full player as soon as the finger lifts. Not by its
+	 * click: right after the player was swiped down, Chrome swallows the next tap's click (it
+	 * takes it as stopping that swipe's fling), so it needed two taps.
+	 */
+	let tap: { x: number; y: number; at: number } | null = null;
+	function tapEnd(event: TouchEvent) {
+		const t = tap;
+		tap = null;
+		swipeStart = null;
+		if (!t || event.timeStamp - t.at > 500 || !current || !(event.target as Element).closest('[data-opens-player]')) return;
+		// Instead of the click (if it comes), so it doesn't open twice.
+		event.preventDefault();
+		onExpand(true);
+	}
+
 	/** Desktop: a click anywhere on the bar that isn't on a button or link opens (or closes) the full player, like YTM. */
 	function barClick(event: MouseEvent) {
 		if ((event.target as Element).closest('button, a, input')) return;
@@ -152,17 +168,21 @@
 	<div
 		class="sm:hidden"
 		role="presentation"
-		ontouchstart={(e) => (swipeStart = e.touches[0].clientY)}
+		ontouchstart={(e) => {
+			swipeStart = e.touches[0].clientY;
+			tap = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: e.timeStamp };
+		}}
 		ontouchmove={(e) => {
+			if (tap && Math.hypot(e.touches[0].clientX - tap.x, e.touches[0].clientY - tap.y) > 10) tap = null;
 			if (swipeStart !== null && swipeStart - e.touches[0].clientY > 30) {
 				swipeStart = null;
 				if (current) onExpand(true);
 			}
 		}}
-		ontouchend={() => (swipeStart = null)}
+		ontouchend={tapEnd}
 	>
 		<div class="flex h-16 items-center gap-1 pr-1 pl-2">
-			<button class="flex min-w-0 flex-1 items-center gap-2.5 text-left" disabled={!current} onclick={() => onExpand(true)} oncontextmenu={onSongMenu}>
+			<button class="flex min-w-0 flex-1 items-center gap-2.5 text-left" data-opens-player disabled={!current} onclick={() => onExpand(true)} oncontextmenu={onSongMenu}>
 				<Art song={current?.item.song ?? null} size={96} class="h-10 w-10 shrink-0" />
 				<div class="min-w-0 flex-1">
 					<div class="truncate text-sm font-medium">{current?.item.song.title ?? 'Nothing playing'}</div>
