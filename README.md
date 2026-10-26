@@ -45,6 +45,11 @@ Music, without Premium, and not tied to a single music service.
   who added it, and a QR code to join. A TV links with a code, like YouTube's, and a TV with
   Chromecast shows it from *Play on* (it plays the music too), also a TV at your place in a
   room on a server, from the app.
+- Long playlists (like Liked music) add at most 200 songs at once, the first or picked at
+  random, asking first above 100 (all set in *Settings → Adding songs*). What takes a moment
+  says so ("Adding Liked music…", then "Added 200 songs from Liked music").
+- Feels fast: the next song is looked up while one plays, playlists open after their first
+  part, the last Home shows right away, and pages show placeholders while they load.
 - Every setting that is a number can be typed in too (volumes, sync adjustment, limits,
   songs per page, cache size, playback speed), next to its slider or choices.
 - Everyone who listens stays in sync, with a per-device sync adjustment (for Bluetooth). A

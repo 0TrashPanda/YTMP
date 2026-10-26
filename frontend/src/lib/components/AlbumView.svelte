@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Skeleton from './Skeleton.svelte';
 	import { hideIfBroken } from '../pictures';
 	// An album page: its songs, in order.
 	import { thumbUrl } from '../images.svelte';
@@ -73,7 +74,7 @@
 	{#if error}
 		<p class="px-2 text-accent">{error}</p>
 	{:else if !album}
-		<p class="px-2 text-muted">Loading…</p>
+		<Skeleton art={false} />
 	{:else}
 		<section class="flex flex-col gap-1">
 			<SongList {room} songs={album.songs} numbered showAlbum={false} {onToast} {onMenu} />

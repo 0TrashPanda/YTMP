@@ -1,8 +1,13 @@
 <script lang="ts">
 	// Play, Play next and Add to queue for a whole album or playlist. A playlist goes into
 	// autoplay instead of the queue ([toAutoplay]): it plays when the queue is empty.
+	// A long one adds at most the set number of songs, and asks first above another
+	// (Settings → Adding songs); loading it says so when it takes a moment.
 	import type { Snippet } from 'svelte';
+	import { addChoice, pickSongs, songsFrom } from '../addLimit';
+	import { whileBusy } from '../busy.svelte';
 	import type { Song } from '../protocol.gen';
+	import { ADD_LIMITS, settings } from '../settings.svelte';
 	import { addToQueue, playNext } from '../songActions';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
@@ -11,6 +16,7 @@
 		room,
 		songs,
 		name,
+		total = null,
 		toAutoplay = false,
 		whole,
 		onToast,
@@ -19,8 +25,10 @@
 		room: RoomConnection;
 		/** Null while loading. */
 		songs: Song[] | null;
-		/** All of it, when [songs] is only the part loaded so far (your playlists). */
-		whole?: () => Promise<Song[]>;
+		/** At least [count] songs (or all there are), when [songs] is only the part loaded so far (long playlists). */
+		whole?: (count: number) => Promise<Song[]>;
+		/** How many songs it has in all, when [songs] is only a part (null: not known). */
+		total?: number | null;
 		/** The album's or playlist's title, for the toasts. */
 		name: string;
 		/** "Add to autoplay" instead of "Add to queue" (playlists). */
@@ -30,28 +38,60 @@
 		children?: Snippet;
 	} = $props();
 
-	const all = async () => (whole ? await whole() : songs) ?? [];
+	/** Asking how many: [few] or [many]; answered with the number, or null (cancelled). */
+	let asking = $state<{ verb: string; few: number; many: number; answer: (count: number | null) => void } | null>(null);
+
+	/** How many to add: within the set most, asked first when it's long. Null: cancelled. */
+	async function howMany(verb: string): Promise<number | null> {
+		const known = whole ? total : (songs?.length ?? 0);
+		const choice = addChoice(known, settings.playlistMax.value, settings.playlistAskOver.value);
+		if (!choice.ask) return choice.count;
+		return new Promise((answer) => (asking = { verb, few: choice.few, many: choice.many, answer }));
+	}
+
+	function answer(count: number | null) {
+		asking?.answer(count);
+		asking = null;
+	}
+
+	/**
+	 * Loads the [count] songs to add (saying so when it takes a moment, as [doing] does) and
+	 * hands them to [use] with how a message names them.
+	 */
+	async function withSongs(count: number, doing: (name: string) => string, use: (list: Song[], label: string) => Promise<unknown>) {
+		await whileBusy(doing(name), async () => {
+			const how = settings.playlistPick.value;
+			// A random pick takes from all of it.
+			const all = whole ? await whole(how === 'random' ? ADD_LIMITS.max : count) : (songs ?? []);
+			const list = pickSongs(all, count, how);
+			if (!list.length) return;
+			await use(list, songsFrom(list.length, Math.max(total ?? 0, all.length), name));
+		});
+	}
 
 	async function addToAutoplay() {
-		const list = await all();
-		if (!list.length) return;
-		const e = await room.run({ kind: 'AutoplaySongs', songs: list });
-		onToast(e ? e.message : `${name} plays when the queue is empty`);
+		const count = await howMany('Add');
+		if (count)
+			await withSongs(count, (n) => `Adding ${n} to autoplay…`, async (list, label) => {
+				const e = await room.run({ kind: 'AutoplaySongs', songs: list });
+				onToast(e ? e.message : `${label} ${list.length === 1 || label === name ? 'plays' : 'play'} when the queue is empty`);
+			});
 	}
 
 	async function addAll(position: 'next' | 'end') {
-		const list = await all();
-		if (!list.length) return;
-		await (position === 'next' ? playNext : addToQueue)(room, list, name, onToast);
+		const count = await howMany('Add');
+		if (count) await withSongs(count, (n) => `Adding ${n}…`, (list, label) => (position === 'next' ? playNext : addToQueue)(room, list, label, onToast));
 	}
 
 	async function playNow() {
-		const list = await all();
-		if (!list.length) return;
-		const [first, ...rest] = list;
-		let e = await room.run({ kind: 'PlayNow', song: first });
-		if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
-		if (e && !room.wasNoticed(e)) onToast(e.message);
+		const count = await howMany('Play');
+		if (count)
+			await withSongs(count, (n) => `Starting ${n}…`, async (list) => {
+				const [first, ...rest] = list;
+				let e = await room.run({ kind: 'PlayNow', song: first });
+				if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
+				if (e && !room.wasNoticed(e)) onToast(e.message);
+			});
 	}
 </script>
 
@@ -78,3 +118,28 @@
 	{/if}
 	{@render children?.()}
 </div>
+
+{#if asking}
+	{@const all = total !== null && asking.many >= total}
+	<div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={() => answer(null)}>
+		<div
+			class="flex w-full max-w-sm flex-col gap-4 rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
+			role="dialog"
+			aria-label="How many songs"
+			tabindex="-1"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && answer(null)}
+		>
+			<h2 class="text-lg font-bold">{total !== null ? `${name} has ${total.toLocaleString()} songs` : `${name} is long`}</h2>
+			<p class="text-sm text-muted">
+				{all ? 'Add them all, or only some?' : `At most ${asking.many.toLocaleString()} go in at once (Settings → Adding songs).`}
+				{settings.playlistPick.value === 'random' ? 'They are picked at random.' : 'From the top of the list.'}
+			</p>
+			<div class="flex flex-col gap-2">
+				<button class="rounded-full bg-white px-4 py-2.5 text-sm font-medium text-black" onclick={() => answer(asking!.few)}>{asking.verb} {asking.few.toLocaleString()}</button>
+				<button class="rounded-full bg-raised px-4 py-2.5 text-sm hover:bg-line" onclick={() => answer(asking!.many)}>{asking.verb} {all ? 'all ' : ''}{asking.many.toLocaleString()}</button>
+				<button class="rounded-full px-4 py-2 text-sm text-muted hover:bg-raised" onclick={() => answer(null)}>Cancel</button>
+			</div>
+		</div>
+	</div>
+{/if}

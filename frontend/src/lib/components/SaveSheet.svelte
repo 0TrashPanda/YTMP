@@ -1,5 +1,6 @@
 <script lang="ts">
 	// "Save to playlist", like YTM's: your own YouTube Music playlists, or a new one.
+	import { whileBusy } from '../busy.svelte';
 	import { thumbUrl } from '../images.svelte';
 	import { createPlaylist, getMyPlaylists, saveToPlaylist } from '../api';
 	import type { PlaylistSummary, Song } from '../protocol.gen';
@@ -18,12 +19,13 @@
 		.then((p) => (playlists = p))
 		.catch((e) => (error = e instanceof Error ? e.message : "Couldn't load your playlists"));
 
+	// The sheet closes right away; saving says so when it takes a moment.
 	async function save(playlist: PlaylistSummary) {
 		busy = true;
+		onClose();
 		try {
-			await saveToPlaylist(playlist.id, [song.id]);
+			await whileBusy(`Saving to ${playlist.title}…`, saveToPlaylist(playlist.id, [song.id]));
 			onToast(`Saved to ${playlist.title}`);
-			onClose();
 		} catch (e) {
 			onToast(e instanceof Error ? e.message : "Couldn't save it");
 		} finally {
@@ -36,10 +38,10 @@
 		const title = name.trim();
 		if (!title) return;
 		busy = true;
+		onClose();
 		try {
-			await createPlaylist(title, [song.id]);
+			await whileBusy(`Making the playlist ${title}…`, createPlaylist(title, [song.id]));
 			onToast(`Saved to ${title}`);
-			onClose();
 		} catch (e) {
 			onToast(e instanceof Error ? e.message : "Couldn't make the playlist");
 		} finally {

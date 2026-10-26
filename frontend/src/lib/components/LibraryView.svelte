@@ -2,7 +2,7 @@
 	// Your library, like YTM's: your playlists (Liked music first) and podcasts, through your
 	// YouTube Music sign-in. Signed out, it asks you to sign in. The search field filters it by
 	// name (and author), as you type. With a YTMP account, History opens your listening history.
-	import { getLibrary } from '../api';
+	import { getLibrary, lastSeen } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
 	import { fuzzyFind } from '../format';
 	import type { HomePage } from '../protocol.gen';
@@ -34,7 +34,7 @@
 	$effect(() => {
 		void youtube.version;
 		if (!youtube.account) return;
-		library = null;
+		library = lastSeen('me:library');
 		error = null;
 		getLibrary()
 			.then((l) => (library = l))
@@ -76,7 +76,7 @@
 				{youtube.busy ? 'Signing in…' : youtube.phoneAccount ? `Use ${youtube.phoneAccount.name} from this phone` : 'Sign in'}
 			</button>
 		</div>
-	{:else if error}
+	{:else if error && !library}
 		<p class="px-2 text-muted">{error}</p>
 	{:else if !library}
 		<div class="grid animate-pulse grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2">

@@ -13,6 +13,7 @@
 	import CardGrid from './CardGrid.svelte';
 	import SongList from './SongList.svelte';
 	import Icon from './Icon.svelte';
+	import Skeleton from './Skeleton.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 
 	let {
@@ -143,14 +144,15 @@
 	{#if error}
 		<p class="px-2 text-muted">{error}</p>
 	{:else if loading && empty}
-		<p class="px-2 text-muted">{similarTo ? 'Finding similar songs…' : link ? 'Looking up the link…' : 'Searching…'}</p>
+		<Skeleton />
 	{:else if empty && (query.trim() || similarTo)}
 		<p class="px-2 text-muted">No results.</p>
 	{/if}
 
 	{#each page.sections as section, i (section.title + i)}
 		{#if section.items.length}
-			<div class="flex flex-col gap-1">
+			<!-- Dimmed while the next results (another chip, more letters) load. -->
+			<div class="flex flex-col gap-1 transition-opacity {loading ? 'opacity-50' : ''}">
 				<div class="flex items-center justify-between gap-2 px-2 pb-1">
 					<h2 class="truncate text-xl font-bold">{section.title}</h2>
 					{#if type === 'all' && section.type && !similarTo}

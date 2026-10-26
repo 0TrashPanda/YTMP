@@ -6,7 +6,7 @@
 	import { fly } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { MediaQuery } from 'svelte/reactivity';
-	import { prefetch } from '../api';
+	import { getLyrics, prefetch } from '../api';
 	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
 	import { isYoutubeSong } from '../ownModule';
@@ -59,6 +59,11 @@
 	} & Omit<PageHandlers, 'onPlaylist'> = $props();
 
 	const current = $derived(room.state?.nowPlaying ?? null);
+	// The lyrics, looked up while the player is open: the Lyrics tab then shows them right away.
+	const lyricsSong = $derived(current?.item.song ?? null);
+	$effect(() => {
+		if (lyricsSong && !lyricsSong.podcast) getLyrics(lyricsSong).catch(() => {});
+	});
 	// Minutes left on the sleep timer: its own clock, only while it runs.
 	let wallNow = $state(Date.now());
 	$effect(() => {

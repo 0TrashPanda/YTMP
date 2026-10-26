@@ -1,6 +1,7 @@
 // What songs do when you tap, swipe or hold them, pick something in the song menu, or press a
 // page's Play buttons, and what it says afterwards: the same everywhere.
 import { bringsOwnRadio, yourRadio } from './api';
+import { whileBusy } from './busy.svelte';
 import { settings } from './settings.svelte';
 import type { Command, Song } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
@@ -51,7 +52,8 @@ export async function startRadio(room: RoomConnection, song: Song, onToast: Toas
 
 /** Autoplay this: the autoplay queue becomes a radio from [song]. */
 export async function autoplayThis(room: RoomConnection, song: Song, onToast: Toast) {
-	return runCommand(room, { kind: 'AutoplayFromHere', song, songs: await yourRadio(song.id) }, onToast, `Autoplay: songs like ${quoted(song)}`);
+	const songs = await whileBusy(`Finding songs like ${quoted(song)}…`, yourRadio(song.id));
+	return runCommand(room, { kind: 'AutoplayFromHere', song, songs }, onToast, `Autoplay: songs like ${quoted(song)}`);
 }
 
 /** The song menu's width, to open it under the right end of a row or button. */

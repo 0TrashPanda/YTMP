@@ -12,6 +12,12 @@ import { preferences } from './preferences.svelte';
 import type { DislikeButton, ImageQuality, SwipeOpens, TabOrder, VideoArt } from './storage';
 import { PAGE_SIZES, read, write } from './storage';
 
+export type PlaylistPick = 'first' | 'random';
+/** How many songs of one playlist may be added at most (Settings → Adding songs). */
+export const ADD_LIMITS = { min: 10, max: 5000 };
+/** The wait before "Adding …" shows, in ms. */
+export const BUSY_DELAYS = { max: 5000 };
+
 const DEVICE_KEY = 'ytmp.deviceSettings';
 const PARKED_KEY = 'ytmp.deviceSettingsParked';
 const MOVE_KEY = 'ytmp.settingsToMove';
@@ -150,6 +156,11 @@ const pageSize = (raw: unknown) => {
 	return size >= PAGE_SIZES.min && size <= PAGE_SIZES.max ? size : undefined;
 };
 
+const count = (min: number, max: number) => (raw: unknown) => {
+	const n = typeof raw === 'number' ? Math.round(raw) : NaN;
+	return n >= min && n <= max ? n : undefined;
+};
+
 const imageQuality = oneOf<ImageQuality>('high', 'low');
 const videoArt = oneOf<VideoArt>('crop', 'fit');
 const dislikeButton = oneOf<DislikeButton>('normal', 'dim', 'hidden');
@@ -170,6 +181,16 @@ export const settings = {
 	askInParty: new Setting('askInParty', true, bool),
 	/** In a party room where others listen along, Pause stops playing on this device instead (not playing here: it pauses, asked first). */
 	pauseStopsHere: new Setting('pauseStopsHere', true, bool),
+
+	// Adding songs
+	/** At most this many songs of one playlist (or album) go into the queue at once. */
+	playlistMax: new Setting('playlistMax', 200, count(ADD_LIMITS.min, ADD_LIMITS.max)),
+	/** More songs than this: asks first how many (0: never asks). */
+	playlistAskOver: new Setting('playlistAskOver', 100, count(0, ADD_LIMITS.max)),
+	/** Which songs of a longer playlist: the first ones, or picked at random from all of it. */
+	playlistPick: new Setting('playlistPick', 'first' as PlaylistPick, oneOf<PlaylistPick>('first', 'random')),
+	/** Something that takes a moment says what's going on after this many milliseconds (busy.svelte.ts). */
+	busyDelay: new Setting('busyDelay', 150, count(0, BUSY_DELAYS.max)),
 
 	// Look
 	imageQuality: new Setting('imageQuality', 'high' as ImageQuality, imageQuality, word('ytmp.imageQuality', imageQuality)),

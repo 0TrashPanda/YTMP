@@ -52,7 +52,7 @@ import type {
 } from './protocol.gen';
 
 import { identity } from './account';
-import { saved } from './storage';
+import { read, saved, write } from './storage';
 
 export class ApiRequestError extends Error {
 	/** The HTTP status, e.g. 404. */
@@ -289,9 +289,10 @@ export function getPlaylist(id: string, personal = false): Promise<PlaylistPage>
 		: cached(`playlist:${id}`, () => request(`/api/playlists/${encodeURIComponent(id)}`));
 }
 
-/** The next songs of one of your playlists, after the part(s) loaded ([PlaylistPage.more]). */
-export function getPlaylistPart(id: string, more: string): Promise<PlaylistPage> {
-	return request(`/api/me/playlists/${encodeURIComponent(id)}?more=${encodeURIComponent(more)}`);
+/** The next songs of a playlist, after the part(s) loaded ([PlaylistPage.more]); [personal]: one of yours. */
+export function getPlaylistPart(id: string, more: string, personal = false): Promise<PlaylistPage> {
+	const base = personal ? '/api/me/playlists' : '/api/playlists';
+	return cached(`${personal ? 'me:' : ''}playlist:${id}:${more}`, () => request(`${base}/${encodeURIComponent(id)}?more=${encodeURIComponent(more)}`));
 }
 
 /** The song's lyrics (LRCLIB, or its source's own), or null when nobody has them. */
@@ -329,7 +330,26 @@ export async function setPodcastSaved(id: string, saved: boolean): Promise<void>
 /** Suggestions for the home page: quick picks, new releases, mixes (yours, with your YouTube Music). */
 export function getHome(): Promise<HomePage> {
 	const path = youtubeFrom ? '/api/me/home' : `/api/home${refreshHome ? '?fresh=1' : ''}`;
-	return cached('home', () => request<HomePage>(path).finally(() => (refreshHome = false)));
+	return keepLast('home', cached('home', () => request<HomePage>(path).finally(() => (refreshHome = false))));
+}
+
+// The last Home and library are kept in this browser: the next time they show right away,
+// while the new ones load (YouTube Music takes a second or two for them).
+type Last = 'home' | 'me:library';
+const lastKey = (key: Last) => `ytmp.last.${youtubeFrom?.server ?? ''}:${key}`;
+
+/** The [key] page as it was last loaded here (null: never, or since signing out). */
+export function lastSeen<T extends HomePage>(key: Last): T | null {
+	try {
+		return JSON.parse(read(lastKey(key)) ?? 'null') as T | null;
+	} catch {
+		return null;
+	}
+}
+
+function keepLast<T>(key: Last, value: Promise<T>): Promise<T> {
+	value.then((v) => write(lastKey(key), JSON.stringify(v))).catch(() => {});
+	return value;
 }
 
 /**
@@ -383,7 +403,7 @@ export function getLocalLibrary(id: string): Promise<LocalLibraryPage> {
 }
 
 export function getLibrary(): Promise<HomePage> {
-	return cached('me:library', () => request('/api/me/library'));
+	return keepLast('me:library', cached('me:library', () => request('/api/me/library')));
 }
 
 /** Your thumbs on a song in YouTube Music: up (liked), down (disliked), or neither. */
@@ -475,6 +495,7 @@ export function forgetPersonal(): void {
 	for (const key of [...cache.keys()]) {
 		if (key === 'home' || key.startsWith('me:') || key.startsWith('search:') || key.startsWith('suggest:')) cache.delete(key);
 	}
+	for (const key of ['home', 'me:library'] as Last[]) write(lastKey(key), 'null');
 }
 
 const pages = { artist: getArtist, album: getAlbum, playlist: getPlaylist, podcast: getPodcast };

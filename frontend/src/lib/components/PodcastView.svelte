@@ -2,6 +2,7 @@
 	// A podcast page: what it's about, and its episodes (newest first). Tap an episode =
 	// play next; ⋮ or right-click = the song menu. With YouTube Music: Subscribe (your library).
 	// With a YTMP account: how far you got in each episode, and marking them played.
+	import { whileBusy } from '../busy.svelte';
 	import { thumbUrl } from '../images.svelte';
 	import { getMyPodcast, getPodcast, setPodcastSaved } from '../api';
 	import { youtube } from '../youtube.svelte';
@@ -11,6 +12,7 @@
 	import type { Episode, EpisodeProgress, PodcastPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
+	import Skeleton from './Skeleton.svelte';
 	import PinButton from './PinButton.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 
@@ -77,7 +79,7 @@
 		saving = true;
 		const want = !saved;
 		try {
-			await setPodcastSaved(id, want);
+			await whileBusy(want ? 'Subscribing…' : 'Unsubscribing…', setPodcastSaved(id, want));
 			saved = want;
 			onToast(want ? 'Subscribed: new episodes show on Home' : 'Unsubscribed');
 		} catch (e) {
@@ -148,7 +150,7 @@
 	{#if error}
 		<p class="px-2 text-accent">{error}</p>
 	{:else if !podcast}
-		<p class="px-2 text-muted">Loading…</p>
+		<Skeleton rows={6} />
 	{:else if podcast.episodes.length === 0}
 		<p class="px-2 text-muted">No episodes.</p>
 	{:else}

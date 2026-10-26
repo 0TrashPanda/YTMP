@@ -130,7 +130,7 @@
 	{@const offset = swipe.offset(key)}
 	<div
 		data-row
-		class="relative overflow-hidden rounded-md {dragging ? 'z-10 shadow-xl' : drag ? 'transition-transform' : ''}"
+		class="relative overflow-hidden rounded-md [contain-intrinsic-size:auto_56px] [content-visibility:auto] {dragging ? 'z-10 shadow-xl' : drag ? 'transition-transform' : ''}"
 		style:transform="translateY({dragging ? drag!.offset : shift(i)}px)"
 	>
 		<!-- Under the song while it's swiped: what letting go does. -->

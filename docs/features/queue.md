@@ -174,5 +174,14 @@ repeat limits also apply to *Play now*.
 
 On a playlist's page, **Add to autoplay** (instead of *Add to queue*) makes the playlist the
 autoplay queue: it plays when the queue is empty, so songs people add still go first, and the
-radio goes on after its last song. Albums keep *Add to queue*. Your own playlists (Liked music
-too) load whole; public playlists up to 1000 songs.
+radio goes on after its last song. Albums keep *Add to queue*.
+
+## Long playlists ✅
+
+Nobody listens to 2000 songs in one queue. *Play*, *Play next*, *Add to queue* and *Add to
+autoplay* on a playlist or album add **at most 200 songs** at once, and a playlist of **more
+than 100** asks first: *Add 100* or *Add all 150* (up to the most). Which songs: **the first**
+ones (default), or **picked at random** from all of it (in the playlist's order). Only the
+part of a long playlist that's needed is loaded, so the first 200 of Liked music go in about
+as fast as a short playlist. All of it is set in *Settings → Adding songs* (the most: 10 to
+5000; asking: never, or above any number).

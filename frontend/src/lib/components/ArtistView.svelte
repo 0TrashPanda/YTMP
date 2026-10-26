@@ -8,6 +8,7 @@
 	import type { RoomConnection } from '../room.svelte';
 	import AlbumGrid from './AlbumGrid.svelte';
 	import Icon from './Icon.svelte';
+	import Skeleton from './Skeleton.svelte';
 	import PinButton from './PinButton.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import SongList from './SongList.svelte';
@@ -88,7 +89,7 @@
 	{#if error}
 		<p class="px-2 text-accent">{error}</p>
 	{:else if !artist}
-		<p class="px-2 text-muted">Loading…</p>
+		<Skeleton rows={5} />
 	{:else}
 		{#if artist.description}
 			<button class="px-2 text-left text-sm text-muted {showBio ? '' : 'line-clamp-2'}" onclick={() => (showBio = !showBio)}>{artist.description}</button>

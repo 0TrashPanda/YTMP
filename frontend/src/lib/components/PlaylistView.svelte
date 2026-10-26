@@ -1,10 +1,11 @@
 <script lang="ts">
 	// A playlist page (community or YouTube Music's own, or one of yours): its songs, in order.
-	// Yours (Liked music too) load in parts: more songs as you scroll down.
+	// Long ones load in parts: more songs as you scroll down.
 	import { thumbUrl } from '../images.svelte';
 	import { deletePlaylist, getPlaylist, getPlaylistPart, movePlaylistItem, renamePlaylist } from '../api';
 	import { settings } from '../settings.svelte';
 	import Icon from './Icon.svelte';
+	import Skeleton from './Skeleton.svelte';
 	import { youtube } from '../youtube.svelte';
 	import { formatTime } from '../format';
 	import type { PlaylistPage, Song } from '../protocol.gen';
@@ -36,6 +37,8 @@
 	} = $props();
 
 	let playlist = $state<PlaylistPage | null>(null);
+	/** It came through your sign-in (its next parts do too). */
+	let throughYou = false;
 	let error = $state<string | null>(null);
 	let showDescription = $state(false);
 
@@ -48,13 +51,19 @@
 		const own = mine;
 		void version;
 		error = null;
+		let personal = own;
 		getPlaylist(playlistId, own)
 			// One of your private playlists (on Home or in search): through your sign-in.
 			.catch((e) => {
 				if (own || !youtube.account) throw e;
+				personal = true;
 				return getPlaylist(playlistId, true).catch(() => Promise.reject(e));
 			})
-			.then((p) => playlistId === id && (playlist = p))
+			.then((p) => {
+				if (playlistId !== id) return;
+				throughYou = personal;
+				playlist = p;
+			})
 			.catch((e) => (error = e instanceof Error ? e.message : "Couldn't load the playlist"));
 	});
 	$effect(() => {
@@ -65,7 +74,7 @@
 	const reload = () => version++;
 
 	// Long lists: this many songs at first, this many more each time you scroll to the end;
-	// your own playlists load the next part from YouTube Music when it's needed.
+	// the next part comes from YouTube Music when it's needed.
 	const pageSize = settings.pageSize.value;
 	let shown = $state(pageSize);
 	let loadingPart = $state<Promise<void> | null>(null);
@@ -75,7 +84,7 @@
 	function loadPart(): Promise<void> {
 		const p = playlist;
 		if (!p?.more || partFailed) return Promise.resolve();
-		loadingPart ??= getPlaylistPart(p.id, p.more)
+		loadingPart ??= getPlaylistPart(p.id, p.more, throughYou)
 			.then((next) => {
 				// Songs moved or removed meanwhile are kept as they are now.
 				if (playlist?.id === p.id && playlist.more === p.more)
@@ -108,10 +117,10 @@
 		return () => watcher.disconnect();
 	});
 
-	/** All of it (at most 1000 songs, like other playlists), for Play and the other buttons. */
-	async function whole(): Promise<Song[]> {
-		while (playlist?.more && playlist.songs.length < 1000 && !partFailed) await loadPart();
-		return playlist?.songs.slice(0, 1000) ?? [];
+	/** At least [count] songs (or all there are), for Play and the other buttons: only the parts that takes. */
+	async function whole(count: number): Promise<Song[]> {
+		while (playlist?.more && playlist.songs.length < count && !partFailed) await loadPart();
+		return playlist?.songs ?? [];
 	}
 
 	/** A song removed from it (Liked music: unliked): gone from the list right away. */
@@ -178,7 +187,7 @@
 
 <div class="flex flex-col gap-6">
 	<header class="flex flex-col gap-5 px-2 sm:flex-row sm:items-end">
-		<div class="aspect-square w-48 shrink-0 overflow-hidden rounded-lg bg-raised shadow-2xl sm:w-56">
+		<div class="aspect-square w-48 shrink-0 overflow-hidden rounded-lg bg-raised shadow-2xl sm:w-56 {playlist ? '' : 'animate-pulse'}">
 			{#if playlist?.thumbnails.at(-1)}
 				<img src={thumbUrl(playlist.thumbnails, 544)} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
 			{/if}
@@ -230,7 +239,7 @@
 					</button>
 				{/if}
 			{/if}
-			<PlayAllButtons {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay whole={playlist?.more ? whole : undefined} {onToast}>
+			<PlayAllButtons {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay whole={playlist?.more ? whole : undefined} total={playlist?.songCount ?? null} {onToast}>
 				<PinButton pin={playlist ? { kind: 'playlist', id, title: playlist.title, art: thumbUrl(playlist.thumbnails, 120), personal: personal || undefined } : null} {onToast} />
 			</PlayAllButtons>
 		</div>
@@ -239,7 +248,7 @@
 	{#if error}
 		<p class="px-2 text-accent">{error}</p>
 	{:else if !playlist}
-		<p class="px-2 text-muted">Loading…</p>
+		<Skeleton />
 	{:else if playlist.songs.length === 0}
 		<p class="px-2 text-muted">This playlist has no songs that can be played.</p>
 	{:else}
@@ -254,7 +263,7 @@
 			/>
 			<div bind:this={end}></div>
 			{#if playlist.songs.length > shown || playlist.more}
-				<p class="px-2 py-2 text-sm text-muted">{partFailed ? "Couldn't load more songs." : 'Loading more…'}</p>
+				{#if partFailed}<p class="px-2 py-2 text-sm text-muted">Couldn't load more songs.</p>{:else}<Skeleton rows={3} />{/if}
 			{/if}
 		</section>
 	{/if}

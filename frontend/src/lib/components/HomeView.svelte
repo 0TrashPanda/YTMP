@@ -6,7 +6,7 @@
 	// has all of that for every section (home.svelte.ts), and a speed dial (YTM's 3×3 covers).
 	// Your pins: tiles in the Pinned section (a speed dial),
 	// or each its own section with its songs. They show at once: nothing to wait for.
-	import { getHome } from '../api';
+	import { getHome, lastSeen } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
 	import { cardTiles, songTiles } from '../dial';
 	import { hideIfBroken } from '../pictures';
@@ -35,7 +35,8 @@
 		onSettings: () => void;
 	} & PageHandlers = $props();
 
-	let home = $state<HomePage | null>(null);
+	// The last one, until the new one is here.
+	let home = $state<HomePage | null>(lastSeen('home'));
 	let error = $state<string | null>(null);
 
 	const sections = $derived(arrange(home?.sections ?? null, prefs));
@@ -177,7 +178,7 @@
 			{/if}
 		</section>
 	{/each}
-	{#if error}
+	{#if error && !home}
 		<div class="flex flex-col items-center gap-2 py-16 text-center text-muted">
 			<Icon name="search" size={48} />
 			<p>Search for a song to start the music.</p>

@@ -7,6 +7,7 @@
 	import type { RoomConnection } from '../room.svelte';
 	import { settings } from '../settings.svelte';
 	import Icon from './Icon.svelte';
+	import Skeleton from './Skeleton.svelte';
 	import PlayAllButtons from './PlayAllButtons.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import SongList from './SongList.svelte';
@@ -66,13 +67,13 @@
 			</p>
 		{/if}
 		<!-- As many as a playlist plays at most. -->
-		<PlayAllButtons {room} songs={page ? all.slice(0, 1000) : null} name={title} toAutoplay {onToast} />
+		<PlayAllButtons {room} songs={page ? all : null} name={title} toAutoplay {onToast} />
 	</header>
 
 	{#if error}
 		<p class="px-2 text-accent">{error}</p>
 	{:else if !page}
-		<p class="px-2 text-muted">Loading…</p>
+		<Skeleton />
 	{:else}
 		{#if inside.length}
 			<div class="flex flex-col gap-1">

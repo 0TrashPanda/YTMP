@@ -6,6 +6,7 @@
 		| 'account'
 		| 'youtube'
 		| 'playback'
+		| 'adding'
 		| 'sound'
 		| 'look'
 		| 'player'
@@ -34,7 +35,7 @@
 	import { preferences } from '../../preferences.svelte';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
-	import { load as loadSettings, onAccount, settings, type Setting } from '../../settings.svelte';
+	import { ADD_LIMITS, BUSY_DELAYS, load as loadSettings, onAccount, settings, type PlaylistPick, type Setting } from '../../settings.svelte';
 	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type VideoArt } from '../../storage';
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
@@ -129,6 +130,7 @@
 					'Playing',
 					[
 						['playback', 'Playback', 'headphones', true],
+						['adding', 'Adding songs', 'playlistAdd', true],
 						['sound', 'Sound', 'volume', true]
 					]
 				],
@@ -175,7 +177,7 @@
 	const pageSettings: Partial<Record<SettingsSection, Setting<unknown>>> = { home: settings.home, menu: settings.songMenu, solo: settings.soloHidden };
 	const pageSetting = $derived(pageSettings[section]);
 	/** Pages with settings that follow your account: a word on that at the bottom. */
-	const followsAccount = $derived(['playback', 'look', 'player', 'home', 'menu', 'gestures', 'solo', 'local'].includes(section));
+	const followsAccount = $derived(['playback', 'adding', 'look', 'player', 'home', 'menu', 'gestures', 'solo', 'local'].includes(section));
 
 	/** Phones: the list was shown, so Back goes there from a page. */
 	// svelte-ignore state_referenced_locally
@@ -315,6 +317,55 @@
 				{:else}
 					<p class="text-xs text-muted">Keyboard: <kbd>Space</kbd> or <kbd>K</kbd> play/pause · <kbd>N</kbd> next · <kbd>P</kbd> previous · <kbd>←</kbd> <kbd>→</kbd> 10 seconds back or ahead · <kbd>↑</kbd> <kbd>↓</kbd> volume · <kbd>/</kbd> search.</p>
 				{/if}
+			{:else if section === 'adding'}
+				<Choice
+					label="Most songs from one playlist"
+					hint="Play, Play next and Add on a playlist or album add at most this many songs at once. Long playlists (like Liked music) then only load the part that's needed."
+					setting={settings.playlistMax}
+					options={[
+						[100, '100'],
+						[200, '200'],
+						[500, '500'],
+						[1000, '1000']
+					]}
+				>
+					<NumberField value={settings.playlistMax.value} min={ADD_LIMITS.min} max={ADD_LIMITS.max} unit="songs" label="Most songs from one playlist" onchange={(v) => settings.playlistMax.set(v)} />
+				</Choice>
+				<Choice
+					label="Which songs"
+					hint="When a playlist has more: the first ones, or picked at random from all of it (that loads the whole playlist first, so it takes longer)."
+					setting={settings.playlistPick}
+					options={[
+						['first', 'The first'],
+						['random', 'At random']
+					] as [PlaylistPick, string][]}
+				/>
+				<Choice
+					label="Ask first above"
+					hint="A playlist with more songs than this asks how many: this many, or all of it (up to the most above)."
+					setting={settings.playlistAskOver}
+					options={[
+						[0, 'Never ask'],
+						[50, '50'],
+						[100, '100'],
+						[200, '200']
+					]}
+				>
+					<NumberField value={settings.playlistAskOver.value} min={0} max={ADD_LIMITS.max} unit="songs" label="Ask first above" onchange={(v) => settings.playlistAskOver.set(v)} />
+				</Choice>
+				<Choice
+					label="Say what's going on after"
+					hint="Something that takes a moment (adding a long playlist, saving to a playlist) says so (“Adding Liked music…”) when it isn't done after this long, and what it did when it's done."
+					setting={settings.busyDelay}
+					options={[
+						[0, 'Right away'],
+						[150, '0.15 s'],
+						[500, '0.5 s'],
+						[1000, '1 s']
+					]}
+				>
+					<NumberField value={settings.busyDelay.value} min={0} max={BUSY_DELAYS.max} step={50} unit="ms" label="Say what's going on after" onchange={(v) => settings.busyDelay.set(v)} />
+				</Choice>
 			{:else if section === 'sound'}
 				{#if equalizer.available}
 					<EqualizerSection />

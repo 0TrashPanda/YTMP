@@ -50,6 +50,7 @@
 	import { nativeBridge } from '../../../lib/native';
 	import { identity, logInOnce, session } from '../../../lib/account';
 	import type { Participant } from '../../../lib/protocol.gen';
+	import { busy } from '../../../lib/busy.svelte';
 
 	/** The code in the link this page was opened with. */
 	const linkCode = page.params.code!.toUpperCase();
@@ -880,6 +881,12 @@
 				<button class="shrink-0 font-bold" onclick={() => room?.undoRemove()}>Undo</button>
 			</div>
 		{/if}
+		{#each busy as b (b.id)}
+			<div class="flex items-center gap-2.5 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg" role="status">
+				<span class="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-black/20 border-t-black"></span>
+				<span class="line-clamp-2">{b.text}</span>
+			</div>
+		{/each}
 		{#each [...room.notices, ...toasts] as message (message.id + message.text)}
 			<button
 				class="pointer-events-auto rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg"

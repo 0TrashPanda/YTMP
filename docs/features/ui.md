@@ -23,6 +23,22 @@ Built so far: artist pages have **Radio** (from their top songs) and *Add top so
 pages have *Play*, *Play next*, *Add to queue*; playlist pages have *Play*, *Play next* and
 *Add to autoplay*. Radio from an album or playlist itself is planned.
 
+## Feeling fast ✅
+
+- **Something that takes a moment says so**: adding a long playlist, saving to a playlist,
+  subscribing, finding songs for *Autoplay this*. Nothing shows when it's done quickly; when it
+  isn't done after **0.15 s** a message with a small spinner says what's going on ("Adding
+  Liked music…"), and when it's done the result takes its place ("Added 200 songs from Liked
+  music to the queue"). The wait is a setting (*Settings → Adding songs*: right away, or up to
+  5 s).
+- **Placeholders**: pages show grey placeholders the shape of what's coming (song rows, cards)
+  instead of "Loading…", so they don't jump. Search keeps the old results dimmed while the new
+  ones load.
+- **The last Home and Library show right away** when the app starts, while the new ones load.
+- **Ahead of time**: the next song's stream is looked up while the current one plays (also
+  when you add a song to play next), and the lyrics while the full player is open. Pages you
+  touch or hover start loading before they open.
+
 ## Home & Explore
 
 Like YTM:
@@ -317,7 +333,9 @@ Open it with the **⋮** button or by **right-clicking** the song.
     **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
     bottom).
   - **Playing**: **Playback** (next while paused, start radio, asking before interrupting a
-    party, pause only stops it here, your other devices, skip silence in podcasts) and **Sound** (equalizer, headphones).
+    party, pause only stops it here, your other devices, skip silence in podcasts), **Adding
+    songs** (long playlists, see [queue](queue.md#long-playlists); when to say what's going
+    on, below) and **Sound** (equalizer, headphones).
   - **How it looks**: **Look** (image quality, video pictures, songs per page), **Player**
     (the tabs, the dislike button), **Home**, **Song menu**, **Taps and swipes** and **Solo
     rooms** (what a solo room leaves out, below).
