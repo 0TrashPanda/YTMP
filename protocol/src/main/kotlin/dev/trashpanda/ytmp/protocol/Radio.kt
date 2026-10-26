@@ -73,6 +73,8 @@ data class GraphTuning(
     val ytmAccount: Double = 0.5,
     /** Songs close together in a YouTube Music radio (not the seed: each other). */
     val radioNear: Double = 0.5,
+    /** A song 2 or 3 songs after another in your listening (right after is [personal]). */
+    val listenNear: Double = 0.3,
     /** A Takeout link that happened only once and no radio confirms (a jump to other music, often). */
     val oneOff: Double = 0.3,
     /** A play in a party, against one alone. */
@@ -151,6 +153,8 @@ enum class EdgeKind {
     @SerialName("ytm") YTM,
     @SerialName("ytm_account") YTM_ACCOUNT,
     @SerialName("radio_near") RADIO_NEAR,
+    @SerialName("personal_near") PERSONAL_NEAR,
+    @SerialName("imported_near") IMPORTED_NEAR,
 }
 
 /**

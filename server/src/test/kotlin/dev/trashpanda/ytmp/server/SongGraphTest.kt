@@ -219,4 +219,43 @@ class SongGraphTest {
         assertEquals(true, confirmed("ytm:b"))
         assertTrue("ytm:q" in similar("ytm:b"))
     }
+
+    /** The "soon after" edges of [scope]: from>to to how often, distances added up. */
+    private fun nearEdges(scope: String): Map<String, List<Int>> = db.use { c ->
+        c.prepareStatement(
+            """SELECT a.source_id AS f, b.source_id AS t, seen, rank_sum FROM song_edges e
+               JOIN song_sources a ON a.song_id = e.from_song JOIN song_sources b ON b.song_id = e.to_song WHERE scope = ? ORDER BY f, t""",
+        ).use {
+            it.setString(1, scope)
+            it.executeQuery().use { rows -> buildMap { while (rows.next()) put("${rows.getString("f")}>${rows.getString("t")}", listOf(rows.getInt(3), rows.getInt(4))) } }
+        }
+    }
+
+    @Test
+    fun `songs played 2 or 3 later go together too, weaker, in a session, and confirm one-off Takeout links`() {
+        // a b c d in one session, then e much later (another session).
+        listOf("a", "b", "c", "d").forEach { play("anna", song("ytm:$it")) }
+        play("anna", song("ytm:e"), gapMs = 3 * 3_600_000L)
+        val live = nearEdges(SongGraph.PERSONAL_NEAR)
+        assertEquals(mapOf("ytm:a>ytm:c" to listOf(1, 2), "ytm:a>ytm:d" to listOf(1, 3), "ytm:b>ytm:d" to listOf(1, 2)), live)
+        graph.rebuild()
+        assertEquals(live, nearEdges(SongGraph.PERSONAL_NEAR))
+        // c is a neighbour of a (2 later), weaker than b (right after); off with the slider.
+        assertEquals(listOf("ytm:b", "ytm:c", "ytm:d"), similar("ytm:a").take(3))
+        assertTrue("ytm:c" !in graph.similar("ytm:a", "anna", tuning = GraphTuning(listenNear = 0.0, secondHop = 0.0)).map { it.id })
+
+        // A one-off Takeout link x → z, and z twice 2 songs after x elsewhere in Takeout: confirmed.
+        val t = now - 20_000_000
+        history.importTakeout(
+            "anna",
+            listOf(
+                TakeoutSong("x", "X", "Artist", listOf(t, t + 3_600_000, t + 7_200_000)),
+                TakeoutSong("z", "Z", "Artist", listOf(t + 180_000, t + 3_600_000 + 360_000, t + 7_200_000 + 360_000)),
+                TakeoutSong("y", "Y", "Artist", listOf(t + 3_600_000 + 180_000, t + 7_200_000 + 180_000)),
+            ),
+        )
+        graph.rebuild()
+        assertEquals(listOf(2, 4), nearEdges(SongGraph.IMPORTED_NEAR)["ytm:x>ytm:z"])
+        assertEquals(true, graph.view("anna", "ytm:x", GraphTuning()).edges.single { it.kind == EdgeKind.IMPORTED && it.to != it.from && it.solo == 1 && it.confirmed }.confirmed)
+    }
 }

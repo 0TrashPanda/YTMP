@@ -1121,7 +1121,7 @@ export interface GraphNode {
   sources: string[];
 }
 
-export type EdgeKind = "personal" | "server" | "imported" | "server_imported" | "ytm" | "ytm_account" | "radio_near";
+export type EdgeKind = "personal" | "server" | "imported" | "server_imported" | "ytm" | "ytm_account" | "radio_near" | "personal_near" | "imported_near";
 
 export interface GraphEdge {
   from: string;
@@ -1144,6 +1144,7 @@ export interface GraphTuning {
   ytm: number;
   ytmAccount: number;
   radioNear: number;
+  listenNear: number;
   oneOff: number;
   party: number;
   skip: number;

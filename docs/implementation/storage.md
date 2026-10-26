@@ -95,6 +95,7 @@ song_edges         -- the graph: "B was played after A"
   from_song → songs.id
   to_song   → songs.id
   scope             -- 'personal' | 'imported' | 'server' | 'server_imported' | 'ytm' | 'ytm_account' | 'radio_near'
+                    --   | 'personal_near' | 'imported_near' (account: the listener)
   account_id        -- the account for 'personal', 'imported' and 'ytm_account' ('radio_near': whose radio, '' none), '' otherwise
   solo_plays        -- counters, kept raw (see below)
   shared_plays
@@ -133,6 +134,11 @@ history_imports    -- Google Takeout imports (plays.import_id points here; '' fo
   happened once counts `oneOff` of it until `confirmed`: a `ytm`, `ytm_account` or
   `radio_near` edge between the same two songs, either way round (`SongGraph.confirm`, after a
   rebuild and after each radio).
+- **Soon after** = `'personal_near'` / `'imported_near'`: in one account's listening, a song
+  2 or 3 songs after another in the same session (same room, gaps under 30 minutes;
+  `NEAR_LISTEN`), not when either was skipped right away. `solo_plays`/`shared_plays` how often,
+  `seen` all of it, `rank_sum` the distances. Built in `rebuild` and kept up in `played`.
+  Seen twice or more, it also confirms a one-off imported link.
 - **Close together in a radio** = `'radio_near'`: each of a radio's songs → the next 3
   (`NEAR_WINDOW`), place = the later one's (for `radioDepth`), counted both ways round.
 - **Solo vs. shared** listening are separate counters, so radio can use either or both.
@@ -156,12 +162,13 @@ server          = S · (solo + party · shared − skip · skips) · decay
 server_imported = S · I · (solo − skip · skips) · decay
 ytm(_account)   = Y(A) · max(0.2, 1 − average rank / 50) · min(2, √seen) · decay   (0 past radioDepth)
 radio_near      = N · (1 − (average distance − 1) / 3) · min(2, √seen) · decay     (0 past radioDepth)
+*_near (listen) = P · (I for imported) · L · (1 − (average distance − 2) / 2) · (solo + party · shared) · decay
 one-off imported: × oneOff unless confirmed
 decay           = 0.5 ^ (days since updated_at / halfLifeDays)
 ```
 
 The numbers are the account's `GraphTuning` (account data `graph_tuning`; defaults P 2, I 1,
-S 1, Y 1.5, A 0.5, N 0.5, oneOff 0.3, party 0.6, skip 1, reverse 0.5, second hop 0.35, 180 days, depth 50),
+S 1, Y 1.5, A 0.5, N 0.5, L 0.3, oneOff 0.3, party 0.6, skip 1, reverse 0.5, second hop 0.35, 180 days, depth 50),
 set with the sliders of the graph view (`GET/PUT /api/account/graph/tuning`). The page
 weighs the raw edges of `GET /api/account/graph` with the same formula
 (`frontend/src/lib/graph.ts`), so the sliders redraw at once. Because what the graph learns

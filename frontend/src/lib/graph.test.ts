@@ -35,6 +35,11 @@ describe('the graph view weighs edges like the server', () => {
 		expect(radioFrom('b', [edge('a', 'b', 'radio_near', { seen: 1, bestRank: 1, rankSum: 1 })], DEFAULT_TUNING, now).map((r) => r.id)).toEqual(['a']);
 	});
 
+	it('counts songs played soon after less, 3 later half of 2 later', () => {
+		expect(weight(edge('a', 'c', 'personal_near', { solo: 2, seen: 2, rankSum: 4 }), DEFAULT_TUNING, now)).toBeCloseTo(2 * 0.3 * 2);
+		expect(weight(edge('a', 'd', 'personal_near', { solo: 1, seen: 1, rankSum: 3 }), DEFAULT_TUNING, now)).toBeCloseTo(2 * 0.3 * 0.5);
+	});
+
 	it("ranks a radio's songs, with the songs before the seed and neighbours' neighbours counting less", () => {
 		const edges = [edge('s', 'a', 'personal', { solo: 3 }), edge('b', 's', 'personal', { solo: 3 }), edge('a', 'c', 'personal', { solo: 3 })];
 		expect(radioFrom('s', edges, DEFAULT_TUNING, now).map((r) => r.id)).toEqual(['a', 'b', 'c']);

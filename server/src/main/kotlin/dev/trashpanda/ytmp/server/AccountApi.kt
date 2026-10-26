@@ -648,6 +648,7 @@ private fun GraphTuning.sane() = GraphTuning(
     ytm = ytm.coerceIn(0.0, 5.0),
     ytmAccount = ytmAccount.coerceIn(0.0, 5.0),
     radioNear = radioNear.coerceIn(0.0, 5.0),
+    listenNear = listenNear.coerceIn(0.0, 5.0),
     oneOff = oneOff.coerceIn(0.0, 1.0),
     party = party.coerceIn(0.0, 2.0),
     skip = skip.coerceIn(0.0, 5.0),

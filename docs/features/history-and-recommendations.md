@@ -101,6 +101,8 @@ Because the history keeps the **order** in which songs were played, YTMP can bui
   duration. Audio fingerprinting (for example AcoustID) can be added later.
 - An **edge A → B** means B was played right after A. The more often that happens,
   the stronger the edge.
+- Songs played **soon after**, 2 or 3 songs later in the same session, go together too:
+  weaker (3 later counts half of 2 later), with their own slider. Also from Takeout.
 - Skips weaken edges. Songs that were played to the end strengthen them.
 
 ### Graph scope
@@ -139,7 +141,7 @@ history; the zip, or the watch history in it).
   style to another looks the same as a good match. So a link that happened **once** counts
   for little (30% by default, a slider) until it's **confirmed**: a YouTube Music radio also
   puts the two songs together (the seed and a song of its radio, or two songs close together
-  in one). A jump from metal to lo-fi rarely is; songs that really go together soon are,
+  in one), or you played one 2 or 3 songs after the other at least twice. A jump from metal to lo-fi rarely is; songs that really go together soon are,
   especially once radios are being learned. A link that happened twice or more counts fully. *Remove* takes an import out of the history (and the graph) again.
 
 ### Learning from YouTube Music

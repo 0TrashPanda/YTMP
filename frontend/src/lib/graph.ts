@@ -15,6 +15,7 @@ export const DEFAULT_TUNING: GraphTuning = {
 	ytm: 1.5,
 	ytmAccount: 0.5,
 	radioNear: 0.5,
+	listenNear: 0.3,
 	oneOff: 0.3,
 	party: 0.6,
 	skip: 1,
@@ -27,8 +28,10 @@ export const DEFAULT_TUNING: GraphTuning = {
 /** Where an edge comes from, as the legend says it, and its colour (validated for the dark surface). */
 export const KINDS: { kind: EdgeKind; label: string; color: string; dashed?: boolean }[] = [
 	{ kind: 'personal', label: 'You, in YTMP', color: '#3987e5' },
+	{ kind: 'personal_near', label: 'You, soon after', color: '#3987e5', dashed: true },
 	{ kind: 'server', label: 'Everyone on your server', color: '#d95926' },
 	{ kind: 'imported', label: 'You, imported from Takeout', color: '#199e70' },
+	{ kind: 'imported_near', label: 'Imported, soon after', color: '#199e70', dashed: true },
 	{ kind: 'server_imported', label: 'Everyone, imported', color: '#d95926', dashed: true },
 	{ kind: 'ytm', label: 'YouTube Music radios', color: '#c98500' },
 	{ kind: 'ytm_account', label: 'Radios with your account', color: '#d55181' },
@@ -49,6 +52,13 @@ export function weight(e: GraphEdge, t: GraphTuning, now: number, party = true):
 			return t.server * (e.solo + e.shared * t.party - e.skips * t.skip) * decay;
 		case 'server_imported':
 			return t.server * t.imported * oneOff(e, t) * (e.solo - e.skips * t.skip) * decay;
+		case 'personal_near':
+		case 'imported_near': {
+			// 2 songs later counts fully, 3 later half.
+			const distance = e.seen > 0 ? e.rankSum / e.seen : 2;
+			const heard = e.solo + e.shared * (party ? t.party : 0);
+			return t.personal * (e.kind === 'imported_near' ? t.imported : 1) * t.listenNear * (1 - (distance - 2) / 2) * heard * decay;
+		}
 		case 'radio_near': {
 			if ((e.bestRank ?? 0) >= t.radioDepth) return 0;
 			const distance = e.seen > 0 ? e.rankSum / e.seen : 1;

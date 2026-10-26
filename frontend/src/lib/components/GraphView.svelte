@@ -211,6 +211,7 @@
 	const sliders: { key: keyof GraphTuning; label: string; min: number; max: number; step: number; unit?: string }[] = [
 		{ key: 'personal', label: 'Your listening', min: 0, max: 5, step: 0.1 },
 		{ key: 'imported', label: 'Imported from Takeout', min: 0, max: 5, step: 0.1 },
+		{ key: 'listenNear', label: 'Songs played soon after (2 or 3 later)', min: 0, max: 2, step: 0.05 },
 		{ key: 'server', label: 'Everyone on your server', min: 0, max: 5, step: 0.1 },
 		{ key: 'ytm', label: 'YouTube Music radios', min: 0, max: 5, step: 0.1 },
 		{ key: 'ytmAccount', label: 'Radios with your account', min: 0, max: 5, step: 0.1 },

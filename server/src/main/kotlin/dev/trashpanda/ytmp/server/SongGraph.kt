@@ -55,13 +55,25 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
     @Synchronized
     fun played(accountId: String, report: PlayReport) = db.transaction { c ->
         val current = Heard(report.song, report.playedAt, report.heardMs, report.skipped, report.roomCode, report.shared, imported = false)
-        val before = c.prepareStatement(
-            "SELECT song, played_at, heard_ms, skipped, room_code, shared, import_id FROM plays WHERE account_id = ? AND played_at < ? ORDER BY played_at DESC LIMIT 1",
+        // The songs before it, newest first: the one right before, and for "soon after" the two before that.
+        val earlier = c.prepareStatement(
+            "SELECT song, played_at, heard_ms, skipped, room_code, shared, import_id FROM plays WHERE account_id = ? AND played_at < ? ORDER BY played_at DESC LIMIT $NEAR_LISTEN",
         ).use {
             it.setString(1, accountId)
             it.setLong(2, report.playedAt)
-            it.executeQuery().use { rows -> if (rows.next()) rows.toHeard() else null }
-        } ?: return@transaction
+            it.executeQuery().use { rows -> buildList { while (rows.next()) add(rows.toHeard()) } }
+        }
+        val chain = ArrayList<Heard>()
+        for (h in earlier) if (inSession(h, chain.lastOrNull() ?: current)) chain += h else break
+        val soon = soonAfter(chain.reversed(), current)
+        for ((h, distance) in soon) {
+            val from = node(c, h.song)
+            val to = node(c, current.song)
+            if (from != to) addNearEdge(c, Edge(from, to, if (current.imported) IMPORTED_NEAR else PERSONAL_NEAR, accountId), NearCounts.of(current, distance))
+        }
+        // Heard twice soon after each other now: that may confirm a one-off Takeout link.
+        if (soon.isNotEmpty()) confirm(c)
+        val before = earlier.firstOrNull() ?: return@transaction
         if (!follows(before, current)) return@transaction
         val othersHeardIt = c.prepareStatement("SELECT COUNT(*) FROM plays WHERE room_code = ? AND played_at = ? AND song_id = ? AND account_id <> ?").use {
             it.setString(1, report.roomCode.take(16))
@@ -88,6 +100,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         c.createStatement().use { it.executeUpdate("DELETE FROM song_edges WHERE scope NOT IN ('$YTM', '$YTM_ACCOUNT') OR seen > 0") }
         val nodes = HashMap<String, String>()
         val edges = HashMap<Edge, Counts>()
+        val near = HashMap<Edge, NearCounts>()
         // A play several accounts heard (same room, same start, same song) counts once for the server.
         val counted = HashSet<String>()
         var plays = 0
@@ -95,6 +108,8 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             statement.executeQuery().use { rows ->
                 var account: String? = null
                 var before: Heard? = null
+                // The last few songs of this listening session, oldest first.
+                val chain = ArrayDeque<Heard>()
                 while (rows.next()) {
                     plays++
                     val id = rows.getString("account_id")
@@ -102,7 +117,16 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                     if (id != account) {
                         account = id
                         before = null
+                        chain.clear()
                     }
+                    if (chain.isNotEmpty() && !inSession(chain.last(), current)) chain.clear()
+                    for ((h, distance) in soonAfter(chain, current)) {
+                        val from = nodes.getOrPut(h.song.id) { node(c, h.song, update = false) }
+                        val to = nodes.getOrPut(current.song.id) { node(c, current.song, update = false) }
+                        if (from != to) near.merge(Edge(from, to, if (current.imported) IMPORTED_NEAR else PERSONAL_NEAR, id), NearCounts.of(current, distance), NearCounts::plus)
+                    }
+                    chain.addLast(current)
+                    if (chain.size > NEAR_LISTEN) chain.removeFirst()
                     val previous = before
                     before = current
                     if (previous == null || !follows(previous, current)) continue
@@ -118,8 +142,9 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             }
         }
         for ((edge, counts) in edges) addEdge(c, edge, counts, counts.lastAt)
+        for ((edge, counts) in near) addNearEdge(c, edge, counts)
         val radios = rebuildRadios(c, nodes)
-        log.info("Song graph built from {} plays and {} radios: {} edges, in {} ms", plays, radios, edges.size, System.currentTimeMillis() - started)
+        log.info("Song graph built from {} plays and {} radios: {} edges and {} soon after, in {} ms", plays, radios, edges.size, near.size, System.currentTimeMillis() - started)
     }
 
     /** The edges of every kept radio fetch. Returns how many fetches. */
@@ -178,7 +203,8 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         c.createStatement().use {
             it.executeUpdate(
                 """UPDATE song_edges SET confirmed = 1 WHERE confirmed = 0 AND scope IN ('$IMPORTED', '$SERVER_IMPORTED') AND EXISTS (
-                     SELECT 1 FROM song_edges r WHERE r.scope IN ('$YTM', '$YTM_ACCOUNT', '$RADIO_NEAR')
+                     SELECT 1 FROM song_edges r WHERE (r.scope IN ('$YTM', '$YTM_ACCOUNT', '$RADIO_NEAR')
+                       OR (r.scope IN ('$PERSONAL_NEAR', '$IMPORTED_NEAR') AND r.account_id = song_edges.account_id AND r.seen >= 2))
                      AND ((r.from_song = song_edges.from_song AND r.to_song = song_edges.to_song) OR (r.from_song = song_edges.to_song AND r.to_song = song_edges.from_song)))""",
             )
         }
@@ -444,6 +470,15 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
 
     private data class Edge(val from: String, val to: String, val scope: String, val account: String)
 
+    /** "Soon after" links: how often alone and in a party, the distances added up. */
+    private data class NearCounts(val solo: Int, val shared: Int, val distance: Int, val lastAt: Long) {
+        operator fun plus(other: NearCounts) = NearCounts(solo + other.solo, shared + other.shared, distance + other.distance, max(lastAt, other.lastAt))
+
+        companion object {
+            fun of(h: Heard, distance: Int) = if (h.shared) NearCounts(0, 1, distance, h.playedAt) else NearCounts(1, 0, distance, h.playedAt)
+        }
+    }
+
     private data class Counts(val solo: Int, val shared: Int, val skips: Int, val lastAt: Long) {
         operator fun plus(other: Counts) = Counts(solo + other.solo, shared + other.shared, skips + other.skips, max(lastAt, other.lastAt))
     }
@@ -465,6 +500,12 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             IMPORTED -> t.personal * t.imported * oneOff(e, t) * (e.solo - e.skips * t.skip) * decay
             SERVER -> t.server * (e.solo + e.shared * t.party - e.skips * t.skip) * decay
             SERVER_IMPORTED -> t.server * t.imported * oneOff(e, t) * (e.solo - e.skips * t.skip) * decay
+            PERSONAL_NEAR, IMPORTED_NEAR -> {
+                // 2 songs later counts fully, 3 later half.
+                val distance = if (e.seen > 0) e.rankSum.toDouble() / e.seen else 2.0
+                val heard = e.solo + e.shared * party
+                t.personal * (if (e.scope == IMPORTED_NEAR) t.imported else 1.0) * t.listenNear * (1 - (distance - 2) / 2) * heard * decay
+            }
             RADIO_NEAR -> {
                 if ((e.ytmRank ?: 0) >= t.radioDepth) return 0.0
                 val distance = if (e.seen > 0) e.rankSum.toDouble() / e.seen else 1.0
@@ -482,6 +523,26 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
 
     /** A Takeout link that happened once and no radio confirms: [GraphTuning.oneOff] of it. */
     private fun oneOff(e: StoredEdge, t: GraphTuning) = if (e.solo <= 1 && !e.confirmed) t.oneOff else 1.0
+
+    /** In the same listening session: the same room, [current] not long after [before] ended, no podcast episodes. */
+    private fun inSession(before: Heard, current: Heard): Boolean =
+        before.roomCode == current.roomCode &&
+            current.playedAt > before.playedAt &&
+            current.playedAt - (before.playedAt + before.heardMs) <= GAP_MS &&
+            before.song.podcast == null && current.song.podcast == null
+
+    /**
+     * The songs of [chain] (this session's last few, oldest first, ending right before
+     * [current]) that [current] came "soon after": 2 or 3 songs later, with how far. Not
+     * when either was skipped right away: that says nothing about how they go together.
+     */
+    private fun soonAfter(chain: List<Heard>, current: Heard): List<Pair<Heard, Int>> {
+        if (current.skipped && current.heardMs < max(EARLY_SKIP_MS, current.song.durationMs / 2)) return emptyList()
+        return chain.withIndex().mapNotNull { (i, h) ->
+            val distance = chain.size - i
+            (h to distance).takeIf { distance in 2..NEAR_LISTEN && !(h.skipped && h.heardMs < EARLY_SKIP_MS) }
+        }
+    }
 
     /** Was [current] played right after [before]: same room, not long after, and [before] not skipped right away. */
     private fun follows(before: Heard, current: Heard): Boolean =
@@ -577,6 +638,31 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         }
     }
 
+    /** A "soon after" edge: [counts] more (seen: how often in all; rank_sum: the distances). */
+    private fun addNearEdge(c: Connection, edge: Edge, counts: NearCounts) {
+        c.prepareStatement(
+            """INSERT INTO song_edges (from_song, to_song, scope, account_id, solo_plays, shared_plays, skips, ytm_rank, seen, rank_sum, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)
+               ON CONFLICT (from_song, to_song, scope, account_id) DO UPDATE SET
+                 solo_plays = song_edges.solo_plays + excluded.solo_plays,
+                 shared_plays = song_edges.shared_plays + excluded.shared_plays,
+                 seen = song_edges.seen + excluded.seen,
+                 rank_sum = song_edges.rank_sum + excluded.rank_sum,
+                 updated_at = CASE WHEN excluded.updated_at > song_edges.updated_at THEN excluded.updated_at ELSE song_edges.updated_at END""",
+        ).use {
+            it.setString(1, edge.from)
+            it.setString(2, edge.to)
+            it.setString(3, edge.scope)
+            it.setString(4, edge.account)
+            it.setInt(5, counts.solo)
+            it.setInt(6, counts.shared)
+            it.setInt(7, counts.solo + counts.shared)
+            it.setInt(8, counts.distance)
+            it.setLong(9, counts.lastAt)
+            it.executeUpdate()
+        }
+    }
+
     /** A YouTube Music edge seen [seen] more times, at best place [best], places adding up to [rankSum]. */
     private fun addYtmEdge(c: Connection, edge: Edge, seen: Int, best: Int, rankSum: Int, at: Long) {
         c.prepareStatement(
@@ -608,7 +694,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         if (nodes.isEmpty()) return emptyList()
         val list = nodes.joinToString(", ") { "?" }
         val own = buildList {
-            if (use != HistoryRadio.OFF) addAll(listOf(PERSONAL, IMPORTED))
+            if (use != HistoryRadio.OFF) addAll(listOf(PERSONAL, IMPORTED, PERSONAL_NEAR, IMPORTED_NEAR))
             add(YTM_ACCOUNT)
             add(RADIO_NEAR)
         }
@@ -669,7 +755,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         private val log = LoggerFactory.getLogger(SongGraph::class.java)
 
         /** Bump to build the graph from the history again on the next start (a new way of learning). */
-        const val VERSION = 3
+        const val VERSION = 4
         private const val VERSION_SETTING = "song_graph_version"
 
         // Edge scopes (`song_edges.scope`). account_id is '' for the server's and YouTube Music's without an account.
@@ -681,6 +767,9 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         const val YTM_ACCOUNT = "ytm_account"
         /** Two songs close together in a YouTube Music radio (account_id: whose account made it, '' none). */
         const val RADIO_NEAR = "radio_near"
+        /** A song 2 or 3 songs after another in your listening in YTMP, or imported from Takeout. */
+        const val PERSONAL_NEAR = "personal_near"
+        const val IMPORTED_NEAR = "imported_near"
 
         fun kindOf(scope: String) = when (scope) {
             PERSONAL -> EdgeKind.PERSONAL
@@ -689,6 +778,8 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             SERVER_IMPORTED -> EdgeKind.SERVER_IMPORTED
             YTM_ACCOUNT -> EdgeKind.YTM_ACCOUNT
             RADIO_NEAR -> EdgeKind.RADIO_NEAR
+            PERSONAL_NEAR -> EdgeKind.PERSONAL_NEAR
+            IMPORTED_NEAR -> EdgeKind.IMPORTED_NEAR
             else -> EdgeKind.YTM
         }
 
@@ -702,6 +793,8 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         const val MAX_RADIO_SONGS = 50
         /** In a radio, each song goes with this many after it. */
         const val NEAR_WINDOW = 3
+        /** In listening, a song goes with the ones up to this many songs after it ("soon after": 2 and 3). */
+        const val NEAR_LISTEN = 3
         private const val SECOND_HOP_FROM = 8
         private const val MIN_SCORE = 0.05
         private const val MAX_HINT_SONGS = 200
