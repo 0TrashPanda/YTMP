@@ -103,7 +103,19 @@ class RadioCrawl(
             }
             try {
                 val radio = fetch(seed)
-                learned(seed, radio)
+                try {
+                    learned(seed, radio)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Not YouTube's doing: keeping it didn't work (the server), try again in a while.
+                    log.info("The radio crawl couldn't keep a radio: {}", e.message)
+                    waiting = e.message ?: "Couldn't keep it"
+                    until = clock() + FAILED_PAUSE_MS
+                    sleep(FAILED_PAUSE_MS)
+                    until = null
+                    continue
+                }
                 lastAt = clock()
                 waiting = null
                 counts = (counts.first + 1) to counts.second

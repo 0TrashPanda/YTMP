@@ -181,7 +181,10 @@ class LocalHost(private val context: Context) {
         fetch = { seed -> ytm.radio(seed) },
         learned = { seed, songs ->
             val token = authLink.ownerAccount?.let(sync::tokenFor) ?: throw SourceException("Not linked to a YTMP account")
-            authLink.auth.reportRadio(token, RadioFetchReport(seed, songs, withAccount = false, RadioWay.CRAWL))
+            // Only learned once the server kept it (an older server doesn't: the crawl waits and says so).
+            if (!authLink.auth.reportRadio(token, RadioFetchReport(seed, songs, withAccount = false, RadioWay.CRAWL))) {
+                throw SourceException("Your YTMP server didn't keep it: it may need an update")
+            }
             crawlLog.put(seed, System.currentTimeMillis())
         },
         load = { RadioCrawl.loadSettings(runCatching { crawlFile.readText() }.getOrNull()) },

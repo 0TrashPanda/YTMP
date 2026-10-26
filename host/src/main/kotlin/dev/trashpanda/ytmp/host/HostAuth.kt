@@ -50,8 +50,11 @@ interface HostAuth {
      */
     suspend fun radioHints(token: String, request: RadioHintsRequest): RadioHints = RadioHints(similar(token, request.seed))
 
-    /** Tells the account in [token]'s auth server about a YouTube Music radio this host fetched (its song graph keeps it). */
-    suspend fun reportRadio(token: String, report: RadioFetchReport) {}
+    /**
+     * Tells the account in [token]'s auth server about a YouTube Music radio this host fetched
+     * (its song graph keeps it). False when it didn't take it (not reachable, or an older server).
+     */
+    suspend fun reportRadio(token: String, report: RadioFetchReport): Boolean = false
 
     /** Where the account in [token] is in an episode, from its auth server (null: nowhere, or not shared with this host). */
     suspend fun episodeProgress(token: String, episodeId: String): EpisodeProgress? = null
@@ -158,12 +161,12 @@ class TrustedAuthServers(
             .getOrDefault(RadioHints(emptyList()))
     }
 
-    override suspend fun reportRadio(token: String, report: RadioFetchReport) = withContext(Dispatchers.IO) {
-        val (claims, server) = ownerOf(token) ?: return@withContext
-        val url = server.url ?: return@withContext
+    override suspend fun reportRadio(token: String, report: RadioFetchReport): Boolean = withContext(Dispatchers.IO) {
+        val (claims, server) = ownerOf(token) ?: return@withContext false
+        val url = server.url ?: return@withContext false
         runCatching { postJson(url, "/api/auth/radio-fetch", token, ProtocolJson.encodeToString(RadioFetchReport.serializer(), report)) }
-            .onFailure { e -> if (e !is NotThere) log.info("Couldn't send a radio to {}: {}", claims.iss, e.message) }
-        Unit
+            .onFailure { e -> log.info("Couldn't send a radio to {}: {}", claims.iss, e.message) }
+            .isSuccess
     }
 
     override suspend fun episodeProgress(token: String, episodeId: String): EpisodeProgress? = withContext(Dispatchers.IO) {
