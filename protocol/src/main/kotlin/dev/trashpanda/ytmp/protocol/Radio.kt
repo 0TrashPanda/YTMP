@@ -153,10 +153,14 @@ enum class EdgeKind {
     @SerialName("radio_near") RADIO_NEAR,
 }
 
-/** A song in the graph view. [plays]: how often you played it (with imported plays). */
+/**
+ * A song in the graph view. [plays]: how often you played it (with imported plays). [sources]:
+ * all its versions' IDs (`ytm:…`, `local:…`): the page shows a cover its own host has (a music
+ * file's, a saved song's) before YouTube's.
+ */
 @Serializable
 @SerialName("GraphNode")
-data class GraphNode(val id: String, val song: Song, val plays: Int = 0, val local: Boolean = false)
+data class GraphNode(val id: String, val song: Song, val plays: Int = 0, val local: Boolean = false, val sources: List<String> = emptyList())
 
 /** An edge with its raw counts: the page weighs it with the sliders ([GraphTuning]). */
 @Serializable

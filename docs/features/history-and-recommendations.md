@@ -166,9 +166,13 @@ of **song connections**:
 *Song graph* in the song menu (around that song), or on your history page and in *Settings
 → Radio* (your most played songs). With your YTMP account.
 
-- Songs are dots (bigger: played more), lines are what YTMP learned goes together: as thick
-  as it counts, coloured by what counts most (you, imported, everyone, YouTube Music's radios
-  without or with your account). Tap a song for all its lines and *Show around this song*.
+- Songs are their covers in circles (bigger: played more): a music file's or a saved song's
+  cover from the device itself when it has one, else YouTube Music's. Lines are what YTMP
+  learned goes together: as thick as it counts, coloured by what counts most (you, imported,
+  everyone, YouTube Music's radios without or with your account, close together in a radio).
+  Tap a song to light up its lines and see them listed, with *Show around this song*.
+- Scroll or pinch to zoom, drag to move, *All* to see it whole. Names show for the seed, the
+  songs its radio would bring first and the one under the pointer, where they fit.
 - *Its radio* lists what a radio from the song would bring, best first.
 - **Sliders** set how much each part counts: your listening, imported, everyone's, the two
   kinds of radios, a party play, a skip, songs played before it, neighbours of neighbours,

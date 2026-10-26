@@ -389,7 +389,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         val plays = nodePlays(c, accountId, nodes)
         GraphView(
             seed = seed,
-            nodes = nodes.mapNotNull { n -> songs[n]?.let { (song, local) -> GraphNode(n, song, plays[n] ?: 0, local) } },
+            nodes = nodes.mapNotNull { n -> songs[n]?.let { (song, sources) -> GraphNode(n, song, plays[n] ?: 0, sources.any { it.startsWith("local:") }, sources) } },
             edges = edges.distinctBy { listOf(it.from, it.to, it.scope) }.map { it.toGraphEdge() },
             tuning = tuning,
             now = now,
@@ -426,14 +426,18 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         return out
     }
 
-    /** A song for each node (YouTube Music's version first), and whether it has a local version. */
-    private fun nodeSongs(c: Connection, nodes: List<String>): Map<String, Pair<Song, Boolean>> {
+    /** A song for each node (YouTube Music's version with a cover first), and all its versions' IDs. */
+    private fun nodeSongs(c: Connection, nodes: List<String>): Map<String, Pair<Song, List<String>>> {
         val versions = HashMap<String, MutableList<Song>>()
         inList(c, "SELECT song_id, data FROM song_sources WHERE song_id", nodes) { rows ->
             runCatching { ProtocolJson.decodeFromString(Song.serializer(), rows.getString(2)) }.getOrNull()
                 ?.let { versions.getOrPut(rows.getString(1)) { mutableListOf() } += it }
         }
-        return versions.mapValues { (_, songs) -> (songs.firstOrNull { it.id.startsWith("ytm:") } ?: songs.first()) to songs.any { it.id.startsWith("local:") } }
+        return versions.mapValues { (_, songs) ->
+            val best = songs.firstOrNull { it.id.startsWith("ytm:") && it.thumbnails.isNotEmpty() }
+                ?: songs.firstOrNull { it.thumbnails.isNotEmpty() } ?: songs.firstOrNull { it.id.startsWith("ytm:") } ?: songs.first()
+            best to songs.map { it.id }
+        }
     }
 
     // --- nodes and edges ------------------------------------------------------------------

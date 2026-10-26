@@ -5,7 +5,9 @@
 	// counts, at once, and "Use for my radios" keeps them for your radios.
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
-	import { DEFAULT_TUNING, KINDS, kindOf, layout, radioFrom, weight } from '../graph';
+	import { coverUrls, DEFAULT_TUNING, KINDS, kindOf, layout, radioFrom, weight } from '../graph';
+	import { thumbUrl } from '../images.svelte';
+	import { nativeBridge } from '../native';
 	import { listening } from '../listening.svelte';
 	import type { EdgeKind, GraphNode, GraphTuning, GraphView, Song } from '../protocol.gen';
 	import { artistNames } from '../format';
@@ -13,7 +15,7 @@
 
 	let { seed = null, onClose, onToast }: { seed?: Song | null; onClose: () => void; onToast: (text: string) => void } = $props();
 
-	const SIZE = 600;
+	const SIZE = 1000;
 	let around = $state<string | null>(null);
 	let view = $state<GraphView | null>(null);
 	let error = $state<string | null>(null);
@@ -30,6 +32,7 @@
 			tuning = { ...v.tuning };
 			saved = { ...v.tuning };
 			picked = null;
+			cam = { x: 0, y: 0, w: SIZE };
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Couldn't load the song graph";
 		}
@@ -40,7 +43,103 @@
 		await load(around);
 	});
 
-	const placed = $derived(view ? layout(view.nodes, view.edges, view.seed, SIZE) : []);
+	const mostPlays = $derived(Math.max(1, ...(view?.nodes ?? []).map((n) => n.plays)));
+	/** A song's size: the seed biggest, the others by how often you played them. */
+	const radius = (n: GraphNode) => (n.id === view?.seed ? 38 : 14 + 14 * Math.sqrt(n.plays / mostPlays));
+	const placed = $derived(view ? layout(view.nodes, view.edges, view.seed, SIZE, radius) : []);
+
+	// Covers: this host's (a music file's, a saved song's) first, else the song's own.
+	let covers = $state<Record<string, string>>({});
+	const loads = (url: string) =>
+		new Promise<boolean>((done) => {
+			const img = new Image();
+			img.referrerPolicy = 'no-referrer';
+			img.onload = () => done(true);
+			img.onerror = () => done(false);
+			img.src = url;
+		});
+	$effect(() => {
+		for (const node of view?.nodes ?? []) {
+			if (node.id in covers) continue;
+			void (async () => {
+				for (const url of coverUrls(node, 120, thumbUrl, !!nativeBridge)) {
+					if (await loads(url)) return void (covers = { ...covers, [node.id]: url });
+				}
+			})();
+		}
+	});
+
+	// Zoom and pan: the part of the graph that shows (a square: x, y, width).
+	let cam = $state({ x: 0, y: 0, w: SIZE });
+	let svg = $state<SVGSVGElement>();
+	let hovered = $state<string | null>(null);
+	/** A drag just moved the graph: the click it ends with isn't a tap on a song. */
+	let dragged = false;
+	const pointers = new Map<number, { x: number; y: number }>();
+	let pinch: { d: number; w: number } | null = null;
+	const scale = $derived(cam.w / SIZE);
+
+	function toGraph(clientX: number, clientY: number) {
+		const rect = svg!.getBoundingClientRect();
+		return { x: cam.x + ((clientX - rect.left) / rect.width) * cam.w, y: cam.y + ((clientY - rect.top) / rect.height) * cam.w };
+	}
+	function zoomAt(clientX: number, clientY: number, w: number) {
+		const next = Math.max(SIZE / 8, Math.min(SIZE, w));
+		const p = toGraph(clientX, clientY);
+		const f = next / cam.w;
+		cam = { x: p.x - (p.x - cam.x) * f, y: p.y - (p.y - cam.y) * f, w: next };
+	}
+	function zoomBy(f: number) {
+		const rect = svg!.getBoundingClientRect();
+		zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, cam.w * f);
+	}
+	function wheel(e: WheelEvent) {
+		e.preventDefault();
+		zoomAt(e.clientX, e.clientY, cam.w * Math.exp(e.deltaY * 0.0015));
+	}
+	function down(e: PointerEvent) {
+		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		dragged = false;
+		if (pointers.size === 2) {
+			const [a, b] = [...pointers.values()];
+			pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), w: cam.w };
+		}
+	}
+	function move(e: PointerEvent) {
+		const last = pointers.get(e.pointerId);
+		if (!last) return;
+		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		if (pointers.size === 2 && pinch) {
+			const [a, b] = [...pointers.values()];
+			zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, (pinch.w * pinch.d) / Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)));
+			dragged = true;
+			return;
+		}
+		const dx = e.clientX - last.x;
+		const dy = e.clientY - last.y;
+		if (!dragged && Math.hypot(dx, dy) < 3) return;
+		if (!dragged) svg?.setPointerCapture(e.pointerId);
+		dragged = true;
+		const per = cam.w / svg!.getBoundingClientRect().width;
+		cam = { ...cam, x: cam.x - dx * per, y: cam.y - dy * per };
+	}
+	function up(e: PointerEvent) {
+		pointers.delete(e.pointerId);
+		if (pointers.size < 2) pinch = null;
+	}
+	function tap(id: string) {
+		if (dragged) return;
+		picked = picked === id ? null : id;
+	}
+	const neighbours = $derived.by(() => {
+		const set = new Set<string>();
+		if (!picked) return set;
+		for (const { e } of weighed) {
+			if (e.from === picked) set.add(e.to);
+			if (e.to === picked) set.add(e.from);
+		}
+		return set;
+	});
 	const at = $derived(new Map(placed.map((p) => [p.node.id, p])));
 	const weighed = $derived(view ? view.edges.map((e) => ({ e, w: weight(e, tuning, view!.now) })).filter((x) => x.w > 0) : []);
 	// One line per pair of songs: as thick as all it counts together, coloured by what counts most.
@@ -61,18 +160,36 @@
 	const strongest = $derived(Math.max(1e-6, ...lines.map((x) => x.w)));
 	const radio = $derived(view?.seed ? radioFrom(view.seed, view.edges, tuning, view.now) : []);
 	const nodeById = $derived(new Map((view?.nodes ?? []).map((n) => [n.id, n])));
-	const mostPlays = $derived(Math.max(1, ...(view?.nodes ?? []).map((n) => n.plays)));
 	// Names next to the seed and the songs its radio would bring first (not on every song).
 	// …and only where they don't run into each other.
 	const labelled = $derived.by(() => {
-		const wanted = [picked, view?.seed, ...radio.slice(0, 6).map((r) => r.id)].filter(Boolean) as string[];
-		const kept: { x: number; y: number }[] = [];
-		const out = new Set<string>();
-		for (const id of wanted) {
+		const wanted = [hovered, picked, view?.seed, ...radio.slice(0, 6).map((r) => r.id)].filter(Boolean) as string[];
+		const font = 22 * scale;
+		type Box = { l: number; r: number; t: number; b: number };
+		const boxes: Box[] = [];
+		const out = new Map<string, { y: number; title: string }>();
+		const hitsSong = (box: Box, own: string) =>
+			placed.some((p) => {
+				if (p.node.id === own) return false;
+				const cx = Math.max(box.l, Math.min(p.x, box.r));
+				const cy = Math.max(box.t, Math.min(p.y, box.b));
+				return Math.hypot(p.x - cx, p.y - cy) < radius(p.node);
+			});
+		const hitsName = (box: Box) => boxes.some((o) => box.l < o.r && box.r > o.l && box.t < o.b && box.b > o.t);
+		for (const id of new Set(wanted)) {
 			const p = at.get(id);
-			if (!p || kept.some((k) => Math.abs(k.x - p.x) < 150 && Math.abs(k.y - p.y) < 22)) continue;
-			kept.push(p);
-			out.add(id);
+			if (!p) continue;
+			const title = p.node.song.title.length > 28 ? `${p.node.song.title.slice(0, 27)}…` : p.node.song.title;
+			const half = (title.length * font * 0.55) / 2;
+			const r = radius(p.node);
+			// Above the song, else below it; a name that fits nowhere is left out (tap the song for it).
+			for (const y of [p.y - r - 10 * scale, p.y + r + 10 * scale + font]) {
+				const box = { l: p.x - half, r: p.x + half, t: y - font, b: y + 4 * scale };
+				if (hitsName(box) || (id !== hovered && id !== picked && id !== view?.seed && hitsSong(box, id))) continue;
+				boxes.push(box);
+				out.set(id, { y, title });
+				break;
+			}
 		}
 		return out;
 	});
@@ -80,7 +197,6 @@
 	const pickedNode = $derived(picked ? nodeById.get(picked) : null);
 	const pickedEdges = $derived(picked ? weighed.filter(({ e }) => e.from === picked || e.to === picked).sort((a, b) => b.w - a.w).slice(0, 6) : []);
 
-	const radius = (n: GraphNode) => 6 + 8 * Math.sqrt(n.plays / mostPlays);
 
 	async function use() {
 		try {
@@ -143,8 +259,24 @@
 					{view.seed === null && around ? "YTMP hasn't learned anything about this song yet." : 'Nothing learned yet: play some music, import your Takeout history, or let it learn radios (Settings → Radio).'}
 				</p>
 			{:else if tab === 'graph'}
-				<div class="relative mx-auto w-full max-w-[min(100%,70vh)] px-2">
-					<svg viewBox="0 0 {SIZE} {SIZE}" class="block h-auto w-full touch-manipulation" role="img" aria-label="The songs and how they go together">
+				<div class="relative mx-auto aspect-square w-full max-w-[min(100%,calc(100dvh-14rem))] px-2 lg:max-w-[min(100%,calc(100dvh-9rem))]">
+					<svg
+						bind:this={svg}
+						viewBox="{cam.x} {cam.y} {cam.w} {cam.w}"
+						class="block h-full w-full cursor-grab touch-none rounded-2xl bg-[radial-gradient(circle_at_center,#1c1c1c,transparent_70%)] select-none active:cursor-grabbing"
+						role="img"
+						aria-label="The songs and how they go together"
+						onwheel={wheel}
+						onpointerdown={down}
+						onpointermove={move}
+						onpointerup={up}
+						onpointercancel={up}
+					>
+						<defs>
+							{#each placed as p (p.node.id)}
+								<clipPath id="gc-{p.node.id}"><circle cx={p.x} cy={p.y} r={radius(p.node)} /></clipPath>
+							{/each}
+						</defs>
 						{#each lines as line (line.a + line.b)}
 							{@const a = at.get(line.a)}
 							{@const b = at.get(line.b)}
@@ -158,44 +290,86 @@
 									x2={b.x}
 									y2={b.y}
 									stroke={k.color}
-									stroke-width={0.75 + 3.25 * (w / strongest)}
-									stroke-opacity={picked ? (near ? 0.95 : 0.12) : 0.25 + 0.6 * (w / strongest)}
-									stroke-dasharray={k.dashed ? '6 4' : undefined}
+									stroke-width={0.75 + 4.25 * (w / strongest) + (near ? 1 : 0)}
+									stroke-opacity={picked ? (near ? 0.95 : 0.06) : 0.2 + 0.6 * (w / strongest)}
+									stroke-dasharray={k.dashed ? '5 4' : undefined}
 									stroke-linecap="round"
+									vector-effect="non-scaling-stroke"
+									style:transition="stroke-width 200ms, stroke-opacity 200ms"
 								/>
 							{/if}
 						{/each}
 						{#each placed as p (p.node.id)}
 							{@const isSeed = p.node.id === view.seed}
+							{@const r = radius(p.node)}
+							{@const dim = !!picked && picked !== p.node.id && !neighbours.has(p.node.id)}
 							<g
 								role="button"
 								tabindex="0"
 								aria-label="{p.node.song.title}, {artistNames(p.node.song)}"
 								class="cursor-pointer outline-none"
-								onclick={() => (picked = picked === p.node.id ? null : p.node.id)}
+								opacity={dim ? 0.3 : 1}
+								style:transition="opacity 200ms"
+								onclick={() => tap(p.node.id)}
+								onpointerenter={() => (hovered = p.node.id)}
+								onpointerleave={() => hovered === p.node.id && (hovered = null)}
 								onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (picked = p.node.id)}
 							>
-								<!-- A bigger target than the dot. -->
-								<circle cx={p.x} cy={p.y} r={Math.max(18, radius(p.node) + 6)} fill="transparent" />
+								<!-- A gap around each song, so lines end before it. -->
+								<circle cx={p.x} cy={p.y} r={r + 3} fill="var(--color-surface)" />
+								<circle cx={p.x} cy={p.y} {r} fill="#2b2b2b" />
+								{#if covers[p.node.id]}
+									<image
+										href={covers[p.node.id]}
+										x={p.x - r}
+										y={p.y - r}
+										width={r * 2}
+										height={r * 2}
+										preserveAspectRatio="xMidYMid slice"
+										clip-path="url(#gc-{p.node.id})"
+									/>
+								{:else}
+									<text x={p.x} y={p.y + r * 0.3} text-anchor="middle" class="pointer-events-none fill-white/40" font-size={r * 0.9}>♪</text>
+								{/if}
 								<circle
 									cx={p.x}
 									cy={p.y}
-									r={isSeed ? radius(p.node) + 4 : radius(p.node)}
-									fill={isSeed ? '#ffffff' : picked === p.node.id ? '#e5e5e5' : '#8a8a8a'}
-									stroke="var(--color-surface)"
-									stroke-width="2"
+									{r}
+									fill="none"
+									stroke={isSeed || picked === p.node.id ? '#ffffff' : hovered === p.node.id ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.18)'}
+									stroke-width={isSeed ? 3 : picked === p.node.id ? 2.5 : 1}
+									vector-effect="non-scaling-stroke"
 								/>
+								<!-- A bigger target than the song on a touch screen. -->
+								<circle cx={p.x} cy={p.y} r={Math.max(r, 22 * scale)} fill="transparent" />
 							</g>
 						{/each}
-						<!-- Names last, over every dot. -->
+						<!-- Names last, over every song, the same size on screen at any zoom. -->
 						{#each placed as p (p.node.id)}
-							{#if labelled.has(p.node.id)}
-								<text x={p.x} y={p.y - radius(p.node) - 8} text-anchor="middle" class="pointer-events-none fill-white text-[13px]" paint-order="stroke" stroke="var(--color-surface)" stroke-width="4">
-									{p.node.song.title.length > 28 ? `${p.node.song.title.slice(0, 27)}…` : p.node.song.title}
-								</text>
+							{@const label = labelled.get(p.node.id)}
+							{#if label}
+								{@const title = label.title}
+								<text
+									x={p.x}
+									y={label.y}
+									text-anchor="middle"
+									class="pointer-events-none fill-white font-medium"
+									font-size={22 * scale}
+									paint-order="stroke"
+									stroke="rgba(15,15,15,0.85)"
+									stroke-width={7 * scale}
+									stroke-linejoin="round">{title}</text
+								>
 							{/if}
 						{/each}
 					</svg>
+					<div class="absolute right-4 bottom-2 flex flex-col overflow-hidden rounded-xl bg-raised/90 shadow-lg ring-1 ring-line">
+						<button class="px-3 py-2 hover:bg-line" aria-label="Zoom in" onclick={() => zoomBy(0.7)}><Icon name="add" size={18} /></button>
+						<button class="px-3 py-2 hover:bg-line" aria-label="Zoom out" onclick={() => zoomBy(1 / 0.7)}><span class="block h-[18px] w-[18px] text-center leading-[18px]">−</span></button>
+						<button class="px-3 py-2 text-xs hover:bg-line" aria-label="Show all" onclick={() => (cam = { x: 0, y: 0, w: SIZE })}>All</button>
+					</div>
+				</div>
+				<div class="mx-auto w-full max-w-3xl">
 					{#if pickedNode}
 						<div class="mx-2 mb-2 rounded-xl bg-raised p-3 text-sm">
 							<p class="truncate font-medium">{pickedNode.song.title}</p>
@@ -211,7 +385,6 @@
 							<button class="mt-2 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-black" onclick={() => ((around = pickedNode.song.id), load(pickedNode.song.id))}>Show around this song</button>
 						</div>
 					{/if}
-				</div>
 				<p class="px-4 pb-1 text-xs text-muted">A line's colour: what counts most for those two songs. Tap a song for all of it.</p>
 				<ul class="flex flex-wrap gap-x-4 gap-y-1 px-4 pb-3 text-xs text-muted" aria-label="Legend">
 					{#each KINDS as k (k.kind)}
@@ -220,8 +393,9 @@
 							{k.label}
 						</li>
 					{/each}
-					<li>Bigger dot: played more</li>
+					<li>Bigger: played more · scroll or pinch to zoom, drag to move</li>
 				</ul>
+				</div>
 			{:else}
 				<ol class="flex flex-col px-4 pb-4">
 					{#each view.seed ? radio.slice(0, 50).map((r) => ({ node: nodeById.get(r.id), score: r.score })) : view.nodes.map((n) => ({ node: n, score: n.plays })) as row, i (i)}

@@ -1118,6 +1118,7 @@ export interface GraphNode {
   song: Song;
   plays: number;
   local: boolean;
+  sources: string[];
 }
 
 export type EdgeKind = "personal" | "server" | "imported" | "server_imported" | "ytm" | "ytm_account" | "radio_near";

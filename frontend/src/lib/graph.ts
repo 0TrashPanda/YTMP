@@ -99,29 +99,32 @@ export interface Placed {
 }
 
 /**
- * A force layout (springs along edges, songs pushing each other away), in a [size] square.
- * [seed] sits in the middle. The same songs and edges always land in the same places.
+ * A force layout (springs along edges, songs pushing each other away, never overlapping), in
+ * a [size] square; [radius] is each song's size. [seed] sits in the middle. The same songs and
+ * edges always land in the same places.
  */
-export function layout(nodes: GraphNode[], edges: GraphEdge[], seed: string | null, size: number): Placed[] {
+export function layout(nodes: GraphNode[], edges: GraphEdge[], seed: string | null, size: number, radius: (node: GraphNode) => number): Placed[] {
 	const n = nodes.length;
 	const index = new Map(nodes.map((node, i) => [node.id, i]));
+	const r = nodes.map(radius);
 	// A fixed start (a spiral), so it doesn't jump around on every load.
 	const pos = nodes.map((_, i) => {
 		const a = i * 2.399963;
-		const r = (size / 3) * Math.sqrt((i + 0.5) / n);
-		return { x: size / 2 + r * Math.cos(a), y: size / 2 + r * Math.sin(a) };
+		const d = (size / 3) * Math.sqrt((i + 0.5) / n);
+		return { x: size / 2 + d * Math.cos(a), y: size / 2 + d * Math.sin(a) };
 	});
 	const links = edges.map((e) => [index.get(e.from), index.get(e.to)]).filter((l): l is [number, number] => l[0] !== undefined && l[1] !== undefined && l[0] !== l[1]);
-	const ideal = size / (2 + Math.sqrt(n));
-	for (let step = 0; step < 300; step++) {
-		const cool = 1 - step / 300;
+	const ideal = size / (1.5 + Math.sqrt(n));
+	const s = seed !== null ? index.get(seed) : undefined;
+	const steps = 350;
+	for (let step = 0; step < steps; step++) {
+		const cool = 1 - step / steps;
 		const force = pos.map(() => ({ x: 0, y: 0 }));
 		for (let i = 0; i < n; i++) {
 			for (let j = i + 1; j < n; j++) {
 				const dx = pos[i].x - pos[j].x || 0.01;
 				const dy = pos[i].y - pos[j].y || 0.01;
-				const d2 = dx * dx + dy * dy;
-				const push = Math.min(1, (ideal * ideal) / d2) * 0.03;
+				const push = Math.min(1, (ideal * ideal) / (dx * dx + dy * dy)) * 0.03;
 				force[i].x += dx * push;
 				force[i].y += dy * push;
 				force[j].x -= dx * push;
@@ -142,14 +145,49 @@ export function layout(nodes: GraphNode[], edges: GraphEdge[], seed: string | nu
 			// A little pull to the middle keeps loose songs in view.
 			force[i].x += (size / 2 - pos[i].x) * 0.03;
 			force[i].y += (size / 2 - pos[i].y) * 0.03;
-			const max = 10 * cool + 0.5;
+			const max = 12 * cool + 0.5;
 			pos[i].x += Math.max(-max, Math.min(max, force[i].x));
 			pos[i].y += Math.max(-max, Math.min(max, force[i].y));
-			pos[i].x = Math.max(24, Math.min(size - 24, pos[i].x));
-			pos[i].y = Math.max(24, Math.min(size - 24, pos[i].y));
 		}
-		const s = seed !== null ? index.get(seed) : undefined;
+		// Songs never sit on each other: overlapping ones are pushed apart.
+		for (let i = 0; i < n; i++) {
+			for (let j = i + 1; j < n; j++) {
+				const dx = pos[j].x - pos[i].x || 0.01;
+				const dy = pos[j].y - pos[i].y || 0.01;
+				const d = Math.hypot(dx, dy);
+				const min = r[i] + r[j] + 6;
+				if (d >= min) continue;
+				const move = (min - d) / 2 / d;
+				pos[i].x -= dx * move;
+				pos[i].y -= dy * move;
+				pos[j].x += dx * move;
+				pos[j].y += dy * move;
+			}
+		}
+		for (let i = 0; i < n; i++) {
+			pos[i].x = Math.max(r[i] + 4, Math.min(size - r[i] - 4, pos[i].x));
+			pos[i].y = Math.max(r[i] + 4, Math.min(size - r[i] - 4, pos[i].y));
+		}
 		if (s !== undefined) pos[s] = { x: size / 2, y: size / 2 };
 	}
 	return nodes.map((node, i) => ({ node, ...pos[i] }));
+}
+
+/**
+ * Where a song's cover can come from, best first: this page's own host (a music file's or a
+ * saved song's cover, also without internet), then the song's own pictures.
+ */
+export function coverUrls(
+	node: GraphNode,
+	size: number,
+	own: (thumbnails: GraphNode['song']['thumbnails'], size: number) => string | undefined,
+	/** Ask this host for saved songs' covers too (the app: its song cache plays offline). */
+	saved = false
+): string[] {
+	const here = node.sources
+		.filter((id) => id.startsWith('local:') || (saved && id.startsWith('ytm:')))
+		.sort((a, b) => Number(b.startsWith('local:')) - Number(a.startsWith('local:')))
+		.map((id) => `/api/local/art/${encodeURIComponent(id)}?size=${size}`);
+	const web = own(node.song.thumbnails, size);
+	return [...here, ...(web ? [web] : [])];
 }
