@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.core
 
+import dev.trashpanda.ytmp.protocol.RadioOptions
 import dev.trashpanda.ytmp.protocol.AdminRoomInfo
 import dev.trashpanda.ytmp.protocol.BanInfo
 import dev.trashpanda.ytmp.protocol.ClientMessage
@@ -71,7 +72,7 @@ class Room(
     /** The roles the room starts with (the creator's template, or the defaults). */
     template: RoleTemplate = DefaultRoles.template,
     /** Similar songs, for Start radio and the autoplay queue. Null: no radio. */
-    private val radio: RadioSource? = null,
+    private val radio: OptionsRadio? = null,
     /**
      * The same room on all the owner's hosts (docs/features/room-sync.md): only rooms with an
      * owner account have one.
@@ -141,6 +142,9 @@ class Room(
     private val members = LinkedHashMap<String, Member>()
     private val queue = ArrayList<QueueItem>()
     private val history = ArrayList<QueueItem>()
+    /** How the room's radio is made (Start radio and the *Radio from* chips set it). */
+    private var radioOptions = RadioOptions()
+
     /** Songs of a history that Start radio cleared, before [history]: for [recentSongIds]. */
     private var cleared = emptyList<String>()
     private var seq = 0L
@@ -572,6 +576,7 @@ class Room(
             bans = bans.map { SavedBan(it.info, it.guestToken) },
             autoplay = autoplay.items.toList(),
             autoplaySeed = autoplay.seed,
+            radioOptions = radioOptions,
             knownPermissions = Permission.entries,
             episodePositions = episodePositions.toMap(),
             syncId = syncId,
@@ -616,6 +621,7 @@ class Room(
         for (b in saved.bans) bans += Ban(b.info, b.guestToken)
         autoplay.items += saved.autoplay
         autoplay.seed = saved.autoplaySeed
+        radioOptions = saved.radioOptions
         episodePositions += saved.episodePositions
         for (m in saved.members) {
             val roleId = m.roleId?.takeIf { roles.has(it) || m.screen }
@@ -888,11 +894,20 @@ class Room(
                 // The history goes too if they asked, and may remove those songs (like Clear queue).
                 val clearHistory = command.clearHistory &&
                     can(member, if ((history + listOfNotNull(current)).all { it.addedBy == member.id }) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS)
+                command.options?.let(::setRadioOptions)
                 startRadio(command.song, member.id to member.name, command.songs?.take(MAX_BROUGHT_RADIO), command.follows, clearHistory)
             }
             is Command.AutoplayFromHere -> {
                 need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
+                command.options?.let(::setRadioOptions)
                 autoplayFromHere(command.song, member.id to member.name, command.songs?.take(MAX_BROUGHT_RADIO))
+            }
+            is Command.SetRadioOptions -> {
+                need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
+                setRadioOptions(command.options)
+                // The radio playing now is made again from its seed; what people queued stays.
+                val seed = autoplay.seed ?: current?.song
+                if (seed != null && seed.podcast == null) autoplayFromHere(seed, member.id to member.name) else emit(autoplay.changed())
             }
             is Command.AutoplaySongs -> {
                 need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
@@ -1866,9 +1881,15 @@ class Room(
         playNextFromQueue()
     }
 
+    private fun setRadioOptions(options: RadioOptions) {
+        if (options == radioOptions) return
+        radioOptions = options
+        emit(Event.RadioOptionsChanged(options))
+    }
+
     /** The room's radio from [song], after it in the autoplay queue (while [song] already plays). */
-    private fun loadRadio(source: RadioSource, song: Song): Job = scope.launch {
-        val songs = runCatching { source.radio(song.id) }
+    private fun loadRadio(source: OptionsRadio, song: Song): Job = scope.launch {
+        val songs = runCatching { source.radio(song.id, radioOptions) }
         mutex.withLock {
             if (autoplay.job != coroutineContext[Job]) return@withLock
             autoplay.job = null
@@ -1909,7 +1930,7 @@ class Room(
         if (source == null && brought == null) return
         autoplay.job?.cancel()
         autoplay.job = scope.launch {
-            val songs = runCatching { brought ?: source!!.radio(song.id) }
+            val songs = runCatching { brought ?: source!!.radio(song.id, radioOptions) }
             mutex.withLock {
                 songs.onFailure { e ->
                     if (e is CancellationException) throw e
@@ -1951,7 +1972,7 @@ class Room(
         autoplay.job = scope.launch {
             var songs: Result<List<Song>> = Result.success(emptyList())
             for (seed in seeds) {
-                songs = runCatching { source.radio(seed.id) }
+                songs = runCatching { source.radio(seed.id, radioOptions) }
                 val skip = mutex.withLock { recentSongIds() }
                 if (songs.isFailure || songs.getOrThrow().any { it.id !in skip }) break
             }
@@ -2008,6 +2029,7 @@ class Room(
         bans = banInfos(),
         autoplay = autoplay.items.toList(),
         autoplaySeed = autoplay.seed,
+        radioOptions = radioOptions,
         migration = migration,
         adminless = adminless,
         repeat = repeat,
@@ -2102,7 +2124,7 @@ class Room(
             scope: CoroutineScope,
             onInfoChanged: () -> Unit = {},
             onOwnerChanged: (oldAccount: String?, oldSyncId: String?) -> Unit = { _, _ -> },
-            radio: RadioSource? = null,
+            radio: OptionsRadio? = null,
             bookmarks: EpisodeBookmarks? = null,
             /** The code here, when it's not [SavedRoom.code] (a room that moved here, whose code was taken). */
             code: String = saved.code,

@@ -99,7 +99,7 @@ class PodcastTest {
         var radios = 0
         val room = Room(
             "ABCD", "Test", "owner", RoomVisibility.PUBLIC, exact, backgroundScope,
-            radio = { radios++; listOf(song) },
+            radio = { _, _ -> radios++; listOf(song) },
         ) { testScheduler.currentTime }
         val anna = room.owner()
         room.run(anna, Command.AddSongs(listOf(episode), QueuePosition.END))

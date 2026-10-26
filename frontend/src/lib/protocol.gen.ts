@@ -56,10 +56,27 @@ export interface CommandAssignRole {
   roleId: string;
 }
 
+export type RadioFrom = "mix" | "ytm" | "graph" | "device";
+
+export interface RadioOptions {
+  from: RadioFrom;
+  discover: number;
+  withAccount: boolean | null;
+  myTaste: boolean;
+  perArtist: number;
+  recentHours: number;
+  leaveOutSkipped: boolean;
+  mixEvery: number;
+  offline: RadioFrom;
+  blockedSongs: string[];
+  blockedArtists: string[];
+}
+
 export interface CommandAutoplayFromHere {
   kind: "AutoplayFromHere";
   song: Song;
   songs: Song[] | null;
+  options: RadioOptions | null;
 }
 
 export interface CommandAutoplaySongs {
@@ -249,6 +266,11 @@ export interface CommandSetPassword {
   password: string | null;
 }
 
+export interface CommandSetRadioOptions {
+  kind: "SetRadioOptions";
+  options: RadioOptions;
+}
+
 export interface CommandSetRemotePlay {
   kind: "SetRemotePlay";
   allowed: boolean;
@@ -300,6 +322,7 @@ export interface CommandStartRadio {
   songs: Song[] | null;
   follows: boolean;
   clearHistory: boolean;
+  options: RadioOptions | null;
 }
 
 export interface CommandUnban {
@@ -378,6 +401,7 @@ export type Command =
   | CommandSetOutputVolume
   | CommandSetParticipantPermissions
   | CommandSetPassword
+  | CommandSetRadioOptions
   | CommandSetRemotePlay
   | CommandSetRepeat
   | CommandSetRoomCode
@@ -590,6 +614,11 @@ export interface EventQueueReplaced {
   items: QueueItem[];
 }
 
+export interface EventRadioOptionsChanged {
+  kind: "RadioOptionsChanged";
+  options: RadioOptions;
+}
+
 export interface EventRepeatChanged {
   kind: "RepeatChanged";
   mode: RepeatMode;
@@ -669,6 +698,7 @@ export type Event =
   | EventQueueItemRemoved
   | EventQueueItemsAdded
   | EventQueueReplaced
+  | EventRadioOptionsChanged
   | EventRepeatChanged
   | EventRolesChanged
   | EventRoomUpdated
@@ -732,6 +762,7 @@ export interface RoomState {
   bans: BanInfo[];
   autoplay: QueueItem[];
   autoplaySeed: Song | null;
+  radioOptions: RadioOptions;
   migration: MigrationOffer | null;
   adminless: boolean;
   repeat: RepeatMode;
@@ -1044,6 +1075,7 @@ export interface HistoryEntry {
   addedByName: string;
   listenedWith: ListenedWith[];
   shared: boolean;
+  imported: boolean;
 }
 
 export interface HistoryPage {
@@ -1074,6 +1106,74 @@ export interface AccountSettings {
   openElsewhere: RoomOpenMode;
   hasRoomPassword: boolean;
   historyRadio: HistoryRadio;
+}
+
+export interface GraphNode {
+  id: string;
+  song: Song;
+  plays: number;
+  local: boolean;
+}
+
+export type EdgeKind = "personal" | "server" | "imported" | "server_imported" | "ytm" | "ytm_account";
+
+export interface GraphEdge {
+  from: string;
+  to: string;
+  kind: EdgeKind;
+  solo: number;
+  shared: number;
+  skips: number;
+  seen: number;
+  bestRank: number | null;
+  rankSum: number;
+  updatedAt: number;
+}
+
+export interface GraphTuning {
+  personal: number;
+  server: number;
+  imported: number;
+  ytm: number;
+  ytmAccount: number;
+  party: number;
+  skip: number;
+  reverse: number;
+  secondHop: number;
+  halfLifeDays: number;
+  radioDepth: number;
+}
+
+export interface GraphView {
+  seed: string | null;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  tuning: GraphTuning;
+  now: number;
+}
+
+export interface HistoryImport {
+  id: string;
+  at: number;
+  plays: number;
+  duplicates: number;
+  firstAt: number;
+  lastAt: number;
+}
+
+export interface HistoryImportList {
+  imports: HistoryImport[];
+}
+
+export interface RadioCrawlStatus {
+  enabled: boolean;
+  paceSeconds: number;
+  refreshDays: number;
+  done: number;
+  total: number;
+  waiting: string | null;
+  until: number | null;
+  lastAt: number | null;
 }
 
 export interface PlayReport {

@@ -158,6 +158,9 @@ class SongCache(
 
     fun has(songId: String): Boolean = synchronized(lock) { songId in entries }
 
+    /** The IDs of the songs saved here. */
+    fun songIds(): List<String> = synchronized(lock) { entries.keys.toList() }
+
     /** Where the phone's own player can play [songId] from: its download, or its file here; null when neither. */
     fun localUri(songId: String): String? =
         downloads?.find(songId)?.uri ?: synchronized(lock) { entries[songId] }?.let { File(dir, it.file).toURI().toString() }

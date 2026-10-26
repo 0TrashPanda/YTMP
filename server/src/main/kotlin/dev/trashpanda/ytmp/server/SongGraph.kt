@@ -1,35 +1,49 @@
 package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.core.SongMatch
+import dev.trashpanda.ytmp.protocol.EdgeKind
+import dev.trashpanda.ytmp.protocol.GraphEdge
+import dev.trashpanda.ytmp.protocol.GraphNode
+import dev.trashpanda.ytmp.protocol.GraphTuning
+import dev.trashpanda.ytmp.protocol.GraphView
 import dev.trashpanda.ytmp.protocol.HistoryRadio
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import dev.trashpanda.ytmp.protocol.RadioHints
+import dev.trashpanda.ytmp.protocol.RadioOptions
+import dev.trashpanda.ytmp.protocol.RadioWay
 import dev.trashpanda.ytmp.protocol.Song
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import org.slf4j.LoggerFactory
 import java.sql.Connection
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.sqrt
 
 /**
  * The song graph (docs/features/history-and-recommendations.md#song-graph): which songs are
- * played after which, learned from the accounts' listening history, and which songs YouTube
- * Music's radios put together. Edges keep raw counts; their weight is worked out when the graph
- * is read ([similar]), so the formula can change without touching the data. Everything but
- * YouTube Music's edges can be rebuilt from the history ([rebuild]).
- * See docs/implementation/storage.md#song-graph.
+ * played after which, learned from the accounts' listening history (also imported from Google
+ * Takeout), and which songs YouTube Music's radios put together. What it learns from is kept raw
+ * (the `plays`, and every radio fetched in `radio_fetches`: when, how, as whom); the edges are
+ * built from that and keep counts, and their weight is worked out when the graph is read, with
+ * the account's [GraphTuning]. So the graph can be weighed and built again without fetching
+ * anything ([rebuild]). See docs/implementation/storage.md#song-graph.
  */
 class SongGraph(private val db: Database, private val clock: () -> Long = System::currentTimeMillis) {
     /** Rebuilds and learning from radios, off the caller's thread, one at a time. */
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "song-graph").apply { isDaemon = true } }
     private val rebuildPending = AtomicBoolean(false)
-    /** Seeds whose YouTube Music radio was learned lately (song ID → when): a radio asked again isn't written again. */
+    /** Radios learned lately (seed and account → when): a radio asked again isn't written again. */
     private val learnedRadios = ConcurrentHashMap<String, Long>()
+    private val ids = ListSerializer(String.serializer())
 
     /** One song heard by an account, as far as the graph cares. */
-    private class Heard(val song: Song, val playedAt: Long, val heardMs: Long, val skipped: Boolean, val roomCode: String, val shared: Boolean)
+    private class Heard(val song: Song, val playedAt: Long, val heardMs: Long, val skipped: Boolean, val roomCode: String, val shared: Boolean, val imported: Boolean)
 
     // --- learning from listening ----------------------------------------------------------
 
@@ -40,9 +54,9 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
      */
     @Synchronized
     fun played(accountId: String, report: PlayReport) = db.transaction { c ->
-        val current = Heard(report.song, report.playedAt, report.heardMs, report.skipped, report.roomCode, report.shared)
+        val current = Heard(report.song, report.playedAt, report.heardMs, report.skipped, report.roomCode, report.shared, imported = false)
         val before = c.prepareStatement(
-            "SELECT song, played_at, heard_ms, skipped, room_code, shared FROM plays WHERE account_id = ? AND played_at < ? ORDER BY played_at DESC LIMIT 1",
+            "SELECT song, played_at, heard_ms, skipped, room_code, shared, import_id FROM plays WHERE account_id = ? AND played_at < ? ORDER BY played_at DESC LIMIT 1",
         ).use {
             it.setString(1, accountId)
             it.setLong(2, report.playedAt)
@@ -64,17 +78,20 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         if (!othersHeardIt) addEdge(c, Edge(from, to, SERVER, ""), counts, current.playedAt)
     }
 
-    /** Builds the graph from the history again (not YouTube Music's edges): after deleting from it, or when the graph is new. */
+    /**
+     * Builds the graph again from what it learned from (not the radios from before they were kept
+     * raw): after deleting from the history, an import, or when the graph is new.
+     */
     @Synchronized
     fun rebuild() = db.transaction { c ->
         val started = System.currentTimeMillis()
-        c.createStatement().use { it.executeUpdate("DELETE FROM song_edges WHERE scope <> '$YTM'") }
+        c.createStatement().use { it.executeUpdate("DELETE FROM song_edges WHERE scope NOT IN ('$YTM', '$YTM_ACCOUNT') OR seen > 0") }
         val nodes = HashMap<String, String>()
         val edges = HashMap<Edge, Counts>()
         // A play several accounts heard (same room, same start, same song) counts once for the server.
         val counted = HashSet<String>()
         var plays = 0
-        c.prepareStatement("SELECT account_id, song, played_at, heard_ms, skipped, room_code, shared FROM plays ORDER BY account_id, played_at").use { statement ->
+        c.prepareStatement("SELECT account_id, song, played_at, heard_ms, skipped, room_code, shared, import_id FROM plays ORDER BY account_id, played_at").use { statement ->
             statement.executeQuery().use { rows ->
                 var account: String? = null
                 var before: Heard? = null
@@ -93,13 +110,45 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                     val to = nodes.getOrPut(current.song.id) { node(c, current.song, update = false) }
                     if (from == to) continue
                     val counts = counts(current)
-                    edges.merge(Edge(from, to, PERSONAL, id), counts, Counts::plus)
-                    if (counted.add("${current.roomCode}|${current.playedAt}|${current.song.id}")) edges.merge(Edge(from, to, SERVER, ""), counts, Counts::plus)
+                    edges.merge(Edge(from, to, if (current.imported) IMPORTED else PERSONAL, id), counts, Counts::plus)
+                    if (counted.add("${current.roomCode}|${current.playedAt}|${current.song.id}")) {
+                        edges.merge(Edge(from, to, if (current.imported) SERVER_IMPORTED else SERVER, ""), counts, Counts::plus)
+                    }
                 }
             }
         }
         for ((edge, counts) in edges) addEdge(c, edge, counts, counts.lastAt)
-        log.info("Song graph built from {} plays: {} edges, in {} ms", plays, edges.size, System.currentTimeMillis() - started)
+        val radios = rebuildRadios(c, nodes)
+        log.info("Song graph built from {} plays and {} radios: {} edges, in {} ms", plays, radios, edges.size, System.currentTimeMillis() - started)
+    }
+
+    /** The edges of every kept radio fetch. Returns how many fetches. */
+    private fun rebuildRadios(c: Connection, nodes: HashMap<String, String>): Int {
+        class Ytm(var seen: Int = 0, var best: Int = Int.MAX_VALUE, var rankSum: Int = 0, var at: Long = 0)
+        val edges = HashMap<Edge, Ytm>()
+        var fetches = 0
+        c.prepareStatement("SELECT seed, fetched_at, account_id, songs FROM radio_fetches").use { statement ->
+            statement.executeQuery().use { rows ->
+                while (rows.next()) {
+                    fetches++
+                    val seed = nodeOf(c, rows.getString("seed")) ?: continue
+                    val account = rows.getString("account_id")
+                    val at = rows.getLong("fetched_at")
+                    val songIds = runCatching { ProtocolJson.decodeFromString(ids, rows.getString("songs")) }.getOrDefault(emptyList())
+                    songIds.forEachIndexed { rank, sourceId ->
+                        val to = nodes.getOrPut(sourceId) { nodeOf(c, sourceId) ?: return@forEachIndexed }
+                        if (to == seed) return@forEachIndexed
+                        val e = edges.getOrPut(Edge(seed, to, if (account.isEmpty()) YTM else YTM_ACCOUNT, account)) { Ytm() }
+                        e.seen++
+                        e.best = min(e.best, rank)
+                        e.rankSum += rank
+                        e.at = max(e.at, at)
+                    }
+                }
+            }
+        }
+        for ((edge, e) in edges) addYtmEdge(c, edge, e.seen, e.best, e.rankSum, e.at)
+        return fetches
     }
 
     /** [rebuild], soon and off this thread (deleting a lot from the history at once asks just once). */
@@ -126,28 +175,57 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
     // --- learning from YouTube Music ------------------------------------------------------
 
     /**
-     * A radio YouTube Music made from [seedSongId] (it starts with the seed): edges from the seed
-     * to its songs, ranked by their place in it. Written off this thread.
+     * A radio YouTube Music made from [seedSongId] (it may start with the seed), as [accountId]
+     * (their sign-in; null: without an account), fetched [way]: kept as it is, and edges from the
+     * seed to its songs, ranked by their place in it. [reportedBy]: the account whose phone sent
+     * it (null: this server fetched it). Written off this thread.
      */
-    fun learnRadio(seedSongId: String, songs: List<Song>) {
+    fun learnRadio(seedSongId: String, songs: List<Song>, accountId: String? = null, way: RadioWay = RadioWay.ROOM, reportedBy: String? = null) {
         val now = clock()
-        val last = learnedRadios[seedSongId]
-        if (last != null && now - last < RADIO_RELEARN_MS) return
+        val key = "$seedSongId|${accountId.orEmpty()}"
+        val last = learnedRadios[key]
+        // The radio crawl always keeps what it fetched: it asks again only when it's time to.
+        if (way != RadioWay.CRAWL && last != null && now - last < RADIO_RELEARN_MS) return
         if (learnedRadios.size > 5_000) learnedRadios.clear()
-        learnedRadios[seedSongId] = now
+        learnedRadios[key] = now
+        val music = songs.filter { it.podcast == null && it.id != seedSongId }.take(MAX_RADIO_SONGS)
+        if (music.isEmpty()) return
         worker.execute {
             runCatching {
                 synchronized(this) {
                     db.transaction { c ->
-                        val seed = songs.firstOrNull { it.id == seedSongId }?.let { node(c, it) } ?: nodeOf(c, seedSongId) ?: return@transaction
-                        songs.filter { it.id != seedSongId && it.podcast == null }.take(MAX_YTM_EDGES).forEachIndexed { rank, song ->
-                            val to = node(c, song)
-                            if (to != seed) addYtmEdge(c, seed, to, rank, now)
+                        // A seed the graph doesn't know yet (only its ID): the radio is kept, its edges come with a rebuild.
+                        val seed = songs.firstOrNull { it.id == seedSongId }?.let { node(c, it) } ?: nodeOf(c, seedSongId)
+                        val sourceIds = music.map { song -> song.id.take(256).also { node(c, song) } }
+                        c.prepareStatement("INSERT INTO radio_fetches (id, seed, fetched_at, way, account_id, reported_by, songs) VALUES (?, ?, ?, ?, ?, ?, ?)").use {
+                            it.setString(1, Ids.random(16))
+                            it.setString(2, seedSongId.take(256))
+                            it.setLong(3, now)
+                            it.setString(4, way.name.lowercase())
+                            it.setString(5, accountId.orEmpty())
+                            it.setString(6, reportedBy.orEmpty())
+                            it.setString(7, ProtocolJson.encodeToString(ids, sourceIds))
+                            it.executeUpdate()
+                        }
+                        if (seed == null) return@transaction
+                        val scope = if (accountId == null) YTM else YTM_ACCOUNT
+                        music.forEachIndexed { rank, song ->
+                            val to = nodeOf(c, song.id) ?: return@forEachIndexed
+                            if (to != seed) addYtmEdge(c, Edge(seed, to, scope, accountId.orEmpty()), 1, rank, rank, now)
                         }
                     }
                 }
             }.onFailure { log.warn("Couldn't learn from a radio: {}", it.message) }
         }
+    }
+
+    /** When each of [seeds] last had a radio fetched without an account (the radio crawl). */
+    fun lastFetched(seeds: Collection<String>): Map<String, Long> = db.use { c ->
+        val out = HashMap<String, Long>()
+        c.prepareStatement("SELECT seed, MAX(fetched_at) FROM radio_fetches WHERE account_id = '' GROUP BY seed").use {
+            it.executeQuery().use { rows -> while (rows.next()) out[rows.getString(1)] = rows.getLong(2) }
+        }
+        out.filterKeys { it in seeds }
     }
 
     /** Waits until what's queued off the caller's thread ([learnRadio], [rebuildSoon]) is done. For tests. */
@@ -159,29 +237,162 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
 
     /**
      * Songs that go with [seedSongId], best first: its neighbours in the graph of [accountId]
-     * (null: only the server's and YouTube Music's), as far as [use] allows, and their neighbours
-     * (weaker). Each in the seed's source when the graph knows it there (a local file stays local).
+     * (null: only the server's and YouTube Music's), as far as [use] allows, weighed with
+     * [tuning], and their neighbours (weaker). Each in the seed's source when the graph knows it
+     * there (a local file stays local).
      */
-    fun similar(seedSongId: String, accountId: String?, use: HistoryRadio = HistoryRadio.ALL, limit: Int = SIMILAR_LIMIT): List<Song> = db.use { c ->
-        val seed = nodeOf(c, seedSongId) ?: return@use emptyList()
-        val personal = accountId?.takeIf { use != HistoryRadio.OFF }
+    fun similar(
+        seedSongId: String,
+        accountId: String?,
+        use: HistoryRadio = HistoryRadio.ALL,
+        limit: Int = SIMILAR_LIMIT,
+        tuning: GraphTuning = GraphTuning(),
+    ): List<Song> = db.use { c -> similar(c, seedSongId, accountId, use, limit, tuning) }
+
+    private fun similar(c: Connection, seedSongId: String, accountId: String?, use: HistoryRadio, limit: Int, tuning: GraphTuning): List<Song> {
+        val seed = nodeOf(c, seedSongId) ?: return emptyList()
         val now = clock()
         val scores = HashMap<String, Double>()
-        for (edge in edges(c, listOf(seed), personal, both = true)) {
+        for (edge in edges(c, listOf(seed), accountId, use, both = true)) {
             val other = if (edge.from == seed) edge.to else edge.from
-            scores.merge(other, edge.weight(use, now) * (if (edge.from == seed) 1.0 else REVERSE), Double::plus)
+            scores.merge(other, weight(edge, use, tuning, now) * (if (edge.from == seed) 1.0 else tuning.reverse), Double::plus)
         }
         scores.remove(seed)
         val near = scores.entries.filter { it.value > 0 }.sortedByDescending { it.value }.take(SECOND_HOP_FROM)
         val best = near.firstOrNull()?.value
-        if (best != null) {
+        if (best != null && tuning.secondHop > 0) {
             val strength = near.associate { it.key to it.value / best }
-            for (edge in edges(c, strength.keys.toList(), personal, both = false)) {
-                if (edge.to != seed) scores.merge(edge.to, strength.getValue(edge.from) * edge.weight(use, now) * SECOND_HOP, Double::plus)
+            for (edge in edges(c, strength.keys.toList(), accountId, use, both = false)) {
+                if (edge.to != seed) scores.merge(edge.to, strength.getValue(edge.from) * weight(edge, use, tuning, now) * tuning.secondHop, Double::plus)
             }
         }
         val ranked = scores.entries.filter { it.value >= MIN_SCORE }.sortedByDescending { it.value }.take(limit * 2).map { it.key }
-        songs(c, ranked, prefer = seedSongId.substringBefore(':')).filter { it.id != seedSongId }.take(limit)
+        return songs(c, ranked, prefer = seedSongId.substringBefore(':')).filter { it.id != seedSongId }.take(limit)
+    }
+
+    /**
+     * What the graph says about a radio from [seed] for [accountId]: its songs, and of those and
+     * [candidates] (YouTube Music's radio) which they heard and which to leave out ([RadioOptions]).
+     */
+    fun hints(seed: String, accountId: String?, candidates: List<String>, options: RadioOptions, use: HistoryRadio, tuning: GraphTuning, limit: Int): RadioHints = db.use { c ->
+        val similar = similar(c, seed, accountId?.takeIf { options.myTaste && use != HistoryRadio.OFF }, use, limit, tuning)
+        if (accountId == null) return@use RadioHints(similar)
+        val ids = (candidates + similar.map { it.id }).distinct().take(MAX_HINT_SONGS)
+        val stats = playStats(c, accountId, ids)
+        val now = clock()
+        val avoid = stats.filter { (_, s) ->
+            (options.leaveOutSkipped && s.skips >= 2 && s.skips > s.plays - s.skips) ||
+                (options.recentHours > 0 && now - s.lastAt < options.recentHours * 3_600_000L)
+        }.keys
+        RadioHints(similar, heard = stats.filterValues { it.plays > it.skips }.keys.toList(), avoid = avoid.toList())
+    }
+
+    private class PlayStats(var plays: Int = 0, var skips: Int = 0, var lastAt: Long = 0)
+
+    /** How often [accountId] played and skipped each of [songIds] (also as the same song from another source). */
+    private fun playStats(c: Connection, accountId: String, songIds: List<String>): Map<String, PlayStats> {
+        if (songIds.isEmpty()) return emptyMap()
+        // The sources of the same songs: a local file heard counts for its YouTube Music song too.
+        val nodeOfSource = HashMap<String, String>()
+        inList(c, "SELECT source_id, song_id FROM song_sources WHERE source_id", songIds) { nodeOfSource[it.getString(1)] = it.getString(2) }
+        val sourcesOfNode = HashMap<String, MutableList<String>>()
+        inList(c, "SELECT source_id, song_id FROM song_sources WHERE song_id", nodeOfSource.values.distinct()) {
+            sourcesOfNode.getOrPut(it.getString(2)) { mutableListOf() } += it.getString(1)
+        }
+        val all = (songIds + sourcesOfNode.values.flatten()).distinct()
+        val bySource = HashMap<String, PlayStats>()
+        c.prepareStatement(
+            "SELECT song_id, COUNT(*), SUM(CASE WHEN skipped THEN 1 ELSE 0 END), MAX(played_at) FROM plays WHERE account_id = ? AND song_id IN (${all.joinToString(", ") { "?" }}) GROUP BY song_id",
+        ).use {
+            it.setString(1, accountId)
+            all.forEachIndexed { i, id -> it.setString(i + 2, id) }
+            it.executeQuery().use { rows -> while (rows.next()) bySource[rows.getString(1)] = PlayStats(rows.getInt(2), rows.getInt(3), rows.getLong(4)) }
+        }
+        return songIds.mapNotNull { id ->
+            val versions = nodeOfSource[id]?.let { sourcesOfNode[it] } ?: listOf(id)
+            val stats = versions.mapNotNull(bySource::get)
+            if (stats.isEmpty()) null
+            else id to PlayStats(stats.sumOf { it.plays }, stats.sumOf { it.skips }, stats.maxOf { it.lastAt })
+        }.toMap()
+    }
+
+    /**
+     * The graph as [accountId] sees it, for the graph view: around [seedSongId] (its neighbours
+     * and theirs), or without one their most played songs and the edges between them. Raw counts:
+     * the page weighs them with the sliders.
+     */
+    fun view(accountId: String, seedSongId: String?, tuning: GraphTuning, use: HistoryRadio = HistoryRadio.ALL): GraphView = db.use { c ->
+        val now = clock()
+        val seed = seedSongId?.let { nodeOf(c, it) }
+        val nodes: List<String>
+        val edges: List<StoredEdge>
+        if (seed != null) {
+            val first = edges(c, listOf(seed), accountId, use, both = true)
+            val score = HashMap<String, Double>()
+            for (e in first) score.merge(if (e.from == seed) e.to else e.from, weight(e, use, tuning, now), Double::plus)
+            val near = score.entries.sortedByDescending { it.value }.take(VIEW_NEIGHBOURS).map { it.key }
+            val second = edges(c, near.take(VIEW_SECOND_FROM), accountId, use, both = false)
+            val score2 = HashMap<String, Double>()
+            for (e in second) if (e.to != seed && e.to !in near) score2.merge(e.to, weight(e, use, tuning, now), Double::plus)
+            val far = score2.entries.sortedByDescending { it.value }.take(VIEW_SECOND).map { it.key }
+            nodes = listOf(seed) + near + far
+            val keep = nodes.toSet()
+            edges = (first + second).filter { it.from in keep && it.to in keep }
+        } else {
+            val top = mostPlayed(c, accountId, VIEW_TOP)
+            nodes = top
+            val keep = top.toSet()
+            edges = edges(c, top, accountId, use, both = false).filter { it.to in keep }
+        }
+        val songs = nodeSongs(c, nodes)
+        val plays = nodePlays(c, accountId, nodes)
+        GraphView(
+            seed = seed,
+            nodes = nodes.mapNotNull { n -> songs[n]?.let { (song, local) -> GraphNode(n, song, plays[n] ?: 0, local) } },
+            edges = edges.distinctBy { listOf(it.from, it.to, it.scope) }.map { it.toGraphEdge() },
+            tuning = tuning,
+            now = now,
+        )
+    }
+
+    /** [accountId]'s most played songs (nodes), most first. */
+    private fun mostPlayed(c: Connection, accountId: String, limit: Int): List<String> {
+        val counts = HashMap<String, Int>()
+        c.prepareStatement("SELECT song_id, COUNT(*) FROM plays WHERE account_id = ? AND skipped = ? GROUP BY song_id").use {
+            it.setString(1, accountId)
+            it.setBoolean(2, false)
+            it.executeQuery().use { rows -> while (rows.next()) counts[rows.getString(1)] = rows.getInt(2) }
+        }
+        val byNode = HashMap<String, Int>()
+        val top = counts.entries.sortedByDescending { it.value }.take(limit * 3)
+        val nodes = HashMap<String, String>()
+        inList(c, "SELECT source_id, song_id FROM song_sources WHERE source_id", top.map { it.key }) { nodes[it.getString(1)] = it.getString(2) }
+        for ((source, n) in top) nodes[source]?.let { byNode.merge(it, n, Int::plus) }
+        return byNode.entries.sortedByDescending { it.value }.take(limit).map { it.key }
+    }
+
+    /** How often [accountId] heard each of [nodes] (any of its sources). */
+    private fun nodePlays(c: Connection, accountId: String, nodes: List<String>): Map<String, Int> {
+        val sources = HashMap<String, String>()
+        inList(c, "SELECT source_id, song_id FROM song_sources WHERE song_id", nodes) { sources[it.getString(1)] = it.getString(2) }
+        if (sources.isEmpty()) return emptyMap()
+        val out = HashMap<String, Int>()
+        c.prepareStatement("SELECT song_id, COUNT(*) FROM plays WHERE account_id = ? AND song_id IN (${sources.keys.joinToString(", ") { "?" }}) GROUP BY song_id").use {
+            it.setString(1, accountId)
+            sources.keys.forEachIndexed { i, s -> it.setString(i + 2, s) }
+            it.executeQuery().use { rows -> while (rows.next()) sources[rows.getString(1)]?.let { n -> out.merge(n, rows.getInt(2), Int::plus) } }
+        }
+        return out
+    }
+
+    /** A song for each node (YouTube Music's version first), and whether it has a local version. */
+    private fun nodeSongs(c: Connection, nodes: List<String>): Map<String, Pair<Song, Boolean>> {
+        val versions = HashMap<String, MutableList<Song>>()
+        inList(c, "SELECT song_id, data FROM song_sources WHERE song_id", nodes) { rows ->
+            runCatching { ProtocolJson.decodeFromString(Song.serializer(), rows.getString(2)) }.getOrNull()
+                ?.let { versions.getOrPut(rows.getString(1)) { mutableListOf() } += it }
+        }
+        return versions.mapValues { (_, songs) -> (songs.firstOrNull { it.id.startsWith("ytm:") } ?: songs.first()) to songs.any { it.id.startsWith("local:") } }
     }
 
     // --- nodes and edges ------------------------------------------------------------------
@@ -192,14 +403,28 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         operator fun plus(other: Counts) = Counts(solo + other.solo, shared + other.shared, skips + other.skips, max(lastAt, other.lastAt))
     }
 
-    private class StoredEdge(val from: String, val to: String, val scope: String, val solo: Int, val shared: Int, val skips: Int, val ytmRank: Int?, val updatedAt: Long) {
-        fun weight(use: HistoryRadio, now: Long): Double {
-            val ageDays = max(0L, now - updatedAt) / 86_400_000.0
-            val decay = 0.5.pow(ageDays / HALF_LIFE_DAYS)
-            return when (scope) {
-                PERSONAL -> PERSONAL_WEIGHT * (solo + (if (use == HistoryRadio.ALL) shared * SHARED_WEIGHT else 0.0) - skips * SKIP_WEIGHT) * decay
-                SERVER -> (solo + shared * SHARED_WEIGHT - skips * SKIP_WEIGHT) * decay
-                else -> YTM_WEIGHT * max(0.2, 1 - (ytmRank ?: MAX_YTM_EDGES) / MAX_YTM_EDGES.toDouble()) * decay
+    private class StoredEdge(
+        val from: String, val to: String, val scope: String, val solo: Int, val shared: Int, val skips: Int,
+        val ytmRank: Int?, val seen: Int, val rankSum: Int, val updatedAt: Long,
+    ) {
+        fun toGraphEdge() = GraphEdge(from, to, kindOf(scope), solo, shared, skips, seen, ytmRank, rankSum, updatedAt)
+    }
+
+    /** What [e] counts, the way [tuning] says. Kept the same as the graph view's (frontend/src/lib/graph.ts). */
+    private fun weight(e: StoredEdge, use: HistoryRadio, t: GraphTuning, now: Long): Double {
+        val ageDays = max(0L, now - e.updatedAt) / 86_400_000.0
+        val decay = if (t.halfLifeDays > 0) 0.5.pow(ageDays / t.halfLifeDays) else 1.0
+        val party = if (use == HistoryRadio.ALL) t.party else 0.0
+        return when (e.scope) {
+            PERSONAL -> t.personal * (e.solo + e.shared * party - e.skips * t.skip) * decay
+            IMPORTED -> t.personal * t.imported * (e.solo - e.skips * t.skip) * decay
+            SERVER -> t.server * (e.solo + e.shared * t.party - e.skips * t.skip) * decay
+            SERVER_IMPORTED -> t.server * t.imported * (e.solo - e.skips * t.skip) * decay
+            else -> {
+                if ((e.ytmRank ?: 0) >= t.radioDepth) return 0.0
+                val rank = if (e.seen > 0) e.rankSum.toDouble() / e.seen else (e.ytmRank ?: MAX_RADIO_SONGS).toDouble()
+                val often = min(2.0, sqrt(max(1, e.seen).toDouble()))
+                (if (e.scope == YTM) t.ytm else t.ytmAccount) * max(0.2, 1 - rank / MAX_RADIO_SONGS) * often * decay
             }
         }
     }
@@ -222,6 +447,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
     private fun java.sql.ResultSet.toHeard() = Heard(
         ProtocolJson.decodeFromString(Song.serializer(), getString("song")),
         getLong("played_at"), getLong("heard_ms"), getBoolean("skipped"), getString("room_code"), getBoolean("shared"),
+        imported = getString("import_id").isNotEmpty(),
     )
 
     private fun nodeOf(c: Connection, sourceId: String): String? =
@@ -297,31 +523,45 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         }
     }
 
-    private fun addYtmEdge(c: Connection, from: String, to: String, rank: Int, at: Long) {
+    /** A YouTube Music edge seen [seen] more times, at best place [best], places adding up to [rankSum]. */
+    private fun addYtmEdge(c: Connection, edge: Edge, seen: Int, best: Int, rankSum: Int, at: Long) {
         c.prepareStatement(
-            """INSERT INTO song_edges (from_song, to_song, scope, account_id, solo_plays, shared_plays, skips, ytm_rank, updated_at)
-               VALUES (?, ?, '$YTM', '', 0, 0, 0, ?, ?)
+            """INSERT INTO song_edges (from_song, to_song, scope, account_id, solo_plays, shared_plays, skips, ytm_rank, seen, rank_sum, updated_at)
+               VALUES (?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?)
                ON CONFLICT (from_song, to_song, scope, account_id) DO UPDATE SET
-                 ytm_rank = CASE WHEN excluded.ytm_rank < song_edges.ytm_rank THEN excluded.ytm_rank ELSE song_edges.ytm_rank END,
-                 updated_at = excluded.updated_at""",
+                 ytm_rank = CASE WHEN song_edges.ytm_rank IS NULL OR excluded.ytm_rank < song_edges.ytm_rank THEN excluded.ytm_rank ELSE song_edges.ytm_rank END,
+                 seen = song_edges.seen + excluded.seen,
+                 rank_sum = song_edges.rank_sum + excluded.rank_sum,
+                 updated_at = CASE WHEN excluded.updated_at > song_edges.updated_at THEN excluded.updated_at ELSE song_edges.updated_at END""",
         ).use {
-            it.setString(1, from)
-            it.setString(2, to)
-            it.setInt(3, rank)
-            it.setLong(4, at)
+            it.setString(1, edge.from)
+            it.setString(2, edge.to)
+            it.setString(3, edge.scope)
+            it.setString(4, edge.account)
+            it.setInt(5, best)
+            it.setInt(6, seen)
+            it.setInt(7, rankSum)
+            it.setLong(8, at)
             it.executeUpdate()
         }
     }
 
-    /** Edges from [nodes] (and, with [both], to them): the server's, YouTube Music's, and [account]'s own. */
-    private fun edges(c: Connection, nodes: List<String>, account: String?, both: Boolean): List<StoredEdge> {
+    /**
+     * Edges from [nodes] (and, with [both], to them): the server's and YouTube Music's, and
+     * [account]'s own (their listening as far as [use] allows, and their account's radios).
+     */
+    private fun edges(c: Connection, nodes: List<String>, account: String?, use: HistoryRadio, both: Boolean): List<StoredEdge> {
         if (nodes.isEmpty()) return emptyList()
         val list = nodes.joinToString(", ") { "?" }
+        val own = buildList {
+            if (use != HistoryRadio.OFF) addAll(listOf(PERSONAL, IMPORTED))
+            add(YTM_ACCOUNT)
+        }
         val sql = buildString {
-            append("SELECT from_song, to_song, scope, solo_plays, shared_plays, skips, ytm_rank, updated_at FROM song_edges WHERE ")
+            append("SELECT from_song, to_song, scope, solo_plays, shared_plays, skips, ytm_rank, seen, rank_sum, updated_at FROM song_edges WHERE ")
             append(if (both) "(from_song IN ($list) OR to_song IN ($list))" else "from_song IN ($list)")
-            append(" AND (scope IN ('$SERVER', '$YTM')")
-            if (account != null) append(" OR (scope = '$PERSONAL' AND account_id = ?)")
+            append(" AND (scope IN ('$SERVER', '$SERVER_IMPORTED', '$YTM')")
+            if (account != null) append(" OR (scope IN (${own.joinToString(", ") { "'$it'" }}) AND account_id = ?)")
             append(")")
         }
         return c.prepareStatement(sql).use { statement ->
@@ -335,7 +575,8 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                         add(
                             StoredEdge(
                                 rows.getString("from_song"), rows.getString("to_song"), rows.getString("scope"),
-                                rows.getInt("solo_plays"), rows.getInt("shared_plays"), rows.getInt("skips"), rank, rows.getLong("updated_at"),
+                                rows.getInt("solo_plays"), rows.getInt("shared_plays"), rows.getInt("skips"), rank,
+                                rows.getInt("seen"), rows.getInt("rank_sum"), rows.getLong("updated_at"),
                             ),
                         )
                     }
@@ -348,14 +589,9 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
     private fun songs(c: Connection, nodes: List<String>, prefer: String): List<Song> {
         if (nodes.isEmpty()) return emptyList()
         val sources = HashMap<String, MutableList<Song>>()
-        c.prepareStatement("SELECT song_id, data FROM song_sources WHERE song_id IN (${nodes.joinToString(", ") { "?" }})").use {
-            nodes.forEachIndexed { i, node -> it.setString(i + 1, node) }
-            it.executeQuery().use { rows ->
-                while (rows.next()) {
-                    val song = runCatching { ProtocolJson.decodeFromString(Song.serializer(), rows.getString("data")) }.getOrNull() ?: continue
-                    sources.getOrPut(rows.getString("song_id")) { mutableListOf() } += song
-                }
-            }
+        inList(c, "SELECT song_id, data FROM song_sources WHERE song_id", nodes) { rows ->
+            runCatching { ProtocolJson.decodeFromString(Song.serializer(), rows.getString("data")) }.getOrNull()
+                ?.let { sources.getOrPut(rows.getString("song_id")) { mutableListOf() } += it }
         }
         return nodes.mapNotNull { node ->
             val versions = sources[node] ?: return@mapNotNull null
@@ -363,39 +599,56 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         }.filter { it.podcast == null }
     }
 
+    /** Runs "[select] IN (…)" for [values], a few hundred at a time, calling [row] for each row. */
+    private fun inList(c: Connection, select: String, values: List<String>, row: (java.sql.ResultSet) -> Unit) {
+        for (chunk in values.distinct().chunked(500)) {
+            if (chunk.isEmpty()) continue
+            c.prepareStatement("$select IN (${chunk.joinToString(", ") { "?" }})").use {
+                chunk.forEachIndexed { i, v -> it.setString(i + 1, v) }
+                it.executeQuery().use { rows -> while (rows.next()) row(rows) }
+            }
+        }
+    }
+
     companion object {
         private val log = LoggerFactory.getLogger(SongGraph::class.java)
 
         /** Bump to build the graph from the history again on the next start (a new way of learning). */
-        const val VERSION = 1
+        const val VERSION = 2
         private const val VERSION_SETTING = "song_graph_version"
 
-        // Edge scopes (docs/implementation/storage.md#song-graph).
+        // Edge scopes (`song_edges.scope`). account_id is '' for the server's and YouTube Music's without an account.
         const val PERSONAL = "personal"
         const val SERVER = "server"
+        const val IMPORTED = "imported"
+        const val SERVER_IMPORTED = "server_imported"
         const val YTM = "ytm"
+        const val YTM_ACCOUNT = "ytm_account"
+
+        fun kindOf(scope: String) = when (scope) {
+            PERSONAL -> EdgeKind.PERSONAL
+            SERVER -> EdgeKind.SERVER
+            IMPORTED -> EdgeKind.IMPORTED
+            SERVER_IMPORTED -> EdgeKind.SERVER_IMPORTED
+            YTM_ACCOUNT -> EdgeKind.YTM_ACCOUNT
+            else -> EdgeKind.YTM
+        }
 
         /** A song started this long after the one before ended still follows it. */
         private const val GAP_MS = 30 * 60_000L
         /** A song skipped within this long says nothing about what comes after it. */
         private const val EARLY_SKIP_MS = 30_000L
-        /** YouTube Music's radio of a song is written at most this often. */
+        /** The same radio (seed and account) is written at most this often. */
         private const val RADIO_RELEARN_MS = 6 * 3_600_000L
-        /** The first this many songs of a YouTube Music radio become edges. */
-        private const val MAX_YTM_EDGES = 25
-
-        // The weights (to tune once there's real data, see docs/open-questions.md).
-        private const val PERSONAL_WEIGHT = 2.0
-        private const val SHARED_WEIGHT = 0.6
-        private const val SKIP_WEIGHT = 1.0
-        private const val YTM_WEIGHT = 1.5
-        /** An edge to the seed (it's played before it) counts this much of one from it. */
-        private const val REVERSE = 0.5
-        /** Neighbours of the seed's best neighbours count this much. */
-        private const val SECOND_HOP = 0.35
+        /** A YouTube Music radio's first this many songs are kept (all it sends at once). */
+        const val MAX_RADIO_SONGS = 50
         private const val SECOND_HOP_FROM = 8
         private const val MIN_SCORE = 0.05
-        private const val HALF_LIFE_DAYS = 180.0
+        private const val MAX_HINT_SONGS = 200
         const val SIMILAR_LIMIT = 50
+        private const val VIEW_NEIGHBOURS = 24
+        private const val VIEW_SECOND_FROM = 8
+        private const val VIEW_SECOND = 24
+        private const val VIEW_TOP = 60
     }
 }

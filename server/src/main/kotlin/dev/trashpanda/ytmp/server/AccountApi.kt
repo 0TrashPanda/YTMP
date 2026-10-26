@@ -52,6 +52,14 @@ import dev.trashpanda.ytmp.protocol.Permission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import dev.trashpanda.ytmp.host.Takeout
+import dev.trashpanda.ytmp.protocol.GraphTuning
+import dev.trashpanda.ytmp.protocol.HistoryImportList
+import dev.trashpanda.ytmp.protocol.RadioFetchReport
+import dev.trashpanda.ytmp.protocol.RadioHints
+import dev.trashpanda.ytmp.protocol.RadioHintsRequest
+import io.ktor.server.request.receiveStream
+import java.time.ZoneId
 import java.security.KeyPair
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.days
@@ -157,7 +165,29 @@ class AccountService(
     fun similar(username: String?, seedSongId: String, personal: Boolean = true): List<Song> {
         val graph = graph ?: return emptyList()
         val account = username?.let(accounts::find)?.takeIf { personal }
-        return graph.similar(seedSongId, account?.id, account?.let(::settings)?.historyRadio ?: HistoryRadio.ALL)
+        return graph.similar(seedSongId, account?.id, account?.let(::settings)?.historyRadio ?: HistoryRadio.ALL, tuning = account?.let(::tuning) ?: GraphTuning())
+    }
+
+    /** How much each part of the song graph counts for [account] (the graph view's sliders). */
+    fun tuning(account: Accounts.Account): GraphTuning =
+        accounts.data(account.id, "graph_tuning")?.let { runCatching { ProtocolJson.decodeFromString(GraphTuning.serializer(), it) }.getOrNull() } ?: GraphTuning()
+
+    /**
+     * What the song graph says about a radio for [username] (one of ours): its songs, and which of
+     * the radio's songs they heard or would rather not. With [personal] false (or no account),
+     * only everyone's listening and YouTube Music's radios, and nothing about what they heard.
+     */
+    fun hints(username: String?, request: RadioHintsRequest, personal: Boolean = true): RadioHints {
+        val graph = graph ?: return RadioHints(emptyList())
+        val account = username?.let(accounts::find)?.takeIf { personal }
+        val use = account?.let(::settings)?.historyRadio ?: HistoryRadio.ALL
+        return graph.hints(request.seed, account?.id, request.candidates.take(200), request.options, use, account?.let(::tuning) ?: GraphTuning(), request.limit.coerceIn(1, 200))
+    }
+
+    /** A host (a phone) fetched a YouTube Music radio for [username] (one of ours): the graph learns from it. */
+    fun radioFetched(username: String, report: RadioFetchReport) {
+        val account = accounts.find(username) ?: return
+        graph?.learnRadio(report.seed, report.songs.take(SongGraph.MAX_RADIO_SONGS + 1), account.id.takeIf { report.withAccount }, report.way, reportedBy = account.id)
     }
 
     /** Deletes [account] and everything kept for it (the admin page). */
@@ -188,6 +218,74 @@ class AccountService(
             val songId = call.request.queryParameters["id"]?.trim().orEmpty()
             if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
             call.respond(SearchResponse(io { similar(claims.sub, songId, personal = mayReadHistory(claims)) }))
+        }
+
+        // The same with the radio's choices, and what the graph says about YouTube Music's songs in it.
+        post("/auth/radio-hints") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            val request = call.receive<RadioHintsRequest>()
+            call.respond(io { hints(claims.sub, request, personal = mayReadHistory(claims)) })
+        }
+
+        // A phone fetched a YouTube Music radio (in a room, or to learn from): the graph keeps it.
+        post("/auth/radio-fetch") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            val report = call.receive<RadioFetchReport>()
+            io { radioFetched(claims.sub, report) }
+            call.respond(HttpStatusCode.NoContent)
+        }
+
+        // The graph view (also from the pages of your phone's app, like the history): around a
+        // song (?seed=), or your most played songs; and how much each part counts for you.
+        route("/account/graph") {
+            install(CORS) {
+                anyHost()
+                allowHeader(HttpHeaders.Authorization)
+                allowHeader(HttpHeaders.ContentType)
+                allowMethod(HttpMethod.Put)
+            }
+            get {
+                val account = call.historyAccount()
+                val graph = graph ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No song graph here")
+                val seed = call.request.queryParameters["seed"]?.trim()?.takeIf { it.isNotEmpty() }
+                call.respond(io { graph.view(account.id, seed, tuning(account), settings(account).historyRadio) })
+            }
+            get("/tuning") {
+                val account = call.historyAccount()
+                call.respond(io { tuning(account) })
+            }
+            put("/tuning") {
+                val account = call.historyAccount()
+                val tuning = call.receive<GraphTuning>().sane()
+                io { accounts.setData(account.id, "graph_tuning", ProtocolJson.encodeToString(GraphTuning.serializer(), tuning)) }
+                call.respond(tuning)
+            }
+        }
+
+        // Google Takeout exports of your YouTube Music history (the zip, or the watch history in it).
+        route("/account/imports") {
+            get {
+                val account = call.account()
+                call.respond(HistoryImportList(io { history.imports(account.id) }))
+            }
+            post {
+                val account = call.account()
+                val upload = call.receiveStream()
+                val made = try {
+                    io { history.importTakeout(account.id, Takeout.read(upload, ZoneId.systemDefault())) }
+                } catch (e: IllegalArgumentException) {
+                    throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "That isn't a Takeout export")
+                }
+                log.info("{} imported {} plays from Takeout ({} already in their history)", account.username, made.plays, made.duplicates)
+                graph?.rebuildSoon()
+                call.respond(made)
+            }
+            delete("/{id}") {
+                val account = call.account()
+                if (!io { history.deleteImport(account.id, call.parameters["id"]!!) }) throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No such import")
+                graph?.rebuildSoon()
+                call.respond(HttpStatusCode.NoContent)
+            }
         }
 
         // A host says where the account is in a podcast episode (paused, skipped, ended), with any
@@ -541,3 +639,18 @@ private const val MAX_PREFERENCES = 64 * 1024
 
 /** Where the app's own pages are, on every phone (android/.../LocalHost.kt): tokens for it only reach your own phone. */
 const val PHONE_APP_ORIGIN = "http://127.0.0.1:8765"
+
+/** Tuning within sensible bounds (the sliders' ranges). */
+private fun GraphTuning.sane() = GraphTuning(
+    personal = personal.coerceIn(0.0, 5.0),
+    server = server.coerceIn(0.0, 5.0),
+    imported = imported.coerceIn(0.0, 5.0),
+    ytm = ytm.coerceIn(0.0, 5.0),
+    ytmAccount = ytmAccount.coerceIn(0.0, 5.0),
+    party = party.coerceIn(0.0, 2.0),
+    skip = skip.coerceIn(0.0, 5.0),
+    reverse = reverse.coerceIn(0.0, 2.0),
+    secondHop = secondHop.coerceIn(0.0, 1.0),
+    halfLifeDays = halfLifeDays.coerceIn(0.0, 3650.0),
+    radioDepth = radioDepth.coerceIn(1, SongGraph.MAX_RADIO_SONGS),
+)

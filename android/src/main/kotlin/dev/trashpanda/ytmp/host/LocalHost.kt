@@ -15,6 +15,11 @@ import dev.trashpanda.ytmp.core.FinishedPlay
 import dev.trashpanda.ytmp.core.RoomHooks
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.RoomRadio
+import dev.trashpanda.ytmp.protocol.RadioFetchReport
+import dev.trashpanda.ytmp.protocol.RadioHints
+import dev.trashpanda.ytmp.protocol.RadioHintsRequest
+import dev.trashpanda.ytmp.protocol.RadioWay
+import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.HostKind
@@ -159,6 +164,36 @@ class LocalHost(private val context: Context) {
         downloads = CombinedDownloads(downloads, PhoneMatchedSongs({ matcher }, phoneLibrary)),
     )
 
+    /** The song graph on the owner's server learns from the radios this phone fetches. */
+    private fun reportRadio(seed: String, songs: List<Song>, withAccount: Boolean, way: RadioWay) {
+        val token = authLink.ownerAccount?.let(sync::tokenFor) ?: return
+        scope.launch { authLink.auth.reportRadio(token, RadioFetchReport(seed, songs, withAccount, way)) }
+    }
+
+    private val crawlLog = RadioCrawl.FileLog(File(context.filesDir, "radio-crawl-log.json"))
+    private val crawlFile = File(context.filesDir, "radio-crawl.json")
+
+    /** Learning YouTube Music's radios of the music on the phone and its saved songs, for the song graph on the owner's server. */
+    private val crawl = RadioCrawl(
+        scope,
+        songs = { matcher.all().map { it.second.id } + cache.songIds().filter { it.startsWith("ytm:") } },
+        lastFetched = { seeds -> crawlLog.get(seeds) },
+        fetch = { seed -> ytm.radio(seed) },
+        learned = { seed, songs ->
+            val token = authLink.ownerAccount?.let(sync::tokenFor) ?: throw SourceException("Not linked to a YTMP account")
+            authLink.auth.reportRadio(token, RadioFetchReport(seed, songs, withAccount = false, RadioWay.CRAWL))
+            crawlLog.put(seed, System.currentTimeMillis())
+        },
+        load = { RadioCrawl.loadSettings(runCatching { crawlFile.readText() }.getOrNull()) },
+        save = { crawlFile.writeText(RadioCrawl.saveSettings(it)) },
+        hold = {
+            when {
+                authLink.ownerAccount?.let(sync::tokenFor) == null -> "Link this phone to a YTMP account first: what it learns is kept there"
+                else -> dataRules.localHold()?.let { "Waiting for $it" }
+            }
+        },
+    )
+
     /** Which of the phone's music is a YouTube Music song (Settings → Playback → Song cache). */
     private val matcher: LocalMatcher = LocalMatcher(
         cache, { phoneLibrary.tracks() },
@@ -199,7 +234,7 @@ class LocalHost(private val context: Context) {
     /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
     private val cached = CachedSource(
         search = { query, type -> ytm.search(query, type) },
-        radio = { ytm.radio(it) },
+        radio = { seed -> ytm.radio(seed).also { reportRadio(seed, it, withAccount = false, RadioWay.ROOM) } },
         catalog = object : CatalogSource {
             override suspend fun artist(id: String) = ytm.artist(id)
             override suspend fun album(id: String) = ytm.album(id)
@@ -215,13 +250,22 @@ class LocalHost(private val context: Context) {
         streams = local.streams(cache.streams),
         scope = scope, outputs = outputs.devices, store = PhoneRoomStore(context),
         radio = RoomRadio(
-            local.radio(cached),
-            // Every room here is the phone owner's, so radio goes through their YouTube Music.
-            owner = { _, seed -> if (LocalMusic.isLocal(seed)) null else youtube.personalized()?.radio(seed) },
-            // The song graph of the owner's server: their listening, and everyone's there.
-            graph = { owner, seed ->
-                (owner ?: authLink.ownerAccount)?.let(sync::tokenFor)?.let { authLink.auth.similar(it, seed) }.orEmpty().filter { local.playable(it.id) }
+            cached,
+            // Every room here is the phone owner's, so radio goes through their YouTube Music (as they set it, or as the room's choice says).
+            owner = { _, seed, withAccount ->
+                val you = if (withAccount == true) youtube.takeIf { it.account() != null } else youtube.personalized()
+                you?.radio(seed)?.also { reportRadio(seed, it, withAccount = true, RadioWay.ROOM) }
             },
+            // The song graph of the owner's server: their listening, and everyone's there.
+            hints = { owner, seed, candidates, options ->
+                val token = (owner ?: authLink.ownerAccount)?.let(sync::tokenFor)
+                val hints = token?.let { authLink.auth.radioHints(it, RadioHintsRequest(seed, candidates, options)) } ?: RadioHints(emptyList())
+                hints.copy(similar = hints.similar.filter { local.playable(it.id) })
+            },
+            // A file on the phone that is a YouTube Music song (its tags, its name, or found by the matcher).
+            ytmIdOf = { id -> local.ytmIdOf(id) ?: local.track(id)?.let { cache.localMatch(it.key)?.song?.id } },
+            library = local::radio,
+            onDevice = { song -> LocalMusic.isLocal(song.id) || cache.has(song.id) || matcher.find(song.id) != null },
         ),
         hooks = RoomHooks(
             onPlayFinished = { play ->
@@ -354,6 +398,7 @@ class LocalHost(private val context: Context) {
         val webApp = installWebApp()
         rooms.startCleanup()
         sync.start()
+        crawl.start()
         outputs.attach(rooms)
         if (phoneMusicOn) local.add(phoneLibrary)
         cache.inUse = { rooms.songsInUse() }
@@ -382,6 +427,7 @@ class LocalHost(private val context: Context) {
                     downloads = downloads.files,
                     cache = cache,
                     local = local,
+                    radioCrawl = crawl,
                     zones = zones,
                     personal = youtube,
                     // Find similar and Related: the song graph of the asker's server, with their login.

@@ -18,6 +18,7 @@ import dev.trashpanda.ytmp.protocol.QueueItem
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.ServerMessage
+import dev.trashpanda.ytmp.protocol.RadioOptions
 import dev.trashpanda.ytmp.protocol.Song
 import java.security.SecureRandom
 
@@ -55,6 +56,11 @@ fun interface LyricsSource {
 /** Songs similar to a seed song (YTM's radio), for Start radio and the autoplay queue. */
 fun interface RadioSource {
     suspend fun radio(seedSongId: String): List<Song>
+}
+
+/** A room's radio, made the way [options] say ([RoomRadio]). */
+fun interface OptionsRadio {
+    suspend fun radio(seedSongId: String, options: RadioOptions): List<Song>
 }
 
 /** The home page, and artist, album, playlist and podcast pages of a source. */

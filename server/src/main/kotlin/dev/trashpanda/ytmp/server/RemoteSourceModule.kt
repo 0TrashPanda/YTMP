@@ -110,7 +110,7 @@ class RemoteSourceModule(
         client.get("$baseUrl/radio") {
             auth()
             parameter("seed", seedSongId)
-            parameter("limit", 25)
+            parameter("limit", 50)
         }.orThrow().body<SearchResult>().items
 
     override suspend fun artist(id: String): ArtistPage =
@@ -205,7 +205,7 @@ class RemoteSourceModule(
         client.get("$baseUrl/me/radio") {
             me(cookie)
             parameter("seed", seedSongId)
-            parameter("limit", 25)
+            parameter("limit", 50)
         }.orThrow().body<SearchResult>().items
 
     suspend fun mySuggestions(cookie: String, query: String): List<String> =

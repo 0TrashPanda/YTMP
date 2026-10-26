@@ -266,6 +266,8 @@ data class RoomState(
     val autoplay: List<QueueItem> = emptyList(),
     /** The song the autoplay queue is a radio of, or null. */
     val autoplaySeed: Song? = null,
+    /** How the room's radio is made (the *Radio from* chips). */
+    val radioOptions: RadioOptions = RadioOptions(),
     /** Someone invited everyone to another room (a clone), or null. */
     val migration: MigrationOffer? = null,
     /** Nobody who runs the room (the owner, or someone with the top role) has been here for a while. */

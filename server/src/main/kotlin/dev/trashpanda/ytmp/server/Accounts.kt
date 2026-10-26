@@ -125,7 +125,7 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
      */
     fun delete(accountId: String, globalId: String) = db.transaction { c ->
         if (c.isLastAdmin(accountId)) throw AccountException("This is the only server admin. Make someone else admin first.")
-        for (table in listOf("sessions", "account_data", "plays", "episode_progress", "song_edges")) {
+        for (table in listOf("sessions", "account_data", "plays", "episode_progress", "song_edges", "radio_fetches", "history_imports")) {
             c.prepareStatement("DELETE FROM $table WHERE account_id = ?").use { it.setString(1, accountId); it.executeUpdate() }
         }
         c.prepareStatement("DELETE FROM invites WHERE created_by = ? AND used_by IS NULL").use { it.setString(1, accountId); it.executeUpdate() }

@@ -26,6 +26,9 @@ import dev.trashpanda.ytmp.host.fetchAuthServerInfo
 import dev.trashpanda.ytmp.host.localOrigins
 import dev.trashpanda.ytmp.host.normalizeOrigin
 import dev.trashpanda.ytmp.host.AccountTokens
+import dev.trashpanda.ytmp.protocol.RadioHintsRequest
+import dev.trashpanda.ytmp.protocol.RadioWay
+import dev.trashpanda.ytmp.host.RadioCrawl
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
@@ -112,6 +115,16 @@ fun main(args: Array<String>) {
         // Songs played here, kept so they start at once without a YouTube lookup.
         val songCache = SongCache(config.cache.folder(config.database), live.cacheBytes, lookup = ytm, audio = ytm, scope = this)
         log.info("Song cache: {} ({} MB at most)", songCache.dir, songCache.maxBytes / (1024 * 1024))
+        // YouTube Music's radios of the songs here, learned slowly for the song graph (the admin switches it on).
+        val crawl = RadioCrawl(
+            this,
+            songs = { local.ytmSongIds() + songCache.songIds().filter { it.startsWith("ytm:") } },
+            lastFetched = { seeds -> withContext(Dispatchers.IO) { graph.lastFetched(seeds) } },
+            fetch = { seed -> ytm.radio(seed) },
+            learned = { seed, songs -> graph.learnRadio(seed, songs, way = RadioWay.CRAWL) },
+            load = { RadioCrawl.loadSettings(accounts.setting("radio_crawl")) },
+            save = { accounts.setSetting("radio_crawl", RadioCrawl.saveSettings(it)) },
+        ).also { it.start() }
         val ownUrl = normalizeOrigin(config.accounts.url)
         val issuer = config.accounts.name.ifBlank {
             accounts.setting("issuer") ?: (ownUrl?.let { URI(it).host } ?: hostName()).also { accounts.setSetting("issuer", it) }
@@ -146,14 +159,23 @@ fun main(args: Array<String>) {
             // Party rooms whose admins are all gone for 5 minutes tell the others they can clone them.
             timeouts = RoomTimeouts(guestSoloRoom = 30.days, adminless = 5.minutes),
             radio = RoomRadio(
-                local.radio(cached),
-                // A room with an owner account of this server: radio through that account's YouTube Music.
-                owner = { owner, seed ->
-                    if (LocalMusic.isLocal(seed)) null
-                    else owner?.let(::localAccount)?.let(youtube::of)?.personalized()?.radio(seed)?.also { graph.learnRadio(seed, it) }
+                cached,
+                // A room with an owner account of this server: radio through that account's YouTube Music
+                // (as they set it, or as the room's choice says). The graph keeps it as theirs.
+                owner = { owner, seed, withAccount ->
+                    val account = owner?.let(::localAccount)
+                    val catalog = account?.let(youtube::of)
+                    val you = if (withAccount == true) catalog?.takeIf { it.account() != null } else catalog?.personalized()
+                    you?.radio(seed)?.also { graph.learnRadio(seed, it, accountId = account) }
                 },
                 // The song graph: the owner's listening (an account here) and everyone's.
-                graph = { owner, seed -> withContext(Dispatchers.IO) { service.similar(owner?.let(::localUsername), seed) }.filter { local.playable(it.id) } },
+                hints = { owner, seed, candidates, options ->
+                    val hints = withContext(Dispatchers.IO) { service.hints(owner?.let(::localUsername), RadioHintsRequest(seed, candidates, options)) }
+                    hints.copy(similar = hints.similar.filter { local.playable(it.id) })
+                },
+                ytmIdOf = local::ytmIdOf,
+                library = local::radio,
+                onDevice = { song -> LocalMusic.isLocal(song.id) || songCache.has(song.id) },
             ),
             hooks = RoomHooks(
                 onPlayFinished = { play ->
@@ -184,7 +206,7 @@ fun main(args: Array<String>) {
                 trusting = trustServers(auth, new.trusted, ownIssuer = issuer)
             }
         }
-        val admin = AdminApi(service, rooms, settings, Versions(http, config.ytm.url.trimEnd('/'), config.ytm.key), AuditLog(db), Backups(db))
+        val admin = AdminApi(service, rooms, settings, Versions(http, config.ytm.url.trimEnd('/'), config.ytm.key), AuditLog(db), Backups(db), crawl)
 
         ytmpModule(
             rooms,

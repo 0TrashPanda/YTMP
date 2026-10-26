@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.core
 
 import dev.trashpanda.ytmp.protocol.BanInfo
+import dev.trashpanda.ytmp.protocol.RadioOptions
 import dev.trashpanda.ytmp.protocol.Migrant
 import dev.trashpanda.ytmp.protocol.MigrationOffer
 import dev.trashpanda.ytmp.protocol.Permission
@@ -46,6 +47,7 @@ data class SavedRoom(
     val bans: List<SavedBan> = emptyList(),
     val autoplay: List<QueueItem> = emptyList(),
     val autoplaySeed: Song? = null,
+    val radioOptions: RadioOptions = RadioOptions(),
     /** The permissions that existed when it was saved (null: before radio), to give roles the newer ones. */
     val knownPermissions: List<Permission>? = null,
     /** Where podcast episodes were left off (song ID -> ms). */

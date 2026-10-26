@@ -156,18 +156,41 @@ class LocalMusic {
     }
 
     /**
-     * More of the library after [seedId], for autoplay, Start radio and Find similar: some of
-     * the same artist, the rest from all over, mixed. Null when [seedId] isn't local music.
+     * Songs of the library like [seedId], for a radio from local music without YouTube Music or
+     * with little in the song graph: the same artist, then the same album, then the same genre.
+     * Never just any song: a radio isn't a shuffle. Null when [seedId] isn't local music.
      */
     suspend fun radio(seedId: String): List<Song>? {
         val (library, kind, _) = parse(seedId) ?: return null
         if (kind != SONG) return emptyList()
         val b = build(library)
-        val seed = b.trackOf[seedId]
+        val seed = b.trackOf[seedId] ?: return emptyList()
         val others = b.songs.filter { it.id != seedId }
-        val same = seed?.let { s -> others.filter { b.trackOf[it.id]?.artist.equals(s.artist, ignoreCase = true) }.shuffled().take(RADIO_SAME_ARTIST) }.orEmpty()
-        val rest = (others - same.toSet()).shuffled().take(RADIO_SIZE - same.size)
-        return (same + rest).shuffled()
+        fun track(s: Song) = b.trackOf.getValue(s.id)
+        val sameArtist = others.filter { track(it).artist.equals(seed.artist, ignoreCase = true) }.shuffled().take(RADIO_SAME_ARTIST)
+        val sameAlbum = others.filter { track(it).album.equals(seed.album, ignoreCase = true) && track(it).folder == seed.folder && seed.album.isNotBlank() }
+        val sameGenre = if (seed.genre.isBlank()) emptyList() else others.filter { track(it).genre.equals(seed.genre, ignoreCase = true) }.shuffled()
+        return (sameArtist + sameAlbum.shuffled() + sameGenre).distinctBy { it.id }.take(RADIO_SIZE)
+    }
+
+    /** The YouTube Music songs the local music here is (as far as its libraries say, see [ytmIdOf]). */
+    suspend fun ytmSongIds(): List<String> = libraries.value.values.flatMap { library ->
+        runCatching { library.tracks() }.getOrDefault(emptyList()).mapNotNull { t ->
+            t.song?.id?.takeIf { it.startsWith("ytm:") } ?: LocalMatcher.idInName(t.file)?.let { "ytm:$it" }
+        }
+    }.distinct()
+
+    /** The library's track of local song [songId], or null. */
+    suspend fun track(songId: String): LocalTrack? {
+        val (library, kind, _) = runCatching { parse(songId) }.getOrNull() ?: return null
+        if (kind != SONG) return null
+        return build(library).trackOf[songId]
+    }
+
+    /** The YouTube Music song local song [songId] is, as far as its library says (a saved song, or an ID in its file name). */
+    suspend fun ytmIdOf(songId: String): String? {
+        val track = track(songId) ?: return null
+        return track.song?.id?.takeIf { it.startsWith("ytm:") } ?: LocalMatcher.idInName(track.file)?.let { "ytm:$it" }
     }
 
     /** Whether [songId] can play here: not local music, or local music of a library this host has (the song graph knows songs of other hosts' too). */
@@ -305,7 +328,7 @@ class LocalMusic {
         private val ART_SIZES = listOf(120, 400, 544)
         private const val VARIOUS_ARTISTS = "Various Artists"
         private const val RADIO_SIZE = 50
-        private const val RADIO_SAME_ARTIST = 10
+        private const val RADIO_SAME_ARTIST = 15
 
         fun isLocal(id: String) = id.startsWith(PREFIX)
 

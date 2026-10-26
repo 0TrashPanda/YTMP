@@ -33,11 +33,11 @@ object SongMatch {
 
 /**
  * A radio with songs from the song graph mixed in: one of [graph]'s (best first) after every
- * two of [base], the rest of each after the other runs out. Songs are in it once (also the same
+ * [every] of [base], the rest of each after the other runs out. Songs are in it once (also the same
  * song from two sources). Without a [base] (no YTM radio for the song, or it failed) it's
  * [graph] alone.
  */
-fun mixRadio(base: List<Song>, graph: List<Song>, limit: Int = RADIO_MIX_LIMIT): List<Song> {
+fun mixRadio(base: List<Song>, graph: List<Song>, limit: Int = RADIO_MIX_LIMIT, every: Int = 2): List<Song> {
     val seen = HashSet<String>()
     val out = ArrayList<Song>()
     fun add(song: Song) {
@@ -46,7 +46,7 @@ fun mixRadio(base: List<Song>, graph: List<Song>, limit: Int = RADIO_MIX_LIMIT):
     val fromBase = base.iterator()
     val fromGraph = graph.iterator()
     while (fromBase.hasNext() || fromGraph.hasNext()) {
-        repeat(2) { if (fromBase.hasNext()) add(fromBase.next()) }
+        repeat(every.coerceAtLeast(1)) { if (fromBase.hasNext()) add(fromBase.next()) }
         if (fromGraph.hasNext()) add(fromGraph.next())
     }
     return out

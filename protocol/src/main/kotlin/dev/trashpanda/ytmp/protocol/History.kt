@@ -44,6 +44,8 @@ data class HistoryEntry(
     val addedByName: String,
     val listenedWith: List<ListenedWith>,
     val shared: Boolean,
+    /** Imported from Google Takeout (a play in YouTube Music itself). */
+    val imported: Boolean = false,
 )
 
 /**

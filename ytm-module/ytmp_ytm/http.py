@@ -128,7 +128,7 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         return {"items": ytm.suggestions(q)}
 
     @app.get("/radio", dependencies=[Depends(check_key)])
-    def radio(seed: str, limit: int = 25):
+    def radio(seed: str, limit: int = 50):
         return {"items": ytm.radio(seed, limit=min(max(limit, 1), 50)), "next": None}
 
     @app.get("/artists/{artist_id}", dependencies=[Depends(check_key)])
@@ -270,7 +270,7 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         return {"items": user.suggestions(q, personal=True)}
 
     @app.get("/me/radio", dependencies=[Depends(check_key)])
-    def my_radio(seed: str, limit: int = 25, user: core.YtmCore = Depends(me)):
+    def my_radio(seed: str, limit: int = 50, user: core.YtmCore = Depends(me)):
         return {"items": user.radio(seed, limit=min(max(limit, 1), 50), personal=True), "next": None}
 
     @app.get("/me/home", dependencies=[Depends(check_key)])

@@ -89,6 +89,8 @@ data class HostSources(
     val cache: SongCache? = null,
     /** Local music (the Local tab): a Raspberry Pi's music folder, the music on the hosting phone. */
     val local: LocalMusic? = null,
+    /** Learning YouTube Music's radios of the music here (a phone's: the owner switches it on in its settings). */
+    val radioCrawl: RadioCrawl? = null,
     /** Amplifier zones, for another host that takes their player over. */
     val zones: ZoneOutputs? = null,
     /** The owner's YouTube Music account (phone hosts), for requests from the host's own app. */
@@ -281,6 +283,8 @@ fun Application.ytmpModule(
             screenRoutes(host)
             // The song cache, in the hosting phone's settings (a server has its own, for its admin).
             songCacheRoutes("/cache", sources.cache, options.cacheSettings) { options.isLocal(it) }
+            // Learning radios, in the hosting phone's settings (a server's is on its admin page).
+            radioCrawlRoutes("/radio-crawl", sources.radioCrawl) { options.isLocal(it) }
             clientLogRoute()
             // Another YTMP host that takes over a zones player asks what this host's zones had before.
             get("/zones/handover") {

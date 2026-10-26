@@ -29,6 +29,7 @@ fun RoomState.apply(event: Event): RoomState = when (event) {
     is Event.OutputsChanged -> copy(outputs = event.outputs)
     is Event.RoomUpdated -> copy(room = event.room)
     is Event.AutoplayChanged -> copy(autoplay = event.items, autoplaySeed = event.seed)
+    is Event.RadioOptionsChanged -> copy(radioOptions = event.options)
     is Event.RolesChanged -> copy(roles = event.roles)
     is Event.SettingsChanged -> copy(settings = event.settings)
     is Event.BansChanged -> copy(bans = event.bans)

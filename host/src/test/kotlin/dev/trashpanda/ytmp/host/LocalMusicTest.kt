@@ -75,9 +75,10 @@ class LocalMusicTest {
         assertNull(local.stream("ytm:abc"))
         assertNull(local.album("MPREb_abc"))
 
-        // Autoplay goes on with the library, never the song itself.
+        // Autoplay goes on with songs like it (here: the same artist), never the song itself, never just any song.
         val radio = local.radio(song.id)!!
-        assertEquals(7, radio.size)
+        assertTrue(radio.isNotEmpty())
+        assertTrue(radio.all { it.artists.first().name == "Avril Lavigne" })
         assertEquals(8, page.songs.size)
         assertTrue(radio.none { it.id == song.id })
         assertNull(local.radio("ytm:abc"))

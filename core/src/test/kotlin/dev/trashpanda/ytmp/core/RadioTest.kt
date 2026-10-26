@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.core
 
+import dev.trashpanda.ytmp.protocol.RadioHints
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
@@ -35,7 +36,7 @@ class RadioTest {
     private val messages = mutableListOf<ServerMessage>()
 
     private suspend fun TestScope.room(): Room {
-        val room = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { "https://s/$it" }, backgroundScope, radio = { requests += it; radio.radio(it) }) { testScheduler.currentTime }
+        val room = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { "https://s/$it" }, backgroundScope, radio = { seed, _ -> requests += seed; radio.radio(seed) }) { testScheduler.currentTime }
         room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Me", null, "owner"), {
             messages += it
             if (it is ServerMessage.Welcome) me = it.participantId
@@ -54,7 +55,7 @@ class RadioTest {
     fun `a room's radio comes from its owner's account, else the shared one`() = runTest {
         val manager = RoomManager(
             { "https://s/$it" }, backgroundScope, clock = { testScheduler.currentTime },
-            radio = RoomRadio(radio, owner = { owner, seed ->
+            radio = RoomRadio(radio, owner = { owner, seed, _ ->
                 when (owner) {
                     "anna@test" -> listOf(song(seed), song("$seed-anna"))
                     "broken@test" -> error("signed out")
@@ -84,7 +85,7 @@ class RadioTest {
             { "https://s/$it" }, backgroundScope, clock = { testScheduler.currentTime },
             radio = RoomRadio(
                 { seed -> if (seed.startsWith("local")) error("not on YouTube Music") else radio.radio(seed) },
-                graph = { owner, seed -> if (owner == "anna@test") listOf(song("$seed-g1"), song("$seed-g2")) else emptyList() },
+                hints = { owner, seed, _, _ -> RadioHints(if (owner == "anna@test") listOf(song("$seed-g1"), song("$seed-g2")) else emptyList()) },
             ),
         )
         suspend fun radioIn(owner: String?, seed: String): List<String> {
@@ -98,7 +99,7 @@ class RadioTest {
             return room.state().autoplay.map { it.song.id }
         }
 
-        assertEquals(listOf("a-1", "a-g1", "a-2", "a-3", "a-g2", "a-4"), radioIn("anna@test", "a").take(6))
+        assertEquals(listOf("a-1", "a-2", "a-g1", "a-3", "a-4", "a-g2"), radioIn("anna@test", "a").take(6))
         assertEquals((1..10).map { "a-$it" }, radioIn(null, "a"))
         // A short radio is topped up from its last song: the graph keeps it going.
         assertEquals(listOf("local-g1", "local-g2", "local-g2-g1", "local-g2-g2"), radioIn("anna@test", "local"))
@@ -106,7 +107,7 @@ class RadioTest {
 
     @Test
     fun `without internet the room pauses after a few songs instead of skipping everything`() = runTest {
-        val room = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { throw Exception("Failed to resolve 'www.youtube.com'") }, backgroundScope, radio = radio) { testScheduler.currentTime }
+        val room = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { throw Exception("Failed to resolve 'www.youtube.com'") }, backgroundScope, radio = { seed, _ -> radio.radio(seed) }) { testScheduler.currentTime }
         room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Me", null, "owner"), {
             messages += it
             if (it is ServerMessage.Welcome) me = it.participantId
@@ -173,7 +174,7 @@ class RadioTest {
     @Test
     fun `start radio plays the song right away, before its radio is there`() = runTest {
         val slow = RadioSource { seed -> kotlinx.coroutines.delay(5_000); radio.radio(seed) }
-        val room = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { "https://s/$it" }, backgroundScope, radio = slow) { testScheduler.currentTime }
+        val room = Room("ABCD", "Party", "owner", RoomVisibility.PUBLIC, { "https://s/$it" }, backgroundScope, radio = { seed, _ -> slow.radio(seed) }) { testScheduler.currentTime }
         room.join(ClientMessage.Hello(PROTOCOL_VERSION, "ABCD", "Me", null, "owner"), {
             messages += it
             if (it is ServerMessage.Welcome) me = it.participantId

@@ -27,6 +27,8 @@ import io.ktor.http.isSuccess
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveStream
+import dev.trashpanda.ytmp.host.RadioCrawl
+import dev.trashpanda.ytmp.protocol.RadioCrawlStatus
 import io.ktor.server.response.header
 import io.ktor.server.response.respondFile
 import io.ktor.server.response.respond
@@ -57,6 +59,8 @@ class AdminApi(
     private val audit: AuditLog? = null,
     /** Null: no backups here (tests). */
     private val backups: Backups? = null,
+    /** Learning YouTube Music's radios of the songs here. Null: not here (tests). */
+    private val crawl: RadioCrawl? = null,
 ) {
     private val accounts get() = service.accounts
 
@@ -164,6 +168,21 @@ class AdminApi(
             if (!io { accounts.deleteInvite(call.parameters["id"]!!) }) throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No such invite link")
             audit?.record(admin.username, "Revoked an invite link")
             call.respond(HttpStatusCode.NoContent)
+        }
+
+        get("/admin/radio-crawl") {
+            service.admin(call)
+            call.respond(crawl?.status() ?: throw notHere())
+        }
+
+        put("/admin/radio-crawl") {
+            val admin = service.admin(call)
+            val crawl = crawl ?: throw notHere()
+            val wanted = call.receive<RadioCrawlStatus>()
+            val before = crawl.status()
+            val status = crawl.set(wanted.enabled, wanted.paceSeconds, wanted.refreshDays)
+            if (before.enabled != status.enabled) audit?.record(admin.username, if (status.enabled) "Switched on learning radios" else "Switched off learning radios")
+            call.respond(status)
         }
 
         get("/admin/settings") {

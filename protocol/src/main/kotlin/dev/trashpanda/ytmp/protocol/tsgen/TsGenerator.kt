@@ -46,6 +46,12 @@ import dev.trashpanda.ytmp.protocol.HistoryPage
 import dev.trashpanda.ytmp.protocol.EpisodeProgressList
 import dev.trashpanda.ytmp.protocol.MarkEpisodeRequest
 import dev.trashpanda.ytmp.protocol.AccountSettings
+import dev.trashpanda.ytmp.protocol.GraphTuning
+import dev.trashpanda.ytmp.protocol.GraphView
+import dev.trashpanda.ytmp.protocol.HistoryImport
+import dev.trashpanda.ytmp.protocol.HistoryImportList
+import dev.trashpanda.ytmp.protocol.RadioCrawlStatus
+import dev.trashpanda.ytmp.protocol.RadioOptions
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.AlbumPage
@@ -227,6 +233,12 @@ fun main(args: Array<String>) {
     generator.addRoot(EpisodeProgressList.serializer().descriptor)
     generator.addRoot(MarkEpisodeRequest.serializer().descriptor)
     generator.addRoot(AccountSettings.serializer().descriptor)
+    generator.addRoot(GraphView.serializer().descriptor)
+    generator.addRoot(GraphTuning.serializer().descriptor)
+    generator.addRoot(HistoryImportList.serializer().descriptor)
+    generator.addRoot(HistoryImport.serializer().descriptor)
+    generator.addRoot(RadioCrawlStatus.serializer().descriptor)
+    generator.addRoot(RadioOptions.serializer().descriptor)
     generator.addRoot(PlayReport.serializer().descriptor)
     generator.addRoot(ArtistPage.serializer().descriptor)
     generator.addRoot(AlbumPage.serializer().descriptor)

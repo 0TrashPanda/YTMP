@@ -207,6 +207,33 @@ class Database private constructor(private val url: String, private val user: St
                 "CREATE TABLE audit_log (id VARCHAR(32) PRIMARY KEY, at BIGINT NOT NULL, actor VARCHAR(64) NOT NULL, action VARCHAR(64) NOT NULL, target VARCHAR(128) NOT NULL, detail TEXT NOT NULL)",
                 "CREATE INDEX audit_log_at ON audit_log (at)",
             ),
+            // 9: the song graph keeps what it learns from raw: every radio fetched (when, how, as whom),
+            // and plays imported from Google Takeout (import_id; '' for plays in YTMP), see SongGraph
+            listOf(
+                """CREATE TABLE radio_fetches (
+                    id VARCHAR(32) PRIMARY KEY,
+                    seed VARCHAR(256) NOT NULL,
+                    fetched_at BIGINT NOT NULL,
+                    way VARCHAR(16) NOT NULL,
+                    account_id VARCHAR(32) NOT NULL,
+                    reported_by VARCHAR(32) NOT NULL,
+                    songs TEXT NOT NULL
+                )""",
+                "CREATE INDEX radio_fetches_seed ON radio_fetches (seed, fetched_at)",
+                "ALTER TABLE song_edges ADD COLUMN seen INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE song_edges ADD COLUMN rank_sum INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE plays ADD COLUMN import_id VARCHAR(32) NOT NULL DEFAULT ''",
+                """CREATE TABLE history_imports (
+                    id VARCHAR(32) PRIMARY KEY,
+                    account_id VARCHAR(32) NOT NULL,
+                    at BIGINT NOT NULL,
+                    plays INTEGER NOT NULL,
+                    duplicates INTEGER NOT NULL,
+                    first_at BIGINT NOT NULL,
+                    last_at BIGINT NOT NULL
+                )""",
+                "CREATE INDEX plays_account_song ON plays (account_id, song_id)",
+            ),
         )
 
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {

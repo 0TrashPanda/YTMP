@@ -106,7 +106,7 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
     }
 
     override suspend fun radio(seedSongId: String): List<Song> = python {
-        val results = core.callAttr("radio", seedSongId, 25)
+        val results = core.callAttr("radio", seedSongId, 50)
         ProtocolJson.decodeFromString(ListSerializer(Song.serializer()), json.callAttr("dumps", results).toString())
     }
 
@@ -163,7 +163,7 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
     }
 
     suspend fun personalRadio(seedSongId: String): List<Song> = python {
-        val results = core.callAttr("radio", seedSongId, 25, true)
+        val results = core.callAttr("radio", seedSongId, 50, true)
         ProtocolJson.decodeFromString(ListSerializer(Song.serializer()), json.callAttr("dumps", results).toString())
     }
 

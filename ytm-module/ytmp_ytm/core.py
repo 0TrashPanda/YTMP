@@ -267,7 +267,7 @@ class YtmCore:
         ytm = self._signed_in() if personal else self._ytm
         return [s for s in ytm.get_search_suggestions(query) if isinstance(s, str)]
 
-    def radio(self, seed_id: str, limit: int = 25, personal: bool = False) -> list[dict]:
+    def radio(self, seed_id: str, limit: int = 50, personal: bool = False) -> list[dict]:
         """YTM's radio for a song: similar songs, usually starting with the song itself.
 
         With [personal], as the signed-in account (it fits its taste, like in YTM).

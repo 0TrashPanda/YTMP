@@ -1,6 +1,10 @@
 package dev.trashpanda.ytmp.server
 
+import dev.trashpanda.ytmp.host.TakeoutSong
 import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.GraphTuning
+import dev.trashpanda.ytmp.protocol.RadioOptions
+import dev.trashpanda.ytmp.protocol.RadioWay
 import dev.trashpanda.ytmp.protocol.HistoryRadio
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.PodcastRef
@@ -127,5 +131,54 @@ class SongGraphTest {
         play("anna", song("ytm:a"))
         play("anna", song("ytm:new"))
         assertEquals(listOf("ytm:new", "ytm:old"), similar("ytm:a"))
+    }
+
+    @Test
+    fun `radios are kept raw, an account's radio only counts for that account, and the graph can be built again from them`() {
+        graph.learnRadio("ytm:a", listOf(song("ytm:a"), song("ytm:x"), song("ytm:y")))
+        graph.learnRadio("ytm:a", listOf(song("ytm:a"), song("ytm:z")), accountId = "anna")
+        graph.awaitIdle()
+        assertEquals(listOf("ytm:x", "ytm:y"), similar("ytm:a", account = "bert"))
+        assertTrue("ytm:z" in similar("ytm:a", account = "anna"))
+        assertEquals(2, db.use { c -> c.createStatement().use { it.executeQuery("SELECT COUNT(*) FROM radio_fetches").use { r -> r.next(); r.getInt(1) } } })
+
+        graph.rebuild()
+        assertEquals(listOf("ytm:x", "ytm:y"), similar("ytm:a", account = "bert"))
+        assertTrue("ytm:z" in similar("ytm:a", account = "anna"))
+        // Tuned to nothing from YouTube Music, and only the first place of a radio: no songs, or only the first.
+        assertEquals(emptyList(), graph.similar("ytm:a", "bert", tuning = GraphTuning(ytm = 0.0)).map { it.id })
+        assertEquals(listOf("ytm:x"), graph.similar("ytm:a", "bert", tuning = GraphTuning(radioDepth = 1)).map { it.id })
+        // The crawl keeps every radio it fetched, also right after another.
+        graph.learnRadio("ytm:a", listOf(song("ytm:x")), way = RadioWay.CRAWL)
+        graph.awaitIdle()
+        assertEquals(now, graph.lastFetched(listOf("ytm:a"))["ytm:a"])
+    }
+
+    @Test
+    fun `a Takeout import joins the history without what's already there, and the graph learns it as imported`() {
+        play("anna", song("ytm:a"), playedAt = now - 50_000_000)
+        val takeout = listOf(
+            // YTMP put this play in YouTube Music's history when it ended: it's the same one.
+            TakeoutSong("a", "Song ytm:a", "Artist", listOf(now - 50_000_000 + 200_000)),
+            TakeoutSong("b", "B", "Artist", listOf(now - 40_000_000, now - 30_000_000)),
+            TakeoutSong("c", "C", "Artist", listOf(now - 40_000_000 + 180_000, now - 30_000_000 + 10_000)),
+        )
+        val made = history.importTakeout("anna", takeout)
+        assertEquals(4, made.plays)
+        assertEquals(1, made.duplicates)
+        assertEquals(made.id, history.imports("anna").single().id)
+        graph.rebuild()
+        // b > c twice, the second time c came 10 s later: b was skipped right away, so that one says nothing.
+        assertEquals(mapOf("ytm:b>ytm:c" to listOf(1, 0, 0)), edges(SongGraph.IMPORTED))
+        assertEquals(emptyMap(), edges(SongGraph.PERSONAL))
+        assertEquals(listOf("ytm:c"), similar("ytm:b"))
+        assertTrue(history.page("anna", null, 10, null).first.any { it.imported })
+
+        val hints = graph.hints("ytm:b", "anna", listOf("ytm:c", "ytm:q"), RadioOptions(), HistoryRadio.ALL, GraphTuning(), 10)
+        assertEquals(listOf("ytm:c"), hints.heard)
+
+        history.deleteImport("anna", made.id)
+        graph.rebuild()
+        assertEquals(emptyMap(), edges(SongGraph.IMPORTED))
     }
 }

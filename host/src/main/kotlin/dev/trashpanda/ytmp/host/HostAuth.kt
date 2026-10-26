@@ -4,6 +4,9 @@ import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.protocol.AuthServerInfo
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import dev.trashpanda.ytmp.protocol.RadioFetchReport
+import dev.trashpanda.ytmp.protocol.RadioHints
+import dev.trashpanda.ytmp.protocol.RadioHintsRequest
 import dev.trashpanda.ytmp.protocol.PlayReport
 import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.EpisodeProgress
@@ -40,6 +43,15 @@ interface HostAuth {
      * [token] (from that account's listening where the server allows it). Empty when there are none.
      */
     suspend fun similar(token: String, seedSongId: String): List<Song> = emptyList()
+
+    /**
+     * What the song graph of the auth server of the account in [token] says about a radio ([RadioHints]).
+     * Only [RadioHints.similar] from a server that doesn't know more.
+     */
+    suspend fun radioHints(token: String, request: RadioHintsRequest): RadioHints = RadioHints(similar(token, request.seed))
+
+    /** Tells the account in [token]'s auth server about a YouTube Music radio this host fetched (its song graph keeps it). */
+    suspend fun reportRadio(token: String, report: RadioFetchReport) {}
 
     /** Where the account in [token] is in an episode, from its auth server (null: nowhere, or not shared with this host). */
     suspend fun episodeProgress(token: String, episodeId: String): EpisodeProgress? = null
@@ -135,6 +147,25 @@ class TrustedAuthServers(
         }.onFailure { log.warn("No songs from the song graph of {}: {}", claims.iss, it.message) }.getOrDefault(emptyList())
     }
 
+    override suspend fun radioHints(token: String, request: RadioHintsRequest): RadioHints = withContext(Dispatchers.IO) {
+        val claims = AccountTokens.verify(token, { trusted[it]?.key }, clock() / 1000) ?: return@withContext RadioHints(emptyList())
+        if (claims.scope != null) return@withContext RadioHints(emptyList())
+        val server = trusted[claims.iss]?.ref ?: return@withContext RadioHints(emptyList())
+        val url = server.url ?: return@withContext RadioHints(ownSimilar?.invoke(claims.sub, request.seed).orEmpty())
+        runCatching { fetchHints(url, token, request) }
+            .recoverCatching { e -> if (e is NotThere) RadioHints(fetchSimilar(url, token, request.seed)) else throw e }
+            .onFailure { log.warn("No songs from the song graph of {}: {}", claims.iss, it.message) }
+            .getOrDefault(RadioHints(emptyList()))
+    }
+
+    override suspend fun reportRadio(token: String, report: RadioFetchReport) = withContext(Dispatchers.IO) {
+        val (claims, server) = ownerOf(token) ?: return@withContext
+        val url = server.url ?: return@withContext
+        runCatching { postJson(url, "/api/auth/radio-fetch", token, ProtocolJson.encodeToString(RadioFetchReport.serializer(), report)) }
+            .onFailure { e -> if (e !is NotThere) log.info("Couldn't send a radio to {}: {}", claims.iss, e.message) }
+        Unit
+    }
+
     override suspend fun episodeProgress(token: String, episodeId: String): EpisodeProgress? = withContext(Dispatchers.IO) {
         val (claims, server) = ownerOf(token) ?: return@withContext null
         runCatching {
@@ -192,6 +223,28 @@ private fun postJson(url: String, path: String, token: String, json: String) {
     try {
         connection.outputStream.use { it.write(json.toByteArray()) }
         if (connection.responseCode !in 200..299) throw SourceException("$url answered ${connection.responseCode}")
+    } finally {
+        connection.disconnect()
+    }
+}
+
+/** An auth server that doesn't have an endpoint (an older YTMP). */
+private class NotThere(url: String) : SourceException("$url doesn't know this yet")
+
+/** What the song graph of an auth server says about a radio, with a host token of one of its accounts. Blocking. */
+private fun fetchHints(url: String, token: String, request: RadioHintsRequest): RadioHints {
+    val connection = URI("${url.trimEnd('/')}/api/auth/radio-hints").toURL().openConnection() as HttpURLConnection
+    connection.connectTimeout = 5_000
+    connection.readTimeout = 5_000
+    connection.requestMethod = "POST"
+    connection.doOutput = true
+    connection.setRequestProperty("Authorization", "Bearer $token")
+    connection.setRequestProperty("Content-Type", "application/json")
+    try {
+        connection.outputStream.use { it.write(ProtocolJson.encodeToString(RadioHintsRequest.serializer(), request).toByteArray()) }
+        if (connection.responseCode == 404 || connection.responseCode == 405) throw NotThere(url)
+        if (connection.responseCode != 200) throw SourceException("$url answered ${connection.responseCode}")
+        return ProtocolJson.decodeFromString(RadioHints.serializer(), connection.inputStream.bufferedReader().readText())
     } finally {
         connection.disconnect()
     }

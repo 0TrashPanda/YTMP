@@ -1,0 +1,225 @@
+package dev.trashpanda.ytmp.protocol
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+// Radio choices and the song graph, see docs/features/history-and-recommendations.md#radio--mix
+// and #song-graph.
+
+/** Where a radio's songs come from. */
+@Serializable
+@SerialName("RadioFrom")
+enum class RadioFrom {
+    /** YouTube Music's radio with the song graph's songs mixed in. */
+    @SerialName("mix") MIX,
+
+    /** Only YouTube Music's radio. */
+    @SerialName("ytm") YTM,
+
+    /** Only the song graph: listening (yours, everyone's) and the stored radios. */
+    @SerialName("graph") GRAPH,
+
+    /** Only songs that play without internet here: local music and saved songs. */
+    @SerialName("device") DEVICE,
+}
+
+/**
+ * How a radio is made (Start radio, Autoplay from here, Find similar, the autoplay queue). The
+ * page sends the whole of it: the defaults of *Settings → Radio* with what was picked when
+ * holding *Start radio*. The room keeps it for the radio's autoplay.
+ */
+@Serializable
+@SerialName("RadioOptions")
+data class RadioOptions(
+    val from: RadioFrom = RadioFrom.MIX,
+    /** -1: songs you know; 1: songs you haven't heard; 0: no preference. */
+    val discover: Double = 0.0,
+    /** YouTube Music's radio as the room owner's account (their taste); false: without an account; null: their setting. */
+    val withAccount: Boolean? = null,
+    /** The room owner's own listening counts; false: only everyone's on their server. */
+    val myTaste: Boolean = true,
+    /** At most this many songs per artist (0: any). */
+    val perArtist: Int = 0,
+    /** Leave out songs the owner played in the last this many hours (0: only what the room just played). */
+    val recentHours: Int = 0,
+    /** Leave out songs the owner skips more often than they hear them. */
+    val leaveOutSkipped: Boolean = false,
+    /** One song from the song graph after every this many of YouTube Music's ([RadioFrom.MIX]). */
+    val mixEvery: Int = 2,
+    /** What a YouTube Music radio becomes when YouTube Music doesn't answer: [RadioFrom.GRAPH] or [RadioFrom.DEVICE]. */
+    val offline: RadioFrom = RadioFrom.GRAPH,
+    /** Songs never put in a radio (their IDs; Dislike's *never in radios*). */
+    val blockedSongs: List<String> = emptyList(),
+    /** Artists never put in a radio (their names, Dislike's *don't play this artist*). */
+    val blockedArtists: List<String> = emptyList(),
+)
+
+/**
+ * How much each part of the song graph counts. Kept per account (`GET`/`PUT
+ * /api/account/graph-tuning`); the graph view's sliders change it.
+ */
+@Serializable
+@SerialName("GraphTuning")
+data class GraphTuning(
+    /** Your own listening in YTMP. */
+    val personal: Double = 2.0,
+    /** Everyone's listening on the server. */
+    val server: Double = 1.0,
+    /** Plays imported from Google Takeout (yours and everyone's). */
+    val imported: Double = 1.0,
+    /** YouTube Music's radios made without an account. */
+    val ytm: Double = 1.5,
+    /** YouTube Music's radios made with your account. */
+    val ytmAccount: Double = 0.5,
+    /** A play in a party, against one alone. */
+    val party: Double = 0.6,
+    /** How much a skip takes off. */
+    val skip: Double = 1.0,
+    /** A song played before the seed, against one after it. */
+    val reverse: Double = 0.5,
+    /** Neighbours of the seed's best neighbours. */
+    val secondHop: Double = 0.35,
+    /** After this many days an edge counts half. */
+    val halfLifeDays: Double = 180.0,
+    /** How far down a YouTube Music radio still counts (1–50). */
+    val radioDepth: Int = 50,
+)
+
+/** `POST /api/auth/radio-hints` (a host, with the account's host token): what the song graph says about a radio. */
+@Serializable
+@SerialName("RadioHintsRequest")
+data class RadioHintsRequest(
+    val seed: String,
+    /** The radio's songs so far (YouTube Music's): which of them [RadioHints.heard] and [RadioHints.avoid] are about. */
+    val candidates: List<String> = emptyList(),
+    val options: RadioOptions = RadioOptions(),
+    /** How many songs from the graph. */
+    val limit: Int = 50,
+)
+
+@Serializable
+@SerialName("RadioHints")
+data class RadioHints(
+    /** Songs that go with the seed in the song graph, best first. */
+    val similar: List<Song>,
+    /** Of the candidates and [similar]: the ones the account has heard. */
+    val heard: List<String> = emptyList(),
+    /** Of the candidates and [similar]: the ones to leave out (skipped a lot, played lately). */
+    val avoid: List<String> = emptyList(),
+)
+
+/** How a stored radio was fetched. */
+@Serializable
+@SerialName("RadioWay")
+enum class RadioWay {
+    /** Played in a room (Start radio, autoplay). */
+    @SerialName("room") ROOM,
+
+    /** Fetched to learn from (the radio crawl). */
+    @SerialName("crawl") CRAWL,
+
+    /** Find similar, Related. */
+    @SerialName("similar") SIMILAR,
+}
+
+/** `POST /api/auth/radio-fetch` (a phone, with the account's host token): a YouTube Music radio it fetched, to learn from. */
+@Serializable
+@SerialName("RadioFetchReport")
+data class RadioFetchReport(
+    val seed: String,
+    /** The radio as YouTube Music gave it, in order. */
+    val songs: List<Song>,
+    /** Made as the account (its YouTube Music sign-in); false: without an account. */
+    val withAccount: Boolean,
+    val way: RadioWay = RadioWay.ROOM,
+)
+
+// --- the graph view -------------------------------------------------------------------
+
+/** Where an edge comes from. */
+@Serializable
+@SerialName("EdgeKind")
+enum class EdgeKind {
+    @SerialName("personal") PERSONAL,
+    @SerialName("server") SERVER,
+    @SerialName("imported") IMPORTED,
+    @SerialName("server_imported") SERVER_IMPORTED,
+    @SerialName("ytm") YTM,
+    @SerialName("ytm_account") YTM_ACCOUNT,
+}
+
+/** A song in the graph view. [plays]: how often you played it (with imported plays). */
+@Serializable
+@SerialName("GraphNode")
+data class GraphNode(val id: String, val song: Song, val plays: Int = 0, val local: Boolean = false)
+
+/** An edge with its raw counts: the page weighs it with the sliders ([GraphTuning]). */
+@Serializable
+@SerialName("GraphEdge")
+data class GraphEdge(
+    val from: String,
+    val to: String,
+    val kind: EdgeKind,
+    val solo: Int = 0,
+    val shared: Int = 0,
+    val skips: Int = 0,
+    /** YouTube Music edges: in how many fetches of the seed's radio, the best place, and the places added up. */
+    val seen: Int = 0,
+    val bestRank: Int? = null,
+    val rankSum: Int = 0,
+    val updatedAt: Long,
+)
+
+/** `GET /api/account/graph?seed=` (around one song) or without a seed (your most played songs). */
+@Serializable
+@SerialName("GraphView")
+data class GraphView(
+    /** The seed's node, or null for the overview. */
+    val seed: String?,
+    val nodes: List<GraphNode>,
+    val edges: List<GraphEdge>,
+    val tuning: GraphTuning,
+    /** Server time, for how old edges are. */
+    val now: Long,
+)
+
+// --- Takeout and the radio crawl ------------------------------------------------------
+
+/** One Google Takeout import into your history. */
+@Serializable
+@SerialName("HistoryImport")
+data class HistoryImport(
+    val id: String,
+    val at: Long,
+    /** Plays added (the ones already in your history, from YTMP itself, are left out). */
+    val plays: Int,
+    /** Plays left out because your history already had them. */
+    val duplicates: Int,
+    val firstAt: Long,
+    val lastAt: Long,
+)
+
+/** `GET /api/account/imports` */
+@Serializable
+@SerialName("HistoryImportList")
+data class HistoryImportList(val imports: List<HistoryImport>)
+
+/** `GET`/`PUT /api/admin/radio-crawl`: learning YouTube Music's radios of the songs here, slowly. */
+@Serializable
+@SerialName("RadioCrawlStatus")
+data class RadioCrawlStatus(
+    val enabled: Boolean,
+    /** Seconds between two radios. */
+    val paceSeconds: Int,
+    /** A song's radio is fetched again after this many days. */
+    val refreshDays: Int,
+    /** Songs with a stored radio (younger than [refreshDays]). */
+    val done: Int = 0,
+    /** Songs to crawl: local music with a YouTube Music ID and saved songs. */
+    val total: Int = 0,
+    /** Why it waits, or null ("YouTube asked to confirm you're not a bot", …). */
+    val waiting: String? = null,
+    /** When it waits until, or null. */
+    val until: Long? = null,
+    val lastAt: Long? = null,
+)

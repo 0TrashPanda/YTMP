@@ -134,6 +134,8 @@ sealed interface Command {
          * Only when the sender may remove those songs (their own, or others'); otherwise it stays.
          */
         val clearHistory: Boolean = false,
+        /** How the radio is made; null: the room's last. */
+        val options: RadioOptions? = null,
     ) : Command
 
     /** Empties the upcoming queue. */
@@ -153,7 +155,17 @@ sealed interface Command {
         val song: Song,
         /** The radio, when the one who starts it brings their own (their YouTube Music account); null: the room's. */
         val songs: List<Song>? = null,
+        /** How the radio is made; null: the room's last. */
+        val options: RadioOptions? = null,
     ) : Command
+
+    /**
+     * The *Radio from* chips in Up next: the autoplay queue's radio is made again with
+     * [options] (the songs people added stay), and later radios use them too.
+     */
+    @Serializable
+    @SerialName("SetRadioOptions")
+    data class SetRadioOptions(val options: RadioOptions) : Command
 
     /**
      * "Add to autoplay" for a playlist: [songs] become the autoplay queue (they play when the
@@ -586,6 +598,11 @@ sealed interface Event {
     @Serializable
     @SerialName("AutoplayChanged")
     data class AutoplayChanged(val seed: Song?, val items: List<QueueItem>) : Event
+
+    /** How the room's radio is made changed (Start radio with other choices, the *Radio from* chips). */
+    @Serializable
+    @SerialName("RadioOptionsChanged")
+    data class RadioOptionsChanged(val options: RadioOptions) : Event
 
     @Serializable
     @SerialName("RolesChanged")
