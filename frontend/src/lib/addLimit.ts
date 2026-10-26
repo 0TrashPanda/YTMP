@@ -3,22 +3,22 @@
 // it); the first ones or picked at random.
 import type { PlaylistPick } from './settings.svelte';
 
-/**
- * Added without asking ([count] songs), or asked first: one of [counts], or (with [everything])
- * all of it. A choice that's as long as the playlist or longer is "all of it".
- */
+/** Added without asking ([count] songs), or asked first: one of [counts], or (with [everything]) all of it. */
 export type AddChoice = { ask: false; count: number } | { ask: true; counts: number[]; everything: boolean };
+
+/** What the prompt offers besides the set numbers: all of it, and a number to type. */
+export type AskExtras = { all?: boolean; custom?: boolean };
 
 /**
  * For a playlist of [total] songs (null: not known, a long one), with at most [max] without
- * asking, asking above [askOver] (0: never) with the choices [counts], and [all]: also offer
- * all of it.
+ * asking, asking above [askOver] (0: never) with the choices [counts] (only those below its
+ * length show). With nothing to choose, it's added without asking.
  */
-export function addChoice(total: number | null, max: number, askOver: number, counts: number[] = [], all = false): AddChoice {
+export function addChoice(total: number | null, max: number, askOver: number, counts: number[] = [], extras: AskExtras = {}): AddChoice {
 	if (askOver > 0 && (total === null || total > askOver)) {
 		const below = [...new Set(counts)].filter((n) => total === null || n < total).sort((a, b) => a - b);
-		const everything = all || (total !== null && counts.some((n) => n >= total));
-		if (below.length || everything) return { ask: true, counts: below, everything };
+		const everything = !!extras.all;
+		if (below.length || everything || extras.custom) return { ask: true, counts: below, everything };
 	}
 	return { ask: false, count: Math.min(total ?? max, max) };
 }

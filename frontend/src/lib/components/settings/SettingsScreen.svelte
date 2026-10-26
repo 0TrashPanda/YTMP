@@ -356,7 +356,7 @@
 				</Choice>
 				<CountList
 					label="Choices when it asks"
-					hint="A button for each number (up to {MAX_ASK_COUNTS}); the ones the playlist is shorter than are left out."
+					hint="A button for each number (up to {MAX_ASK_COUNTS}). A number that's as long as the playlist or longer doesn't show."
 					setting={settings.playlistAskCounts}
 					min={1}
 					max={ADD_LIMITS.max}
@@ -367,6 +367,16 @@
 					label="Also: add all of it"
 					hint="When it asks, a button for the whole playlist, however long (Liked music can take a while to load)."
 					setting={settings.playlistAskAll}
+				/>
+				<Toggle
+					label="Also: type a number"
+					hint="When it asks, a box to type how many songs, for a number that isn't among the choices."
+					setting={settings.playlistAskCustom}
+				/>
+				<Toggle
+					label="Also: first or at random"
+					hint="When it asks, a switch between the first songs and songs picked at random, for that time. It starts as set in Which songs."
+					setting={settings.playlistAskPick}
 				/>
 				<Choice
 					label="Say what's going on after"

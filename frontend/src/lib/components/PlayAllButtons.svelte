@@ -7,7 +7,7 @@
 	import { addChoice, pickSongs, songsFrom } from '../addLimit';
 	import { whileBusy } from '../busy.svelte';
 	import type { Song } from '../protocol.gen';
-	import { ADD_LIMITS, settings } from '../settings.svelte';
+	import { ADD_LIMITS, settings, type PlaylistPick } from '../settings.svelte';
 	import { addToQueue, playNext } from '../songActions';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
@@ -38,29 +38,44 @@
 		children?: Snippet;
 	} = $props();
 
-	/** Asking how many: one of [counts], or all of it ([everything]); answered with the number, or null (cancelled). */
-	let asking = $state<{ verb: string; counts: number[]; everything: boolean; answer: (count: number | null) => void } | null>(null);
+	type Amount = { count: number; how: PlaylistPick };
 
-	/** How many to add: within the set most, or asked first when it's long. Null: cancelled. */
-	async function howMany(verb: string): Promise<number | null> {
+	/** Asking how many: one of [counts], all of it ([everything]) or a typed number; answered with it, or null (cancelled). */
+	let asking = $state<{ verb: string; counts: number[]; everything: boolean; answer: (amount: Amount | null) => void } | null>(null);
+	/** In the prompt: the first ones or at random (this time only), and a typed number. */
+	let pick = $state<PlaylistPick>('first');
+	let typed = $state<number | null>(null);
+
+	/** How many to add, and which: within the set most, or asked first when it's long. Null: cancelled. */
+	async function howMany(verb: string): Promise<Amount | null> {
 		const known = whole ? total : (songs?.length ?? 0);
-		const choice = addChoice(known, settings.playlistMax.value, settings.playlistAskOver.value, settings.playlistAskCounts.value, settings.playlistAskAll.value);
-		if (!choice.ask) return choice.count;
+		const choice = addChoice(known, settings.playlistMax.value, settings.playlistAskOver.value, settings.playlistAskCounts.value, {
+			all: settings.playlistAskAll.value,
+			custom: settings.playlistAskCustom.value
+		});
+		if (!choice.ask) return { count: choice.count, how: settings.playlistPick.value };
+		pick = settings.playlistPick.value;
+		typed = null;
 		return new Promise((answer) => (asking = { verb, counts: choice.counts, everything: choice.everything, answer }));
 	}
 
 	function answer(count: number | null) {
-		asking?.answer(count);
+		asking?.answer(count ? { count, how: pick } : null);
 		asking = null;
+	}
+
+	function answerTyped(event: SubmitEvent) {
+		event.preventDefault();
+		const n = Math.round(typed ?? 0);
+		if (n >= 1) answer(Math.min(n, total ?? n));
 	}
 
 	/**
 	 * Loads the [count] songs to add (saying so when it takes a moment, as [doing] does) and
 	 * hands them to [use] with how a message names them.
 	 */
-	async function withSongs(count: number, doing: (name: string) => string, use: (list: Song[], label: string) => Promise<unknown>) {
+	async function withSongs({ count, how }: Amount, doing: (name: string) => string, use: (list: Song[], label: string) => Promise<unknown>) {
 		await whileBusy(doing(name), async () => {
-			const how = settings.playlistPick.value;
 			// A random pick takes from all of it.
 			const all = whole ? await whole(how === 'random' ? Math.max(count, ADD_LIMITS.max) : count) : (songs ?? []);
 			const list = pickSongs(all, count, how);
@@ -72,23 +87,23 @@
 	}
 
 	async function addToAutoplay() {
-		const count = await howMany('Add');
-		if (count)
-			await withSongs(count, (n) => `Adding ${n} to autoplay…`, async (list, label) => {
+		const amount = await howMany('Add');
+		if (amount)
+			await withSongs(amount, (n) => `Adding ${n} to autoplay…`, async (list, label) => {
 				const e = await room.run({ kind: 'AutoplaySongs', songs: list });
 				onToast(e ? e.message : `${label} ${list.length === 1 || label === name ? 'plays' : 'play'} when the queue is empty`);
 			});
 	}
 
 	async function addAll(position: 'next' | 'end') {
-		const count = await howMany('Add');
-		if (count) await withSongs(count, (n) => `Adding ${n}…`, (list, label) => (position === 'next' ? playNext : addToQueue)(room, list, label, onToast));
+		const amount = await howMany('Add');
+		if (amount) await withSongs(amount, (n) => `Adding ${n}…`, (list, label) => (position === 'next' ? playNext : addToQueue)(room, list, label, onToast));
 	}
 
 	async function playNow() {
-		const count = await howMany('Play');
-		if (count)
-			await withSongs(count, (n) => `Starting ${n}…`, async (list) => {
+		const amount = await howMany('Play');
+		if (amount)
+			await withSongs(amount, (n) => `Starting ${n}…`, async (list) => {
 				const [first, ...rest] = list;
 				let e = await room.run({ kind: 'PlayNow', song: first });
 				if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
@@ -135,8 +150,21 @@
 			<h2 class="line-clamp-2 text-lg font-bold">{name}</h2>
 			<p class="-mt-2 text-sm text-muted">
 				<span class="font-medium text-white">{total !== null ? `${total.toLocaleString()} songs.` : 'A long playlist.'}</span>
-				How many? {settings.playlistPick.value === 'random' ? 'They are picked at random.' : 'From the top of the list.'}
+				How many?{#if !settings.playlistAskPick.value}{pick === 'random' ? ' They are picked at random.' : ' From the top of the list.'}{/if}
 			</p>
+			{#if settings.playlistAskPick.value}
+				<!-- Which songs, for this time (it starts as set in Settings → Adding songs). -->
+				<div class="flex rounded-full bg-raised p-1" role="radiogroup" aria-label="Which songs">
+					{#each [['first', 'From the top'], ['random', 'At random']] as [option, text] (option)}
+						<button
+							class="flex-1 rounded-full py-1.5 text-sm {pick === option ? 'bg-white font-medium text-black' : 'text-muted'}"
+							role="radio"
+							aria-checked={pick === option}
+							onclick={() => (pick = option as PlaylistPick)}>{text}</button
+						>
+					{/each}
+				</div>
+			{/if}
 			<div class="flex flex-col gap-2">
 				{#each asking.counts as count, i (count)}
 					<button class="rounded-full px-4 py-2.5 text-sm {i === 0 ? 'bg-white font-medium text-black' : 'bg-raised hover:bg-line'}" onclick={() => answer(count)}>
@@ -148,6 +176,22 @@
 					<button class="rounded-full px-4 py-2.5 text-sm {asking.counts.length ? 'bg-raised hover:bg-line' : 'bg-white font-medium text-black'}" onclick={() => answer(total ?? Infinity)}>
 						{total !== null ? `${asking.verb} all ${total.toLocaleString()}` : `${asking.verb} everything`}
 					</button>
+				{/if}
+				{#if settings.playlistAskCustom.value}
+					<!-- Another number: typed. -->
+					<form class="flex items-center gap-2" onsubmit={answerTyped}>
+						<input
+							class="min-w-0 flex-1 rounded-full bg-raised px-4 py-2.5 text-sm tabular-nums outline-none ring-white/40 [appearance:textfield] focus:ring-2 [&::-webkit-inner-spin-button]:appearance-none"
+							type="number"
+							inputmode="numeric"
+							min="1"
+							max={total ?? undefined}
+							placeholder="Another number"
+							aria-label="How many songs"
+							bind:value={typed}
+						/>
+						<button class="shrink-0 rounded-full bg-raised px-4 py-2.5 text-sm hover:bg-line disabled:opacity-40" disabled={!typed || typed < 1}>{asking.verb}</button>
+					</form>
 				{/if}
 				<button class="rounded-full px-4 py-2 text-sm text-muted hover:bg-raised" onclick={() => answer(null)}>Cancel</button>
 			</div>

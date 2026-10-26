@@ -200,6 +200,10 @@ export const settings = {
 	playlistAskCounts: new Setting<number[]>('playlistAskCounts', [100, 200], counts),
 	/** When it asks, also: add all of it, however long. */
 	playlistAskAll: new Setting('playlistAskAll', true, bool),
+	/** When it asks, also: a number to type. */
+	playlistAskCustom: new Setting('playlistAskCustom', true, bool),
+	/** When it asks, also: the first ones or at random, for this time ([playlistPick] is how it starts). */
+	playlistAskPick: new Setting('playlistAskPick', true, bool),
 	/** Which songs of a longer playlist: the first ones, or picked at random from all of it. */
 	playlistPick: new Setting('playlistPick', 'first' as PlaylistPick, oneOf<PlaylistPick>('first', 'random')),
 	/** Something that takes a moment says what's going on after this many milliseconds (busy.svelte.ts). */

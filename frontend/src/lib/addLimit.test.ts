@@ -7,17 +7,24 @@ describe('adding a long playlist', () => {
 	});
 
 	it('asks above the set number, with the set choices below its length, and all of it', () => {
-		expect(addChoice(2000, 200, 100, [50, 100, 500], true)).toEqual({ ask: true, counts: [50, 100, 500], everything: true });
-		// A choice as long as the playlist is all of it.
-		expect(addChoice(150, 200, 100, [100, 200], false)).toEqual({ ask: true, counts: [100], everything: true });
-		expect(addChoice(2000, 200, 100, [200, 100], false)).toEqual({ ask: true, counts: [100, 200], everything: false });
+		expect(addChoice(2000, 200, 100, [50, 100, 500], { all: true })).toEqual({ ask: true, counts: [50, 100, 500], everything: true });
+		expect(addChoice(2000, 200, 100, [200, 100])).toEqual({ ask: true, counts: [100, 200], everything: false });
 		// Not known how long: a long one.
-		expect(addChoice(null, 200, 100, [100], true)).toEqual({ ask: true, counts: [100], everything: true });
+		expect(addChoice(null, 200, 100, [100], { all: true })).toEqual({ ask: true, counts: [100], everything: true });
+	});
+
+	it('leaves out choices as long as the playlist or longer', () => {
+		expect(addChoice(150, 200, 100, [100, 150, 200])).toEqual({ ask: true, counts: [100], everything: false });
+	});
+
+	it('asks with only a number to type', () => {
+		expect(addChoice(150, 200, 100, [500], { custom: true })).toEqual({ ask: true, counts: [], everything: false });
 	});
 
 	it('adds without asking when asking is off, or there is nothing to choose', () => {
-		expect(addChoice(2000, 200, 0, [100], true)).toEqual({ ask: false, count: 200 });
-		expect(addChoice(2000, 200, 100, [], false)).toEqual({ ask: false, count: 200 });
+		expect(addChoice(2000, 200, 0, [100], { all: true, custom: true })).toEqual({ ask: false, count: 200 });
+		expect(addChoice(2000, 200, 100, [])).toEqual({ ask: false, count: 200 });
+		expect(addChoice(150, 200, 100, [500])).toEqual({ ask: false, count: 150 });
 	});
 
 	it('takes the first songs, or a random pick in the playlist order', () => {
