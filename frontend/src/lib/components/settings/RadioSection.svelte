@@ -6,7 +6,8 @@
 	import { getRadioCrawl, setRadioCrawl } from '../../api';
 	import { listening } from '../../listening.svelte';
 	import type { RadioOptions } from '../../protocol.gen';
-	import { blockArtist, blockSong, DEFAULT_RADIO, radioDefaults, setRadioDefaults } from '../../radio.svelte';
+	import { blockArtist, blockSong, DEFAULT_RADIO, RADIO_FROM, radioDefaults, setRadioDefaults } from '../../radio.svelte';
+	import { settings } from '../../settings.svelte';
 	import { youtube } from '../../youtube.svelte';
 	import RadioChoices from '../RadioChoices.svelte';
 	import Choice from './Choice.svelte';
@@ -35,6 +36,20 @@
 	<h3 class="font-bold">Every radio</h3>
 	<p class="text-xs text-muted">Start radio, Autoplay this and autoplay. Hold Start radio (or right-click it) to choose differently for one radio.</p>
 	<RadioChoices bind:value={picked} hasAccount={!!youtube.account} party />
+</section>
+
+<section class={card}>
+	<h3 class="font-bold">Chips above Up next</h3>
+	<p class="text-xs text-muted">Change the radio that's playing. Hide the ones you don't use; the one playing always shows.</p>
+	{#each RADIO_FROM as f (f.value)}
+		<Toggle
+			label={f.label}
+			hint={f.hint}
+			checked={!settings.radioChipsHidden.value.includes(f.value)}
+			onchange={(on) =>
+				settings.radioChipsHidden.set(on ? settings.radioChipsHidden.value.filter((v) => v !== f.value) : [...settings.radioChipsHidden.value, f.value])}
+		/>
+	{/each}
 </section>
 
 <section class={card}>

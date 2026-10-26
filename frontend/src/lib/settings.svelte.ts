@@ -234,6 +234,10 @@ export const settings = {
 	songMenu: new Setting<unknown>('songMenu', undefined, (raw) => raw),
 	/** How radios are made: Settings → Radio (radio.svelte.ts). */
 	radio: new Setting<unknown>('radio', undefined, (raw) => raw),
+	/** The Radio from chips above Up next that are hidden (mix, ytm, graph, device). */
+	radioChipsHidden: new Setting<string[]>('radioChipsHidden', [], (raw) =>
+		Array.isArray(raw) ? raw.filter((r): r is string => ['mix', 'ytm', 'graph', 'device'].includes(r as string)) : undefined
+	),
 	/** The YouTube Music playlist you saved to last (holding Save to playlist saves straight to it). */
 	lastPlaylist: new Setting<{ id: string; title: string } | undefined>('lastPlaylist', undefined, (raw) => {
 		const p = object(raw);

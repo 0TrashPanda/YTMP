@@ -9,6 +9,7 @@
 	import { ACTION_ICONS, ACTION_NAMES, gestures, RowGestures, type QueueAction } from '../gestures.svelte';
 	import { menuAt, startRadio } from '../songActions';
 	import { RADIO_FROM, withFrom } from '../radio.svelte';
+	import { settings } from '../settings.svelte';
 	import type { ItemList, QueueItem } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -25,6 +26,8 @@
 		| { kind: 'header'; key: string };
 
 	const roomState = $derived(room.state);
+	const from = $derived(roomState?.radioOptions?.from ?? 'mix');
+	const chips = $derived(RADIO_FROM.filter((f) => f.value === from || !settings.radioChipsHidden.value.includes(f.value)));
 	const canClear = $derived(
 		!!roomState?.queue.length && room.can(roomState.queue.every((i) => i.addedBy === room.participantId) ? 'remove_own' : 'remove_others')
 	);
@@ -342,10 +345,10 @@
 		</div>
 	{/if}
 	<!-- Like YouTube Music's chips above Up next: what the radio playing now is made from. -->
-	{#if roomState?.autoplaySeed && !roomState.autoplaySeed.podcast && room.can('autoplay_from_here')}
-		{@const from = roomState.radioOptions?.from ?? 'mix'}
+	<!-- Settings → Radio hides the ones you don't use; the one playing always shows. -->
+	{#if roomState?.autoplaySeed && !roomState.autoplaySeed.podcast && room.can('autoplay_from_here') && chips.length > 1}
 		<div class="flex shrink-0 gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]" role="group" aria-label="Radio from">
-			{#each RADIO_FROM as f (f.value)}
+			{#each chips as f (f.value)}
 				<button
 					class="shrink-0 rounded-lg px-3 py-1.5 text-sm {from === f.value ? 'bg-white text-black' : 'bg-raised hover:bg-line'}"
 					aria-pressed={from === f.value}

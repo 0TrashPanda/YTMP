@@ -208,6 +208,8 @@ of **song connections**:
   same artist, album, genre. Never just any song: a radio isn't a shuffle.
 - Without internet, a YouTube Music or Mix radio becomes *Song graph* or *On this device*
   (your choice).
+- The chips above *Up next* can be hidden one by one (*Settings → Radio → Chips above Up
+  next*); the one playing always shows, and with only one left the row goes.
 - *Settings → Radio* also has: songs per artist, leave out songs you skip more than you
   hear and songs played in the last hours, and **never in radios** (artists and songs, from
   holding Dislike).
