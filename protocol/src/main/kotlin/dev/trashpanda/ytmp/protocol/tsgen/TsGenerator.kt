@@ -46,6 +46,7 @@ import dev.trashpanda.ytmp.protocol.HistoryPage
 import dev.trashpanda.ytmp.protocol.EpisodeProgressList
 import dev.trashpanda.ytmp.protocol.MarkEpisodeRequest
 import dev.trashpanda.ytmp.protocol.AccountSettings
+import dev.trashpanda.ytmp.protocol.GraphBuildStatus
 import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.GraphView
 import dev.trashpanda.ytmp.protocol.HistoryImport
@@ -235,6 +236,7 @@ fun main(args: Array<String>) {
     generator.addRoot(AccountSettings.serializer().descriptor)
     generator.addRoot(GraphView.serializer().descriptor)
     generator.addRoot(GraphTuning.serializer().descriptor)
+    generator.addRoot(GraphBuildStatus.serializer().descriptor)
     generator.addRoot(HistoryImportList.serializer().descriptor)
     generator.addRoot(HistoryImport.serializer().descriptor)
     generator.addRoot(RadioCrawlStatus.serializer().descriptor)

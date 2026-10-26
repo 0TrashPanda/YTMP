@@ -158,6 +158,8 @@ class History(private val db: Database) {
             insert.executeBatch()
         }
         val made = HistoryImport(id, System.currentTimeMillis(), added, duplicates, plays.first().first, plays.last().first)
+        // Nothing new (imported before): no import to list.
+        if (added == 0) return@transaction made
         c.prepareStatement("INSERT INTO history_imports (id, account_id, at, plays, duplicates, first_at, last_at) VALUES (?, ?, ?, ?, ?, ?, ?)").use {
             it.setString(1, id)
             it.setString(2, accountId)

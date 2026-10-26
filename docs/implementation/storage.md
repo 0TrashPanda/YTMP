@@ -174,7 +174,9 @@ weighs the raw edges of `GET /api/account/graph` with the same formula
 (`frontend/src/lib/graph.ts`), so the sliders redraw at once. Because what the graph learns
 from is all kept (the plays and `radio_fetches`), **all of it is rebuilt**: on the first
 start with the graph or when its version changes, after deleting from a history, and after
-a Takeout import or removing one. YTM edges from before radios were kept (`seen = 0`) stay
+a Takeout import or removing one. `GET /api/account/graph/status` (`GraphBuildStatus`, no login:
+the rebuild holds the one database connection, and it says nothing personal) tells how far a
+rebuild got, for the pages' progress bar (`GraphBuildBar.svelte`, every 500 ms while busy). YTM edges from before radios were kept (`seen = 0`) stay
 as they are.
 
 ### Radio hints

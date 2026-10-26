@@ -6,6 +6,7 @@
 	import NumberField from '../NumberField.svelte';
 	import CacheSection from './CacheSection.svelte';
 	import CrawlSection from './CrawlSection.svelte';
+	import GraphBuildBar from '../GraphBuildBar.svelte';
 	import Choice from './Choice.svelte';
 	import Switch from './Switch.svelte';
 
@@ -191,6 +192,8 @@
 	</section>
 
 	<section class={card}>
+		<!-- The song graph being built again (a new version of the server builds it once). -->
+		<GraphBuildBar load={authServer.graphStatus} />
 		<CrawlSection
 			load={authServer.radioCrawl}
 			save={authServer.setRadioCrawl}

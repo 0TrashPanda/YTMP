@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.core.SongMatch
 import dev.trashpanda.ytmp.protocol.EdgeKind
+import dev.trashpanda.ytmp.protocol.GraphBuildStatus
 import dev.trashpanda.ytmp.protocol.GraphEdge
 import dev.trashpanda.ytmp.protocol.GraphNode
 import dev.trashpanda.ytmp.protocol.GraphTuning
@@ -38,6 +39,20 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
     /** Rebuilds and learning from radios, off the caller's thread, one at a time. */
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "song-graph").apply { isDaemon = true } }
     private val rebuildPending = AtomicBoolean(false)
+
+    /** A rebuild under way: what it does now, and how far it got in all (0–1). */
+    private class Building(val startedAt: Long) {
+        @Volatile var step = "Reading your listening"
+        @Volatile var fraction = 0.0
+    }
+    @Volatile private var building: Building? = null
+    @Volatile private var builtAt: Long? = null
+
+    /** Whether the graph is being built again (or will be soon), and how far it got: the pages' progress bar. */
+    fun buildStatus(): GraphBuildStatus {
+        val b = building
+        return GraphBuildStatus(building = b != null, waiting = rebuildPending.get(), step = b?.step, fraction = b?.fraction ?: 0.0, startedAt = b?.startedAt, builtAt = builtAt)
+    }
     /** Radios learned lately (seed and account → when): a radio asked again isn't written again. */
     private val learnedRadios = ConcurrentHashMap<String, Long>()
     private val ids = ListSerializer(String.serializer())
@@ -95,8 +110,20 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
      * raw): after deleting from the history, an import, or when the graph is new.
      */
     @Synchronized
-    fun rebuild() = db.transaction { c ->
+    fun rebuild() {
+        val b = Building(clock())
+        building = b
+        try {
+            rebuild(b)
+        } finally {
+            building = null
+            builtAt = clock()
+        }
+    }
+
+    private fun rebuild(b: Building) = db.transaction { c ->
         val started = System.currentTimeMillis()
+        val total = c.createStatement().use { s -> s.executeQuery("SELECT COUNT(*) FROM plays").use { if (it.next()) it.getInt(1) else 0 } }
         c.createStatement().use { it.executeUpdate("DELETE FROM song_edges WHERE scope NOT IN ('$YTM', '$YTM_ACCOUNT') OR seen > 0") }
         val nodes = HashMap<String, String>()
         val edges = HashMap<Edge, Counts>()
@@ -112,6 +139,8 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                 val chain = ArrayDeque<Heard>()
                 while (rows.next()) {
                     plays++
+                    // Reading the plays is the first third or so.
+                    if (plays % PROGRESS_EVERY == 0) b.fraction = READ_SHARE * plays / total.coerceAtLeast(1)
                     val id = rows.getString("account_id")
                     val current = rows.toHeard()
                     if (id != account) {
@@ -141,14 +170,23 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                 }
             }
         }
-        for ((edge, counts) in edges) addEdge(c, edge, counts, counts.lastAt)
-        for ((edge, counts) in near) addNearEdge(c, edge, counts)
-        val radios = rebuildRadios(c, nodes)
+        b.step = "Saving what goes together"
+        val saving = (edges.size + near.size).coerceAtLeast(1)
+        var saved = 0
+        fun savedOne() {
+            if (++saved % PROGRESS_EVERY == 0) b.fraction = READ_SHARE + SAVE_SHARE * saved / saving
+        }
+        for ((edge, counts) in edges) addEdge(c, edge, counts, counts.lastAt).also { savedOne() }
+        for ((edge, counts) in near) addNearEdge(c, edge, counts).also { savedOne() }
+        b.step = "Adding YouTube Music's radios"
+        b.fraction = READ_SHARE + SAVE_SHARE
+        val radios = rebuildRadios(c, nodes, b)
         log.info("Song graph built from {} plays and {} radios: {} edges and {} soon after, in {} ms", plays, radios, edges.size, near.size, System.currentTimeMillis() - started)
     }
 
     /** The edges of every kept radio fetch. Returns how many fetches. */
-    private fun rebuildRadios(c: Connection, nodes: HashMap<String, String>): Int {
+    private fun rebuildRadios(c: Connection, nodes: HashMap<String, String>, b: Building): Int {
+        val total = c.createStatement().use { s -> s.executeQuery("SELECT COUNT(*) FROM radio_fetches").use { if (it.next()) it.getInt(1) else 0 } }.coerceAtLeast(1)
         class Ytm(var seen: Int = 0, var best: Int = Int.MAX_VALUE, var rankSum: Int = 0, var at: Long = 0)
         val edges = HashMap<Edge, Ytm>()
         var fetches = 0
@@ -156,6 +194,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             statement.executeQuery().use { rows ->
                 while (rows.next()) {
                     fetches++
+                    if (fetches % 20 == 0) b.fraction = READ_SHARE + SAVE_SHARE + (1 - READ_SHARE - SAVE_SHARE) * fetches / total
                     val seed = nodeOf(c, rows.getString("seed")) ?: continue
                     val account = rows.getString("account_id")
                     val at = rows.getLong("fetched_at")
@@ -795,6 +834,10 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         const val NEAR_WINDOW = 3
         /** In listening, a song goes with the ones up to this many songs after it ("soon after": 2 and 3). */
         const val NEAR_LISTEN = 3
+        // The progress bar: how much of a rebuild reading the plays and saving the links take.
+        private const val READ_SHARE = 0.35
+        private const val SAVE_SHARE = 0.5
+        private const val PROGRESS_EVERY = 500
         private const val SECOND_HOP_FROM = 8
         private const val MIN_SCORE = 0.05
         private const val MAX_HINT_SONGS = 200

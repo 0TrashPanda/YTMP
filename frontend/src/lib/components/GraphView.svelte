@@ -12,6 +12,7 @@
 	import type { EdgeKind, GraphNode, GraphTuning, GraphView, Song } from '../protocol.gen';
 	import { artistNames } from '../format';
 	import Icon from './Icon.svelte';
+	import GraphBuildBar from './GraphBuildBar.svelte';
 
 	let { seed = null, onClose, onToast }: { seed?: Song | null; onClose: () => void; onToast: (text: string) => void } = $props();
 
@@ -243,6 +244,10 @@
 		{/if}
 	</header>
 
+	<!-- Being built again: it loads again by itself when that's done. -->
+	<div class="shrink-0 px-4 empty:hidden">
+		<GraphBuildBar load={() => listening.buildStatus()} onDone={() => load(around)} />
+	</div>
 	<div class="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
 		<div class="flex min-w-0 flex-col lg:flex-1">
 			<div class="flex gap-2 px-4 pb-2" role="tablist">

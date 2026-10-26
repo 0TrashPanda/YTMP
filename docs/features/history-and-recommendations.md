@@ -136,7 +136,10 @@ history; the zip, or the watch history in it).
 - Takeout only says when a song started: how much was heard is the time until the next
   one, and one left within 30 s counts as skipped.
 - The graph learns them apart from your plays in YTMP, so a slider can weigh them
-  differently.
+  differently. While it's learning them, a bar shows how far it got (on the history page,
+  in the graph view, and on the admin page when a new version of the server builds the
+  graph again); the graph view loads again by itself when it's done. Importing the same
+  export again adds nothing and changes nothing.
 - Takeout has no genre, and most of it is one song after another once: a switch from one
   style to another looks the same as a good match. So a link that happened **once** counts
   for little (30% by default, a slider) until it's **confirmed**: a YouTube Music radio also

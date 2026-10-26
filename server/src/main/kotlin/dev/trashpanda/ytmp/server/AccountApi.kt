@@ -53,6 +53,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import dev.trashpanda.ytmp.host.Takeout
+import dev.trashpanda.ytmp.protocol.GraphBuildStatus
 import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.HistoryImportList
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
@@ -254,6 +255,11 @@ class AccountService(
                 val account = call.historyAccount()
                 call.respond(io { tuning(account) })
             }
+            // Whether the graph is being built again, and how far it got (the progress bar). Without
+            // a login: checking one needs the database, which the rebuild holds; this says nothing personal.
+            get("/status") {
+                call.respond(graph?.buildStatus() ?: GraphBuildStatus(building = false))
+            }
             put("/tuning") {
                 val account = call.historyAccount()
                 val tuning = call.receive<GraphTuning>().sane()
@@ -277,7 +283,7 @@ class AccountService(
                     throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "That isn't a Takeout export")
                 }
                 log.info("{} imported {} plays from Takeout ({} already in their history)", account.username, made.plays, made.duplicates)
-                graph?.rebuildSoon()
+                if (made.plays > 0) graph?.rebuildSoon()
                 call.respond(made)
             }
             delete("/{id}") {

@@ -7,6 +7,7 @@
 	import Icon from '../../../lib/components/Icon.svelte';
 	import { artistNames, formatTime } from '../../../lib/format';
 	import GraphView from '../../../lib/components/GraphView.svelte';
+	import GraphBuildBar from '../../../lib/components/GraphBuildBar.svelte';
 	import type { AccountSettings, HistoryEntry, HistoryImport } from '../../../lib/protocol.gen';
 
 	let plays = $state<HistoryEntry[]>([]);
@@ -23,6 +24,8 @@
 	let uploading = $state(false);
 	let importNote = $state<string | null>(null);
 	let graph = $state(false);
+	/** Bumped when a rebuild was just asked for: the progress bar looks. */
+	let rebuilding = $state(0);
 
 	async function openImports() {
 		importing = !importing;
@@ -35,7 +38,12 @@
 		importNote = null;
 		try {
 			const made = await authServer.importTakeout(file);
-			importNote = `Added ${made.plays.toLocaleString()} plays${made.duplicates ? ` (${made.duplicates.toLocaleString()} were in your history already)` : ''}. The song graph learns them in a moment.`;
+			uploading = false;
+			importNote = made.plays
+				? `Added ${made.plays.toLocaleString()} plays${made.duplicates ? ` (${made.duplicates.toLocaleString()} were in your history already)` : ''}.`
+				: 'Nothing new: all of it is in your history already.';
+			if (!made.plays) return;
+			rebuilding++;
 			imports = await authServer.imports();
 			await load(true);
 		} catch (e) {
@@ -49,6 +57,7 @@
 		if (!confirm(`Take the ${i.plays.toLocaleString()} imported plays out of your history again?`)) return;
 		await authServer.deleteImport(i.id);
 		imports = imports.filter((x) => x.id !== i.id);
+		rebuilding++;
 		await load(true);
 	}
 
@@ -84,6 +93,7 @@
 
 	async function remove(play: HistoryEntry) {
 		await authServer.deletePlay(play.id);
+		rebuilding++;
 		plays = plays.filter((p) => p.id !== play.id);
 	}
 
@@ -94,6 +104,7 @@
 		const what = start === null && end === null ? 'your whole history' : `your history ${from ? `from ${from}` : ''} ${to ? `up to ${to}` : ''}`;
 		if (!confirm(`Delete ${what.trim()}? This can't be undone.`)) return;
 		await authServer.deleteHistory(start, end);
+		rebuilding++;
 		deleting = false;
 		await load(true);
 	}
@@ -120,16 +131,18 @@
 </svelte:head>
 
 <main class="mx-auto flex min-h-full max-w-2xl flex-col gap-4 px-4 py-8">
-	<header class="flex items-center gap-3">
+	<header class="flex flex-wrap items-center gap-3">
 		<a href="/account" class="rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label="Back">
 			<svg viewBox="0 0 24 24" class="h-6 w-6"><path fill="currentColor" d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" /></svg>
 		</a>
-		<h1 class="flex-1 text-2xl font-bold">Listening history</h1>
+		<h1 class="flex-1 text-2xl font-bold whitespace-nowrap">Listening history</h1>
 		{#if loggedIn}
+			<div class="flex flex-wrap gap-2">
 			<button class="rounded-full bg-raised px-4 py-2 text-sm hover:bg-line" onclick={() => (graph = true)}>Song graph</button>
 			<button class="rounded-full bg-raised px-4 py-2 text-sm hover:bg-line" onclick={openImports}>Import…</button>
 			<button class="rounded-full bg-raised px-4 py-2 text-sm hover:bg-line" onclick={() => authServer.exportHistory(session.current!.account.username)}>Export</button>
 			<button class="rounded-full bg-raised px-4 py-2 text-sm hover:bg-line" onclick={() => (deleting = !deleting)}>Delete…</button>
+			</div>
 		{/if}
 	</header>
 
@@ -139,6 +152,8 @@
 		{#if settings && !settings.tracking}
 			<p class="rounded-lg bg-raised px-4 py-3 text-sm">History is <b>paused</b>: new songs aren't kept. Turn it on under <a href="/account" class="underline">Account</a>.</p>
 		{/if}
+
+		<GraphBuildBar load={authServer.graphStatus} kick={rebuilding} />
 
 		{#if importing}
 			<section class="flex flex-col gap-3 rounded-xl bg-surface p-4 ring-1 ring-line">

@@ -5,7 +5,7 @@
 // this, from /connect. See docs/implementation/auth.md#your-history-on-other-pages.
 import { answer, ApiRequestError, getHost } from './api';
 import { APP_HOME_ORIGIN, identity, session } from './account';
-import type { EpisodeProgress, EpisodeProgressList, GraphTuning, GraphView, HistoryPage, HostInfo, MarkEpisodeRequest } from './protocol.gen';
+import type { EpisodeProgress, EpisodeProgressList, GraphBuildStatus, GraphTuning, GraphView, HistoryPage, HostInfo, MarkEpisodeRequest } from './protocol.gen';
 
 interface Access {
 	/** Your server's address. */
@@ -80,6 +80,11 @@ class ListeningHistory {
 	/** The song graph around [seed] (a song ID), or your most played songs without one, with raw counts (graph.ts weighs them). */
 	graph(seed: string | null): Promise<GraphView> {
 		return this.call<GraphView>(`/api/account/graph${seed ? `?seed=${encodeURIComponent(seed)}` : ''}`);
+	}
+
+	/** Whether the song graph is being built again on your server, and how far it got. */
+	buildStatus(): Promise<GraphBuildStatus> {
+		return this.call<GraphBuildStatus>('/api/account/graph/status');
 	}
 
 	/** How much each part of the song graph counts for your radios. */

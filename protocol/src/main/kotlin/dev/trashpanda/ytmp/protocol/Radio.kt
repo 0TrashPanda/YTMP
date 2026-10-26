@@ -201,6 +201,22 @@ data class GraphView(
     val now: Long,
 )
 
+/** `GET /api/account/graph/status`: the song graph being built again (after an import, a deletion, a new version). */
+@Serializable
+@SerialName("GraphBuildStatus")
+data class GraphBuildStatus(
+    val building: Boolean,
+    /** A rebuild is asked for and starts in a moment. */
+    val waiting: Boolean = false,
+    /** What it does now ("Reading your listening", …). */
+    val step: String? = null,
+    /** How far it got in all, 0–1. */
+    val fraction: Double = 0.0,
+    val startedAt: Long? = null,
+    /** When the last rebuild ended (since the server started), or null. */
+    val builtAt: Long? = null,
+)
+
 // --- Takeout and the radio crawl ------------------------------------------------------
 
 /** One Google Takeout import into your history. */

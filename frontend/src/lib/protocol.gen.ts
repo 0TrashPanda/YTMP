@@ -1162,6 +1162,15 @@ export interface GraphView {
   now: number;
 }
 
+export interface GraphBuildStatus {
+  building: boolean;
+  waiting: boolean;
+  step: string | null;
+  fraction: number;
+  startedAt: number | null;
+  builtAt: number | null;
+}
+
 export interface HistoryImport {
   id: string;
   at: number;

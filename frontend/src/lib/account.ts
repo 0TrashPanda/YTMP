@@ -31,6 +31,7 @@ import type {
 	YoutubeSignInRequest,
 	HistoryImport,
 	HistoryImportList,
+	GraphBuildStatus,
 	RadioCrawlStatus
 } from './protocol.gen';
 
@@ -156,6 +157,8 @@ export const authServer = {
 		return body as HistoryImport;
 	},
 	deleteImport: (id: string) => call<null>(`/api/account/imports/${encodeURIComponent(id)}`, undefined, 'DELETE'),
+	/** Whether the song graph is being built again, and how far it got. */
+	graphStatus: () => call<GraphBuildStatus>('/api/account/graph/status'),
 
 	// The server admin's page (Settings → Server admin).
 	/** Learning YouTube Music's radios of the server's songs. */
