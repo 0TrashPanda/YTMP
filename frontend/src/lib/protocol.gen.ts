@@ -1120,7 +1120,7 @@ export interface GraphNode {
   local: boolean;
 }
 
-export type EdgeKind = "personal" | "server" | "imported" | "server_imported" | "ytm" | "ytm_account";
+export type EdgeKind = "personal" | "server" | "imported" | "server_imported" | "ytm" | "ytm_account" | "radio_near";
 
 export interface GraphEdge {
   from: string;
@@ -1133,6 +1133,7 @@ export interface GraphEdge {
   bestRank: number | null;
   rankSum: number;
   updatedAt: number;
+  confirmed: boolean;
 }
 
 export interface GraphTuning {
@@ -1141,6 +1142,8 @@ export interface GraphTuning {
   imported: number;
   ytm: number;
   ytmAccount: number;
+  radioNear: number;
+  oneOff: number;
   party: number;
   skip: number;
   reverse: number;

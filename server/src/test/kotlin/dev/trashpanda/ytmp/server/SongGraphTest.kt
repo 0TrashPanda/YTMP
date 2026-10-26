@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.host.TakeoutSong
 import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.EdgeKind
 import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.RadioOptions
 import dev.trashpanda.ytmp.protocol.RadioWay
@@ -180,5 +181,42 @@ class SongGraphTest {
         history.deleteImport("anna", made.id)
         graph.rebuild()
         assertEquals(emptyMap(), edges(SongGraph.IMPORTED))
+    }
+
+    @Test
+    fun `songs close together in a radio go together, and confirm a Takeout link that happened once`() {
+        // Imported: b → c once (a one-off), d → e once.
+        history.importTakeout(
+            "anna",
+            listOf(
+                TakeoutSong("b", "B", "Artist", listOf(now - 10_000_000)),
+                TakeoutSong("c", "C", "Artist", listOf(now - 10_000_000 + 180_000)),
+                TakeoutSong("d", "D", "Artist", listOf(now - 5_000_000)),
+                TakeoutSong("e", "E", "Artist", listOf(now - 5_000_000 + 180_000)),
+            ),
+        )
+        graph.rebuild()
+        assertEquals(listOf("ytm:c"), similar("ytm:b"))
+        /** Whether the imported link around [seed] (there's one) is confirmed. */
+        fun confirmed(seed: String) = graph.view("anna", seed, GraphTuning()).edges.single { it.kind == EdgeKind.IMPORTED }.confirmed
+        assertEquals(false, confirmed("ytm:b"))
+
+        // A radio of something else has b and c next to each other: that confirms b → c, not d → e.
+        graph.learnRadio("ytm:z", listOf(song("ytm:z"), song("ytm:b", "B"), song("ytm:c", "C"), song("ytm:q")))
+        graph.awaitIdle()
+        assertEquals(true, confirmed("ytm:b"))
+        assertEquals(false, confirmed("ytm:d"))
+        // b and q are 2 apart in that radio: neighbours, also the other way round.
+        assertTrue("ytm:q" in similar("ytm:b"))
+        assertTrue("ytm:b" in similar("ytm:q"))
+        // Without near links and one-offs counting nothing, d has no songs left; b still has c, confirmed.
+        val none = GraphTuning(radioNear = 0.0, oneOff = 0.0)
+        assertEquals(emptyList(), graph.similar("ytm:d", "anna", tuning = none).map { it.id })
+        assertEquals(listOf("ytm:c"), graph.similar("ytm:b", "anna", tuning = none.copy(ytm = 0.0)).map { it.id })
+
+        // Built again from what's kept: the same.
+        graph.rebuild()
+        assertEquals(true, confirmed("ytm:b"))
+        assertTrue("ytm:q" in similar("ytm:b"))
     }
 }

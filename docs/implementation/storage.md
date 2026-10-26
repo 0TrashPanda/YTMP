@@ -94,14 +94,15 @@ song_sources       -- the same song on different sources (merging)
 song_edges         -- the graph: "B was played after A"
   from_song → songs.id
   to_song   → songs.id
-  scope             -- 'personal' | 'imported' | 'server' | 'server_imported' | 'ytm' | 'ytm_account'
-  account_id        -- the account for 'personal', 'imported' and 'ytm_account', '' otherwise
+  scope             -- 'personal' | 'imported' | 'server' | 'server_imported' | 'ytm' | 'ytm_account' | 'radio_near'
+  account_id        -- the account for 'personal', 'imported' and 'ytm_account' ('radio_near': whose radio, '' none), '' otherwise
   solo_plays        -- counters, kept raw (see below)
   shared_plays
   skips
   ytm_rank          -- YTM edges: its best place in YTM's radio of from_song
   seen              -- YTM edges: in how many kept fetches (0: learned before fetches were kept)
-  rank_sum          -- YTM edges: its places added up (for the average)
+  rank_sum          -- YTM edges: its places added up (for the average); radio_near: the distances
+  confirmed         -- imported edges: a radio also puts the two songs together (migration 10)
   updated_at        -- the last play (or YTM radio) that counted
 
 radio_fetches      -- every YouTube Music radio fetched, as it came (migration 9)
@@ -128,7 +129,12 @@ history_imports    -- Google Takeout imports (plays.import_id points here; '' fo
   (`POST /api/auth/radio-fetch`), or the radio crawl fetches one; each fetch is kept in
   `radio_fetches` first (a room's at most every 6 hours per seed and account).
 - **Imported edges** = `'imported'` / `'server_imported'`: like personal and server, from
-  plays imported from Takeout (`plays.import_id`), so they can be weighed apart.
+  plays imported from Takeout (`plays.import_id`), so they can be weighed apart. One that
+  happened once counts `oneOff` of it until `confirmed`: a `ytm`, `ytm_account` or
+  `radio_near` edge between the same two songs, either way round (`SongGraph.confirm`, after a
+  rebuild and after each radio).
+- **Close together in a radio** = `'radio_near'`: each of a radio's songs → the next 3
+  (`NEAR_WINDOW`), place = the later one's (for `radioDepth`), counted both ways round.
 - **Solo vs. shared** listening are separate counters, so radio can use either or both.
 
 ### What counts as "played after"
@@ -149,11 +155,13 @@ imported        = P · I · (solo − skip · skips) · decay
 server          = S · (solo + party · shared − skip · skips) · decay
 server_imported = S · I · (solo − skip · skips) · decay
 ytm(_account)   = Y(A) · max(0.2, 1 − average rank / 50) · min(2, √seen) · decay   (0 past radioDepth)
+radio_near      = N · (1 − (average distance − 1) / 3) · min(2, √seen) · decay     (0 past radioDepth)
+one-off imported: × oneOff unless confirmed
 decay           = 0.5 ^ (days since updated_at / halfLifeDays)
 ```
 
 The numbers are the account's `GraphTuning` (account data `graph_tuning`; defaults P 2, I 1,
-S 1, Y 1.5, A 0.5, party 0.6, skip 1, reverse 0.5, second hop 0.35, 180 days, depth 50),
+S 1, Y 1.5, A 0.5, N 0.5, oneOff 0.3, party 0.6, skip 1, reverse 0.5, second hop 0.35, 180 days, depth 50),
 set with the sliders of the graph view (`GET/PUT /api/account/graph/tuning`). The page
 weighs the raw edges of `GET /api/account/graph` with the same formula
 (`frontend/src/lib/graph.ts`), so the sliders redraw at once. Because what the graph learns

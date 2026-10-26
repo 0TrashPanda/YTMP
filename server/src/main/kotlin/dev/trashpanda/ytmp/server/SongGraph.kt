@@ -135,20 +135,53 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                     val account = rows.getString("account_id")
                     val at = rows.getLong("fetched_at")
                     val songIds = runCatching { ProtocolJson.decodeFromString(ids, rows.getString("songs")) }.getOrDefault(emptyList())
-                    songIds.forEachIndexed { rank, sourceId ->
-                        val to = nodes.getOrPut(sourceId) { nodeOf(c, sourceId) ?: return@forEachIndexed }
-                        if (to == seed) return@forEachIndexed
-                        val e = edges.getOrPut(Edge(seed, to, if (account.isEmpty()) YTM else YTM_ACCOUNT, account)) { Ytm() }
+                    val placed = songIds.map { sourceId -> nodes[sourceId] ?: nodeOf(c, sourceId)?.also { nodes[sourceId] = it } }
+                    fun count(edge: Edge, rank: Int, value: Int) {
+                        val e = edges.getOrPut(edge) { Ytm() }
                         e.seen++
                         e.best = min(e.best, rank)
-                        e.rankSum += rank
+                        e.rankSum += value
                         e.at = max(e.at, at)
                     }
+                    placed.forEachIndexed { rank, to ->
+                        if (to != null && to != seed) count(Edge(seed, to, if (account.isEmpty()) YTM else YTM_ACCOUNT, account), rank, rank)
+                    }
+                    for ((edge, rank, distance) in nearLinks(placed, account)) count(edge, rank, distance)
                 }
             }
         }
         for ((edge, e) in edges) addYtmEdge(c, edge, e.seen, e.best, e.rankSum, e.at)
+        confirm(c)
         return fetches
+    }
+
+    /**
+     * Songs close together in a radio ([placed]: its songs' nodes, in order) go together too:
+     * each to the next [NEAR_WINDOW], with the later one's place and how far apart. Weak links.
+     */
+    private fun nearLinks(placed: List<String?>, account: String): List<Triple<Edge, Int, Int>> = buildList {
+        for (i in placed.indices) {
+            val a = placed[i] ?: continue
+            for (j in i + 1..min(placed.lastIndex, i + NEAR_WINDOW)) {
+                val b = placed[j] ?: continue
+                // Its place is the later song's: both are within "how far down a radio counts".
+                if (a != b) add(Triple(Edge(a, b, RADIO_NEAR, account), j, j - i))
+            }
+        }
+    }
+
+    /**
+     * Takeout links that happened once are only "confirmed" (count fully) when a YouTube Music
+     * radio also puts the two songs together: a one-off from metal to lo-fi rarely is.
+     */
+    private fun confirm(c: Connection) {
+        c.createStatement().use {
+            it.executeUpdate(
+                """UPDATE song_edges SET confirmed = 1 WHERE confirmed = 0 AND scope IN ('$IMPORTED', '$SERVER_IMPORTED') AND EXISTS (
+                     SELECT 1 FROM song_edges r WHERE r.scope IN ('$YTM', '$YTM_ACCOUNT', '$RADIO_NEAR')
+                     AND ((r.from_song = song_edges.from_song AND r.to_song = song_edges.to_song) OR (r.from_song = song_edges.to_song AND r.to_song = song_edges.from_song)))""",
+            )
+        }
     }
 
     /** [rebuild], soon and off this thread (deleting a lot from the history at once asks just once). */
@@ -207,12 +240,15 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                             it.setString(7, ProtocolJson.encodeToString(ids, sourceIds))
                             it.executeUpdate()
                         }
-                        if (seed == null) return@transaction
-                        val scope = if (accountId == null) YTM else YTM_ACCOUNT
-                        music.forEachIndexed { rank, song ->
-                            val to = nodeOf(c, song.id) ?: return@forEachIndexed
-                            if (to != seed) addYtmEdge(c, Edge(seed, to, scope, accountId.orEmpty()), 1, rank, rank, now)
+                        val placed = music.map { nodeOf(c, it.id) }
+                        for ((edge, rank, distance) in nearLinks(placed, accountId.orEmpty())) addYtmEdge(c, edge, 1, rank, distance, now)
+                        if (seed != null) {
+                            val scope = if (accountId == null) YTM else YTM_ACCOUNT
+                            placed.forEachIndexed { rank, to ->
+                                if (to != null && to != seed) addYtmEdge(c, Edge(seed, to, scope, accountId.orEmpty()), 1, rank, rank, now)
+                            }
                         }
+                        confirm(c)
                     }
                 }
             }.onFailure { log.warn("Couldn't learn from a radio: {}", it.message) }
@@ -255,15 +291,20 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         val scores = HashMap<String, Double>()
         for (edge in edges(c, listOf(seed), accountId, use, both = true)) {
             val other = if (edge.from == seed) edge.to else edge.from
-            scores.merge(other, weight(edge, use, tuning, now) * (if (edge.from == seed) 1.0 else tuning.reverse), Double::plus)
+            // Songs close together in a radio go together either way round.
+            val back = if (edge.from == seed || edge.scope == RADIO_NEAR) 1.0 else tuning.reverse
+            scores.merge(other, weight(edge, use, tuning, now) * back, Double::plus)
         }
         scores.remove(seed)
         val near = scores.entries.filter { it.value > 0 }.sortedByDescending { it.value }.take(SECOND_HOP_FROM)
         val best = near.firstOrNull()?.value
         if (best != null && tuning.secondHop > 0) {
             val strength = near.associate { it.key to it.value / best }
-            for (edge in edges(c, strength.keys.toList(), accountId, use, both = false)) {
-                if (edge.to != seed) scores.merge(edge.to, strength.getValue(edge.from) * weight(edge, use, tuning, now) * tuning.secondHop, Double::plus)
+            for (edge in edges(c, strength.keys.toList(), accountId, use, both = true)) {
+                // Onwards from a neighbour; songs close together in a radio either way round.
+                val w = weight(edge, use, tuning, now) * tuning.secondHop
+                strength[edge.from]?.let { if (edge.to != seed) scores.merge(edge.to, it * w, Double::plus) }
+                if (edge.scope == RADIO_NEAR) strength[edge.to]?.let { if (edge.from != seed) scores.merge(edge.from, it * w, Double::plus) }
             }
         }
         val ranked = scores.entries.filter { it.value >= MIN_SCORE }.sortedByDescending { it.value }.take(limit * 2).map { it.key }
@@ -405,9 +446,9 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
 
     private class StoredEdge(
         val from: String, val to: String, val scope: String, val solo: Int, val shared: Int, val skips: Int,
-        val ytmRank: Int?, val seen: Int, val rankSum: Int, val updatedAt: Long,
+        val ytmRank: Int?, val seen: Int, val rankSum: Int, val updatedAt: Long, val confirmed: Boolean,
     ) {
-        fun toGraphEdge() = GraphEdge(from, to, kindOf(scope), solo, shared, skips, seen, ytmRank, rankSum, updatedAt)
+        fun toGraphEdge() = GraphEdge(from, to, kindOf(scope), solo, shared, skips, seen, ytmRank, rankSum, updatedAt, confirmed)
     }
 
     /** What [e] counts, the way [tuning] says. Kept the same as the graph view's (frontend/src/lib/graph.ts). */
@@ -417,9 +458,15 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         val party = if (use == HistoryRadio.ALL) t.party else 0.0
         return when (e.scope) {
             PERSONAL -> t.personal * (e.solo + e.shared * party - e.skips * t.skip) * decay
-            IMPORTED -> t.personal * t.imported * (e.solo - e.skips * t.skip) * decay
+            IMPORTED -> t.personal * t.imported * oneOff(e, t) * (e.solo - e.skips * t.skip) * decay
             SERVER -> t.server * (e.solo + e.shared * t.party - e.skips * t.skip) * decay
-            SERVER_IMPORTED -> t.server * t.imported * (e.solo - e.skips * t.skip) * decay
+            SERVER_IMPORTED -> t.server * t.imported * oneOff(e, t) * (e.solo - e.skips * t.skip) * decay
+            RADIO_NEAR -> {
+                if ((e.ytmRank ?: 0) >= t.radioDepth) return 0.0
+                val distance = if (e.seen > 0) e.rankSum.toDouble() / e.seen else 1.0
+                val often = min(2.0, sqrt(max(1, e.seen).toDouble()))
+                t.radioNear * (1 - (distance - 1) / NEAR_WINDOW) * often * decay
+            }
             else -> {
                 if ((e.ytmRank ?: 0) >= t.radioDepth) return 0.0
                 val rank = if (e.seen > 0) e.rankSum.toDouble() / e.seen else (e.ytmRank ?: MAX_RADIO_SONGS).toDouble()
@@ -428,6 +475,9 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             }
         }
     }
+
+    /** A Takeout link that happened once and no radio confirms: [GraphTuning.oneOff] of it. */
+    private fun oneOff(e: StoredEdge, t: GraphTuning) = if (e.solo <= 1 && !e.confirmed) t.oneOff else 1.0
 
     /** Was [current] played right after [before]: same room, not long after, and [before] not skipped right away. */
     private fun follows(before: Heard, current: Heard): Boolean =
@@ -556,11 +606,12 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         val own = buildList {
             if (use != HistoryRadio.OFF) addAll(listOf(PERSONAL, IMPORTED))
             add(YTM_ACCOUNT)
+            add(RADIO_NEAR)
         }
         val sql = buildString {
-            append("SELECT from_song, to_song, scope, solo_plays, shared_plays, skips, ytm_rank, seen, rank_sum, updated_at FROM song_edges WHERE ")
+            append("SELECT from_song, to_song, scope, solo_plays, shared_plays, skips, ytm_rank, seen, rank_sum, updated_at, confirmed FROM song_edges WHERE ")
             append(if (both) "(from_song IN ($list) OR to_song IN ($list))" else "from_song IN ($list)")
-            append(" AND (scope IN ('$SERVER', '$SERVER_IMPORTED', '$YTM')")
+            append(" AND ((scope IN ('$SERVER', '$SERVER_IMPORTED', '$YTM', '$RADIO_NEAR') AND account_id = '')")
             if (account != null) append(" OR (scope IN (${own.joinToString(", ") { "'$it'" }}) AND account_id = ?)")
             append(")")
         }
@@ -576,7 +627,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                             StoredEdge(
                                 rows.getString("from_song"), rows.getString("to_song"), rows.getString("scope"),
                                 rows.getInt("solo_plays"), rows.getInt("shared_plays"), rows.getInt("skips"), rank,
-                                rows.getInt("seen"), rows.getInt("rank_sum"), rows.getLong("updated_at"),
+                                rows.getInt("seen"), rows.getInt("rank_sum"), rows.getLong("updated_at"), rows.getInt("confirmed") != 0,
                             ),
                         )
                     }
@@ -614,7 +665,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         private val log = LoggerFactory.getLogger(SongGraph::class.java)
 
         /** Bump to build the graph from the history again on the next start (a new way of learning). */
-        const val VERSION = 2
+        const val VERSION = 3
         private const val VERSION_SETTING = "song_graph_version"
 
         // Edge scopes (`song_edges.scope`). account_id is '' for the server's and YouTube Music's without an account.
@@ -624,6 +675,8 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         const val SERVER_IMPORTED = "server_imported"
         const val YTM = "ytm"
         const val YTM_ACCOUNT = "ytm_account"
+        /** Two songs close together in a YouTube Music radio (account_id: whose account made it, '' none). */
+        const val RADIO_NEAR = "radio_near"
 
         fun kindOf(scope: String) = when (scope) {
             PERSONAL -> EdgeKind.PERSONAL
@@ -631,6 +684,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             IMPORTED -> EdgeKind.IMPORTED
             SERVER_IMPORTED -> EdgeKind.SERVER_IMPORTED
             YTM_ACCOUNT -> EdgeKind.YTM_ACCOUNT
+            RADIO_NEAR -> EdgeKind.RADIO_NEAR
             else -> EdgeKind.YTM
         }
 
@@ -642,6 +696,8 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         private const val RADIO_RELEARN_MS = 6 * 3_600_000L
         /** A YouTube Music radio's first this many songs are kept (all it sends at once). */
         const val MAX_RADIO_SONGS = 50
+        /** In a radio, each song goes with this many after it. */
+        const val NEAR_WINDOW = 3
         private const val SECOND_HOP_FROM = 8
         private const val MIN_SCORE = 0.05
         private const val MAX_HINT_SONGS = 200

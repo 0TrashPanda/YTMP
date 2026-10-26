@@ -71,6 +71,10 @@ data class GraphTuning(
     val ytm: Double = 1.5,
     /** YouTube Music's radios made with your account. */
     val ytmAccount: Double = 0.5,
+    /** Songs close together in a YouTube Music radio (not the seed: each other). */
+    val radioNear: Double = 0.5,
+    /** A Takeout link that happened only once and no radio confirms (a jump to other music, often). */
+    val oneOff: Double = 0.3,
     /** A play in a party, against one alone. */
     val party: Double = 0.6,
     /** How much a skip takes off. */
@@ -146,6 +150,7 @@ enum class EdgeKind {
     @SerialName("server_imported") SERVER_IMPORTED,
     @SerialName("ytm") YTM,
     @SerialName("ytm_account") YTM_ACCOUNT,
+    @SerialName("radio_near") RADIO_NEAR,
 }
 
 /** A song in the graph view. [plays]: how often you played it (with imported plays). */
@@ -163,11 +168,16 @@ data class GraphEdge(
     val solo: Int = 0,
     val shared: Int = 0,
     val skips: Int = 0,
-    /** YouTube Music edges: in how many fetches of the seed's radio, the best place, and the places added up. */
+    /**
+     * YouTube Music edges: in how many fetches of the seed's radio, the best place, and the
+     * places added up. Close together in a radio: in how many, the best place, the distances added up.
+     */
     val seen: Int = 0,
     val bestRank: Int? = null,
     val rankSum: Int = 0,
     val updatedAt: Long,
+    /** Imported links: a radio also puts the two songs together (a one-off then counts fully). */
+    val confirmed: Boolean = false,
 )
 
 /** `GET /api/account/graph?seed=` (around one song) or without a seed (your most played songs). */

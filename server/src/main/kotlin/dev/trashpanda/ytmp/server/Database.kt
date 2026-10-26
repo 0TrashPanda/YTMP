@@ -234,6 +234,8 @@ class Database private constructor(private val url: String, private val user: St
                 )""",
                 "CREATE INDEX plays_account_song ON plays (account_id, song_id)",
             ),
+            // 10: a Takeout link that happened once counts fully only once a radio confirms it (SongGraph.confirm)
+            listOf("ALTER TABLE song_edges ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0"),
         )
 
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {

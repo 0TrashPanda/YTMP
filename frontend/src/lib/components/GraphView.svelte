@@ -98,6 +98,8 @@
 		{ key: 'server', label: 'Everyone on your server', min: 0, max: 5, step: 0.1 },
 		{ key: 'ytm', label: 'YouTube Music radios', min: 0, max: 5, step: 0.1 },
 		{ key: 'ytmAccount', label: 'Radios with your account', min: 0, max: 5, step: 0.1 },
+		{ key: 'radioNear', label: 'Songs close together in a radio', min: 0, max: 5, step: 0.1 },
+		{ key: 'oneOff', label: 'Takeout links that happened once, unconfirmed', min: 0, max: 1, step: 0.05 },
 		{ key: 'party', label: 'A party play, against one alone', min: 0, max: 2, step: 0.05 },
 		{ key: 'skip', label: 'How much a skip takes off', min: 0, max: 5, step: 0.1 },
 		{ key: 'reverse', label: 'Songs played before it', min: 0, max: 2, step: 0.05 },

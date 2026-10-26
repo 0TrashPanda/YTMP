@@ -15,6 +15,7 @@ const edge = (from: string, to: string, kind: GraphEdge['kind'], more: Partial<G
 	bestRank: null,
 	rankSum: 0,
 	updatedAt: now,
+	confirmed: false,
 	...more
 });
 
@@ -25,6 +26,13 @@ describe('the graph view weighs edges like the server', () => {
 		expect(weight(edge('a', 'b', 'ytm', { seen: 1, bestRank: 10, rankSum: 10 }), { ...DEFAULT_TUNING, radioDepth: 10 }, now)).toBe(0);
 		// Half as much after the half-life.
 		expect(weight(edge('a', 'b', 'server', { solo: 1, updatedAt: now - 180 * 86_400_000 }), DEFAULT_TUNING, now)).toBeCloseTo(0.5);
+	});
+
+	it('lets a one-off Takeout link count less until a radio confirms it, and near links count either way', () => {
+		expect(weight(edge('a', 'b', 'imported', { solo: 1 }), DEFAULT_TUNING, now)).toBeCloseTo(0.6);
+		expect(weight(edge('a', 'b', 'imported', { solo: 1, confirmed: true }), DEFAULT_TUNING, now)).toBeCloseTo(2);
+		expect(weight(edge('a', 'b', 'radio_near', { seen: 1, bestRank: 1, rankSum: 3 }), DEFAULT_TUNING, now)).toBeCloseTo(0.5 / 3);
+		expect(radioFrom('b', [edge('a', 'b', 'radio_near', { seen: 1, bestRank: 1, rankSum: 1 })], DEFAULT_TUNING, now).map((r) => r.id)).toEqual(['a']);
 	});
 
 	it("ranks a radio's songs, with the songs before the seed and neighbours' neighbours counting less", () => {

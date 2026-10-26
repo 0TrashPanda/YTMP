@@ -134,7 +134,13 @@ history; the zip, or the watch history in it).
 - Takeout only says when a song started: how much was heard is the time until the next
   one, and one left within 30 s counts as skipped.
 - The graph learns them apart from your plays in YTMP, so a slider can weigh them
-  differently. *Remove* takes an import out of the history (and the graph) again.
+  differently.
+- Takeout has no genre, and most of it is one song after another once: a switch from one
+  style to another looks the same as a good match. So a link that happened **once** counts
+  for little (30% by default, a slider) until it's **confirmed**: a YouTube Music radio also
+  puts the two songs together (the seed and a song of its radio, or two songs close together
+  in one). A jump from metal to lo-fi rarely is; songs that really go together soon are,
+  especially once radios are being learned. A link that happened twice or more counts fully. *Remove* takes an import out of the history (and the graph) again.
 
 ### Learning from YouTube Music
 
@@ -145,6 +151,8 @@ of **song connections**:
 - Every YouTube Music radio YTMP fetches (50 songs) is **kept as it came**: when, how (a
   room, learning, Find similar) and as whom (without an account, or which account). The graph
   is built from what's kept, so it can be weighed again any time without fetching anything.
+- The seed goes with each of the radio's songs, and the songs **close together** in it go
+  with each other too (each with the next three; weak, its own slider).
 - A radio made **without an account** counts for everyone; one made **with your account**
   only in your own radios (it's your taste, as YouTube sees it), and less by default.
 - A phone sends the radios it fetches to its owner's server.

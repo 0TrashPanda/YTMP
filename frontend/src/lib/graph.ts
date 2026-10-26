@@ -5,6 +5,8 @@ import type { EdgeKind, GraphEdge, GraphNode, GraphTuning } from './protocol.gen
 
 /** A YouTube Music radio's first this many songs are kept (SongGraph.MAX_RADIO_SONGS). */
 const MAX_RADIO_SONGS = 50;
+/** In a radio, each song goes with this many after it (SongGraph.NEAR_WINDOW). */
+const NEAR_WINDOW = 3;
 
 export const DEFAULT_TUNING: GraphTuning = {
 	personal: 2,
@@ -12,6 +14,8 @@ export const DEFAULT_TUNING: GraphTuning = {
 	imported: 1,
 	ytm: 1.5,
 	ytmAccount: 0.5,
+	radioNear: 0.5,
+	oneOff: 0.3,
 	party: 0.6,
 	skip: 1,
 	reverse: 0.5,
@@ -27,7 +31,8 @@ export const KINDS: { kind: EdgeKind; label: string; color: string; dashed?: boo
 	{ kind: 'imported', label: 'You, imported from Takeout', color: '#199e70' },
 	{ kind: 'server_imported', label: 'Everyone, imported', color: '#d95926', dashed: true },
 	{ kind: 'ytm', label: 'YouTube Music radios', color: '#c98500' },
-	{ kind: 'ytm_account', label: 'Radios with your account', color: '#d55181' }
+	{ kind: 'ytm_account', label: 'Radios with your account', color: '#d55181' },
+	{ kind: 'radio_near', label: 'Close together in a radio', color: '#9085e9', dashed: true }
 ];
 export const kindOf = (kind: EdgeKind) => KINDS.find((k) => k.kind === kind) ?? KINDS[0];
 
@@ -39,11 +44,17 @@ export function weight(e: GraphEdge, t: GraphTuning, now: number, party = true):
 		case 'personal':
 			return t.personal * (e.solo + e.shared * (party ? t.party : 0) - e.skips * t.skip) * decay;
 		case 'imported':
-			return t.personal * t.imported * (e.solo - e.skips * t.skip) * decay;
+			return t.personal * t.imported * oneOff(e, t) * (e.solo - e.skips * t.skip) * decay;
 		case 'server':
 			return t.server * (e.solo + e.shared * t.party - e.skips * t.skip) * decay;
 		case 'server_imported':
-			return t.server * t.imported * (e.solo - e.skips * t.skip) * decay;
+			return t.server * t.imported * oneOff(e, t) * (e.solo - e.skips * t.skip) * decay;
+		case 'radio_near': {
+			if ((e.bestRank ?? 0) >= t.radioDepth) return 0;
+			const distance = e.seen > 0 ? e.rankSum / e.seen : 1;
+			const often = Math.min(2, Math.sqrt(Math.max(1, e.seen)));
+			return t.radioNear * (1 - (distance - 1) / NEAR_WINDOW) * often * decay;
+		}
 		default: {
 			if ((e.bestRank ?? 0) >= t.radioDepth) return 0;
 			const rank = e.seen > 0 ? e.rankSum / e.seen : (e.bestRank ?? MAX_RADIO_SONGS);
@@ -53,13 +64,17 @@ export function weight(e: GraphEdge, t: GraphTuning, now: number, party = true):
 	}
 }
 
+/** A Takeout link that happened once and no radio confirms counts [GraphTuning.oneOff] of it. */
+const oneOff = (e: GraphEdge, t: GraphTuning) => (e.solo <= 1 && !e.confirmed ? t.oneOff : 1);
+
 /** What a radio from [seed] would bring, best first (SongGraph.similar, without the limits). */
 export function radioFrom(seed: string, edges: GraphEdge[], t: GraphTuning, now: number): { id: string; score: number }[] {
 	const scores = new Map<string, number>();
 	const add = (id: string, v: number) => scores.set(id, (scores.get(id) ?? 0) + v);
 	for (const e of edges) {
 		if (e.from === seed) add(e.to, weight(e, t, now));
-		else if (e.to === seed) add(e.from, weight(e, t, now) * t.reverse);
+		// Songs close together in a radio go together either way round.
+		else if (e.to === seed) add(e.from, weight(e, t, now) * (e.kind === 'radio_near' ? 1 : t.reverse));
 	}
 	scores.delete(seed);
 	const near = [...scores].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
@@ -67,8 +82,11 @@ export function radioFrom(seed: string, edges: GraphEdge[], t: GraphTuning, now:
 	if (best && t.secondHop > 0) {
 		const strength = new Map(near.map(([id, v]) => [id, v / best]));
 		for (const e of edges) {
+			const w = weight(e, t, now) * t.secondHop;
 			const s = strength.get(e.from);
-			if (s !== undefined && e.to !== seed) add(e.to, s * weight(e, t, now) * t.secondHop);
+			if (s !== undefined && e.to !== seed) add(e.to, s * w);
+			const back = e.kind === 'radio_near' ? strength.get(e.to) : undefined;
+			if (back !== undefined && e.from !== seed) add(e.from, back * w);
 		}
 	}
 	return [...scores].filter(([, v]) => v >= 0.05).sort((a, b) => b[1] - a[1]).map(([id, score]) => ({ id, score }));
