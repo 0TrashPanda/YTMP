@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { hold } from '../hold';
+	import { playOnLast } from '../playOn';
+	import { holds } from '../songMenu.svelte';
 	import { wheelAdjust } from '../wheel';
 	import { nativeBridge } from '../native';
 	import { MediaQuery } from 'svelte/reactivity';
@@ -333,6 +336,7 @@
 						aria-label="Play on"
 						title={activeOutputs ? `Playing on ${activeOutputs} speaker(s)` : 'Play on a speaker or TV'}
 						onclick={() => (showOutputs = true)}
+						use:hold={holds('playOn') ? () => void playOnLast(room, onToast).then((done) => done || (showOutputs = true)) : null}
 					>
 						<Icon name="cast" size={20} />
 					</button>

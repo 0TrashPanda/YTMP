@@ -1,6 +1,7 @@
 <script lang="ts">
 	// "Save to playlist", like YTM's: your own YouTube Music playlists, or a new one.
 	import { whileBusy } from '../busy.svelte';
+	import { settings } from '../settings.svelte';
 	import { thumbUrl } from '../images.svelte';
 	import { createPlaylist, getMyPlaylists, saveToPlaylist } from '../api';
 	import type { PlaylistSummary, Song } from '../protocol.gen';
@@ -25,6 +26,7 @@
 		onClose();
 		try {
 			await whileBusy(`Saving to ${playlist.title}…`, saveToPlaylist(playlist.id, [song.id]));
+			settings.lastPlaylist.set({ id: playlist.id, title: playlist.title });
 			onToast(`Saved to ${playlist.title}`);
 		} catch (e) {
 			onToast(e instanceof Error ? e.message : "Couldn't save it");
@@ -40,7 +42,8 @@
 		busy = true;
 		onClose();
 		try {
-			await whileBusy(`Making the playlist ${title}…`, createPlaylist(title, [song.id]));
+			const made = await whileBusy(`Making the playlist ${title}…`, createPlaylist(title, [song.id]));
+			settings.lastPlaylist.set({ id: made, title });
 			onToast(`Saved to ${title}`);
 		} catch (e) {
 			onToast(e instanceof Error ? e.message : "Couldn't make the playlist");

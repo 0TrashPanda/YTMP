@@ -3,7 +3,7 @@
 // podcast, genre, folder and history pages. Back (the phone's, or the back arrow) goes to the
 // one before, scrolled as you left it. A new kind of page is a new View.
 import { forgetLocalPlace, localPlace } from './local.svelte';
-import type { Song } from './protocol.gen';
+import type { RadioFrom, Song } from './protocol.gen';
 
 /** The bottom bar's pages. */
 export type Section = 'home' | 'library' | 'local';
@@ -11,7 +11,7 @@ export type Section = 'home' | 'library' | 'local';
 /** Pages opened on top of them. */
 export type View =
 	| { kind: 'search'; query: string }
-	| { kind: 'similar'; song: Song }
+	| { kind: 'similar'; song: Song; from?: RadioFrom }
 	| { kind: 'artist'; id: string; name: string }
 	| { kind: 'album'; id: string; title: string }
 	| { kind: 'playlist'; id: string; title: string; personal?: boolean }

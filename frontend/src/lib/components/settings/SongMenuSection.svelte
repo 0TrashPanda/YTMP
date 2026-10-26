@@ -1,9 +1,17 @@
 <script lang="ts">
-	// Settings → Song menu: the order of its actions, which show, the dividers, and the big
-	// buttons at the top of the phone's menu (see songMenu.svelte.ts).
+	// Settings → Song menu: the order of its actions, which show, the dividers, the big
+	// buttons at the top of the phone's menu, and what holding an action (or a player button)
+	// offers (see songMenu.svelte.ts).
 	import {
 		BUTTON_COUNT,
 		DEFAULT_BUTTONS,
+		HOLD_CHOICES,
+		HOLD_DOES,
+		PLAYER_BUTTONS,
+		holds,
+		setChoiceShown,
+		setHoldOn,
+		type Holdable,
 		MENU_ACTIONS,
 		addDivider,
 		isDefaultLayout,
@@ -23,6 +31,14 @@
 
 	const actions = Object.keys(MENU_ACTIONS) as MenuAction[];
 	const onButton = (action: MenuAction) => songMenu.buttons.includes(action);
+
+	/** What can be held: the menu's actions (in their order), then the player's buttons. */
+	const holdable = $derived<Holdable[]>([
+		...songMenu.items.filter((i): i is MenuAction => i !== 'divider' && i in HOLD_CHOICES),
+		...(Object.keys(PLAYER_BUTTONS) as Holdable[])
+	]);
+	const nameOf = (h: Holdable) => (h in MENU_ACTIONS ? MENU_ACTIONS[h as MenuAction] : PLAYER_BUTTONS[h as keyof typeof PLAYER_BUTTONS]);
+	let open = $state<Holdable | null>(null);
 </script>
 
 <div class="flex flex-col gap-8">
@@ -93,5 +109,46 @@
 		<button class="flex items-center gap-2 self-start rounded-full px-3 py-1.5 text-sm text-muted hover:bg-raised hover:text-white" onclick={addDivider}>
 			<Icon name="add" size={18} /> Add a divider
 		</button>
+	</section>
+
+	<section class="flex flex-col gap-3">
+		<div>
+			<p class="text-sm font-medium">Holding</p>
+			<p class="text-xs text-muted">
+				Hold an action in the menu (with a mouse: right-click it, or its ›) for more choices, like Start radio from only your listening. Switch holding off, or hide
+				choices you don't use.
+			</p>
+		</div>
+		<ul class="flex flex-col">
+			{#each holdable as h (h)}
+				{@const on = !songMenu.hold[h]?.off}
+				<li class="border-b border-line/60 py-1.5">
+					<div class="flex items-center gap-3">
+						<Icon name={nameOf(h).icon} size={20} class="shrink-0 {on ? '' : 'text-muted'}" />
+						<button class="min-w-0 flex-1 text-left" onclick={() => (open = open === h ? null : h)} disabled={!HOLD_CHOICES[h]?.length}>
+							<p class="truncate text-sm">{nameOf(h).name}</p>
+							<p class="truncate text-xs text-muted">
+								{HOLD_DOES[h] ?? `${(HOLD_CHOICES[h] ?? []).filter((c) => !songMenu.hold[h]?.hidden.includes(c.id)).length} choices`}
+							</p>
+						</button>
+						{#if HOLD_CHOICES[h]?.length}
+							<Icon name="chevron" size={18} class="shrink-0 text-muted transition-transform {open === h ? 'rotate-180' : ''}" />
+						{/if}
+						<Switch checked={!songMenu.hold[h]?.off} label="Holding {nameOf(h).name}" onchange={(v) => setHoldOn(h, v)} />
+					</div>
+					{#if open === h}
+						<ul class="mt-1 ml-8 flex flex-col">
+							{#each HOLD_CHOICES[h] ?? [] as c (c.id)}
+								{@const shown = !songMenu.hold[h]?.hidden.includes(c.id)}
+								<li class="flex items-center gap-3 py-1.5">
+									<span class="min-w-0 flex-1 text-sm {shown ? '' : 'text-muted line-through'}">{c.name}</span>
+									<Switch checked={shown} disabled={!!songMenu.hold[h]?.off} label="Show {c.name}" onchange={(v) => setChoiceShown(h, c.id, v)} />
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</li>
+			{/each}
+		</ul>
 	</section>
 </div>

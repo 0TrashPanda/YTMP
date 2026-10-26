@@ -68,7 +68,7 @@ internal fun Route.personalRoutes(host: HostContext) = with(host) {
             val songId = call.request.queryParameters["id"]?.trim().orEmpty()
             if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
             val owner = call.owner()
-            call.respond(SearchResponse(call.withGraph(songId) { owner.radio(songId) ?: throw notHere() }.filter { it.id != songId }))
+            call.respond(SearchResponse(call.similarFrom(songId) { owner.radio(songId) ?: throw notHere() }.filter { it.id != songId }))
         }
         get("/youtube") {
             val mine = call.personal()

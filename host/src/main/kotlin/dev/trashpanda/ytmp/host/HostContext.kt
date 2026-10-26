@@ -51,6 +51,19 @@ internal class HostContext(val rooms: RoomManager, val sources: HostSources, val
         return sources.personal?.takeIf { isDeviceOwner() }
     }
 
+    /**
+     * Find similar from where the request's `from` says (Find similar's hold): YouTube Music's
+     * radio and the song graph mixed (the usual), only one of them, or only what plays here
+     * without internet.
+     */
+    suspend fun ApplicationCall.similarFrom(songId: String, radio: suspend () -> List<Song>): List<Song> = when (request.queryParameters["from"]) {
+        "ytm" -> radio()
+        "graph" -> sources.songGraph?.invoke(this, songId).orEmpty()
+        "device" -> withGraph(songId) { runCatching { radio() }.getOrDefault(emptyList()) }
+            .filter { LocalMusic.isLocal(it.id) || sources.cache?.has(it.id) == true }
+        else -> withGraph(songId, radio)
+    }
+
     /** [radio] (of [songId]) with the song graph's songs for whoever asks mixed in ([mixedRadio]). */
     suspend fun ApplicationCall.withGraph(songId: String, radio: suspend () -> List<Song>): List<Song> {
         val graph = sources.songGraph ?: return radio()

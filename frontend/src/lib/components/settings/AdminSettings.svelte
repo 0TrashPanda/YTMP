@@ -5,6 +5,7 @@
 	import type { AdminSettings, ServerSettingOverrides, ServerSettingValues, SignupMode } from '../../protocol.gen';
 	import NumberField from '../NumberField.svelte';
 	import CacheSection from './CacheSection.svelte';
+	import CrawlSection from './CrawlSection.svelte';
 	import Choice from './Choice.svelte';
 	import Switch from './Switch.svelte';
 
@@ -187,6 +188,16 @@
 			<NumberField value={v.cacheBytes / GB} min={0} max={10000} step={0.1} unit="GB" label="Song cache size in GB (0: off)" disabled={busy} onchange={(n) => set('cacheBytes', Math.round(n * GB))} />
 		</div>
 		{@render fromFile('cacheBytes')}
+	</section>
+
+	<section class={card}>
+		<CrawlSection
+			load={authServer.radioCrawl}
+			save={authServer.setRadioCrawl}
+			card
+			{onToast}
+			hint="Slowly fetches YouTube Music's radio (without an account) of the server's local music that has a YouTube Music ID and of the songs in its cache, for the song graph: everyone's radios and On this device get better from it."
+		/>
 	</section>
 
 	<section class={card}>

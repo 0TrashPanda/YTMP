@@ -27,9 +27,14 @@
 	import { onMount, tick } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { fly, fade } from 'svelte/transition';
-	import type { Command } from '../protocol.gen';
-	import { removeFromPlaylist } from '../api';
-	import { autoplayThis, runCommand, startRadio } from '../songActions';
+	import type { Command, RadioFrom, RadioOptions } from '../protocol.gen';
+	import { keepOffline, removeFromPlaylist, saveToPlaylist } from '../api';
+	import { autoplayThis, quoted, runCommand, startRadio, type Toast } from '../songActions';
+	import { hold } from '../hold';
+	import { blockArtist, blockSong, isBlockedArtist, isBlockedSong, radioOptions } from '../radio.svelte';
+	import { settings } from '../settings.svelte';
+	import { nativeBridge } from '../native';
+	import RadioChoices from './RadioChoices.svelte';
 	import { listening } from '../listening.svelte';
 	import { likes } from '../likes.svelte';
 	import type { RoomConnection } from '../room.svelte';
@@ -37,7 +42,7 @@
 	import { canDownload, downloadSong } from '../downloads';
 	import { youtube } from '../youtube.svelte';
 	import { sleepTimer } from '../sleepTimer.svelte';
-	import { arrange, songMenuLayout, type MenuAction } from '../songMenu.svelte';
+	import { arrange, holds, shownChoices, songMenuLayout, type MenuAction } from '../songMenu.svelte';
 	import { artistNames } from '../format';
 	import Art from './Art.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
@@ -46,8 +51,9 @@
 		room: RoomConnection;
 		target: MenuTarget;
 		onClose: () => void;
-		onToast: (text: string) => void;
-		onFindSimilar: (song: Song) => void;
+		onToast: Toast;
+		/** Find similar, from both or only one of YouTube Music and the song graph ([from]). */
+		onFindSimilar: (song: Song, from?: RadioFrom) => void;
 		onArtist: (artist: ArtistRef) => void;
 		onAlbum: (album: AlbumRef, artist: string) => void;
 		onPodcast: (podcast: PodcastRef) => void;
@@ -55,8 +61,10 @@
 		onSave?: (song: Song) => void;
 		/** The sleep timer (in the menu of the song that's playing). */
 		onSleepTimer?: () => void;
+		/** The song graph around a song (with your YTMP account). */
+		onGraph?: (song: Song) => void;
 	}
-	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave, onSleepTimer }: Props = $props();
+	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave, onSleepTimer, onGraph }: Props = $props();
 
 	const song = $derived(target.song);
 	const item = $derived(target.item);
@@ -73,6 +81,61 @@
 		run: () => void | Promise<void>;
 		danger?: boolean;
 		href?: string;
+		/** Holding it (or right-click, or its ›): its choices, or something straight away. */
+		held?: () => void;
+	}
+
+	/** A choice in the sheet of a held action. */
+	interface Choice {
+		icon: IconName;
+		label: string;
+		run: () => void | Promise<void>;
+		danger?: boolean;
+	}
+
+	/** What a held action shows: choices, or the choices for a radio. */
+	type Sub = { title: string; choices: Choice[] } | { title: string; radio: 'radio' | 'autoplay' | 'similar'; seed: Song; show: string[] };
+	let sub = $state<Sub | null>(null);
+	let radioPick = $state<RadioOptions>(radioOptions());
+
+	/** Holding [action] opens [make]'s choices (only those that show), or nothing when there are none. */
+	function choicesFor(action: MenuAction, title: string, make: () => (Choice & { id: string })[]): (() => void) | undefined {
+		if (!holds(action)) return undefined;
+		return () => {
+			const shown = shownChoices(action);
+			const choices = make().filter((c) => shown.includes(c.id));
+			if (choices.length) sub = { title, choices };
+		};
+	}
+
+	function radioFor(action: 'radio' | 'autoplay' | 'similar', seed: Song, title: string): (() => void) | undefined {
+		if (!holds(action)) return undefined;
+		return () => {
+			radioPick = radioOptions();
+			sub = { title, radio: action, seed, show: shownChoices(action) };
+		};
+	}
+
+	function startPicked() {
+		if (!sub || !('radio' in sub)) return;
+		const { radio, seed } = sub;
+		const options = radioPick;
+		onClose();
+		if (radio === 'radio') void startRadio(room, seed, onToast, quoted(seed), options);
+		else if (radio === 'autoplay') void autoplayThis(room, seed, onToast, options);
+		else onFindSimilar(seed, options.from);
+	}
+
+	/** On the phone's own pages, which keep its song cache (Download's "keep it offline"). */
+	const onThisPhone = !!nativeBridge && ['127.0.0.1', 'localhost'].includes(location.hostname);
+	const party = $derived((room.state?.participants.filter((p) => p.online && !p.screen).length ?? 0) > 1);
+
+	/** Removes [items] one by one (the ones you may remove). */
+	async function removeAll(items: QueueItem[], what: string) {
+		onClose();
+		const mine = items.filter((i) => room.can(i.addedBy === room.participantId ? 'remove_own' : 'remove_others'));
+		for (const i of mine) await room.run({ kind: 'RemoveQueueItem', itemId: i.itemId });
+		onToast(mine.length ? `Removed ${mine.length} ${mine.length === 1 ? 'song' : 'songs'} ${what}` : 'You may not remove those songs');
 	}
 
 	async function command(c: Command, done?: string) {
@@ -85,13 +148,23 @@
 		const add = (action: MenuAction, entry: Entry) => (list[action] ??= []).push(entry);
 		const fromAutoplay = place === 'autoplay' && item;
 		if (room.can('add_songs')) {
+			const current = song;
+			const where = (action: MenuAction) =>
+				choicesFor(action, current.title, () => [
+					{ id: 'next', icon: 'playNext', label: 'Play next', run: () => command({ kind: 'AddSongs', songs: [current], position: 'next' }, room.playNextText(quoted(current))) },
+					{ id: 'end', icon: 'playlistAdd', label: 'Add to the end of the queue', run: () => command({ kind: 'AddSongs', songs: [current], position: 'end' }, `Added ${quoted(current)} to the queue`) },
+					...(fromAutoplay
+						? []
+						: [{ id: 'autoplay', icon: 'autoplay' as IconName, label: 'Add to autoplay', run: () => command({ kind: 'AddSongs', songs: [current], position: 'autoplay' }, `${quoted(current)} plays when the queue runs out`) }])
+				]);
 			add('playNext', {
 				icon: 'playNext',
 				label: 'Play next',
 				run: () =>
 					fromAutoplay
 						? command({ kind: 'MoveItem', itemId: item!.itemId, list: 'queue', toIndex: 0 }, room.playNextText(`"${song.title}"`))
-						: command({ kind: 'AddSongs', songs: [song], position: 'next' }, room.playNextText(`"${song.title}"`))
+						: command({ kind: 'AddSongs', songs: [song], position: 'next' }, room.playNextText(`"${song.title}"`)),
+				held: where('playNext')
 			});
 			add('addToQueue', {
 				icon: 'playlistAdd',
@@ -99,7 +172,8 @@
 				run: () =>
 					fromAutoplay
 						? command({ kind: 'MoveItem', itemId: item!.itemId, list: 'queue', toIndex: queueLength }, `Added "${song.title}" to the queue`)
-						: command({ kind: 'AddSongs', songs: [song], position: 'end' }, `Added "${song.title}" to the queue`)
+						: command({ kind: 'AddSongs', songs: [song], position: 'end' }, `Added "${song.title}" to the queue`),
+				held: where('addToQueue')
 			});
 		}
 		if (place !== 'current' && room.can('play_now')) {
@@ -122,7 +196,8 @@
 					run: () => {
 						onClose();
 						void startRadio(room, seed, onToast);
-					}
+					},
+					held: radioFor('radio', seed, `Radio from ${quoted(seed)}`)
 				});
 			}
 			if (room.can('autoplay_from_here')) {
@@ -132,12 +207,14 @@
 					run: () => {
 						onClose();
 						void autoplayThis(room, seed, onToast);
-					}
+					},
+					held: radioFor('autoplay', seed, `Autoplay: songs like ${quoted(seed)}`)
 				});
 			}
 			// Read everything from the target before closing: closing clears it.
 			const current = song;
-			add('similar', { icon: 'similar', label: 'Find similar', run: () => (onFindSimilar(current), onClose()) });
+			add('similar', { icon: 'similar', label: 'Find similar', run: () => (onFindSimilar(current), onClose()), held: radioFor('similar', current, `Songs like ${quoted(current)}`) });
+			if (onGraph && listening.available) add('graph', { icon: 'graph', label: 'Song graph', run: () => (onClose(), onGraph(current)) });
 			}
 		// Likes and playlists are YouTube Music's: not for local music.
 		const fromYoutube = isYoutubeSong(song.id);
@@ -156,7 +233,35 @@
 					if ((await likes.rate(current.id, disliking ? 'dislike' : 'none', onToast)) && disliking && wasCurrent && solo && room.can('skip')) {
 						await room.run({ kind: 'Skip', play: false });
 					}
-				}
+				},
+				held: choicesFor('dislike', current.title, () => {
+					const artist = current.artists[0]?.name;
+					const dislike = async () => {
+						if (rating !== 'dislike') await likes.rate(current.id, 'dislike', onToast);
+					};
+					return [
+						...(artist
+							? [
+									isBlockedArtist(artist)
+										? { id: 'artist', icon: 'radio' as IconName, label: `Play ${artist} in radios again`, run: () => (onClose(), blockArtist(artist, false), onToast(`${artist} can be in radios again`)) }
+										: {
+												id: 'artist',
+												icon: 'dislike' as IconName,
+												label: `Dislike, and don't play ${artist} in radios`,
+												run: async () => (onClose(), blockArtist(artist), onToast(`Radios leave out ${artist}`), await dislike())
+											}
+								]
+							: []),
+						isBlockedSong(current.id)
+							? { id: 'never', icon: 'radio' as IconName, label: 'Allow this song in radios again', run: () => (onClose(), blockSong(current.id, false), onToast(`${quoted(current)} can be in radios again`)) }
+							: {
+									id: 'never',
+									icon: 'dislike' as IconName,
+									label: 'Dislike, and never put it in radios',
+									run: async () => (onClose(), blockSong(current.id), onToast(`Radios leave out ${quoted(current)}`), await dislike())
+								}
+					];
+				})
 			});
 		}
 		if (target.playlist) {
@@ -192,21 +297,79 @@
 		}
 		if (onSave && fromYoutube) {
 			const current = song;
-			add('save', { icon: 'save', label: 'Save to playlist', run: () => (onSave(current), onClose()) });
+			const last = settings.lastPlaylist.value;
+			add('save', {
+				icon: 'save',
+				label: 'Save to playlist',
+				run: () => (onSave(current), onClose()),
+				// Like YouTube Music: straight into the playlist you saved to last, with a way to pick another.
+				held:
+					holds('save') && last
+						? async () => {
+								onClose();
+								try {
+									await saveToPlaylist(last.id, [current.id]);
+									onToast(`Saved to ${last.title}`, { label: 'Change', run: () => onSave(current) });
+								} catch (e) {
+									onToast(e instanceof Error ? e.message : "Couldn't save it");
+								}
+							}
+						: undefined
+			});
 		}
 		if (canDownload(song)) {
 			const current = song;
-			add('download', { icon: 'download', label: 'Download', run: () => (onClose(), void downloadSong(current, onToast)) });
+			add('download', {
+				icon: 'download',
+				label: 'Download',
+				run: () => (onClose(), void downloadSong(current, onToast)),
+				held: onThisPhone
+					? choicesFor('download', current.title, () => [
+							{ id: 'file', icon: 'download', label: 'Save as a music file', run: () => (onClose(), void downloadSong(current, onToast)) },
+							{
+								id: 'offline',
+								icon: 'phone',
+								label: 'Only keep it offline in the app',
+								run: async () => {
+									onClose();
+									try {
+										await keepOffline(current);
+										onToast(`${quoted(current)} plays offline now`);
+									} catch (e) {
+										onToast(e instanceof Error ? e.message : "Couldn't keep it offline");
+									}
+								}
+							}
+						])
+					: undefined
+			});
 		}
 		if (place === 'current' && onSleepTimer) {
-			add('sleepTimer', { icon: 'sleep', label: sleepTimer.active ? 'Sleep timer (on)' : 'Sleep timer', run: () => (onSleepTimer(), onClose()) });
+			const last = sleepTimer.last;
+			add('sleepTimer', {
+				icon: 'sleep',
+				label: sleepTimer.active ? 'Sleep timer (on)' : 'Sleep timer',
+				run: () => (onSleepTimer(), onClose()),
+				held:
+					holds('sleepTimer') && last !== null
+						? () => {
+								onClose();
+								sleepTimer.set(last);
+								onToast(last === 'song' ? 'Stops at the end of this song' : `Stops in ${last} min`, { label: 'Change', run: () => onSleepTimer() });
+							}
+						: undefined
+			});
 		}
 		if (song.podcast?.id) {
 			const podcast = song.podcast;
 			add('goPodcast', { icon: 'podcast', label: `Go to ${podcast.name}`, run: () => (onPodcast(podcast), onClose()) });
 		}
+		const pickArtist =
+			song.artists.length > 1
+				? choicesFor('goArtist', 'Go to artist', () => song.artists.map((a) => ({ id: 'pick', icon: 'person' as IconName, label: a.name, run: () => (onArtist(a), onClose()) })))
+				: undefined;
 		for (const artist of song.artists.slice(0, 3)) {
-			add('goArtist', { icon: 'person', label: `Go to ${artist.name}`, run: () => (onArtist(artist), onClose()) });
+			add('goArtist', { icon: 'person', label: `Go to ${artist.name}`, run: () => (onArtist(artist), onClose()), held: pickArtist });
 		}
 		if (song.album) {
 			const album = song.album;
@@ -258,7 +421,23 @@
 				// The current song too: the next one plays.
 				label: place === 'history' ? 'Remove from history' : place === 'autoplay' ? 'Remove from autoplay' : 'Remove from queue',
 				danger: true,
-				run: () => command({ kind: 'RemoveQueueItem', itemId: item.itemId })
+				run: () => command({ kind: 'RemoveQueueItem', itemId: item.itemId }),
+				held: choicesFor('remove', song.title, () => {
+					const list = place === 'history' ? (room.state?.history ?? []) : place === 'autoplay' ? (room.state?.autoplay ?? []) : (room.state?.queue ?? []);
+					const artist = item.song.artists[0]?.name;
+					return [
+						...(artist
+							? [{ id: 'artist', icon: 'remove' as IconName, label: `Remove the songs by ${artist}`, danger: true, run: () => removeAll(list.filter((i) => i.song.artists[0]?.name === artist), `by ${artist}`) }]
+							: []),
+						{
+							id: 'person',
+							icon: 'remove' as IconName,
+							label: `Remove the songs ${item.addedBy === room.participantId ? 'you' : item.addedByName} added`,
+							danger: true,
+							run: () => removeAll(list.filter((i) => i.addedBy === item.addedBy), `added by ${item.addedBy === room.participantId ? 'you' : item.addedByName}`)
+						}
+					];
+				})
 			});
 		}
 		return list;
@@ -305,17 +484,49 @@
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} onresize={() => !phone.current && onClose()} />
 
 {#snippet row(entry: Entry, big: boolean)}
-	{@const style = `flex w-full items-center ${big ? 'gap-5 px-5 py-3.5' : 'gap-3 px-4 py-2'} text-left hover:bg-line active:bg-line ${entry.danger ? 'text-accent' : ''}`}
-	{#if entry.href}
-		<a role="menuitem" class={style} href={entry.href} target="_blank" rel="noopener" onclick={entry.run}>
-			<Icon name={entry.icon} size={big ? 24 : 20} class="shrink-0" />
-			<span class="truncate">{entry.label}</span>
-		</a>
+	{@const style = `flex min-w-0 flex-1 items-center ${big ? 'gap-5 px-5 py-3.5' : 'gap-3 px-4 py-2'} text-left hover:bg-line active:bg-line ${entry.danger ? 'text-accent' : ''}`}
+	<div class="flex w-full items-stretch">
+		{#if entry.href}
+			<a role="menuitem" class={style} href={entry.href} target="_blank" rel="noopener" onclick={entry.run}>
+				<Icon name={entry.icon} size={big ? 24 : 20} class="shrink-0" />
+				<span class="truncate">{entry.label}</span>
+			</a>
+		{:else}
+			<button role="menuitem" class={style} onclick={entry.run} use:hold={entry.held}>
+				<Icon name={entry.icon} size={big ? 24 : 20} class="shrink-0" />
+				<span class="truncate">{entry.label}</span>
+			</button>
+		{/if}
+		<!-- With a mouse there's no holding: the › opens the choices. -->
+		{#if entry.held && !big}
+			<button class="shrink-0 px-2 text-muted hover:bg-line hover:text-white" aria-label="More choices for {entry.label}" title="More choices" onclick={entry.held}>
+				<Icon name="chevron" size={18} class="-rotate-90" />
+			</button>
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet held(s: Sub, big: boolean)}
+	<div class="flex shrink-0 items-center gap-2 {big ? 'px-3 pt-1 pb-3' : 'border-b border-line px-2 pb-1'}">
+		<button class="rounded-full p-2 hover:bg-line" aria-label="Back" onclick={() => (sub = null)}><Icon name="back" size={20} /></button>
+		<p class="min-w-0 flex-1 truncate {big ? 'font-medium' : 'text-sm text-muted'}">{s.title}</p>
+	</div>
+	{#if 'radio' in s}
+		<div class="flex flex-col gap-4 overflow-y-auto {big ? 'px-5 pb-4' : 'px-4 py-3'}">
+			<RadioChoices bind:value={radioPick} show={s.show} hasAccount={!!youtube.account} {party} />
+			<button class="self-start rounded-full bg-white px-5 py-2 text-sm font-medium text-black" onclick={startPicked}>
+				{s.radio === 'similar' ? 'Find similar' : s.radio === 'autoplay' ? 'Autoplay this' : 'Start radio'}
+			</button>
+		</div>
 	{:else}
-		<button role="menuitem" class={style} onclick={entry.run}>
-			<Icon name={entry.icon} size={big ? 24 : 20} class="shrink-0" />
-			<span class="truncate">{entry.label}</span>
-		</button>
+		<div class="min-h-0 flex-1 overflow-y-auto {big ? 'py-2' : 'py-1'}">
+			{#each s.choices as c, i (i)}
+				<button role="menuitem" class="flex w-full items-center {big ? 'gap-5 px-5 py-3.5' : 'gap-3 px-4 py-2'} text-left hover:bg-line active:bg-line {c.danger ? 'text-accent' : ''}" onclick={c.run}>
+					<Icon name={c.icon} size={big ? 24 : 20} class="shrink-0" />
+					<span class="truncate">{c.label}</span>
+				</button>
+			{/each}
+		</div>
 	{/if}
 {/snippet}
 
@@ -333,6 +544,9 @@
 		ontouchcancel={touchEnd}
 	>
 		<div class="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-white/30"></div>
+		{#if sub}
+			<div class="flex min-h-0 flex-1 flex-col pt-2">{@render held(sub, true)}</div>
+		{:else}
 		<div class="flex shrink-0 items-center gap-3 px-4 pt-3 pb-4">
 			<Art {song} size={48} class="h-12 w-12" />
 			<div class="min-w-0 flex-1">
@@ -349,7 +563,7 @@
 							<span class="line-clamp-2">{entry.label}</span>
 						</a>
 					{:else}
-						<button role="menuitem" class="flex flex-col items-center gap-1.5 rounded-xl bg-white/10 px-1 py-3 text-center text-xs active:bg-white/20 {entry.danger ? 'text-accent' : ''}" onclick={entry.run}>
+						<button role="menuitem" class="flex flex-col items-center gap-1.5 rounded-xl bg-white/10 px-1 py-3 text-center text-xs active:bg-white/20 {entry.danger ? 'text-accent' : ''}" onclick={entry.run} use:hold={entry.held}>
 							<Icon name={entry.icon} size={24} />
 							<span class="line-clamp-2">{entry.label}</span>
 						</button>
@@ -366,24 +580,29 @@
 				{/if}
 			{/each}
 		</div>
+		{/if}
 	</div>
 {:else}
 	<!-- Click anywhere else (or right-click) to close. -->
 	<div class="fixed inset-0 z-[55]" role="presentation" onclick={onClose} oncontextmenu={(e) => (e.preventDefault(), onClose())}></div>
 	<div
 		bind:this={menu}
-		class="fixed z-[56] max-h-[calc(100vh-16px)] w-64 overflow-y-auto rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line"
+		class="fixed z-[56] max-h-[calc(100vh-16px)] {sub && 'radio' in sub ? 'w-80' : 'w-64'} overflow-y-auto rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line"
 		style:left="{left}px"
 		style:top="{top}px"
 		role="menu"
 	>
-		<div class="truncate border-b border-line px-4 pt-1 pb-2 text-sm text-muted">{song.title}</div>
-		{#each layout.list as entry, i (i)}
-			{#if entry === null}
-				<div class="my-1 h-px bg-line"></div>
-			{:else}
-				{@render row(entry, false)}
-			{/if}
-		{/each}
+		{#if sub}
+			<div class="flex flex-col">{@render held(sub, false)}</div>
+		{:else}
+			<div class="truncate border-b border-line px-4 pt-1 pb-2 text-sm text-muted">{song.title}</div>
+			{#each layout.list as entry, i (i)}
+				{#if entry === null}
+					<div class="my-1 h-px bg-line"></div>
+				{:else}
+					{@render row(entry, false)}
+				{/if}
+			{/each}
+		{/if}
 	</div>
 {/if}

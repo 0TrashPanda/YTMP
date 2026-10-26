@@ -28,7 +28,10 @@ import type {
 	ServerAbout,
 	RoleTemplate,
 	SessionResponse,
-	YoutubeSignInRequest
+	YoutubeSignInRequest,
+	HistoryImport,
+	HistoryImportList,
+	RadioCrawlStatus
 } from './protocol.gen';
 
 function read<T>(key: string): T | null {
@@ -139,7 +142,25 @@ export const authServer = {
 		URL.revokeObjectURL(link.href);
 	},
 
+	/** Your Google Takeout imports into the history. */
+	imports: async () => (await call<HistoryImportList>('/api/account/imports')).imports,
+	/** Imports a Takeout export (the zip, or the watch history in it): its YouTube Music plays join your history. */
+	async importTakeout(file: File): Promise<HistoryImport> {
+		const response = await fetch('/api/account/imports', {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${session.current?.sessionToken}`, 'Content-Type': 'application/octet-stream' },
+			body: file
+		});
+		const body = await response.json().catch(() => null);
+		if (!response.ok) throw new ApiRequestError(body?.message ?? `Import failed (${response.status})`);
+		return body as HistoryImport;
+	},
+	deleteImport: (id: string) => call<null>(`/api/account/imports/${encodeURIComponent(id)}`, undefined, 'DELETE'),
+
 	// The server admin's page (Settings → Server admin).
+	/** Learning YouTube Music's radios of the server's songs. */
+	radioCrawl: () => call<RadioCrawlStatus>('/api/admin/radio-crawl'),
+	setRadioCrawl: (status: RadioCrawlStatus) => call<RadioCrawlStatus>('/api/admin/radio-crawl', status, 'PUT'),
 	listAccounts: async () => (await call<AccountListResponse>('/api/admin/accounts')).accounts,
 	createAccount: (username: string, password: string, displayName: string, isAdmin = false) =>
 		call<AccountInfo>('/api/admin/accounts', { username, password, displayName, isAdmin }),

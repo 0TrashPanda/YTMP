@@ -33,6 +33,8 @@
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
 	import { preferences } from '../../../lib/preferences.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
+	import type { ToastAction } from '../../../lib/songActions';
+	import GraphView from '../../../lib/components/GraphView.svelte';
 	import type { Link } from '../../../lib/links';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
 	import CloneSheet from '../../../lib/components/CloneSheet.svelte';
@@ -89,6 +91,7 @@
 	type Sheet =
 		| { kind: 'menu'; target: MenuTarget }
 		| { kind: 'save'; song: Song }
+		| { kind: 'graph'; song: Song | null }
 		| { kind: 'settings'; start: SettingsSection | null }
 		| { kind: 'avatar' | 'share' | 'clone' | 'leave' | 'playOn' | 'partyScreen' | 'linkTv' | 'sleep' };
 	let sheet = $state<Sheet | null>(null);
@@ -214,7 +217,7 @@
 		event.preventDefault();
 		openMenu({ song: item.song, item, place: 'current', x: event.clientX, y: event.clientY });
 	}
-	let toasts = $state<{ id: number; text: string }[]>([]);
+	let toasts = $state<{ id: number; text: string; action?: ToastAction }[]>([]);
 	let now = $state(Date.now());
 	let toastId = 0;
 
@@ -374,11 +377,12 @@
 		lastScrollTop = top;
 	}
 
-	function toast(text: string) {
+	function toast(text: string, action?: ToastAction) {
 		// Negative, so they never clash with the host's notice IDs.
 		const id = -++toastId;
-		toasts.push({ id, text });
-		setTimeout(() => (toasts = toasts.filter((t) => t.id !== id)), 3000);
+		toasts.push({ id, text, action });
+		// One with a button stays a bit longer, to reach it.
+		setTimeout(() => (toasts = toasts.filter((t) => t.id !== id)), action ? 6000 : 3000);
 	}
 
 	const solo = $derived(room?.state?.room.visibility === 'private');
@@ -723,7 +727,7 @@
 									onPodcast={openPodcast}
 								/>
 							{:else if view.kind === 'similar'}
-								<SearchResults {room} query="" similarTo={view.song} onToast={toast} onMenu={openMenu} />
+								<SearchResults {room} query="" similarTo={view.song} similarFrom={view.from} onToast={toast} onMenu={openMenu} />
 							{:else if view.kind === 'artist'}
 								<ArtistView
 									{room}
@@ -852,13 +856,16 @@
 			target={sheet.target}
 			onClose={() => close('menu')}
 			onToast={toast}
-			onFindSimilar={(song) => show({ kind: 'similar', song })}
+			onFindSimilar={(song, from) => show({ kind: 'similar', song, from })}
 			onArtist={openArtist}
 			onAlbum={openAlbum}
 			onPodcast={openPodcast}
 			onSave={youtube.account ? (song) => (sheet = { kind: 'save', song }) : undefined}
 			onSleepTimer={() => (sheet = { kind: 'sleep' })}
+			onGraph={(song) => (sheet = { kind: 'graph', song })}
 		/>
+	{:else if sheet?.kind === 'graph'}
+		<GraphView seed={sheet.song} onClose={() => close('graph')} onToast={toast} />
 	{:else if sheet?.kind === 'save'}
 		<SaveSheet song={sheet.song} onClose={() => close('save')} onToast={toast} />
 	{:else if sheet?.kind === 'clone' && room.state}
@@ -878,7 +885,7 @@
 			onLeave={() => (sheet = { kind: 'leave' })}
 		/>
 	{:else if sheet?.kind === 'settings'}
-		<SettingsScreen bind:this={settingsScreen} start={sheet.start} {room} roomHost={host} onClone={() => (sheet = { kind: 'clone' })} onClose={() => close('settings')} onToast={toast} />
+		<SettingsScreen bind:this={settingsScreen} start={sheet.start} {room} roomHost={host} onClone={() => (sheet = { kind: 'clone' })} onGraph={() => (sheet = { kind: 'graph', song: null })} onClose={() => close('settings')} onToast={toast} />
 	{:else if sheet?.kind === 'leave' && room.state}
 		<LeaveRoomDialog {room} onClose={() => close('leave')} />
 	{:else if sheet?.kind === 'linkTv'}
@@ -911,12 +918,20 @@
 			</div>
 		{/each}
 		{#each [...room.notices, ...toasts] as message (message.id + message.text)}
-			<button
-				class="pointer-events-auto rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg"
-				onclick={() => room?.dismissNotice(message.id)}
-			>
-				{message.text}
-			</button>
+			{@const action = (message as { action?: ToastAction }).action}
+			{#if action}
+				<div class="pointer-events-auto flex items-center gap-3 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">
+					<span class="min-w-0 truncate">{message.text}</span>
+					<button class="shrink-0 font-bold" onclick={() => ((toasts = toasts.filter((t) => t.id !== message.id)), action.run())}>{action.label}</button>
+				</div>
+			{:else}
+				<button
+					class="pointer-events-auto rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg"
+					onclick={() => room?.dismissNotice(message.id)}
+				>
+					{message.text}
+				</button>
+			{/if}
 		{/each}
 	</div>
 {/if}

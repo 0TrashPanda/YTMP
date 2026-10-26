@@ -3,6 +3,7 @@
 // this device stops playing (the room plays on for the others). One timer per device, like
 // YouTube Music's. In the app it runs in the app's player (it keeps going with the screen off,
 // when this page is frozen); in a browser it runs here, while the room's page is open.
+import { read, write } from './storage';
 import { nativeBridge } from './native';
 import type { RoomPlayer } from './player.svelte';
 import type { NowPlaying, PlaybackStatus } from './protocol.gen';
@@ -11,6 +12,7 @@ import { positionNow } from './sync';
 
 /** The sound fades out over this long (ms) before it stops. */
 export const FADE_MS = 10_000;
+const LAST_KEY = 'ytmp.sleepLast';
 
 /** When it stops: at [endsAt] (ms since 1970), or at the end of the song [itemId] (the queue item). */
 export interface SleepSetting {
@@ -65,7 +67,16 @@ class SleepTimer {
 	set(when: number | 'song'): void {
 		const itemId = when === 'song' ? (this.room?.state?.nowPlaying?.item.itemId ?? null) : null;
 		if (when === 'song' && !itemId) return;
+		write(LAST_KEY, String(when));
 		this.change({ endsAt: when === 'song' ? null : Date.now() + when * 60_000, itemId });
+	}
+
+	/** The time set last (holding Sleep timer starts it again), or null. */
+	get last(): number | 'song' | null {
+		const raw = read(LAST_KEY);
+		if (raw === 'song') return 'song';
+		const minutes = Number(raw);
+		return raw && minutes > 0 ? minutes : null;
 	}
 
 	cancel(): void {

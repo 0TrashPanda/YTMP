@@ -8,6 +8,7 @@
 	import { artistNames, formatTime } from '../format';
 	import { ACTION_ICONS, ACTION_NAMES, gestures, RowGestures, type QueueAction } from '../gestures.svelte';
 	import { menuAt, startRadio } from '../songActions';
+	import { RADIO_FROM, withFrom } from '../radio.svelte';
 	import type { ItemList, QueueItem } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -338,6 +339,22 @@
 					Clear queue
 				</button>
 			{/if}
+		</div>
+	{/if}
+	<!-- Like YouTube Music's chips above Up next: what the radio playing now is made from. -->
+	{#if roomState?.autoplaySeed && !roomState.autoplaySeed.podcast && room.can('autoplay_from_here')}
+		{@const from = roomState.radioOptions?.from ?? 'mix'}
+		<div class="flex shrink-0 gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]" role="group" aria-label="Radio from">
+			{#each RADIO_FROM as f (f.value)}
+				<button
+					class="shrink-0 rounded-lg px-3 py-1.5 text-sm {from === f.value ? 'bg-white text-black' : 'bg-raised hover:bg-line'}"
+					aria-pressed={from === f.value}
+					title={f.hint}
+					onclick={() => from !== f.value && room.run({ kind: 'SetRadioOptions', options: withFrom(roomState?.radioOptions, f.value) })}
+				>
+					{f.label}
+				</button>
+			{/each}
 		</div>
 	{/if}
 	<div bind:this={list} onscroll={follow} class="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">

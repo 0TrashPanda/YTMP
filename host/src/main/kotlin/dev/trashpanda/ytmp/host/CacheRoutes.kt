@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.host
 
+import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.DownloadItems
 import dev.trashpanda.ytmp.protocol.DownloadRequest
@@ -101,6 +102,19 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
             val wanted = call.receive<TakeoutPreviewRequest>()
             call.respond(withContext(Dispatchers.Default) { prefill.preview(wanted.days, wanted.minPlays) })
         }
+    }
+    // Download's hold: keep a song in the cache (it stays like the songs played most), not as a music file.
+    post("/keep") {
+        call.status()
+        val song = call.receive<Song>()
+        val cache = cache ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No song cache here")
+        if (!cache.takes(song)) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "This song can't be kept offline")
+        val kept = withContext(Dispatchers.IO) { cache.fetch(song) }
+        if (!kept) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Couldn't keep it offline (not enough room?)")
+        // Counted as played a few times now, so trimming the cache keeps it like the songs played most.
+        val now = System.currentTimeMillis()
+        cache.importPlays(List(3) { song to now - it * 86_400_000L })
+        call.respond(call.status())
     }
     post("/clear") {
         call.status()

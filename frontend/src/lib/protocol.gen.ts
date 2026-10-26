@@ -42,7 +42,7 @@ export interface Song {
   podcast: PodcastRef | null;
 }
 
-export type QueuePosition = "next" | "end";
+export type QueuePosition = "next" | "end" | "autoplay";
 
 export interface CommandAddSongs {
   kind: "AddSongs";
@@ -307,6 +307,10 @@ export interface CommandSetVisibility {
   visibility: RoomVisibility;
 }
 
+export interface CommandShuffleAutoplay {
+  kind: "ShuffleAutoplay";
+}
+
 export interface CommandShuffleQueue {
   kind: "ShuffleQueue";
 }
@@ -408,6 +412,7 @@ export type Command =
   | CommandSetSpeakers
   | CommandSetSpeed
   | CommandSetVisibility
+  | CommandShuffleAutoplay
   | CommandShuffleQueue
   | CommandSkip
   | CommandStartRadio

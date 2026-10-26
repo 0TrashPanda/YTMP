@@ -8,7 +8,7 @@
 	import { playNext, quoted } from '../songActions';
 	import { itemCard } from '../cards';
 	import { artistNames } from '../format';
-	import type { AlbumRef, ArtistRef, PodcastRef, SearchItem, SearchPage, SearchType, Song } from '../protocol.gen';
+	import type { RadioFrom, AlbumRef, ArtistRef, PodcastRef, SearchItem, SearchPage, SearchType, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import CardGrid from './CardGrid.svelte';
 	import SongList from './SongList.svelte';
@@ -22,6 +22,7 @@
 		type = 'all',
 		onType = () => {},
 		similarTo = null,
+		similarFrom = 'mix',
 		onToast,
 		onMenu,
 		onArtist = () => {},
@@ -36,6 +37,8 @@
 		onType?: (type: SearchType) => void;
 		/** Show songs similar to this one instead of searching. */
 		similarTo?: Song | null;
+		/** Find similar from both YouTube Music and the song graph, or only one of them. */
+		similarFrom?: RadioFrom;
 		onToast: (text: string) => void;
 		onMenu: (target: MenuTarget) => void;
 		onArtist?: (artist: ArtistRef) => void;
@@ -82,7 +85,7 @@
 						: seed
 						? {
 								sections: [
-									{ title: `Similar to ${seed.title}`, type: null, items: (await similar(seed.id, controller.signal)).map((song) => ({ kind: 'song', song, video: false })) }
+									{ title: `Similar to ${seed.title}`, type: null, items: (await similar(seed.id, controller.signal, similarFrom)).map((song) => ({ kind: 'song', song, video: false })) }
 								]
 							}
 						: await search(q, t, controller.signal);

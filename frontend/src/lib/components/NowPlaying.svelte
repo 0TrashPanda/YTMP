@@ -3,6 +3,9 @@
 	// the song, the position, the controls and where it plays; "Up next" and "Related" slide up
 	// over it. Swipe down (or the chevron, or Back) closes it. Desktop: above the player bar,
 	// which keeps the controls and the song; the art on the left, Up next and Related on the right.
+	import { hold } from '../hold';
+	import { playOnLast } from '../playOn';
+	import { holds } from '../songMenu.svelte';
 	import { fly } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { MediaQuery } from 'svelte/reactivity';
@@ -332,7 +335,12 @@
 		{/if}
 		<div class="ml-auto flex items-center lg:hidden">
 			{#if shows(room, 'cast')}
-				<button class="rounded-full p-2 hover:bg-white/10 {activeOutputs.length ? 'text-accent' : ''}" aria-label="Play on" onclick={() => (showOutputs = true)}>
+				<button
+					class="rounded-full p-2 hover:bg-white/10 {activeOutputs.length ? 'text-accent' : ''}"
+					aria-label="Play on"
+					onclick={() => (showOutputs = true)}
+					use:hold={holds('playOn') ? () => void playOnLast(room, onToast).then((done) => done || (showOutputs = true)) : null}
+				>
 					<Icon name="cast" />
 				</button>
 			{/if}

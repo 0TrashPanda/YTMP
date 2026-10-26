@@ -6,6 +6,7 @@
 		| 'account'
 		| 'youtube'
 		| 'playback'
+		| 'radio'
 		| 'adding'
 		| 'sound'
 		| 'look'
@@ -59,6 +60,7 @@
 	import SongMenuSection from './SongMenuSection.svelte';
 	import Toggle from './Toggle.svelte';
 	import YoutubeSection from './YoutubeSection.svelte';
+	import RadioSection from './RadioSection.svelte';
 
 	let {
 		start = null,
@@ -66,6 +68,7 @@
 		room = null,
 		roomHost = null,
 		onClone,
+		onGraph,
 		onClose,
 		onToast
 	}: {
@@ -79,6 +82,8 @@
 		roomHost?: HostInfo | null;
 		/** Opens "Clone room". */
 		onClone?: () => void;
+		/** Opens the song graph (your most played songs). */
+		onGraph?: () => void;
 		onClose: () => void;
 		onToast: (text: string) => void;
 	} = $props();
@@ -131,6 +136,7 @@
 					'Playing',
 					[
 						['playback', 'Playback', 'headphones', true],
+						['radio', 'Radio', 'radio', true],
 						['adding', 'Adding songs', 'playlistAdd', true],
 						['sound', 'Sound', 'volume', true]
 					]
@@ -488,6 +494,8 @@
 					<NumberField value={settings.homeRefresh.value} min={0} max={7 * 24 * 60} unit="min" label="New suggestions after" onchange={(v) => settings.homeRefresh.set(v)} />
 				</Choice>
 				<HomeSection />
+			{:else if section === 'radio'}
+				<RadioSection {onToast} {onThisPhone} {onGraph} />
 			{:else if section === 'menu'}
 				<SongMenuSection />
 			{:else if section === 'gestures'}

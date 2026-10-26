@@ -232,6 +232,13 @@ export const settings = {
 	home: new Setting<Record<string, unknown>>('home', {}, object, json('ytmp.home', object)),
 	/** The song menu's layout (songMenu.svelte.ts). */
 	songMenu: new Setting<unknown>('songMenu', undefined, (raw) => raw),
+	/** How radios are made: Settings → Radio (radio.svelte.ts). */
+	radio: new Setting<unknown>('radio', undefined, (raw) => raw),
+	/** The YouTube Music playlist you saved to last (holding Save to playlist saves straight to it). */
+	lastPlaylist: new Setting<{ id: string; title: string } | undefined>('lastPlaylist', undefined, (raw) => {
+		const p = object(raw);
+		return p && typeof p.id === 'string' && typeof p.title === 'string' ? { id: p.id, title: p.title } : undefined;
+	}),
 	/** What solo rooms leave out (soloLook.svelte.ts). */
 	soloHidden: new Setting<unknown>('soloHidden', undefined, (raw) => raw),
 	/** The Local tab shows the music on the network. */

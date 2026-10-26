@@ -48,7 +48,7 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
         val songId = call.request.queryParameters["id"]?.trim().orEmpty()
         if (songId.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing id")
         val source = sources.similar ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No radio source")
-        call.respond(SearchResponse(call.withGraph(songId) { call.asYou({ radio(songId) }) { source.radio(songId) } }.filter { it.id != songId }))
+        call.respond(SearchResponse(call.similarFrom(songId) { call.asYou({ radio(songId) }) { source.radio(songId) } }.filter { it.id != songId }))
     }
     get("/lyrics") {
         // The song as the page knows it: LRCLIB looks lyrics up by title, artist, album and length.

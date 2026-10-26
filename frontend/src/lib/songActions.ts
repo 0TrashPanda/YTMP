@@ -3,10 +3,17 @@
 import { bringsOwnRadio, yourRadio } from './api';
 import { whileBusy } from './busy.svelte';
 import { settings } from './settings.svelte';
-import type { Command, Song } from './protocol.gen';
+import { radioOptions } from './radio.svelte';
+import type { Command, RadioOptions, Song } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 
-export type Toast = (text: string) => void;
+/** A button on a message, like "Change" after saving to a playlist. */
+export interface ToastAction {
+	label: string;
+	run: () => void;
+}
+
+export type Toast = (text: string, action?: ToastAction) => void;
 
 /** How a message names one song. */
 export const quoted = (song: Song) => `"${song.title}"`;
@@ -39,22 +46,33 @@ export const playNow = (room: RoomConnection, song: Song, onToast: Toast) => run
  * [name]: what it's from. The song starts right away; your own radio follows once it's loaded.
  * With the setting on, what played before (above the song) is cleared too.
  */
-export async function startRadio(room: RoomConnection, song: Song, onToast: Toast, name = quoted(song)) {
-	const own = bringsOwnRadio();
+export async function startRadio(room: RoomConnection, song: Song, onToast: Toast, name = quoted(song), options: RadioOptions = radioOptions()) {
+	const own = bringsOwnRadio() && ownRadioFits(options);
 	const radio = own ? yourRadio(song.id) : null;
-	const started = await runCommand(room, { kind: 'StartRadio', song, songs: null, follows: own, clearHistory: settings.radioClearsHistory.value }, onToast, `Starting a radio from ${name}`);
+	const started = await runCommand(
+		room,
+		{ kind: 'StartRadio', song, songs: null, follows: own, clearHistory: settings.radioClearsHistory.value, options },
+		onToast,
+		`Starting a radio from ${name}`
+	);
 	if (!started || !radio) return started;
 	const songs = await radio;
 	// Unless something else was played meanwhile: then that keeps playing.
-	if (room.state?.nowPlaying?.item.song.id === song.id) await room.run({ kind: 'StartRadio', song, songs, follows: false, clearHistory: false });
+	if (room.state?.nowPlaying?.item.song.id === song.id) await room.run({ kind: 'StartRadio', song, songs, follows: false, clearHistory: false, options });
 	return started;
 }
 
 /** Autoplay this: the autoplay queue becomes a radio from [song]. */
-export async function autoplayThis(room: RoomConnection, song: Song, onToast: Toast) {
-	const songs = await whileBusy(`Finding songs like ${quoted(song)}…`, yourRadio(song.id));
-	return runCommand(room, { kind: 'AutoplayFromHere', song, songs }, onToast, `Autoplay: songs like ${quoted(song)}`);
+export async function autoplayThis(room: RoomConnection, song: Song, onToast: Toast, options: RadioOptions = radioOptions()) {
+	const songs = ownRadioFits(options) ? await whileBusy(`Finding songs like ${quoted(song)}…`, yourRadio(song.id)) : null;
+	return runCommand(room, { kind: 'AutoplayFromHere', song, songs, options }, onToast, `Autoplay: songs like ${quoted(song)}`);
 }
+
+/**
+ * The radio you bring from your server (your account's YouTube Music with your listening) is
+ * that mix: the room makes the others (only YouTube Music, only the graph, only what's here).
+ */
+const ownRadioFits = (options: RadioOptions) => options.from === 'mix' && options.withAccount !== false;
 
 /** The song menu's width, to open it under the right end of a row or button. */
 const MENU_WIDTH = 256;

@@ -11,6 +11,7 @@ export type MenuAction =
 	| 'radio'
 	| 'autoplay'
 	| 'similar'
+	| 'graph'
 	| 'like'
 	| 'dislike'
 	| 'removeFromPlaylist'
@@ -34,6 +35,7 @@ export const MENU_ACTIONS: Record<MenuAction, { name: string; icon: IconName; hi
 	radio: { name: 'Start radio', icon: 'radio' },
 	autoplay: { name: 'Autoplay this', icon: 'autoplay' },
 	similar: { name: 'Find similar', icon: 'similar' },
+	graph: { name: 'Song graph', icon: 'graph', hint: 'With your YTMP account' },
 	like: { name: 'Like', icon: 'like', hint: 'With YouTube Music linked' },
 	dislike: { name: 'Dislike', icon: 'dislike', hint: 'With YouTube Music linked' },
 	removeFromPlaylist: { name: 'Remove from this playlist', icon: 'remove', hint: 'On your own playlists' },
@@ -57,6 +59,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
 	'radio',
 	'autoplay',
 	'similar',
+	'graph',
 	'divider',
 	'like',
 	'dislike',
@@ -80,24 +83,113 @@ export const DEFAULT_ITEMS: MenuItem[] = [
 export const BUTTON_COUNT = 3;
 export const DEFAULT_BUTTONS: (MenuAction | null)[] = ['playNext', 'addToQueue', 'save'];
 
+/** Buttons outside the song menu that can be held too (the player's). */
+export type PlayerButton = 'shuffle' | 'playOn' | 'next';
+export type Holdable = MenuAction | PlayerButton;
+
+/**
+ * What holding an action offers (a sheet of choices; Settings → Song menu can hide each, or
+ * switch holding off). An action listed with no choices does one thing straight away when held.
+ */
+export const HOLD_CHOICES: Partial<Record<Holdable, { id: string; name: string }[]>> = {
+	radio: [
+		{ id: 'from', name: 'Radio from' },
+		{ id: 'discover', name: 'Songs you know or new ones' },
+		{ id: 'account', name: 'With or without your YouTube Music account' },
+		{ id: 'taste', name: 'Your taste or everyone’s (in parties)' }
+	],
+	autoplay: [
+		{ id: 'from', name: 'Radio from' },
+		{ id: 'discover', name: 'Songs you know or new ones' },
+		{ id: 'account', name: 'With or without your YouTube Music account' },
+		{ id: 'taste', name: 'Your taste or everyone’s (in parties)' }
+	],
+	similar: [{ id: 'from', name: 'Radio from' }],
+	playNext: [
+		{ id: 'next', name: 'Play next' },
+		{ id: 'end', name: 'Add to the end of the queue' },
+		{ id: 'autoplay', name: 'Add to autoplay' }
+	],
+	addToQueue: [
+		{ id: 'next', name: 'Play next' },
+		{ id: 'end', name: 'Add to the end of the queue' },
+		{ id: 'autoplay', name: 'Add to autoplay' }
+	],
+	save: [],
+	dislike: [
+		{ id: 'artist', name: 'Don’t play this artist in radios' },
+		{ id: 'never', name: 'Never put this song in radios' }
+	],
+	remove: [
+		{ id: 'artist', name: 'Remove the songs by this artist' },
+		{ id: 'person', name: 'Remove the songs this person added' }
+	],
+	goArtist: [{ id: 'pick', name: 'Pick one of the artists' }],
+	download: [
+		{ id: 'file', name: 'Save as a music file' },
+		{ id: 'offline', name: 'Only keep it offline in the app' }
+	],
+	sleepTimer: [],
+	shuffle: [
+		{ id: 'queue', name: 'Shuffle the queue' },
+		{ id: 'autoplay', name: 'Shuffle the queue and autoplay' }
+	],
+	playOn: [],
+	next: [
+		{ id: 'other', name: 'Next song from someone else' },
+		{ id: 'album', name: 'Skip to after this album' }
+	]
+};
+
+/** How each holdable thing is named in the settings when it isn't in the song menu. */
+export const PLAYER_BUTTONS: Record<PlayerButton, { name: string; icon: IconName; held: string }> = {
+	shuffle: { name: 'Shuffle', icon: 'shuffle', held: 'Shuffle what?' },
+	playOn: { name: 'Play on', icon: 'cast', held: 'Plays on the device you used last' },
+	next: { name: 'Next', icon: 'next', held: 'Skip to where?' }
+};
+
+/** What holding does when it has no sheet. */
+export const HOLD_DOES: Partial<Record<Holdable, string>> = {
+	save: 'Saves straight to the playlist you used last',
+	sleepTimer: 'Starts the time you used last',
+	playOn: 'Plays on the device you used last'
+};
+
+/** What holding [action] is set to: off, or which of its choices are hidden. */
+export interface HoldSetting {
+	off: boolean;
+	hidden: string[];
+}
+
 export interface MenuLayout {
 	items: MenuItem[];
 	hidden: MenuAction[];
 	/** The phone's big buttons (null: none in that place). Not repeated in the list below them. */
 	buttons: (MenuAction | null)[];
+	/** Holding actions (and the player's buttons): only what's changed from "on, everything shown". */
+	hold: Partial<Record<Holdable, HoldSetting>>;
 }
 
 const isAction = (value: unknown): value is MenuAction => typeof value === 'string' && value in MENU_ACTIONS;
 
 export function defaultLayout(): MenuLayout {
-	return { items: [...DEFAULT_ITEMS], hidden: [], buttons: [...DEFAULT_BUTTONS] };
+	return { items: [...DEFAULT_ITEMS], hidden: [], buttons: [...DEFAULT_BUTTONS], hold: {} };
 }
 
 /** Reads a saved layout, keeping what's still known; actions added since then go at the end. */
 export function parseLayout(saved: unknown): MenuLayout {
 	const layout = defaultLayout();
 	if (!saved || typeof saved !== 'object') return layout;
-	const stored = saved as Partial<Record<keyof MenuLayout, unknown[]>>;
+	const stored = saved as Partial<Record<'items' | 'hidden' | 'buttons', unknown[]>> & { hold?: unknown };
+	if (stored.hold && typeof stored.hold === 'object') {
+		for (const [key, value] of Object.entries(stored.hold as Record<string, unknown>)) {
+			if (!(key in HOLD_CHOICES) || !value || typeof value !== 'object') continue;
+			const v = value as { off?: unknown; hidden?: unknown };
+			const ids = new Set(HOLD_CHOICES[key as Holdable]!.map((c) => c.id));
+			const hidden = Array.isArray(v.hidden) ? v.hidden.filter((h): h is string => typeof h === 'string' && ids.has(h)) : [];
+			if (v.off === true || hidden.length) layout.hold[key as Holdable] = { off: v.off === true, hidden };
+		}
+	}
 	if (Array.isArray(stored.items)) {
 		const items = stored.items.filter((i): i is MenuItem => i === 'divider' || isAction(i));
 		const unique = items.filter((i, n) => i === 'divider' || items.indexOf(i) === n);
@@ -185,4 +277,34 @@ export function arrange<T>(layout: MenuLayout, available: Partial<Record<MenuAct
 		}
 	}
 	return { buttons, list };
+}
+
+/** Whether holding [action] does something (it has choices or one thing to do, and isn't switched off). */
+export function holds(action: Holdable, layout: MenuLayout = songMenuLayout()): boolean {
+	const choices = HOLD_CHOICES[action];
+	if (!choices || layout.hold[action]?.off) return false;
+	return choices.length === 0 || shownChoices(action, layout).length > 0;
+}
+
+/** The choices of holding [action] that show. */
+export function shownChoices(action: Holdable, layout: MenuLayout = songMenuLayout()): string[] {
+	const hidden = layout.hold[action]?.hidden ?? [];
+	return (HOLD_CHOICES[action] ?? []).map((c) => c.id).filter((id) => !hidden.includes(id));
+}
+
+function setHold(action: Holdable, setting: HoldSetting): void {
+	const hold = { ...songMenuLayout().hold };
+	if (!setting.off && !setting.hidden.length) delete hold[action];
+	else hold[action] = setting;
+	change({ hold });
+}
+
+export function setHoldOn(action: Holdable, on: boolean): void {
+	setHold(action, { off: !on, hidden: songMenuLayout().hold[action]?.hidden ?? [] });
+}
+
+export function setChoiceShown(action: Holdable, choice: string, shown: boolean): void {
+	const current = songMenuLayout().hold[action] ?? { off: false, hidden: [] };
+	const hidden = shown ? current.hidden.filter((h) => h !== choice) : [...new Set([...current.hidden, choice])];
+	setHold(action, { off: current.off, hidden });
 }

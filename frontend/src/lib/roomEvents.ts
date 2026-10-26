@@ -60,6 +60,9 @@ export function applyEvent(s: RoomState, e: Event): void {
 			s.autoplay = e.items;
 			s.autoplaySeed = e.seed;
 			break;
+		case 'RadioOptionsChanged':
+			s.radioOptions = e.options;
+			break;
 		case 'RolesChanged':
 			s.roles = e.roles;
 			break;

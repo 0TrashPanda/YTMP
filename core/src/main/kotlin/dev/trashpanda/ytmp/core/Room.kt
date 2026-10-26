@@ -775,6 +775,12 @@ class Room(
                 if (songs.isEmpty()) return leftOut
                 autoplay.dismissed = false
                 val items = songs.map { newItem(it, member) }
+                if (command.position == QueuePosition.AUTOPLAY) {
+                    autoplay.addFirst(items)
+                    emit(autoplay.changed())
+                    startIfIdle()
+                    return leftOut
+                }
                 // Fair order: each song in the next round where they have none yet ("play next"
                 // too, unless they may reorder the queue anyway).
                 if (settings.fairOrder && (command.position == QueuePosition.END || !can(member, Permission.REORDER))) {
@@ -821,6 +827,12 @@ class Room(
                 need(member, Permission.REORDER)?.let { return it }
                 if (queue.size < 2) return null
                 replaceQueue(FairOrder.shuffled(queue, current, settings.fairOrder))
+            }
+            Command.ShuffleAutoplay -> {
+                need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
+                if (autoplay.items.size < 2) return null
+                autoplay.items.shuffle()
+                emit(autoplay.changed())
             }
             is Command.SetRepeat -> {
                 need(member, Permission.REPEAT)?.let { return it }

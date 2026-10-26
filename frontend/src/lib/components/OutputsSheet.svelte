@@ -2,6 +2,7 @@
 	import { wheelAdjust } from '../wheel';
 	// "Play on": this device (with its sync adjustment and volume) and the speakers and TVs the host found.
 	import { MediaQuery } from 'svelte/reactivity';
+	import { rememberOutput } from '../playOn';
 	import { castScreen, unlinkScreen } from '../api';
 	import { nativeBridge, type CastScreenState, type NearbyState } from '../native';
 	import type { RoomPlayer } from '../player.svelte';
@@ -23,6 +24,7 @@
 	async function toggle(outputId: string, active: boolean, screen = false) {
 		const error = await room.run({ kind: 'SetOutput', outputId, active, screen });
 		if (error && !room.wasNoticed(error)) onToast(error.message);
+		else if (active && !screen) rememberOutput(outputId);
 	}
 
 	function setVolume(outputId: string, volume: number) {

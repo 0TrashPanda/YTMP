@@ -48,7 +48,9 @@ import type {
 	PlaylistItemRef,
 	RemovePlaylistItemsRequest,
 	MovePlaylistItemRequest,
-	RenamePlaylistRequest
+	RenamePlaylistRequest,
+	RadioCrawlStatus,
+	RadioFrom
 } from './protocol.gen';
 
 import { identity } from './account';
@@ -249,13 +251,28 @@ export function suggestions(query: string, signal?: AbortSignal): Promise<string
 	);
 }
 
-/** Songs similar to a song (YTM's radio), for Find similar. */
-export function similar(songId: string, signal?: AbortSignal): Promise<Song[]> {
+/** Songs similar to a song (YTM's radio and the song graph, or only one of them: [from]), for Find similar. */
+export function similar(songId: string, signal?: AbortSignal, from: RadioFrom = 'mix'): Promise<Song[]> {
 	const base = viaYourServer() ? '/api/me/similar' : '/api/similar';
+	const extra = from === 'mix' ? '' : `&from=${from}`;
 	return abortable(
-		cached(`${viaYourServer() ? 'me:' : ''}similar:${songId}`, async () => (await request<SearchResponse>(`${base}?id=${encodeURIComponent(songId)}`)).items),
+		cached(`${viaYourServer() ? 'me:' : ''}similar:${from}:${songId}`, async () => (await request<SearchResponse>(`${base}?id=${encodeURIComponent(songId)}${extra}`)).items),
 		signal
 	);
+}
+
+/** Keeps [song] in this phone's song cache, to play offline (Download's hold). */
+export async function keepOffline(song: Song): Promise<void> {
+	await request<unknown>('/api/cache/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(song) });
+}
+
+/** Learning radios of the music on this phone (its settings; a server's is on its admin page). */
+export function getRadioCrawl(): Promise<RadioCrawlStatus> {
+	return request<RadioCrawlStatus>('/api/radio-crawl');
+}
+
+export function setRadioCrawl(status: RadioCrawlStatus): Promise<RadioCrawlStatus> {
+	return request<RadioCrawlStatus>('/api/radio-crawl', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(status) });
 }
 
 /** Whether [yourRadio] brings one (it comes from your server), or the room's radio is used. */

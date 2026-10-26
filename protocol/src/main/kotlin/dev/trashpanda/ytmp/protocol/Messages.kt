@@ -78,6 +78,9 @@ enum class ItemList {
 enum class QueuePosition {
     @SerialName("next") NEXT,
     @SerialName("end") END,
+
+    /** At the start of the autoplay queue: it plays when the queue runs out, before the radio goes on. */
+    @SerialName("autoplay") AUTOPLAY,
 }
 
 @Serializable
@@ -213,6 +216,11 @@ sealed interface Command {
     @Serializable
     @SerialName("ShuffleQueue")
     data object ShuffleQueue : Command
+
+    /** Puts the autoplay queue in a random order (Shuffle's hold). Autoplay from here. */
+    @Serializable
+    @SerialName("ShuffleAutoplay")
+    data object ShuffleAutoplay : Command
 
     @Serializable
     @SerialName("SetRepeat")

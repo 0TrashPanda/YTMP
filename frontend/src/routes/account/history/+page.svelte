@@ -1,11 +1,13 @@
 <script lang="ts">
-	// Your listening history: search, delete, export. See docs/features/history-and-recommendations.md.
+	// Your listening history: search, delete, export, import from Google Takeout, and the song
+	// graph it makes. See docs/features/history-and-recommendations.md.
 	import { onMount } from 'svelte';
 	import { authServer, session } from '../../../lib/account';
 	import Art from '../../../lib/components/Art.svelte';
 	import Icon from '../../../lib/components/Icon.svelte';
 	import { artistNames, formatTime } from '../../../lib/format';
-	import type { AccountSettings, HistoryEntry } from '../../../lib/protocol.gen';
+	import GraphView from '../../../lib/components/GraphView.svelte';
+	import type { AccountSettings, HistoryEntry, HistoryImport } from '../../../lib/protocol.gen';
 
 	let plays = $state<HistoryEntry[]>([]);
 	let more = $state(false);
@@ -16,6 +18,41 @@
 	let deleting = $state(false);
 	let from = $state('');
 	let to = $state('');
+	let importing = $state(false);
+	let imports = $state<HistoryImport[]>([]);
+	let uploading = $state(false);
+	let importNote = $state<string | null>(null);
+	let graph = $state(false);
+
+	async function openImports() {
+		importing = !importing;
+		if (importing) imports = await authServer.imports().catch(() => []);
+	}
+
+	async function upload(file: File | undefined) {
+		if (!file) return;
+		uploading = true;
+		importNote = null;
+		try {
+			const made = await authServer.importTakeout(file);
+			importNote = `Added ${made.plays.toLocaleString()} plays${made.duplicates ? ` (${made.duplicates.toLocaleString()} were in your history already)` : ''}. The song graph learns them in a moment.`;
+			imports = await authServer.imports();
+			await load(true);
+		} catch (e) {
+			importNote = e instanceof Error ? e.message : "Couldn't import it";
+		} finally {
+			uploading = false;
+		}
+	}
+
+	async function removeImport(i: HistoryImport) {
+		if (!confirm(`Take the ${i.plays.toLocaleString()} imported plays out of your history again?`)) return;
+		await authServer.deleteImport(i.id);
+		imports = imports.filter((x) => x.id !== i.id);
+		await load(true);
+	}
+
+	const shortDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
 	const loggedIn = !!session.current;
 
@@ -89,6 +126,8 @@
 		</a>
 		<h1 class="flex-1 text-2xl font-bold">Listening history</h1>
 		{#if loggedIn}
+			<button class="rounded-full bg-raised px-4 py-2 text-sm hover:bg-line" onclick={() => (graph = true)}>Song graph</button>
+			<button class="rounded-full bg-raised px-4 py-2 text-sm hover:bg-line" onclick={openImports}>Import…</button>
 			<button class="rounded-full bg-raised px-4 py-2 text-sm hover:bg-line" onclick={() => authServer.exportHistory(session.current!.account.username)}>Export</button>
 			<button class="rounded-full bg-raised px-4 py-2 text-sm hover:bg-line" onclick={() => (deleting = !deleting)}>Delete…</button>
 		{/if}
@@ -99,6 +138,31 @@
 	{:else}
 		{#if settings && !settings.tracking}
 			<p class="rounded-lg bg-raised px-4 py-3 text-sm">History is <b>paused</b>: new songs aren't kept. Turn it on under <a href="/account" class="underline">Account</a>.</p>
+		{/if}
+
+		{#if importing}
+			<section class="flex flex-col gap-3 rounded-xl bg-surface p-4 ring-1 ring-line">
+				<p class="font-medium">Import from YouTube Music</p>
+				<p class="text-sm text-muted">
+					In <a class="underline" href="https://takeout.google.com" target="_blank" rel="noopener">Google Takeout</a>, pick only “YouTube and YouTube Music” with its history, and
+					upload the zip (or the watch-history file in it). Its YouTube Music plays join your history, marked as imported; plays that are already here (YTMP adds yours to
+					YouTube Music) are left out. Takeout doesn't say how much of a song was heard: the time until the next one counts.
+				</p>
+				<label class="self-start rounded-full bg-white px-4 py-2 text-sm font-medium text-black {uploading ? 'opacity-50' : 'cursor-pointer'}">
+					{uploading ? 'Importing…' : 'Choose the export'}
+					<input type="file" accept=".zip,.html,.json" class="hidden" disabled={uploading} onchange={(e) => upload(e.currentTarget.files?.[0])} />
+				</label>
+				{#if importNote}<p class="text-sm">{importNote}</p>{/if}
+				{#each imports as i (i.id)}
+					<div class="flex items-center gap-3 border-t border-line/60 pt-2 text-sm">
+						<div class="min-w-0 flex-1">
+							<p>{i.plays.toLocaleString()} plays, {shortDay(i.firstAt)} – {shortDay(i.lastAt)}</p>
+							<p class="text-xs text-muted">Imported {shortDay(i.at)}</p>
+						</div>
+						<button class="rounded-full px-3 py-1.5 text-sm text-muted hover:bg-raised hover:text-white" onclick={() => removeImport(i)}>Remove</button>
+					</div>
+				{/each}
+			</section>
 		{/if}
 
 		{#if deleting}
@@ -133,7 +197,7 @@
 								{time(play.playedAt)} · {play.roomName}
 								{#if play.listenedWith.length}· with {play.listenedWith.map((p) => p.name).join(', ')}{:else if play.shared}· with others{/if}
 								{#if !play.addedByMe}· added by {play.addedByName}{/if}
-								{#if play.skipped}· skipped at {formatTime(play.heardMs)}{/if}
+								{#if play.imported}· imported{#if play.skipped} · skipped{/if}{:else if play.skipped}· skipped at {formatTime(play.heardMs)}{/if}
 							</p>
 						</div>
 						<button
@@ -159,3 +223,7 @@
 		{#if error}<p class="text-center text-accent">{error}</p>{/if}
 	{/if}
 </main>
+
+{#if graph}
+	<GraphView onClose={() => (graph = false)} onToast={(text) => (importNote = text)} />
+{/if}

@@ -17,7 +17,7 @@ describe('parseLayout', () => {
 });
 
 describe('arrange', () => {
-	const layout: MenuLayout = { items: ['divider', 'playNext', 'divider', 'divider', 'like', 'radio', 'divider', 'save', 'divider'], hidden: ['like'], buttons: ['save', 'download', null] };
+	const layout: MenuLayout = { items: ['divider', 'playNext', 'divider', 'divider', 'like', 'radio', 'divider', 'save', 'divider'], hidden: ['like'], buttons: ['save', 'download', null], hold: {} };
 
 	it('leaves out hidden and unavailable actions, and extra dividers', () => {
 		const { buttons, list } = arrange(layout, { playNext: ['next'], like: ['like'], radio: ['radio'], save: ['save'] }, false);

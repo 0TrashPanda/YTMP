@@ -55,6 +55,12 @@ internal class Autoplay(private val clock: () -> Long) {
         items += songs.map { item(it, origin) }
     }
 
+    /** [items] someone added, at the start (they play before the radio goes on). */
+    fun addFirst(added: List<QueueItem>) {
+        dismissed = false
+        items.addAll(0, added)
+    }
+
     private fun item(song: Song, origin: QueueItemOrigin) =
         QueueItem(Ids.short(), song, by?.first ?: "autoplay", by?.second ?: "Autoplay", clock(), result = null, origin = origin)
 }

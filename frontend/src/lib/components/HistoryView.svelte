@@ -81,7 +81,8 @@
 		if (play.listenedWith.length) parts.push(`with ${play.listenedWith.map((p) => p.name).join(', ')}`);
 		else if (play.shared) parts.push('with others');
 		if (!play.addedByMe && play.addedByName) parts.push(`added by ${play.addedByName}`);
-		if (play.skipped) parts.push(`skipped at ${formatTime(play.heardMs)}`);
+		if (play.imported) parts.push(play.skipped ? 'imported · skipped' : 'imported');
+		else if (play.skipped) parts.push(`skipped at ${formatTime(play.heardMs)}`);
 		return parts.join(' · ');
 	}
 
