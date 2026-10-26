@@ -59,7 +59,12 @@ class PhoneFolders(private val context: Context) {
         val genre: String = "",
         val folder: String,
         val file: String = "",
-    )
+    ) {
+        fun track() = LocalTrack(
+            key = key, title = title, artist = artist, albumArtist = albumArtist, album = album,
+            disc = disc, track = track, year = year, durationMs = durationMs, folder = folder, genre = genre, file = file,
+        )
+    }
 
     init {
         runCatching {
@@ -99,8 +104,16 @@ class PhoneFolders(private val context: Context) {
         scannedAt = 0
     }
 
-    /** True when [tracks] should be read again: something changed, or it's a while ago. */
-    fun stale(seenVersion: Int) = seenVersion != version || System.currentTimeMillis() - scannedAt > RESCAN_MS
+    /** True when the folders should be walked again (in the background): it's a while since the last time. */
+    fun dueForRescan() = System.currentTimeMillis() - scannedAt > RESCAN_MS
+
+    /** The music in the folders as last read (kept in [index]), without looking at the folders: quick. */
+    fun known(): List<LocalTrack> = files.values.map { it.track() }
+
+    /** Whether the last [tracks] found new, changed or removed files. */
+    @Volatile
+    var changedInLastWalk = false
+        private set
 
     /** The file for a song [key] from a folder, or null. */
     fun uri(key: String): Uri? = files[key]?.uri?.let(Uri::parse)
@@ -109,7 +122,8 @@ class PhoneFolders(private val context: Context) {
 
     fun isFolderKey(key: String) = key.startsWith(KEY_PREFIX)
 
-    /** All the music in the folders; tags of new or changed files are read now. */
+    /** All the music in the folders; tags of new or changed files are read now. Slow: it walks every folder. */
+    @Synchronized
     fun tracks(): List<LocalTrack> {
         val seen = HashSet<String>()
         val found = ArrayList<LocalTrack>()
@@ -126,16 +140,14 @@ class PhoneFolders(private val context: Context) {
                     read(key, doc) ?: return@walk
                 }
                 files[key] = entry
-                found += LocalTrack(
-                    key = key, title = entry.title, artist = entry.artist, albumArtist = entry.albumArtist, album = entry.album,
-                    disc = entry.disc, track = entry.track, year = entry.year, durationMs = entry.durationMs, folder = entry.folder, genre = entry.genre, file = entry.file,
-                )
+                found += entry.track()
             }
         }
         val gone = files.keys.filter { it !in seen }
         gone.forEach(files::remove)
         scannedAt = System.currentTimeMillis()
-        if (read > 0 || gone.isNotEmpty()) saveIndex()
+        changedInLastWalk = read > 0 || gone.isNotEmpty()
+        if (changedInLastWalk) saveIndex()
         return found
     }
 
@@ -232,7 +244,8 @@ class PhoneFolders(private val context: Context) {
         const val KEY_PREFIX = "f"
         private const val TAG = "YtmpFolders"
         private const val FOLDERS = "musicFolders"
-        private const val RESCAN_MS = 2 * 60_000L
+        // In the background: the Local tab doesn't wait for it.
+        private const val RESCAN_MS = 10 * 60_000L
         private val EXTENSIONS = setOf("mp3", "m4a", "flac", "ogg", "opus", "wav", "aac", "wma", "oga")
     }
 }

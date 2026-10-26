@@ -365,6 +365,9 @@ class LocalHost(private val context: Context) {
         applyFromYoutube()
         // So downloads play from the Music folder from the first song on.
         scope.launch { runCatching { downloads.all() } }
+        // Ready before they're needed: YouTube Music (Python) and the music on this phone.
+        scope.launch { runCatching { ytm.warmUp() }.onFailure { Log.w(TAG, "Warming up YouTube Music failed: ${it.message}") } }
+        if (phoneMusicOn) scope.launch { runCatching { local.page(PhoneLibrary.ID) } }
         wifi.start()
         embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
             ytmpModule(

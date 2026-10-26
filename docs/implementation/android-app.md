@@ -190,6 +190,13 @@ inside the WebView.
 
 In the browser, the frontend plays audio itself with HTML audio / the Web Audio API.
 
+## Ready at start ✅
+
+`LocalHost.start()` starts Python and the YTM module in the background (`OnDeviceYtm.warmUp()`:
+imports, `YtmCore`, YouTube Music's visitor ID), so the first search or page after the app
+starts doesn't wait for it: 2.2 s → 0.8 s for the first search on a Pixel 7. The phone's own
+music (with *Music on this phone* on) is read then too.
+
 ## Debug builds next to the real app ✅
 
 A debug build (`./gradlew :android:assembleDebug`) is its own app, *YTMP debug*

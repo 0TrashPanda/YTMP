@@ -88,6 +88,14 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         python.getModule("ytmp_ytm.core").callAttr("log_to", PythonLog())
     }
 
+    /**
+     * Starts Python and the module now (imports, YouTube Music's visitor ID), so the first
+     * search or page after the app starts doesn't wait for it (~1.5 s on a Pixel 7).
+     */
+    suspend fun warmUp() {
+        python { core }
+    }
+
     override suspend fun search(query: String, type: SearchType): SearchPage = python {
         val page = core.callAttr("search", query, type.wireName, 20)
         ProtocolJson.decodeFromString(SearchPage.serializer(), json.callAttr("dumps", page).toString())

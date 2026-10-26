@@ -79,8 +79,11 @@ friends reach them too.
 
 **Picked folders** (`PhoneFolders`, bridge version 16: `musicFolders`, `addMusicFolder`,
 `removeMusicFolder`, `onMusicFolders`): `ACTION_OPEN_DOCUMENT_TREE` with a persisted read grant
-(prefs `ytmp.local` `musicFolders`). The tree is walked with `DocumentsContract` every 2 minutes
-(and when the list changes); tags come from `MediaMetadataRetriever` once per file (its
+(prefs `ytmp.local` `musicFolders`). Walking the tree with `DocumentsContract` is slow, so the
+Local tab never waits for it: the songs come from the index (below) right away, and the tree is
+walked in the background every 10 minutes (when the Local tab or a lookup asks), and only right
+away when a folder was added or removed; a walk that found changes makes the next read use them.
+At app start the phone's music is read in the background, so the Local tab opens at once; tags come from `MediaMetadataRetriever` once per file (its
 modified time and size), kept in `files/music-folders.json`, which also maps a song's key
 (`f` + the first 8 bytes of the SHA-1 of its document URI) back to the file after a restart. Covers
 are the embedded picture. Their songs are tracks of `PhoneLibrary` next to the media store's;

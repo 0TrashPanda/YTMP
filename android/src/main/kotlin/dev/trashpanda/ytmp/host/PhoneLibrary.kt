@@ -12,8 +12,13 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.header
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondOutputStream
+import dev.trashpanda.ytmp.Log
 import dev.trashpanda.ytmp.protocol.LocalLibraryKind
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -35,25 +40,48 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
     private val mutex = Mutex()
     private var tracks: List<LocalTrack>? = null
     private var generation = -1L
-    private var foldersSeen = -1
+    // At first the folders' music as last read (their index); walking them follows in the background.
+    private var foldersSeen = folders.version
+    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var rescanning: Job? = null
     private val types = ConcurrentHashMap<String, String>()
 
-    /** The phone's music; read again when the media store changed. */
+    /**
+     * The phone's music; read again when the media store changed (a quick check). The picked
+     * folders are slow to walk, so they're walked in the background now and then, and only
+     * right away when a folder was added or removed.
+     */
     override suspend fun tracks(): List<LocalTrack> = mutex.withLock {
         val now = withContext(Dispatchers.IO) { generation() }
-        tracks?.let { if (now == generation && !folders.stale(foldersSeen)) return it }
+        tracks?.let {
+            if (now == generation && folders.version == foldersSeen) {
+                if (folders.dueForRescan()) rescanFolders()
+                return it
+            }
+        }
         val seen = folders.version
         val read = withContext(Dispatchers.IO) {
             // The media store needs the permission; the picked folders don't.
             val scanned = if (canRead()) query() else emptyList()
+            val inFolders = if (seen != foldersSeen) folders.tracks() else folders.known()
             // A file the media store knows too shows once (its entry stays).
             val seenSongs = scanned.mapTo(HashSet(), ::sameSong)
-            scanned + folders.tracks().filter { seenSongs.add(sameSong(it)) }.onEach { track -> folders.mime(track.key)?.let { types[track.key] = it } }
+            scanned + inFolders.filter { seenSongs.add(sameSong(it)) }.onEach { track -> folders.mime(track.key)?.let { types[track.key] = it } }
         }
         tracks = read
         generation = now
         foldersSeen = seen
+        if (folders.dueForRescan()) rescanFolders()
         read
+    }
+
+    /** Walks the picked folders in the background; when something changed, the next [tracks] reads it. */
+    private fun rescanFolders() {
+        if (folders.isEmpty() || rescanning?.isActive == true) return
+        rescanning = background.launch {
+            runCatching { folders.tracks() }.onFailure { Log.w(TAG, "Music folders: ${it.message}") }
+            if (folders.changedInLastWalk) mutex.withLock { tracks = null }
+        }
     }
 
     override fun fileUrl(key: String) = "${baseUrl()}/api/audio/${encode(LocalMusic.songId(id, key))}"
@@ -194,5 +222,6 @@ class PhoneLibrary(private val context: Context, private val baseUrl: () -> Stri
 
     companion object {
         const val ID = "phone"
+        private const val TAG = "YtmpPhoneMusic"
     }
 }
