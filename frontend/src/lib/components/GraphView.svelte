@@ -7,7 +7,7 @@
 	import { fade } from 'svelte/transition';
 	import { DEFAULT_TUNING, KINDS, kindOf, layout, radioFrom, weight } from '../graph';
 	import { listening } from '../listening.svelte';
-	import type { GraphNode, GraphTuning, GraphView, Song } from '../protocol.gen';
+	import type { EdgeKind, GraphNode, GraphTuning, GraphView, Song } from '../protocol.gen';
 	import { artistNames } from '../format';
 	import Icon from './Icon.svelte';
 
@@ -43,12 +43,39 @@
 	const placed = $derived(view ? layout(view.nodes, view.edges, view.seed, SIZE) : []);
 	const at = $derived(new Map(placed.map((p) => [p.node.id, p])));
 	const weighed = $derived(view ? view.edges.map((e) => ({ e, w: weight(e, tuning, view!.now) })).filter((x) => x.w > 0) : []);
-	const strongest = $derived(Math.max(1e-6, ...weighed.map((x) => x.w)));
+	// One line per pair of songs: as thick as all it counts together, coloured by what counts most.
+	const lines = $derived.by(() => {
+		const pairs = new Map<string, { a: string; b: string; w: number; top: { kind: EdgeKind; w: number } }>();
+		for (const { e, w } of weighed) {
+			const [a, b] = e.from < e.to ? [e.from, e.to] : [e.to, e.from];
+			const key = `${a}|${b}`;
+			const pair = pairs.get(key);
+			if (!pair) pairs.set(key, { a, b, w, top: { kind: e.kind, w } });
+			else {
+				pair.w += w;
+				if (w > pair.top.w) pair.top = { kind: e.kind, w };
+			}
+		}
+		return [...pairs.values()].sort((x, y) => x.w - y.w);
+	});
+	const strongest = $derived(Math.max(1e-6, ...lines.map((x) => x.w)));
 	const radio = $derived(view?.seed ? radioFrom(view.seed, view.edges, tuning, view.now) : []);
 	const nodeById = $derived(new Map((view?.nodes ?? []).map((n) => [n.id, n])));
 	const mostPlays = $derived(Math.max(1, ...(view?.nodes ?? []).map((n) => n.plays)));
 	// Names next to the seed and the songs its radio would bring first (not on every song).
-	const labelled = $derived(new Set([view?.seed, ...radio.slice(0, 6).map((r) => r.id), picked].filter(Boolean) as string[]));
+	// …and only where they don't run into each other.
+	const labelled = $derived.by(() => {
+		const wanted = [picked, view?.seed, ...radio.slice(0, 6).map((r) => r.id)].filter(Boolean) as string[];
+		const kept: { x: number; y: number }[] = [];
+		const out = new Set<string>();
+		for (const id of wanted) {
+			const p = at.get(id);
+			if (!p || kept.some((k) => Math.abs(k.x - p.x) < 150 && Math.abs(k.y - p.y) < 22)) continue;
+			kept.push(p);
+			out.add(id);
+		}
+		return out;
+	});
 	const changed = $derived(JSON.stringify(tuning) !== JSON.stringify(saved));
 	const pickedNode = $derived(picked ? nodeById.get(picked) : null);
 	const pickedEdges = $derived(picked ? weighed.filter(({ e }) => e.from === picked || e.to === picked).sort((a, b) => b.w - a.w).slice(0, 6) : []);
@@ -116,12 +143,13 @@
 			{:else if tab === 'graph'}
 				<div class="relative mx-auto w-full max-w-[min(100%,70vh)] px-2">
 					<svg viewBox="0 0 {SIZE} {SIZE}" class="block h-auto w-full touch-manipulation" role="img" aria-label="The songs and how they go together">
-						{#each weighed as { e, w }, i (i)}
-							{@const a = at.get(e.from)}
-							{@const b = at.get(e.to)}
+						{#each lines as line (line.a + line.b)}
+							{@const a = at.get(line.a)}
+							{@const b = at.get(line.b)}
+							{@const w = line.w}
 							{#if a && b}
-								{@const k = kindOf(e.kind)}
-								{@const near = picked && (e.from === picked || e.to === picked)}
+								{@const k = kindOf(line.top.kind)}
+								{@const near = picked && (line.a === picked || line.b === picked)}
 								<line
 									x1={a.x}
 									y1={a.y}
@@ -155,12 +183,15 @@
 									stroke="var(--color-surface)"
 									stroke-width="2"
 								/>
-								{#if labelled.has(p.node.id)}
-									<text x={p.x} y={p.y - radius(p.node) - 8} text-anchor="middle" class="pointer-events-none fill-white text-[13px]" paint-order="stroke" stroke="var(--color-surface)" stroke-width="4">
-										{p.node.song.title.length > 28 ? `${p.node.song.title.slice(0, 27)}…` : p.node.song.title}
-									</text>
-								{/if}
 							</g>
+						{/each}
+						<!-- Names last, over every dot. -->
+						{#each placed as p (p.node.id)}
+							{#if labelled.has(p.node.id)}
+								<text x={p.x} y={p.y - radius(p.node) - 8} text-anchor="middle" class="pointer-events-none fill-white text-[13px]" paint-order="stroke" stroke="var(--color-surface)" stroke-width="4">
+									{p.node.song.title.length > 28 ? `${p.node.song.title.slice(0, 27)}…` : p.node.song.title}
+								</text>
+							{/if}
 						{/each}
 					</svg>
 					{#if pickedNode}
@@ -179,6 +210,7 @@
 						</div>
 					{/if}
 				</div>
+				<p class="px-4 pb-1 text-xs text-muted">A line's colour: what counts most for those two songs. Tap a song for all of it.</p>
 				<ul class="flex flex-wrap gap-x-4 gap-y-1 px-4 pb-3 text-xs text-muted" aria-label="Legend">
 					{#each KINDS as k (k.kind)}
 						<li class="flex items-center gap-1.5">

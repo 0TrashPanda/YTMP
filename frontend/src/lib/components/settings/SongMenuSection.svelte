@@ -132,7 +132,7 @@
 							</p>
 						</button>
 						{#if HOLD_CHOICES[h]?.length}
-							<Icon name="chevron" size={18} class="shrink-0 text-muted transition-transform {open === h ? 'rotate-180' : ''}" />
+							<Icon name="chevron" size={18} class="shrink-0 text-muted transition-transform {open === h ? 'rotate-90' : ''}" />
 						{/if}
 						<Switch checked={!songMenu.hold[h]?.off} label="Holding {nameOf(h).name}" onchange={(v) => setHoldOn(h, v)} />
 					</div>

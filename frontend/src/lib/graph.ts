@@ -103,11 +103,11 @@ export function layout(nodes: GraphNode[], edges: GraphEdge[], seed: string | nu
 				const dx = pos[i].x - pos[j].x || 0.01;
 				const dy = pos[i].y - pos[j].y || 0.01;
 				const d2 = dx * dx + dy * dy;
-				const push = (ideal * ideal) / d2;
-				force[i].x += dx * push * 0.05;
-				force[i].y += dy * push * 0.05;
-				force[j].x -= dx * push * 0.05;
-				force[j].y -= dy * push * 0.05;
+				const push = Math.min(1, (ideal * ideal) / d2) * 0.03;
+				force[i].x += dx * push;
+				force[i].y += dy * push;
+				force[j].x -= dx * push;
+				force[j].y -= dy * push;
 			}
 		}
 		for (const [a, b] of links) {
@@ -122,8 +122,8 @@ export function layout(nodes: GraphNode[], edges: GraphEdge[], seed: string | nu
 		}
 		for (let i = 0; i < n; i++) {
 			// A little pull to the middle keeps loose songs in view.
-			force[i].x += (size / 2 - pos[i].x) * 0.01;
-			force[i].y += (size / 2 - pos[i].y) * 0.01;
+			force[i].x += (size / 2 - pos[i].x) * 0.03;
+			force[i].y += (size / 2 - pos[i].y) * 0.03;
 			const max = 10 * cool + 0.5;
 			pos[i].x += Math.max(-max, Math.min(max, force[i].x));
 			pos[i].y += Math.max(-max, Math.min(max, force[i].y));

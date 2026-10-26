@@ -500,7 +500,7 @@
 		<!-- With a mouse there's no holding: the › opens the choices. -->
 		{#if entry.held && !big}
 			<button class="shrink-0 px-2 text-muted hover:bg-line hover:text-white" aria-label="More choices for {entry.label}" title="More choices" onclick={entry.held}>
-				<Icon name="chevron" size={18} class="-rotate-90" />
+				<Icon name="chevron" size={18} />
 			</button>
 		{/if}
 	</div>
