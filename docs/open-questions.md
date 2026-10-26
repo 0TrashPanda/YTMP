@@ -11,8 +11,9 @@ _None open right now._
 - **Updating yt-dlp on the phone**: it only changes with app releases now. Download newer
   yt-dlp releases at runtime (see [ytm-module](implementation/ytm-module.md#plan-embed-python-with-chaquopy-and-update-yt-dlp-at-runtime)),
   or just release the app more often?
-- **Song graph weights**: tune the weight formula and radio mix once there is real data. The
-  first guess is in [storage](implementation/storage.md#raw-counters-weights-computed-at-query-time).
+- **Song graph weights**: the defaults are still a first guess; each account can now tune
+  them with the graph view's sliders, and those choices are the data to pick better defaults
+  from. See [storage](implementation/storage.md#raw-counters-weights-computed-at-query-time).
 - **Loudness for local files / media servers**: YouTube gives a loudness value, but local
   files don't always have one. Use ReplayGain tags when present, otherwise measure the
   loudness on the host (for example with ffmpeg on the server)? How on a phone host?

@@ -394,6 +394,28 @@ button isn't repeated in the list under it. An action still only shows where it 
 all your devices, wherever your history can be shown too; otherwise on this device. The first
 time, the layout of the device you set it up on goes to your account.
 
+### Hold for choices ✅
+
+**Hold** an action in the song menu for more choices (with a mouse: right-click it, or the
+› next to it). A tap still does what it always does.
+
+| Hold | Choices |
+|---|---|
+| Start radio, Autoplay this | *Radio from* (Mix, YouTube Music, Song graph, On this device), songs you know or new ones, with or without your YouTube Music account, your taste or everyone's (in parties); then *Start* |
+| Find similar | where from |
+| Play next, Add to queue | play next, the end of the queue, or autoplay (plays when the queue runs out) |
+| Save to playlist | saves straight into the playlist you saved to last: "Saved to … · **Change**" |
+| Dislike | dislike and don't play this artist in radios, or never put this song in radios (or allow them again) |
+| Remove (Up next) | remove the songs by this artist, or the songs this person added |
+| Go to artist | pick one of all the song's artists |
+| Download (the app, on the phone's own pages) | save as a music file, or only keep it offline in the app |
+| Sleep timer | starts the time used last ("Stops in 30 min · Change") |
+
+The player's buttons too: **Shuffle** (the queue, or the queue and autoplay), **Next**
+(the next song from someone else, or past this album), **Play on** (straight to the
+speaker or TV used last). *Settings → Song menu → Holding* switches holding off per action
+and hides choices you don't use; saved with the menu's layout.
+
 ### Share links
 
 > Planned. Built now: sharing a **room** (link and QR code in the room's share sheet).

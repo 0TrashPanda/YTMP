@@ -87,11 +87,11 @@ A personal overview built from the history, in the style of Spotify Wrapped:
 
 ## Song graph
 
-> Built: the personal and server graphs from listening, YouTube Music's radios as edges, merging
-> songs by title, artist and length, and mixing it into radio, autoplay, find similar and
-> *Related*. How it's stored and weighed: [storage](../implementation/storage.md#song-graph).
-> Not yet: audio fingerprinting, and YouTube Music's radios fetched by a phone (only a server's
-> are learned).
+> Built: the personal and server graphs from listening (also imported from Google Takeout),
+> YouTube Music's radios as edges (the server's, a phone's, and the radio crawl's; each kept as
+> it came), merging songs by title, artist and length, mixing it into radio, autoplay, find
+> similar and *Related*, and the graph view with its sliders. How it's stored and weighed:
+> [storage](../implementation/storage.md#song-graph). Not yet: audio fingerprinting.
 
 Because the history keeps the **order** in which songs were played, YTMP can build a
 **graph of songs**:
@@ -123,24 +123,77 @@ learns much faster in a small group of friends.
   only gets what everyone on your server listens to.
 - Deleting from your history takes it out of the graph too (it's rebuilt from what's left).
 
+### Importing from YouTube Music (Google Takeout)
+
+Your YouTube Music history from before YTMP can join yours: on your server's history page,
+*Import…* takes a Google Takeout export (pick only "YouTube and YouTube Music" with its
+history; the zip, or the watch history in it).
+
+- Its YouTube Music plays go into your history, marked **imported**. Plays already there
+  (YTMP adds yours to YouTube Music's history) are left out, so importing twice adds nothing.
+- Takeout only says when a song started: how much was heard is the time until the next
+  one, and one left within 30 s counts as skipped.
+- The graph learns them apart from your plays in YTMP, so a slider can weigh them
+  differently. *Remove* takes an import out of the history (and the graph) again.
+
 ### Learning from YouTube Music
 
 Most use of YTMP is: search for a song or artist with the YTM module, play it, or start
 a radio from it. YTM's own radios and "related" lists are therefore a large source
 of **song connections**:
 
-- When YTMP fetches a YTM radio or a related list, those connections are added to the graph
-  as **external edges**, kept apart from edges learned from your own listening.
-- This gives the graph useful data from day one, also for local files that can be
-  matched to YTM songs.
+- Every YouTube Music radio YTMP fetches (50 songs) is **kept as it came**: when, how (a
+  room, learning, Find similar) and as whom (without an account, or which account). The graph
+  is built from what's kept, so it can be weighed again any time without fetching anything.
+- A radio made **without an account** counts for everyone; one made **with your account**
+  only in your own radios (it's your taste, as YouTube sees it), and less by default.
+- A phone sends the radios it fetches to its owner's server.
+- **Learning radios**: the server (its admin page) and the phone (*Settings → Radio*) can
+  slowly fetch the radio of every song they have: music files that are a YouTube Music song
+  and saved songs. Without an account, one every 1½ minutes by default, each song again after
+  3 months; it stops for hours when YouTube asks whether it's a bot.
+
+### The graph view
+
+*Song graph* in the song menu (around that song), or on your history page and in *Settings
+→ Radio* (your most played songs). With your YTMP account.
+
+- Songs are dots (bigger: played more), lines are what YTMP learned goes together: as thick
+  as it counts, coloured by what counts most (you, imported, everyone, YouTube Music's radios
+  without or with your account). Tap a song for all its lines and *Show around this song*.
+- *Its radio* lists what a radio from the song would bring, best first.
+- **Sliders** set how much each part counts: your listening, imported, everyone's, the two
+  kinds of radios, a party play, a skip, songs played before it, neighbours of neighbours,
+  how fast old plays fade, how far down a radio counts. The graph changes at once; *Use for
+  my radios* makes your radios, Find similar and Related use them.
 
 ## Radio / Mix
 
 > Implemented: *Start radio* and *Autoplay from here* with **YouTube Music's radio** (and the
 > autoplay room setting, see [queue](queue.md#autoplay-queue)), with the **song graph** mixed
-> in: one song from the graph after every two of YouTube Music's. Where YouTube Music has no
-> radio (local music) or doesn't answer, the graph's songs are the radio. The room owner's
-> graph is used.
+> in: one song from the graph after every two of YouTube Music's (*Settings → Radio*). The
+> room owner's graph is used. *Radio from* (Mix, YouTube Music, Song graph, On this device),
+> songs you know or new ones, with or without your account and whose taste: the defaults in
+> *Settings → Radio*, for one radio by holding Start radio, and for the radio playing with
+> the chips above *Up next*.
+
+### Radio from
+
+| Choice | The radio is |
+|---|---|
+| **Mix** (default) | YouTube Music's radio, a song from the song graph after every few |
+| **YouTube Music** | only YouTube Music's radio |
+| **Song graph** | only what YTMP learned: your listening, everyone's, the radios it kept |
+| **On this device** | only songs that play without internet here: music files and saved songs |
+
+- A **music file** that is a YouTube Music song (from its tags or name, or matched on the
+  phone) gets that song's radio. Other files get the song graph, then songs like them: the
+  same artist, album, genre. Never just any song: a radio isn't a shuffle.
+- Without internet, a YouTube Music or Mix radio becomes *Song graph* or *On this device*
+  (your choice).
+- *Settings → Radio* also has: songs per artist, leave out songs you skip more than you
+  hear and songs played in the last hours, and **never in radios** (artists and songs, from
+  holding Dislike).
 
 A radio is an endless list of songs similar to a starting point. There are two ways to use
 it from the [song menu](ui.md#song-menu):
@@ -168,6 +221,7 @@ Like a radio, but **it does not touch the queue**. Starting from a song, an arti
 album, YTMP shows a **list of similar songs** that you can browse, and you pick the ones
 you want to add to the queue (or play next, save to a playlist, …).
 
-- Uses the same data as Radio / Mix (YTM radio, song graph, metadata).
+- Uses the same data as Radio / Mix (YTM radio, song graph, metadata). Holding it picks
+  where from (Mix, only YouTube Music, only the song graph, only what's on this device).
 - Handy in a shared room: find songs that fit the vibe without flooding the queue.
 - Respects room permissions: adding songs from the list needs the *add songs* permission.

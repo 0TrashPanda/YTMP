@@ -94,13 +94,26 @@ song_sources       -- the same song on different sources (merging)
 song_edges         -- the graph: "B was played after A"
   from_song → songs.id
   to_song   → songs.id
-  scope             -- 'personal' | 'server' | 'ytm'
-  account_id        -- the account for scope = 'personal', '' otherwise
+  scope             -- 'personal' | 'imported' | 'server' | 'server_imported' | 'ytm' | 'ytm_account'
+  account_id        -- the account for 'personal', 'imported' and 'ytm_account', '' otherwise
   solo_plays        -- counters, kept raw (see below)
   shared_plays
   skips
-  ytm_rank          -- for scope = 'ytm': its best place in YTM's radio of from_song
+  ytm_rank          -- YTM edges: its best place in YTM's radio of from_song
+  seen              -- YTM edges: in how many kept fetches (0: learned before fetches were kept)
+  rank_sum          -- YTM edges: its places added up (for the average)
   updated_at        -- the last play (or YTM radio) that counted
+
+radio_fetches      -- every YouTube Music radio fetched, as it came (migration 9)
+  id, seed, fetched_at
+  way               -- 'room' | 'crawl' | 'similar'
+  account_id        -- whose YouTube Music account made it; '' without an account
+  reported_by       -- the account whose phone sent it; '' when the server fetched it
+  songs             -- JSON list of the radio's song IDs, in order (their data is in song_sources)
+  INDEX (seed, fetched_at)
+
+history_imports    -- Google Takeout imports (plays.import_id points here; '' for plays in YTMP)
+  id, account_id, at, plays, duplicates, first_at, last_at
   PRIMARY KEY (from_song, to_song, scope, account_id)
   INDEX (from_song, scope, account_id), INDEX (to_song, scope, account_id)
 ```
@@ -109,9 +122,13 @@ song_edges         -- the graph: "B was played after A"
 - **Server graph** = rows with `scope = 'server'`, updated together with the personal rows
   whenever someone with tracking on plays a song. A play several accounts heard (same room,
   same start, same song) counts once: the first report of it does (`plays_room_time` index).
-- **YTM edges** = rows with `scope = 'ytm'`: the seed → its first 25 songs whenever the
-  server fetches a YTM radio (also an account's own), at most every 6 hours per seed. A
-  phone's YTM radios aren't learned yet.
+- **YTM edges** = `scope = 'ytm'` (made without an account, everyone's) or `'ytm_account'`
+  (made with an account's YouTube Music: only that account's radios use it). The seed → its
+  50 songs, whenever the server fetches a radio, a phone sends one it fetched
+  (`POST /api/auth/radio-fetch`), or the radio crawl fetches one; each fetch is kept in
+  `radio_fetches` first (a room's at most every 6 hours per seed and account).
+- **Imported edges** = `'imported'` / `'server_imported'`: like personal and server, from
+  plays imported from Takeout (`plays.import_id`), so they can be weighed apart.
 - **Solo vs. shared** listening are separate counters, so radio can use either or both.
 
 ### What counts as "played after"
@@ -127,17 +144,50 @@ Edges store **counts** (plays, skips, YTM rank), not a final weight. The weight 
 computed when the graph is read:
 
 ```
-personal = 2 · (solo + 0.6 · shared − skips) · decay     (shared left out for "only solo")
-server   =     (solo + 0.6 · shared − skips) · decay
-ytm      = 1.5 · max(0.2, 1 − rank / 25) · decay
-decay    = 0.5 ^ (days since updated_at / 180)
+personal        = P · (solo + party · shared − skip · skips) · decay   (shared left out for "only solo")
+imported        = P · I · (solo − skip · skips) · decay
+server          = S · (solo + party · shared − skip · skips) · decay
+server_imported = S · I · (solo − skip · skips) · decay
+ytm(_account)   = Y(A) · max(0.2, 1 − average rank / 50) · min(2, √seen) · decay   (0 past radioDepth)
+decay           = 0.5 ^ (days since updated_at / halfLifeDays)
 ```
 
-The formula can be tuned without migrating data (the numbers are a first guess, see
-[open questions](../open-questions.md)). And because the full listening history is stored
-too, everything but the YTM edges is **rebuilt from history**: on the first start with the
-graph (so an existing history counts right away), when its version changes, and after
-deleting from a history (so deleted plays are gone from the graph too).
+The numbers are the account's `GraphTuning` (account data `graph_tuning`; defaults P 2, I 1,
+S 1, Y 1.5, A 0.5, party 0.6, skip 1, reverse 0.5, second hop 0.35, 180 days, depth 50),
+set with the sliders of the graph view (`GET/PUT /api/account/graph/tuning`). The page
+weighs the raw edges of `GET /api/account/graph` with the same formula
+(`frontend/src/lib/graph.ts`), so the sliders redraw at once. Because what the graph learns
+from is all kept (the plays and `radio_fetches`), **all of it is rebuilt**: on the first
+start with the graph or when its version changes, after deleting from a history, and after
+a Takeout import or removing one. YTM edges from before radios were kept (`seen = 0`) stay
+as they are.
+
+### Radio hints
+
+A room's radio asks the owner's server `POST /api/auth/radio-hints` (`RadioHintsRequest`:
+the seed, YouTube Music's songs, the room's `RadioOptions`): the graph's songs for the seed,
+and of all of them which the account heard (for *songs you know / new to you*) and which to
+leave out (skipped more than heard, or played in the last hours). An older server without
+it gets `GET /api/auth/radio` (only the songs).
+
+### Takeout import
+
+`POST /api/account/imports` (the zip, or the watch history in it, read by `host/Takeout`):
+the YouTube Music plays go into `plays` with an `import_id`, room `takeout` (so they only
+follow each other), no length, heard = the time to the next play (at most 15 min), skipped
+when that's under 30 s. A play already in the history is left out: the same song started
+here up to 15 minutes before (YTMP adds a play to YouTube Music's history when it ends) or 2
+after. `DELETE /api/account/imports/{id}` takes it out again.
+
+### The radio crawl
+
+`host/RadioCrawl.kt`: one anonymous radio every `paceSeconds` (default 90, at least 30) of a
+song not learned in `refreshDays` (default 90), oldest first; after an error it waits 30
+minutes, after a bot check 6 hours. The server's crawls its local music with a YouTube Music
+ID and its song cache, kept in its settings (`radio_crawl`, `GET/PUT /api/admin/radio-crawl`).
+A phone's crawls its matched music files and saved songs, sends each radio to its owner's
+server and keeps when in `radio-crawl-log.json` (`GET/PUT /api/radio-crawl`, only on the
+phone; it waits for the matcher's Wi-Fi and charging rules).
 
 ### Song matching
 

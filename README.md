@@ -73,7 +73,16 @@ Music, without Premium, and not tied to a single music service.
 - Radio from a song (it can clear the songs that played before too, like YouTube Music),
   autoplay when the queue runs out, find similar. With a YTMP account they
   learn which songs you (and everyone on your server) play after each other, and mix those
-  in; local music gets a radio from it too.
+  in. *Radio from* chips above Up next: Mix, YouTube Music, Song graph, or only what's on
+  this device. A music file that is a YouTube Music song gets that song's radio; other files
+  get songs like them, never a shuffle.
+- Hold Start radio (or right-click it) to choose for one radio: where from, songs you know
+  or new ones, with or without your YouTube Music account. *Settings → Radio* has the
+  defaults, songs per artist, leave out songs you skip or just played, never-in-radios.
+- The song graph: import your YouTube Music history from Google Takeout, see the graph
+  (around a song, or your most played) and move sliders for how much each part counts.
+  The server (and the phone) can slowly learn YouTube Music's radios of your music; every
+  radio is kept as it came, so the graph can be weighed again without fetching anything.
 - Podcasts: subscribe, new episodes on Home, played marks and resume where you stopped (in
   any room, with a YTMP account), playback speed for the room, exact episode lengths, back
   10 s / ahead 30 s, no music radio after an episode.
@@ -110,7 +119,10 @@ Music, without Premium, and not tied to a single music service.
   In the app the phone's speaker, wired headphones and each Bluetooth device keep their own.
 - A song menu (⋮, right-click or hold) you can arrange yourself (*Settings → Song menu*):
   order, hide actions, dividers. On a phone it slides up from the bottom like YouTube
-  Music's, with three big buttons at the top that you pick.
+  Music's, with three big buttons at the top that you pick. Hold an action for more:
+  where Add to queue puts it, Save to playlist straight into the last one, Dislike's
+  never-in-radios, remove all by an artist, keep a song offline; Shuffle, Next and Play on
+  can be held too. Each hold can be switched off or trimmed.
 - Download a song or episode from its menu: a music file with its title, artist, album and
   cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app
