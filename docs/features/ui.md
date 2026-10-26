@@ -347,8 +347,8 @@ Open it with the **⋮** button or by **right-clicking** the song.
   the setting allows.
 - **Pull Home down** to load new suggestions (only a pull down: swiping a row sideways never
   refreshes). Rows that scroll sideways have **page dots**.
-- **Long lists** come in pages: Liked music and your own playlists load more as you scroll
-  down; songs in Local have **Load more**. How many songs a page has (100, 300 or 1000, or a
+- **Long lists** come in pages: playlists (Liked music and your own too) load more as you
+  scroll down; songs in Local have **Load more**. How many songs a page has (100, 300 or 1000, or a
   number from 10 to 5000 typed in) is a setting in *Settings → Look*.
 - Phones: the mini player's progress line is at its **bottom**, between it and the bottom bar.
 - Actions that need a room permission (for example adding songs) are **disabled** when you

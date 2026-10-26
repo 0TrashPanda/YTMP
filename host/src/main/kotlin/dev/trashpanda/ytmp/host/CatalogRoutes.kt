@@ -68,7 +68,8 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
     }
     get("/artists/{id}") { call.respond(catalog("artist").artist(call.parameters["id"]!!)) }
     get("/albums/{id}") { call.respond(catalog("album").album(call.parameters["id"]!!)) }
-    get("/playlists/{id}") { call.respond(catalog("playlist").playlist(call.parameters["id"]!!)) }
+    // ?more=: the next part of a long playlist ([PlaylistPage.more]).
+    get("/playlists/{id}") { call.respond(catalog("playlist").playlist(call.parameters["id"]!!, call.request.queryParameters["more"])) }
     get("/podcasts/{id}") { call.respond(catalog("podcast").podcast(call.parameters["id"]!!)) }
     // A song by its ID: a link to it was pasted in the search box.
     get("/songs/{id}") {

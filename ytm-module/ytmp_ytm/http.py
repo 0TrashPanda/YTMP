@@ -140,8 +140,8 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         return ytm.album(album_id)
 
     @app.get("/playlists/{playlist_id}", dependencies=[Depends(check_key)])
-    def playlist(playlist_id: str):
-        return ytm.playlist(playlist_id)
+    def playlist(playlist_id: str, more: str | None = None):
+        return ytm.playlist(playlist_id, more=more)
 
     @app.get("/home", dependencies=[Depends(check_key)])
     def home():
@@ -372,6 +372,7 @@ def main() -> None:
         js_runtime=os.environ.get("YTMP_YTM_JS_RUNTIME") or None,
         pot_url=os.environ.get("YTMP_YTM_POT_URL") or None,
     )
+    ytm.warm_up()
     app = create_app(ytm, os.environ.get("YTMP_MODULE_KEY") or None)
     uvicorn.run(
         app,

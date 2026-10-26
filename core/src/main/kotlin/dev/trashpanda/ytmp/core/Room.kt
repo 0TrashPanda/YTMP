@@ -207,6 +207,8 @@ class Room(
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
 
     private var resolveJob: Job? = null
+    /** The song after this one whose stream was looked up ahead of time (see [warmUpNext]). */
+    private var warmedUp: String? = null
     private var endJob: Job? = null
     /** Pauses the music when nothing plays it any more (see [pauseWhenNobodyHears]). */
     private var emptyJob: Job? = null
@@ -1767,8 +1769,8 @@ class Room(
             }
             // Warm up the next song so it starts quickly.
             if (next != null) {
-                runCatching { streams.resolveStream(next.song.id) }
-                    .onFailure { if (it !is CancellationException) log.info("Room {}: warming up the next song {} failed: {}", code, next.song.id, it.message) }
+                warmedUp = next.song.id
+                warm(next.song)
             }
         }
     }
@@ -2020,6 +2022,23 @@ class Room(
         isPlaying = wantPlaying
         for (member in members.values) member.send(message)
         for (listener in changeListeners) listener()
+        if (event is Event.QueueItemsAdded || event is Event.QueueItemMoved || event is Event.QueueItemRemoved || event is Event.QueueReplaced) warmUpNext()
+    }
+
+    /**
+     * A new song is next (added to play next, moved up): its stream is looked up now, while
+     * this one plays, instead of when this one ends. Once per song.
+     */
+    private fun warmUpNext() {
+        val next = queue.firstOrNull()?.song ?: return
+        if (streamUrl == null || next.id == warmedUp) return
+        warmedUp = next.id
+        scope.launch { warm(next) }
+    }
+
+    private suspend fun warm(song: Song) {
+        runCatching { streams.resolveStream(song.id) }
+            .onFailure { if (it !is CancellationException) log.info("Room {}: warming up the next song {} failed: {}", code, song.id, it.message) }
     }
 
     private fun invalid(message: String) = ErrorInfo(ErrorCode.INVALID, message)

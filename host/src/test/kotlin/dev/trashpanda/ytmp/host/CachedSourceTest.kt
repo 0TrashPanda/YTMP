@@ -43,7 +43,7 @@ class CachedSourceTest {
         val source = CachedSource({ _, _ -> searches++; page }, { emptyList() }, object : dev.trashpanda.ytmp.core.CatalogSource {
             override suspend fun artist(id: String) = error("no")
             override suspend fun album(id: String) = error("no")
-            override suspend fun playlist(id: String) = error("no")
+            override suspend fun playlist(id: String, more: String?) = error("no")
             override suspend fun podcast(id: String) = error("no")
             override suspend fun home() = error("no")
         })

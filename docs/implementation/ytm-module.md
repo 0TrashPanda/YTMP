@@ -90,13 +90,22 @@ them encrypted with the account (`YoutubeLinks.kt`, AES-GCM) and sends them to t
 Works without a Google Cloud project. An expired sign-in shows as signed out. yt-dlp stays
 anonymous (it doesn't use the cookies).
 
-**Your playlists in parts:** Liked music and your own playlists load part by part (YouTube
-Music's own parts, ~100 songs), so a big library opens quickly. ytmusicapi's `get_playlist`
+**Playlists in parts:** playlists (public ones, Liked music and your own) load part by part
+(YouTube Music's own parts, ~100 songs), so a long one opens as fast as a short one; the
+artist page's songs are the first part of the artist's songs playlist. ytmusicapi's `limit`
+doesn't count the first part (`limit=20` still loads a second part of 100). ytmusicapi's `get_playlist`
 loads all parts itself and doesn't hand out the token for the next one, so `core.py` wraps
 its `get_continuations_2025`: with `limit=0` it stops after the first part and keeps that
 part's token (per thread) as the page's `more`. The next part is one `browse` request with
 that token, parsed with ytmusicapi's own `parse_playlist_items`. If a newer ytmusicapi
-renames that function, playlists simply load whole again.
+renames that function, playlists simply load whole again (public ones up to 1000 songs).
+
+**Only what's needed (speed):** yt-dlp skips its *initial data* request (`player_skip:
+initial_data`): that's chapters, comments and the heatmap, ~0.8 s per song whose answer YTMP
+never uses. At start the module gets YouTube Music's visitor ID in the background
+(`warm_up()`), so the first search or page doesn't wait for that 650 KB page (and doesn't
+fetch it three times over for a search's three parallel lookups). A personal Home loads the
+new episodes and YouTube Music's home at the same time.
 
 ## Android on-device variant ✅ (Chaquopy)
 

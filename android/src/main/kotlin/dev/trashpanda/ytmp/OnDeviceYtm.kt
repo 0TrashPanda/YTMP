@@ -60,7 +60,9 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
     class Stream(val url: String, val headers: Map<String, String>, val durationMs: Long?)
 
     private val python: Python
-    private val core: PyObject by lazy { python.getModule("ytmp_ytm.core").callAttr("YtmCore", language, location, null) }
+    private val core: PyObject by lazy {
+        python.getModule("ytmp_ytm.core").callAttr("YtmCore", language, location, null).also { it.callAttr("warm_up") }
+    }
     private val json: PyObject
 
     /**
@@ -108,8 +110,8 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         ProtocolJson.decodeFromString(AlbumPage.serializer(), json.callAttr("dumps", core.callAttr("album", id)).toString())
     }
 
-    override suspend fun playlist(id: String): PlaylistPage = python {
-        ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id)).toString())
+    override suspend fun playlist(id: String, more: String?): PlaylistPage = python {
+        ProtocolJson.decodeFromString(PlaylistPage.serializer(), json.callAttr("dumps", core.callAttr("playlist", id, false, more)).toString())
     }
 
     override suspend fun podcast(id: String): PodcastPage = python {

@@ -29,7 +29,9 @@ from .parse import MODULE_ID
 
 _PREFIXES = ("ytm:", "yt:")
 _ARTIST_SONGS = 20
-# Public playlists can be huge; your own (Liked music too) come in parts (YouTube's, ~100 songs).
+# Playlists come in parts (YouTube's, ~100 songs): the page shows the first right away and asks
+# for more as you scroll, so a long one opens as fast as a short one. Without ytmusicapi's
+# parts (see _first_part_only), public ones load whole, up to this many songs.
 _PLAYLIST_SONGS = 1000
 _HOME_SECTIONS = 12
 _LIBRARY_ITEMS = 200
@@ -54,6 +56,9 @@ _SLOW_RESOLVE_S = 8.0
 # an ad and only work once it's over, so the usual player (no ads) goes first: the mobile web
 # player is there for when YouTube's bot check turns the usual one away.
 _PO_TOKEN_ARGS = {"player_client": ["visionos", "mweb"], "fetch_pot": ["always"], "skip": ["hls"]}
+# yt-dlp's "initial data" is the watch page's other half (chapters, comments, heatmap): a
+# request of ~0.8 s for every song whose answer we never use.
+_PLAYER_SKIP = {"player_skip": ["initial_data"]}
 # Waiting longer than this for an ad to end is not worth it: the song fails instead.
 _MAX_AD_WAIT_S = 60
 # After YouTube's bot check, no lookups for this long, longer each time it's still there:
@@ -152,8 +157,9 @@ class YtmCore:
         if js_runtime:
             self._ydl_opts["js_runtimes"] = {js_runtime: {}}
         self._pot_url = pot_url
+        self._ydl_opts["extractor_args"] = {"youtube": _PLAYER_SKIP}
         if pot_url:
-            self._ydl_opts["extractor_args"] = {"youtubepot-bgutilhttp": {"base_url": [pot_url]}}
+            self._ydl_opts["extractor_args"]["youtubepot-bgutilhttp"] = {"base_url": [pot_url]}
         self._bot_check = _BotCheck()
         self._streams: dict[str, StreamInfo] = {}
         self._lock = threading.Lock()
@@ -163,6 +169,19 @@ class YtmCore:
         # that everything shared (search, rooms) keeps using.
         self._user: YTMusic | None = None
         log.info("yt-dlp %s, ytmusicapi %s", yt_dlp.version.__version__, _version("ytmusicapi"))
+
+    def warm_up(self) -> None:
+        """Gets YouTube Music's visitor ID now, in the background: the first search or page needs
+        it, and would otherwise wait for it (a 650 KB page, ~1 s), once per request made at
+        the same time."""
+
+        def visit() -> None:
+            try:
+                _ = self._ytm.base_headers
+            except Exception as e:  # offline: the first request tries again
+                log.info("No visitor ID yet: %s", e)
+
+        threading.Thread(target=visit, name="ytm-warm-up", daemon=True).start()
 
     def sign_in(self, cookie: str) -> dict:
         """Uses the cookies of a signed-in music.youtube.com session for personal pages.
@@ -285,7 +304,7 @@ class YtmCore:
         # The artist's songs are a playlist; read more of it than the 5 on the page.
         if songs_section.get("browseId"):
             try:
-                playlist = self._ytm.get_playlist(songs_section["browseId"], limit=_ARTIST_SONGS)
+                playlist = _first_part_of(self._ytm, songs_section["browseId"])[0]
                 songs = [s for t in playlist.get("tracks") or [] if (s := parse.song_from_search(t))]
             except Exception:
                 songs = []
@@ -338,19 +357,16 @@ class YtmCore:
     def playlist(self, playlist_id: str, personal: bool = False, more: str | None = None) -> dict:
         """A playlist with its songs: a public one, or with [personal] also the signed-in account's own (Liked music is "LM").
 
-        Your own come in parts: the first, then [more] (the page's "more") asks for the next songs only.
+        It comes in parts: the first, then [more] (the page's "more") asks for the next songs only.
         """
         ytm = self._signed_in() if personal else self._ytm
-        if personal and more:
-            return self._more_of_playlist(ytm, playlist_id, more)
-        token = None
+        if more:
+            return self._more_of_playlist(ytm, playlist_id, more, places=personal)
         try:
-            if personal and _first_part_only:
-                _first_part.token = None
-                p = ytm.get_playlist(playlist_id, limit=0)
-                token = _first_part.token
+            if _first_part_only:
+                p, token = _first_part_of(ytm, playlist_id)
             else:
-                p = ytm.get_playlist(playlist_id, limit=None if personal else _PLAYLIST_SONGS)
+                p, token = ytm.get_playlist(playlist_id, limit=None if personal else _PLAYLIST_SONGS), None
         except Exception as e:
             # ytmusicapi's message is about YouTube's page layout: keep it for the log only.
             log.info("playlist %s: %s", playlist_id, e)
@@ -370,8 +386,9 @@ class YtmCore:
             "songCount": count if isinstance(count, int) else None,
         }
 
-    def _more_of_playlist(self, ytm: YTMusic, playlist_id: str, token: str) -> dict:
-        """The next part of your own playlist: only its songs (and the token for the part after it)."""
+    def _more_of_playlist(self, ytm: YTMusic, playlist_id: str, token: str, places: bool) -> dict:
+        """The next part of a playlist: only its songs (and the token for the part after it).
+        [places]: your own, with each song's place in it."""
         try:
             response = ytm._send_request("browse", {"continuation": token})
             items = nav(response, CONTINUATION_ITEMS, True) or []
@@ -387,7 +404,7 @@ class YtmCore:
             "author": None,
             "description": None,
             "thumbnails": [],
-            **parse.playlist_songs(tracks, places=True),
+            **parse.playlist_songs(tracks, places=places),
             "more": following if tracks else None,
         }
 
@@ -568,15 +585,19 @@ class YtmCore:
         """
         ytm = self._signed_in() if personal else self._ytm
         sections = []
-        if personal:
-            # New episodes of your podcasts first, like YouTube Music shows them to podcast listeners.
-            try:
-                episodes = self.new_episodes()
-                if episodes:
-                    sections.append({"title": "New episodes", "items": [{"kind": "song", "song": s, "video": False} for s in episodes]})
-            except Exception as e:
-                log.info("No new episodes on Home: %s", e)
-        for s in ytm.get_home(limit=_HOME_SECTIONS):
+        with ThreadPoolExecutor(2) as pool:
+            # At the same time: the new episodes take a lookup per podcast.
+            episodes = pool.submit(self.new_episodes) if personal else None
+            home = pool.submit(ytm.get_home, limit=_HOME_SECTIONS)
+            if episodes:
+                # New episodes of your podcasts first, like YouTube Music shows them to podcast listeners.
+                try:
+                    if found := episodes.result():
+                        sections.append({"title": "New episodes", "items": [{"kind": "song", "song": s, "video": False} for s in found]})
+                except Exception as e:
+                    log.info("No new episodes on Home: %s", e)
+            home_sections = home.result()
+        for s in home_sections:
             items = [item for c in s.get("contents") or [] if (item := parse.home_item(c))]
             if items:
                 sections.append({"title": s.get("title") or "", "items": items})
@@ -598,7 +619,7 @@ class YtmCore:
         steps = _YdlLog(vid)
         opts = dict(self._ydl_opts, logger=steps)
         if self._pot_url or pot.available():
-            opts["extractor_args"] = dict(opts.get("extractor_args") or {}, youtube=_PO_TOKEN_ARGS)
+            opts["extractor_args"] = dict(opts.get("extractor_args") or {}, youtube={**_PLAYER_SKIP, **_PO_TOKEN_ARGS})
         started = time.monotonic()
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
@@ -703,12 +724,24 @@ def _version(package: str) -> str:
         return "?"
 
 
-# Your own playlists in parts: ytmusicapi loads the parts after the first itself (get_playlist's
+# Playlists in parts: ytmusicapi loads the parts after the first itself (get_playlist's
 # limit), and doesn't say how to ask for the next one. With limit 0 it stops after the first
 # part, and this keeps that part's token (per thread). If a new ytmusicapi works differently,
 # they're loaded whole, as before.
 _first_part = threading.local()
 _load_parts = getattr(ytmusicapi.mixins.playlists, "get_continuations_2025", None)
+
+
+def _first_part_of(ytm: YTMusic, playlist_id: str) -> tuple[dict, str | None]:
+    """A playlist with only its first part of songs, and the token for the next part (None: no more).
+
+    ytmusicapi's own limit doesn't count the first part: limit=20 loads a second part anyway.
+    """
+    if not _first_part_only:
+        return ytm.get_playlist(playlist_id, limit=_ARTIST_SONGS), None
+    _first_part.token = None
+    p = ytm.get_playlist(playlist_id, limit=0)
+    return p, _first_part.token
 
 
 def _first_part_then_token(results, limit, request_func, parse_func):

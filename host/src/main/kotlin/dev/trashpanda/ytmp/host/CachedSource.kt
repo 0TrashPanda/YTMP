@@ -56,7 +56,8 @@ class CachedSource(
     override suspend fun album(id: String) = albums.get(id) { catalog.album(id) }
 
     // Shorter: people edit their playlists.
-    override suspend fun playlist(id: String) = playlists.get(id) { catalog.playlist(id) }
+    override suspend fun playlist(id: String, more: String?) =
+        playlists.get(if (more == null) id else "$id\n$more") { catalog.playlist(id, more) }
 
     override suspend fun podcast(id: String) = podcasts.get(id) { catalog.podcast(id) }
 

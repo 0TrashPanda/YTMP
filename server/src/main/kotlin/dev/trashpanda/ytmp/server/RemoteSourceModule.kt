@@ -119,8 +119,11 @@ class RemoteSourceModule(
     override suspend fun album(id: String): AlbumPage =
         client.get("$baseUrl/albums/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
 
-    override suspend fun playlist(id: String): PlaylistPage =
-        client.get("$baseUrl/playlists/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
+    override suspend fun playlist(id: String, more: String?): PlaylistPage =
+        client.get("$baseUrl/playlists/${id.encodeURLPathPart()}") {
+            auth()
+            if (more != null) parameter("more", more)
+        }.orThrow().body()
 
     override suspend fun podcast(id: String): PodcastPage =
         client.get("$baseUrl/podcasts/${id.encodeURLPathPart()}") { auth() }.orThrow().body()

@@ -46,7 +46,7 @@ def _bare_core() -> core.YtmCore:
     ytm = core.YtmCore.__new__(core.YtmCore)
     ytm._lock = core.threading.Lock()
     ytm._streams = {}
-    ytm._ydl_opts = {}
+    ytm._ydl_opts = {"extractor_args": {"youtube": core._PLAYER_SKIP}}
     ytm._pot_url = None
     ytm._bot_check = core._BotCheck()
     return ytm
@@ -146,7 +146,8 @@ def test_po_tokens_ask_as_the_mobile_web_player(monkeypatch):
 
     monkeypatch.setattr(FakeYdl, "opts", [])
     _bare_core().stream("ytm:abc")
-    assert "extractor_args" not in FakeYdl.opts[0]
+    # Without tokens: only the request whose answer isn't used is skipped.
+    assert FakeYdl.opts[0]["extractor_args"] == {"youtube": {"player_skip": ["initial_data"]}}
 
     # A server with a bgutil server.
     monkeypatch.setattr(FakeYdl, "opts", [])
@@ -162,6 +163,7 @@ def test_po_tokens_ask_as_the_mobile_web_player(monkeypatch):
     monkeypatch.setattr(core.pot, "_botguard", object())
     _bare_core().stream("ytm:abc")
     assert FakeYdl.opts[0]["extractor_args"]["youtube"]["fetch_pot"] == ["always"]
+    assert FakeYdl.opts[0]["extractor_args"]["youtube"]["player_skip"] == ["initial_data"]
 
 
 def test_parse_range():
@@ -430,6 +432,28 @@ def test_own_playlists_come_in_parts(monkeypatch):
     more = ytm.playlist("LM", personal=True, more="NEXT")
     assert sent == [{"continuation": "NEXT"}]
     assert ([s["id"] for s in more["songs"]], more["itemIds"], more["more"]) == (["ytm:bbbbbbbbbbb"], ["S9"], None)
+
+
+def test_public_playlists_come_in_parts_too(monkeypatch):
+    ytm, user = _signed_in_core(monkeypatch)
+    sent = []
+
+    def first_part(playlist_id, limit=None):
+        assert limit == 0
+        shelf = {"contents": [{"continuationItemRenderer": {"continuationEndpoint": {"continuationCommand": {"token": "NEXT"}}}}]}
+        core.ytmusicapi.mixins.playlists.get_continuations_2025(shelf, limit, None, None)
+        return {"title": "Big", "trackCount": 900, "tracks": [{"videoId": "aaaaaaaaaaa", "title": "A", "artists": [], "duration_seconds": 100}]}
+
+    monkeypatch.setattr(user, "get_playlist", first_part)
+    page = ytm.playlist("PLbig")
+    assert (page["more"], page["songCount"], page["owned"]) == ("NEXT", 900, False)
+
+    monkeypatch.setattr(user, "_send_request", lambda endpoint, body: sent.append(body) or {"onResponseReceivedActions": [{"appendContinuationItemsAction": {"continuationItems": ["x"]}}]}, raising=False)
+    monkeypatch.setattr(core, "parse_playlist_items", lambda items: [{"videoId": "bbbbbbbbbbb", "title": "B", "artists": [], "setVideoId": "S9", "duration_seconds": 90}])
+    monkeypatch.setattr(core, "get_continuation_token", lambda items: None)
+    more = ytm.playlist("PLbig", more="NEXT")
+    # Not yours: no places in it.
+    assert (sent, [s["id"] for s in more["songs"]], more["itemIds"]) == ([{"continuation": "NEXT"}], ["ytm:bbbbbbbbbbb"], [])
 
 
 def test_a_playlist_youtube_wont_show_says_so_plainly():

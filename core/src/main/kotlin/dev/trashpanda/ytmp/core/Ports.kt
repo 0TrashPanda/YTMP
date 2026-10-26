@@ -63,7 +63,8 @@ interface CatalogSource {
 
     suspend fun album(id: String): AlbumPage
 
-    suspend fun playlist(id: String): PlaylistPage
+    /** The first part of a playlist, or with [more] (its [PlaylistPage.more]) only the next songs. */
+    suspend fun playlist(id: String, more: String? = null): PlaylistPage
 
     suspend fun podcast(id: String): PodcastPage
 

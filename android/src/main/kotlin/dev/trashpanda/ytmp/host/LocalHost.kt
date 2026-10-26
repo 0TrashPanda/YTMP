@@ -202,7 +202,7 @@ class LocalHost(private val context: Context) {
         catalog = object : CatalogSource {
             override suspend fun artist(id: String) = ytm.artist(id)
             override suspend fun album(id: String) = ytm.album(id)
-            override suspend fun playlist(id: String) = ytm.playlist(id)
+            override suspend fun playlist(id: String, more: String?) = ytm.playlist(id, more)
             override suspend fun podcast(id: String) = ytm.podcast(id)
             override suspend fun song(id: String) = ytm.song(id)
             override suspend fun home() = ytm.home()
