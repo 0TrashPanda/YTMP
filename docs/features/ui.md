@@ -407,7 +407,7 @@ time, the layout of the device you set it up on goes to your account.
 | Save to playlist | saves straight into the playlist you saved to last: "Saved to … · **Change**" |
 | Dislike | dislike and don't play this artist in radios, or never put this song in radios (or allow them again) |
 | Remove (Up next) | remove the songs by this artist, or the songs this person added |
-| Go to artist | pick one of all the song's artists |
+| Go to artist | pick one of all the song's artists (the menu shows only the first; with this hold off, a line each) |
 | Download (the app, on the phone's own pages) | save as a music file, or only keep it offline in the app |
 | Sleep timer | starts the time used last ("Stops in 30 min · Change") |
 

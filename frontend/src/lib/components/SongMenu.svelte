@@ -368,8 +368,12 @@
 			song.artists.length > 1
 				? choicesFor('goArtist', 'Go to artist', () => song.artists.map((a) => ({ id: 'pick', icon: 'person' as IconName, label: a.name, run: () => (onArtist(a), onClose()) })))
 				: undefined;
-		for (const artist of song.artists.slice(0, 3)) {
-			add('goArtist', { icon: 'person', label: `Go to ${artist.name}`, run: () => (onArtist(artist), onClose()), held: pickArtist });
+		// One entry for the first artist, the others by holding it; with holding off, one each (up to 3).
+		if (pickArtist) {
+			const first = song.artists[0];
+			add('goArtist', { icon: 'person', label: `Go to ${first.name}`, run: () => (onArtist(first), onClose()), held: pickArtist });
+		} else {
+			for (const artist of song.artists.slice(0, 3)) add('goArtist', { icon: 'person', label: `Go to ${artist.name}`, run: () => (onArtist(artist), onClose()) });
 		}
 		if (song.album) {
 			const album = song.album;
