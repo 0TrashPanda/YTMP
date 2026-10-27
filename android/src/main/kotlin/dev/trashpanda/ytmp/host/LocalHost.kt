@@ -170,6 +170,14 @@ class LocalHost(private val context: Context) {
         scope.launch { authLink.auth.reportRadio(token, RadioFetchReport(seed, songs, withAccount, way)) }
     }
 
+    /** The song graph for the songs the phone can play offline, from the owner's server, for radios without it. */
+    private val graphCopy = GraphCopyStore(
+        File(context.filesDir, "graph-copy.json"),
+        scope,
+        songs = { (if (phoneMusicOn) local.songs(PhoneLibrary.ID) else emptyList()) + cache.songs() + matcher.all().map { it.second } },
+        fetch = { request -> authLink.ownerAccount?.let(sync::tokenFor)?.let { authLink.auth.graphCopy(it, request) } },
+    )
+
     private val crawlLog = RadioCrawl.FileLog(File(context.filesDir, "radio-crawl-log.json"))
     private val crawlFile = File(context.filesDir, "radio-crawl.json")
 
@@ -262,7 +270,8 @@ class LocalHost(private val context: Context) {
             // The song graph of the owner's server: their listening, and everyone's there.
             hints = { owner, seed, candidates, options ->
                 val token = (owner ?: authLink.ownerAccount)?.let(sync::tokenFor)
-                val hints = token?.let { authLink.auth.radioHints(it, RadioHintsRequest(seed, candidates, options)) } ?: RadioHints(emptyList())
+                // The server can't be reached: the phone's own copy of the graph for its songs.
+                val hints = token?.let { authLink.auth.radioHints(it, RadioHintsRequest(seed, candidates, options)) } ?: RadioHints(graphCopy.similar(seed))
                 hints.copy(similar = hints.similar.filter { local.playable(it.id) })
             },
             // A file on the phone that is a YouTube Music song (its tags, its name, or found by the matcher).
@@ -402,6 +411,7 @@ class LocalHost(private val context: Context) {
         rooms.startCleanup()
         sync.start()
         crawl.start()
+        graphCopy.start()
         outputs.attach(rooms)
         if (phoneMusicOn) local.add(phoneLibrary)
         cache.inUse = { rooms.songsInUse() }

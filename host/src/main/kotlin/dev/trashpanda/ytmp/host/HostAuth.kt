@@ -4,6 +4,8 @@ import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.protocol.AuthServerInfo
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import dev.trashpanda.ytmp.protocol.GraphCopy
+import dev.trashpanda.ytmp.protocol.GraphCopyRequest
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
 import dev.trashpanda.ytmp.protocol.RadioHints
 import dev.trashpanda.ytmp.protocol.RadioHintsRequest
@@ -48,7 +50,10 @@ interface HostAuth {
      * What the song graph of the auth server of the account in [token] says about a radio ([RadioHints]).
      * Only [RadioHints.similar] from a server that doesn't know more.
      */
-    suspend fun radioHints(token: String, request: RadioHintsRequest): RadioHints = RadioHints(similar(token, request.seed))
+    suspend fun radioHints(token: String, request: RadioHintsRequest): RadioHints? = RadioHints(similar(token, request.seed))
+
+    /** The graph for a phone's songs from the account in [token]'s auth server ([GraphCopy]); null when it can't be had. */
+    suspend fun graphCopy(token: String, request: GraphCopyRequest): GraphCopy? = null
 
     /**
      * Tells the account in [token]'s auth server about a YouTube Music radio this host fetched
@@ -150,7 +155,8 @@ class TrustedAuthServers(
         }.onFailure { log.warn("No songs from the song graph of {}: {}", claims.iss, it.message) }.getOrDefault(emptyList())
     }
 
-    override suspend fun radioHints(token: String, request: RadioHintsRequest): RadioHints = withContext(Dispatchers.IO) {
+    /** Null: the server couldn't be asked (the phone then uses its copy of the graph). */
+    override suspend fun radioHints(token: String, request: RadioHintsRequest): RadioHints? = withContext(Dispatchers.IO) {
         val claims = AccountTokens.verify(token, { trusted[it]?.key }, clock() / 1000) ?: return@withContext RadioHints(emptyList())
         if (claims.scope != null) return@withContext RadioHints(emptyList())
         val server = trusted[claims.iss]?.ref ?: return@withContext RadioHints(emptyList())
@@ -158,7 +164,28 @@ class TrustedAuthServers(
         runCatching { fetchHints(url, token, request) }
             .recoverCatching { e -> if (e is NotThere) RadioHints(fetchSimilar(url, token, request.seed)) else throw e }
             .onFailure { log.warn("No songs from the song graph of {}: {}", claims.iss, it.message) }
-            .getOrDefault(RadioHints(emptyList()))
+            .getOrNull()
+    }
+
+    override suspend fun graphCopy(token: String, request: GraphCopyRequest): GraphCopy? = withContext(Dispatchers.IO) {
+        val (claims, server) = ownerOf(token) ?: return@withContext null
+        val url = server.url ?: return@withContext null
+        runCatching {
+            val connection = URI("${url.trimEnd('/')}/api/auth/graph-copy").toURL().openConnection() as HttpURLConnection
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 60_000
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.setRequestProperty("Content-Type", "application/json")
+            try {
+                connection.outputStream.use { it.write(ProtocolJson.encodeToString(GraphCopyRequest.serializer(), request).toByteArray()) }
+                if (connection.responseCode != 200) throw SourceException("$url answered ${connection.responseCode}")
+                ProtocolJson.decodeFromString(GraphCopy.serializer(), connection.inputStream.bufferedReader().readText())
+            } finally {
+                connection.disconnect()
+            }
+        }.onFailure { log.info("No copy of the song graph from {}: {}", claims.iss, it.message) }.getOrNull()
     }
 
     override suspend fun reportRadio(token: String, report: RadioFetchReport): Boolean = withContext(Dispatchers.IO) {

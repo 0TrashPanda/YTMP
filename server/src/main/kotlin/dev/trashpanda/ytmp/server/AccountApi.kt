@@ -54,6 +54,8 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import dev.trashpanda.ytmp.host.Takeout
 import dev.trashpanda.ytmp.protocol.GraphBuildStatus
+import dev.trashpanda.ytmp.protocol.GraphCopy
+import dev.trashpanda.ytmp.protocol.GraphCopyRequest
 import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.HistoryImportList
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
@@ -185,6 +187,14 @@ class AccountService(
         return graph.hints(request.seed, account?.id, request.candidates.take(200), request.options, use, account?.let(::tuning) ?: GraphTuning(), request.limit.coerceIn(1, 200))
     }
 
+    /** For a phone of [username] (one of ours): its songs' neighbours among its songs ([SongGraph.neighboursAmong]). */
+    fun graphCopy(username: String, request: GraphCopyRequest, personal: Boolean): Map<String, List<String>> {
+        val graph = graph ?: return emptyMap()
+        val account = accounts.find(username)?.takeIf { personal }
+        val use = account?.let(::settings)?.historyRadio ?: HistoryRadio.ALL
+        return graph.neighboursAmong(request.seeds, request.among, account?.id, use, account?.let(::tuning) ?: GraphTuning(), request.limit.coerceIn(1, 100))
+    }
+
     /** A host (a phone) fetched a YouTube Music radio for [username] (one of ours): the graph learns from it. */
     fun radioFetched(username: String, report: RadioFetchReport) {
         val account = accounts.find(username) ?: return
@@ -226,6 +236,16 @@ class AccountService(
             val claims = call.ownToken() ?: throw notLoggedIn()
             val request = call.receive<RadioHintsRequest>()
             call.respond(io { hints(claims.sub, request, personal = mayReadHistory(claims)) })
+        }
+
+        // A phone's copy of the graph for the songs it can play offline (radios without this server).
+        post("/auth/graph-copy") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            val request = call.receive<GraphCopyRequest>()
+            if (request.seeds.size > MAX_COPY_SEEDS || request.among.size > MAX_COPY_SONGS) {
+                throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Ask for at most $MAX_COPY_SEEDS songs at a time, among $MAX_COPY_SONGS")
+            }
+            call.respond(GraphCopy(io { graphCopy(claims.sub, request, personal = mayReadHistory(claims)) }))
         }
 
         // A phone fetched a YouTube Music radio (in a room, or to learn from): the graph keeps it.
@@ -666,3 +686,7 @@ private fun GraphTuning.sane() = GraphTuning(
     halfLifeDays = halfLifeDays.coerceIn(0.0, 3650.0),
     radioDepth = radioDepth.coerceIn(1, SongGraph.MAX_RADIO_SONGS),
 )
+
+/** A phone's copy of the graph is asked for this many songs at a time, among at most this many. */
+private const val MAX_COPY_SEEDS = 500
+private const val MAX_COPY_SONGS = 50_000

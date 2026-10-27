@@ -352,6 +352,31 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
 
     private fun similar(c: Connection, seedSongId: String, accountId: String?, use: HistoryRadio, limit: Int, tuning: GraphTuning): List<Song> {
         val seed = nodeOf(c, seedSongId) ?: return emptyList()
+        val ranked = ranked(c, seed, accountId, use, tuning).take(limit * 2)
+        return songs(c, ranked, prefer = seedSongId.substringBefore(':')).filter { it.id != seedSongId }.take(limit)
+    }
+
+    /**
+     * For each of [seeds] (a phone's songs), its best neighbours that are among [among] (the
+     * songs that phone can play offline), as those IDs: the phone's copy of the graph for
+     * radios without your server. Seeds without any are left out.
+     */
+    fun neighboursAmong(seeds: List<String>, among: Collection<String>, accountId: String?, use: HistoryRadio, tuning: GraphTuning, limit: Int): Map<String, List<String>> = db.use { c ->
+        // The phone's songs by node: a music file and its YouTube Music song are one.
+        val idsOfNode = HashMap<String, MutableList<String>>()
+        inList(c, "SELECT source_id, song_id FROM song_sources WHERE source_id", among.toList()) { idsOfNode.getOrPut(it.getString(2)) { mutableListOf() } += it.getString(1) }
+        val nodeOfId = idsOfNode.flatMap { (node, ids) -> ids.map { it to node } }.toMap()
+        buildMap {
+            for (seed in seeds) {
+                val node = nodeOfId[seed] ?: continue
+                val near = ranked(c, node, accountId, use, tuning).mapNotNull { idsOfNode[it]?.firstOrNull() }.filter { it != seed }.take(limit)
+                if (near.isNotEmpty()) put(seed, near)
+            }
+        }
+    }
+
+    /** The nodes that go with [seed], best first (enough to pass [MIN_SCORE]). */
+    private fun ranked(c: Connection, seed: String, accountId: String?, use: HistoryRadio, tuning: GraphTuning): List<String> {
         val now = clock()
         val scores = HashMap<String, Double>()
         for (edge in edges(c, listOf(seed), accountId, use, both = true)) {
@@ -372,8 +397,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                 if (edge.scope == RADIO_NEAR) strength[edge.to]?.let { if (edge.from != seed) scores.merge(edge.from, it * w, Double::plus) }
             }
         }
-        val ranked = scores.entries.filter { it.value >= MIN_SCORE }.sortedByDescending { it.value }.take(limit * 2).map { it.key }
-        return songs(c, ranked, prefer = seedSongId.substringBefore(':')).filter { it.id != seedSongId }.take(limit)
+        return scores.entries.filter { it.value >= MIN_SCORE }.sortedByDescending { it.value }.map { it.key }
     }
 
     /**

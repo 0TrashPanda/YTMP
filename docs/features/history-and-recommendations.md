@@ -125,6 +125,14 @@ learns much faster in a small group of friends.
   only gets what everyone on your server listens to.
 - Deleting from your history takes it out of the graph too (it's rebuilt from what's left).
 
+### On the phone, without your server
+
+The graph lives on your YTMP server, with your account. The app keeps a **copy for the songs
+it can play offline** (your music on the phone, and its saved songs): each one's best
+neighbours among them, weighed with your sliders. It's made again once a day when your server
+can be reached. When it can't (no internet, the server is down), radios use the copy: *Song
+graph* and *On this device* still bring the songs you play together.
+
 ### Importing from YouTube Music (Google Takeout)
 
 Your YouTube Music history from before YTMP can join yours: on your server's history page,

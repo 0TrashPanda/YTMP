@@ -187,6 +187,15 @@ and of all of them which the account heard (for *songs you know / new to you*) a
 leave out (skipped more than heard, or played in the last hours). An older server without
 it gets `GET /api/auth/radio` (only the songs).
 
+### The phone's copy
+
+`host/GraphCopyStore.kt`: the phone sends its offline songs' IDs (`among`; phone music, the song
+cache, music files matched to YouTube Music) in parts of 400 (`seeds`) to `POST
+/api/auth/graph-copy`; `SongGraph.neighboursAmong` ranks each seed's neighbours like a radio
+and keeps those among the phone's songs (a file and its YouTube Music song are one node). The
+phone keeps them with those songs in `files/graph-copy.json`, once a day, and its rooms' radio
+hints fall back to it when `radioHints` can't reach the server (null).
+
 ### Takeout import
 
 `POST /api/account/imports` (the zip, or the watch history in it, read by `host/Takeout`):

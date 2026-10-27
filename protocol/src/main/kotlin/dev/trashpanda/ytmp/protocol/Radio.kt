@@ -114,6 +114,27 @@ data class RadioHints(
     val avoid: List<String> = emptyList(),
 )
 
+/**
+ * `POST /api/auth/graph-copy` (a phone, with the account's host token): the song graph for the
+ * songs it can play offline, kept on the phone for radios without the server.
+ */
+@Serializable
+@SerialName("GraphCopyRequest")
+data class GraphCopyRequest(
+    /** The songs to give neighbours for (a part of [among] at a time). */
+    val seeds: List<String>,
+    /** All the songs the phone can play offline: neighbours are only these. */
+    val among: List<String>,
+    val limit: Int = 50,
+)
+
+@Serializable
+@SerialName("GraphCopy")
+data class GraphCopy(
+    /** Each seed's neighbours among the phone's songs, best first. */
+    val neighbours: Map<String, List<String>>,
+)
+
 /** How a stored radio was fetched. */
 @Serializable
 @SerialName("RadioWay")

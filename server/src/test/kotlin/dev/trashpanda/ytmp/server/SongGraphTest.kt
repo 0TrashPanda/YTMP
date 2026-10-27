@@ -258,4 +258,13 @@ class SongGraphTest {
         assertEquals(listOf(2, 4), nearEdges(SongGraph.IMPORTED_NEAR)["ytm:x>ytm:z"])
         assertEquals(true, graph.view("anna", "ytm:x", GraphTuning()).edges.single { it.kind == EdgeKind.IMPORTED && it.to != it.from && it.solo == 1 && it.confirmed }.confirmed)
     }
+
+    @Test
+    fun `a phone's copy gives each of its songs the neighbours that are on the phone too`() {
+        listOf("a", "b", "c").forEach { play("anna", song("ytm:$it")) }
+        // The phone has a and c (not b); a local file of c counts as c.
+        play("anna", song("local:phone:s:c.m4a", "Song ytm:c"), gapMs = 3 * 3_600_000L)
+        val copy = graph.neighboursAmong(listOf("ytm:a", "ytm:b"), listOf("ytm:a", "local:phone:s:c.m4a"), "anna", HistoryRadio.ALL, GraphTuning(), 10)
+        assertEquals(mapOf("ytm:a" to listOf("local:phone:s:c.m4a")), copy)
+    }
 }

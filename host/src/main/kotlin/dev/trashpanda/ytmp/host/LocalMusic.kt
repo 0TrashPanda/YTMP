@@ -180,6 +180,9 @@ class LocalMusic {
         }
     }.distinct()
 
+    /** All the songs of library [libraryId] (none when it isn't here). */
+    suspend fun songs(libraryId: String): List<Song> = libraries.value[libraryId]?.let { build(it).songs }.orEmpty()
+
     /** The library's track of local song [songId], or null. */
     suspend fun track(songId: String): LocalTrack? {
         val (library, kind, _) = runCatching { parse(songId) }.getOrNull() ?: return null
