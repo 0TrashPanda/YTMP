@@ -245,3 +245,18 @@ Remote **output** modules (for example a future Discord bot) would use a similar
 much smaller API: `POST /play { audioUrl, positionMs }`, `POST /pause`,
 `POST /volume { level }`, `GET /state`. This will be defined when the first remote
 output module is built.
+
+## Unreadable pages
+
+YouTube sometimes sends some visitors another page layout that ytmusicapi can't read (an
+artist page without `musicImmersiveHeaderRenderer`, 2026-10). `ytmp_ytm/keep.py` remembers
+YouTube's answers to the last few requests of each call, and when a call fails because a page
+didn't look as expected (a `KeyError`, `IndexError`, … anywhere in the cause) or only read with
+a fallback, writes them to `page-<time>-<what>-<id>.json` (the newest 10; requests and answers,
+never the request headers, so no cookies). Turn one into a test like
+`tests/test_core.py::test_artist_page_with_another_header` (the page in `tests/data/`).
+
+- **Phone:** in the app's `files/logs/pages`; *Settings → App → Send logs* adds them after the
+  logs. A debug build: `adb shell run-as dev.trashpanda.ytmp.debug ls files/logs/pages`.
+- **Server module:** in its temp folder (`/tmp/ytmp-ytm-pages`), or `YTMP_YTM_KEEP_DIR`
+  (empty: not kept); copy them out with `docker cp`.

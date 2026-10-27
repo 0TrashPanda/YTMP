@@ -7,6 +7,7 @@ See docs/implementation/module-api.md.
 from __future__ import annotations
 
 import contextlib
+import functools
 import copy
 import logging
 import re
@@ -25,7 +26,7 @@ from ytmusicapi.helpers import initialize_headers
 from ytmusicapi.navigation import NAVIGATION_BROWSE_ID, SECTION_LIST, SINGLE_COLUMN_TAB, TAB_CONTENT, TITLE, TWO_COLUMN_RENDERER, nav
 from ytmusicapi.parsers.playlists import parse_playlist_items
 
-from . import parse, pot
+from . import keep, parse, pot
 from .parse import MODULE_ID
 
 _PREFIXES = ("ytm:", "yt:")
@@ -151,6 +152,7 @@ class YtmCore:
         """[pot_url]: a bgutil PO token server (http://host:4416), for PO tokens on a server.
         On the phone, the app hands pot.py a WebView instead."""
         self._ytm = YTMusic(language=language, location=location)
+        keep.record(self._ytm)
         self._ydl_opts = {
             "format": "bestaudio[ext=m4a]/bestaudio",
             "noplaylist": True,
@@ -196,6 +198,7 @@ class YtmCore:
         headers = initialize_headers()
         headers.update({"cookie": cookie, "x-goog-authuser": "0", "x-origin": _YTM_ORIGIN, "origin": _YTM_ORIGIN, "authorization": "SAPISIDHASH 0"})
         user = YTMusic(auth=dict(headers), language=self._language, location=self._location)
+        keep.record(user)
         account = _account(user)
         self._user = user
         return account
@@ -309,6 +312,7 @@ class YtmCore:
             if not a:
                 raise NotFound(str(e)) from e
             log.info("Artist %s read without ytmusicapi's header (%s)", artist_id, e)
+            keep.save("artist", artist_id, e, note="read with the fallback for another header")
         songs_section = a.get("songs") or {}
         # The top songs on the page (5, like YTM shows them). All their songs are a playlist
         # (songsPlaylistId): the page loads it when it needs more, so it opens a request sooner.
@@ -913,3 +917,23 @@ def _artist_any_header(ytm: YTMusic, artist_id: str) -> dict | None:
         artist["songs"]["results"] = parse_playlist_items(shelf.get("contents") or [])
     artist.update(ytm.parser.parse_channel_contents(results))
     return artist
+
+
+def _keeping(what: str, method):
+    """[method] of YtmCore, keeping YouTube's pages when they couldn't be read ([keep])."""
+
+    @functools.wraps(method)
+    def call(self, *args, **kwargs):
+        keep.start()
+        try:
+            return method(self, *args, **kwargs)
+        except Exception as e:
+            if keep.unreadable(e):
+                keep.save(what, str(args[0]) if args else "", e)
+            raise
+
+    return call
+
+
+for _name in ("search", "radio", "song", "artist", "album", "playlist", "podcast", "new_episodes", "lyrics", "history", "own_playlists", "home", "library"):
+    setattr(YtmCore, _name, _keeping(_name, getattr(YtmCore, _name)))

@@ -86,6 +86,8 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
         python = Python.getInstance()
         json = python.getModule("json")
         python.getModule("ytmp_ytm.core").callAttr("log_to", PythonLog())
+        // YouTube pages the module couldn't read go with the logs (Send logs), to make tests from.
+        python.getModule("ytmp_ytm.keep").callAttr("keep_in", LogFiles.pagesDir(context).path)
     }
 
     /**

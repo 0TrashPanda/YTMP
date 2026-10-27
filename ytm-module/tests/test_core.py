@@ -711,3 +711,25 @@ def test_artist_page_with_another_header(monkeypatch):
     assert a["thumbnails"]
     assert a["songs"]
     assert a["albums"] or a["singles"]
+
+
+def test_unreadable_pages_are_kept(monkeypatch, tmp_path):
+    """A page that didn't look as expected is written to a file (the newest few), to make a test from."""
+    import json
+
+    from ytmp_ytm import keep
+
+    keep.keep_in(str(tmp_path))
+    page = {"contents": {"something": "new"}}
+    monkeypatch.setattr(core.YTMusic, "_send_request", lambda self, endpoint, body, *a, **k: page, raising=False)
+    c = core.YtmCore()
+    with pytest.raises(core.NotFound):
+        c.album("MPREb_x")
+    kept = keep.kept()
+    assert len(kept) == 1
+    saved = json.loads(kept[0].read_text())
+    assert saved["what"] == "album" and saved["id"] == "MPREb_x"
+    assert saved["pages"][-1]["response"] == page
+    # A genuine "not there" isn't kept.
+    assert not keep.unreadable(core.NotFound("No such album"))
+    keep.keep_in(None)
