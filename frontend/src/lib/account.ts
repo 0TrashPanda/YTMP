@@ -145,13 +145,27 @@ export const authServer = {
 
 	/** Your Google Takeout imports into the history. */
 	imports: async () => (await call<HistoryImportList>('/api/account/imports')).imports,
-	/** Imports a Takeout export (the zip, or the watch history in it): its YouTube Music plays join your history. */
-	async importTakeout(file: File): Promise<HistoryImport> {
-		const response = await fetch('/api/account/imports', {
-			method: 'POST',
-			headers: { Authorization: `Bearer ${session.current?.sessionToken}`, 'Content-Type': 'application/octet-stream' },
-			body: file
-		});
+	/**
+	 * Imports a Takeout export (the zip, or the watch history in it): its YouTube Music plays join
+	 * your history. Sent in parts of 512 KB (a reverse proxy in front of the server often takes
+	 * at most 1 MB at once); [onPart] says how far it got.
+	 */
+	async importTakeout(file: File, onPart?: (sent: number, of: number) => void): Promise<HistoryImport> {
+		const auth = { Authorization: `Bearer ${session.current?.sessionToken}` };
+		const PART = 512 * 1024;
+		const upload = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => (b % 36).toString(36)).join('');
+		const parts = Math.max(1, Math.ceil(file.size / PART));
+		for (let i = 0; i < parts; i++) {
+			onPart?.(i, parts);
+			const sent = await fetch(`/api/account/imports/part?upload=${upload}&part=${i}`, {
+				method: 'POST',
+				headers: { ...auth, 'Content-Type': 'application/octet-stream' },
+				body: file.slice(i * PART, (i + 1) * PART)
+			});
+			if (!sent.ok) throw new ApiRequestError((await sent.json().catch(() => null))?.message ?? `Upload failed (${sent.status})`);
+		}
+		onPart?.(parts, parts);
+		const response = await fetch(`/api/account/imports?upload=${upload}`, { method: 'POST', headers: auth });
 		const body = await response.json().catch(() => null);
 		if (!response.ok) throw new ApiRequestError(body?.message ?? `Import failed (${response.status})`);
 		return body as HistoryImport;

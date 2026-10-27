@@ -62,6 +62,7 @@ import dev.trashpanda.ytmp.protocol.RadioHints
 import dev.trashpanda.ytmp.protocol.RadioHintsRequest
 import io.ktor.server.request.receiveStream
 import java.time.ZoneId
+import java.io.File
 import java.security.KeyPair
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.days
@@ -186,6 +187,12 @@ class AccountService(
         return graph.hints(request.seed, account?.id, request.candidates.take(200), request.options, use, account?.let(::tuning) ?: GraphTuning(), request.limit.coerceIn(1, 200))
     }
 
+    /** Where [account]'s upload [id] (in parts) is put together, in the temp folder. */
+    private fun uploadFile(account: Accounts.Account, id: String?): File {
+        if (id == null || !id.matches(Regex("[A-Za-z0-9]{8,40}"))) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Which upload?")
+        return File(System.getProperty("java.io.tmpdir"), "ytmp-upload-${account.id}-$id")
+    }
+
     /** The whole song graph as [username] (one of ours) sees it, for their phone's copy; only everyone's when not [personal]. */
     fun graphFull(username: String, personal: Boolean): GraphFull? {
         val graph = graph ?: return null
@@ -289,11 +296,38 @@ class AccountService(
                 val account = call.account()
                 call.respond(HistoryImportList(io { history.imports(account.id) }))
             }
+            // A big export comes in parts first (a reverse proxy often takes at most 1 MB at once):
+            // ?upload=<id>&part=<n>, from 0; then POST without a body and ?upload=<id> imports it.
+            post("/part") {
+                val account = call.account()
+                val file = uploadFile(account, call.request.queryParameters["upload"])
+                val part = call.request.queryParameters["part"]?.toIntOrNull() ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Which part?")
+                val bytes = call.receiveStream().use { it.readNBytes(MAX_UPLOAD_PART + 1) }
+                if (bytes.size > MAX_UPLOAD_PART) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "A part is at most ${MAX_UPLOAD_PART / 1024} KB")
+                io {
+                    if (part == 0) file.delete()
+                    if (file.length() + bytes.size > MAX_UPLOAD) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "That's too big for a Takeout export")
+                    file.appendBytes(bytes)
+                }
+                call.respond(HttpStatusCode.NoContent)
+            }
             post {
                 val account = call.account()
-                val upload = call.receiveStream()
+                val parts = call.request.queryParameters["upload"]?.let { uploadFile(account, it) }
+                val whole = if (parts == null) call.receiveStream() else null
                 val made = try {
-                    io { history.importTakeout(account.id, Takeout.read(upload, ZoneId.systemDefault())) }
+                    io {
+                        if (parts != null) {
+                            if (!parts.isFile) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Nothing was uploaded")
+                            try {
+                                parts.inputStream().buffered().use { history.importTakeout(account.id, Takeout.read(it, ZoneId.systemDefault())) }
+                            } finally {
+                                parts.delete()
+                            }
+                        } else {
+                            history.importTakeout(account.id, Takeout.read(whole!!, ZoneId.systemDefault()))
+                        }
+                    }
                 } catch (e: IllegalArgumentException) {
                     throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "That isn't a Takeout export")
                 }
@@ -681,3 +715,7 @@ private fun GraphTuning.sane() = GraphTuning(
     halfLifeDays = halfLifeDays.coerceIn(0.0, 3650.0),
     radioDepth = radioDepth.coerceIn(1, SongGraph.MAX_RADIO_SONGS),
 )
+
+/** An upload in parts: each at most this big (a reverse proxy's usual 1 MB limit, with room to spare), and all of it. */
+private const val MAX_UPLOAD_PART = 512 * 1024
+private const val MAX_UPLOAD = 500L * 1024 * 1024

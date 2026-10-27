@@ -157,6 +157,10 @@ server {
     http2 on;
     server_name ytmp.example.com;
 
+    # Uploads like a database backup are bigger than nginx's usual 1 MB (a Takeout export
+    # comes in parts, so it works without this too).
+    client_max_body_size 200m;
+
     ssl_certificate     /etc/letsencrypt/live/ytmp.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/ytmp.example.com/privkey.pem;
 

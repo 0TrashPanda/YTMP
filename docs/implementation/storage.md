@@ -205,7 +205,9 @@ file is compacted once (`VACUUM`). With 31,000 imported plays the graph went fro
 
 ### Takeout import
 
-`POST /api/account/imports` (the zip, or the watch history in it, read by `host/Takeout`):
+`POST /api/account/imports` (the zip, or the watch history in it, read by `host/Takeout`; the
+page sends it in parts of 512 KB to `POST …/imports/part?upload=&part=` first and then
+`POST …/imports?upload=`, because a reverse proxy often takes at most 1 MB at once):
 the YouTube Music plays go into `plays` with an `import_id`, room `takeout` (so they only
 follow each other), no length, heard = the time to the next play (at most 15 min), skipped
 when that's under 30 s. A play already in the history is left out: the same song started

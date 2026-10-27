@@ -37,7 +37,7 @@
 		uploading = true;
 		importNote = null;
 		try {
-			const made = await authServer.importTakeout(file);
+			const made = await authServer.importTakeout(file, (sent, of) => (importNote = sent < of ? `Uploading… ${Math.round((sent / of) * 100)}%` : 'Reading the export…'));
 			uploading = false;
 			importNote = made.plays
 				? `Added ${made.plays.toLocaleString()} plays${made.duplicates ? ` (${made.duplicates.toLocaleString()} were in your history already)` : ''}.`

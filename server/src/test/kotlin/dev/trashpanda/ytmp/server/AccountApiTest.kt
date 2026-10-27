@@ -7,6 +7,7 @@ import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.HostSources
 import dev.trashpanda.ytmp.host.TrustedAuthServers
 import dev.trashpanda.ytmp.host.ytmpModule
+import dev.trashpanda.ytmp.protocol.HistoryImport
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.AccountListResponse
 import dev.trashpanda.ytmp.protocol.AuthServerInfo
@@ -428,5 +429,24 @@ class AccountApiTest {
         val tampered = token.split('.').let { (h, p, s) -> "$h.${p.dropLast(2)}xx.$s" }
         assertNull(auth.verify(tampered))
         assertNull(auth.verify(AccountTokens.sign(AccountTokens.Claims("a", "anna", "Anna", origin, now - 120, now - 60), key.private)))
+    }
+
+    @Test
+    fun `a Takeout export can come in parts, for a reverse proxy that takes little at once`() = testApplication {
+        setup(SignupMode.OPEN)
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>().sessionToken
+        val export = """[{"header":"YouTube Music","title":"Watched Song","titleUrl":"https://music.youtube.com/watch?v=abcdefghijk",""" +
+            """"subtitles":[{"name":"Artist - Topic"}],"time":"2026-10-01T10:00:00Z"}]"""
+        val bytes = export.toByteArray()
+        val half = bytes.size / 2
+        for ((i, part) in listOf(bytes.copyOfRange(0, half), bytes.copyOfRange(half, bytes.size)).withIndex()) {
+            val sent = client.post("/api/account/imports/part?upload=abcdefgh12&part=$i") { bearerAuth(anna); setBody(part) }
+            assertEquals(HttpStatusCode.NoContent, sent.status)
+        }
+        val made = client.post("/api/account/imports?upload=abcdefgh12") { bearerAuth(anna) }.body<HistoryImport>()
+        assertEquals(1, made.plays)
+        // The parts are gone once imported.
+        assertEquals(HttpStatusCode.BadRequest, client.post("/api/account/imports?upload=abcdefgh12") { bearerAuth(anna) }.status)
     }
 }
