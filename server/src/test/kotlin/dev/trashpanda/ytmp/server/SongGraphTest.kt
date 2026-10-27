@@ -262,8 +262,9 @@ class SongGraphTest {
     @Test
     fun `a phone's copy gives each of its songs the neighbours that are on the phone too`() {
         listOf("a", "b", "c").forEach { play("anna", song("ytm:$it")) }
-        // The phone has a and c (not b); a local file of c counts as c.
-        play("anna", song("local:phone:s:c.m4a", "Song ytm:c"), gapMs = 3 * 3_600_000L)
+        // The phone has a and c (not b); its file of c, played on the phone, is the same song as c.
+        play("anna", song("ytm:a"), gapMs = 3 * 3_600_000L)
+        play("anna", song("local:phone:s:c.m4a", "Song ytm:c"))
         val copy = graph.neighboursAmong(listOf("ytm:a", "ytm:b"), listOf("ytm:a", "local:phone:s:c.m4a"), "anna", HistoryRadio.ALL, GraphTuning(), 10)
         assertEquals(mapOf("ytm:a" to listOf("local:phone:s:c.m4a")), copy)
     }
