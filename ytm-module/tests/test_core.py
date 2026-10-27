@@ -690,3 +690,24 @@ def test_history_labels_become_days():
     assert parse.days_ago("March 2024", today) == 19 * 30 + 8
     assert parse.days_ago("Vandaag", today) is None
     assert parse.days_ago(None, today) is None
+
+
+def test_artist_page_with_another_header(monkeypatch):
+    """YouTube sends some visitors an artist page without musicImmersiveHeaderRenderer: ytmusicapi
+    fails on it ('header'), the page is read from whichever header it has."""
+    import json
+    import pathlib
+
+    page = json.loads((pathlib.Path(__file__).parent / "data" / "artist_other_header.json").read_text())
+    c = core.YtmCore()
+
+    def broken(_id):
+        raise KeyError("header")
+
+    monkeypatch.setattr(c._ytm, "get_artist", broken)
+    monkeypatch.setattr(c._ytm, "_send_request", lambda endpoint, body, *a, **k: page)
+    a = c.artist("UCqH54i8-ZP829SqRLGT7X-Q")
+    assert a["name"] == "Alexandria"
+    assert a["thumbnails"]
+    assert a["songs"]
+    assert a["albums"] or a["singles"]

@@ -22,7 +22,7 @@ import ytmusicapi.mixins.playlists
 from ytmusicapi import LikeStatus, YTMusic
 from ytmusicapi.continuations import CONTINUATION_ITEMS, get_continuation_token
 from ytmusicapi.helpers import initialize_headers
-from ytmusicapi.navigation import nav
+from ytmusicapi.navigation import NAVIGATION_BROWSE_ID, SECTION_LIST, SINGLE_COLUMN_TAB, TAB_CONTENT, TITLE, TWO_COLUMN_RENDERER, nav
 from ytmusicapi.parsers.playlists import parse_playlist_items
 
 from . import parse, pot
@@ -300,7 +300,15 @@ class YtmCore:
         try:
             a = self._ytm.get_artist(artist_id)
         except Exception as e:
-            raise NotFound(str(e)) from e
+            # YouTube sends some visitors another page layout (no musicImmersiveHeaderRenderer):
+            # read the page ourselves then, the way ytmusicapi does, with whichever header it has.
+            try:
+                a = _artist_any_header(self._ytm, artist_id)
+            except Exception:
+                a = None
+            if not a:
+                raise NotFound(str(e)) from e
+            log.info("Artist %s read without ytmusicapi's header (%s)", artist_id, e)
         songs_section = a.get("songs") or {}
         # The top songs on the page (5, like YTM shows them). All their songs are a playlist
         # (songsPlaylistId): the page loads it when it needs more, so it opens a request sooner.
@@ -846,3 +854,62 @@ class _BotCheck:
 
 def _clean_error(message: str) -> str:
     return re.sub(r"^ERROR: (\[[^\]]+\] )?([\w-]+: )?", "", message).strip()
+
+
+def _header_of(response: dict) -> dict:
+    """The page's header, whatever its renderer is called (the first *HeaderRenderer in it)."""
+    def find(node, depth=0):
+        if depth > 6:
+            return None
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key.endswith("HeaderRenderer") and isinstance(value, dict):
+                    return value
+            for value in node.values():
+                if (found := find(value, depth + 1)) is not None:
+                    return found
+        elif isinstance(node, list):
+            for value in node:
+                if (found := find(value, depth + 1)) is not None:
+                    return found
+        return None
+    return find(response.get("header") or {}) or find(response) or {}
+
+
+def _first_thumbnails(node, depth=0) -> list:
+    if depth > 8:
+        return []
+    if isinstance(node, dict):
+        if isinstance(node.get("thumbnails"), list) and node["thumbnails"]:
+            return node["thumbnails"]
+        values = node.values()
+    elif isinstance(node, list):
+        values = node
+    else:
+        return []
+    for value in values:
+        if found := _first_thumbnails(value, depth + 1):
+            return found
+    return []
+
+
+def _artist_any_header(ytm: YTMusic, artist_id: str) -> dict | None:
+    """An artist page like YTMusic.get_artist gives it (name, thumbnails, songs, albums, singles), from any header."""
+    response = ytm._send_request("browse", {"browseId": artist_id.removeprefix("MPLA")})
+    results = nav(response, SINGLE_COLUMN_TAB + SECTION_LIST, True) or nav(response, [*TWO_COLUMN_RENDERER, *TAB_CONTENT, *SECTION_LIST], True)
+    if not results:
+        return None
+    header = _header_of(response)
+    artist: dict = {
+        "name": "".join(r.get("text", "") for r in (header.get("title") or {}).get("runs") or []),
+        "thumbnails": _first_thumbnails(header.get("thumbnail") or header.get("foregroundThumbnail") or header),
+        "description": None,
+        "songs": {"browseId": None},
+    }
+    shelf = results[0].get("musicShelfRenderer") if isinstance(results[0], dict) else None
+    if shelf:
+        if "navigationEndpoint" in (nav(shelf, TITLE, True) or {}):
+            artist["songs"]["browseId"] = nav(shelf, TITLE + NAVIGATION_BROWSE_ID, True)
+        artist["songs"]["results"] = parse_playlist_items(shelf.get("contents") or [])
+    artist.update(ytm.parser.parse_channel_contents(results))
+    return artist
