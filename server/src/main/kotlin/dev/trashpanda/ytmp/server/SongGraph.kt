@@ -808,7 +808,7 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         private val log = LoggerFactory.getLogger(SongGraph::class.java)
 
         /** Bump to build the graph from the history again on the next start (a new way of learning). */
-        const val VERSION = 4
+        const val VERSION = 5
         private const val VERSION_SETTING = "song_graph_version"
 
         // Edge scopes (`song_edges.scope`). account_id is '' for the server's and YouTube Music's without an account.

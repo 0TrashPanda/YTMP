@@ -13,9 +13,12 @@ import kotlinx.coroutines.launch
  */
 class PlayReporter(private val auth: HostAuth, private val scope: CoroutineScope) {
     fun report(play: FinishedPlay) {
-        val shared = play.listeners.size > 1
-        for (me in play.listeners) {
-            val token = me.accountToken ?: continue
+        // One person can be in the room more than once (their phone and their laptop, or two tabs):
+        // their account hears the song once, and they didn't listen "with" themselves.
+        val people = play.listeners.distinctBy { it.accountId ?: "guest:${it.participantId}" }
+        val shared = people.size > 1
+        for ((account, mine) in play.listeners.filter { it.accountToken != null && it.accountId != null }.groupBy { it.accountId!! }) {
+            val me = mine.first()
             val report = PlayReport(
                 song = play.item.song,
                 playedAt = play.startedAt,
@@ -23,14 +26,14 @@ class PlayReporter(private val auth: HostAuth, private val scope: CoroutineScope
                 skipped = play.skipped,
                 roomCode = play.roomCode,
                 roomName = play.roomName,
-                addedByMe = play.item.addedBy == me.participantId,
+                addedByMe = mine.any { play.item.addedBy == it.participantId },
                 addedByName = play.item.addedByName,
-                listenedWith = play.listeners
-                    .filter { it.participantId != me.participantId && !it.hideFromHistory }
+                listenedWith = people
+                    .filter { it.accountId != account && !it.hideFromHistory }
                     .map { ListenedWith(it.accountId, it.name) },
                 shared = shared,
             )
-            scope.launch { auth.reportPlay(token, report) }
+            scope.launch { auth.reportPlay(me.accountToken!!, report) }
         }
     }
 }

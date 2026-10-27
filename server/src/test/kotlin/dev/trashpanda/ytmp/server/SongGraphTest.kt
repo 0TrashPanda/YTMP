@@ -14,6 +14,7 @@ import dev.trashpanda.ytmp.protocol.Song
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SongGraphTest {
@@ -274,5 +275,16 @@ class SongGraphTest {
         // Bert's own links aren't in Anna's copy; everyone's are.
         assertEquals(setOf(EdgeKind.SERVER), kinds("ytm:x", "ytm:y"))
         assertEquals(SongMatch.key(song("ytm:a")), full.nodes[ids.indexOf("ytm:a")].key)
+    }
+
+    @Test
+    fun `a play reported twice is kept once, and the graph learns it once`() {
+        play("anna", song("ytm:a"))
+        val report = PlayReport(song("ytm:b"), at + 1_000, 200_000, false, "SOLO", "Room", true, "Me", emptyList(), false)
+        assertTrue(history.add("anna", report))
+        graph.played("anna", report)
+        assertFalse(history.add("anna", report))
+        assertEquals(2, history.page("anna", null, 10, null).first.size)
+        assertEquals(mapOf("ytm:a>ytm:b" to listOf(1, 0, 0)), edges(SongGraph.PERSONAL))
     }
 }

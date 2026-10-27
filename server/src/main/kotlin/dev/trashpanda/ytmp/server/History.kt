@@ -17,7 +17,16 @@ import kotlin.math.min
 class History(private val db: Database) {
     private val listenedWith = ListSerializer(ListenedWith.serializer())
 
-    fun add(accountId: String, report: PlayReport) = db.use { c ->
+    /** Keeps [report]; false when the history has it already (the same song, room and start: reported twice). */
+    fun add(accountId: String, report: PlayReport): Boolean = db.use { c ->
+        val already = c.prepareStatement("SELECT COUNT(*) FROM plays WHERE account_id = ? AND played_at = ? AND song_id = ? AND room_code = ?").use {
+            it.setString(1, accountId)
+            it.setLong(2, report.playedAt)
+            it.setString(3, report.song.id.take(256))
+            it.setString(4, report.roomCode.take(16))
+            it.executeQuery().use { rows -> rows.next() && rows.getInt(1) > 0 }
+        }
+        if (already) return@use false
         c.prepareStatement(
             """INSERT INTO plays (id, account_id, played_at, song_id, title, artists, song, heard_ms, skipped, room_code, room_name,
                added_by_me, added_by_name, listened_with, shared) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -39,7 +48,7 @@ class History(private val db: Database) {
             it.setBoolean(15, report.shared)
             it.executeUpdate()
         }
-        Unit
+        true
     }
 
     /** Newest first, played before [before] (ms), matching [query] in title or artists. */

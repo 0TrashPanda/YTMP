@@ -203,11 +203,19 @@ account's `imported` links when read (`edges`); `song_edges_from` went (the key 
 `from_song`); on SQLite `song_edges` is `WITHOUT ROWID` (rows live in the key's tree), and the
 file is compacted once (`VACUUM`). With 31,000 imported plays the graph went from 32 MB to 16 MB.
 
+### One play, once
+
+A host reports a finished song once per account in the room (`PlayReporter`: one person in
+the room twice, from two devices, is one listener). The server also keeps a report only once
+(`History.add`: same account, song, room and start), and migration 12 removed the doubles from
+before.
+
 ### Takeout import
 
 `POST /api/account/imports` (the zip, or the watch history in it, read by `host/Takeout`; the
 page sends it in parts of 512 KB to `POST …/imports/part?upload=&part=` first and then
-`POST …/imports?upload=`, because a reverse proxy often takes at most 1 MB at once):
+`POST …/imports?upload=&tz=`, because a reverse proxy often takes at most 1 MB at once; `tz`
+is the browser's time zone, which the HTML export's times are in):
 the YouTube Music plays go into `plays` with an `import_id`, room `takeout` (so they only
 follow each other), no length, heard = the time to the next play (at most 15 min), skipped
 when that's under 30 s. A play already in the history is left out: the same song started

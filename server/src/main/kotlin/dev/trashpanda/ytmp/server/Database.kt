@@ -283,6 +283,12 @@ class Database private constructor(private val url: String, private val user: St
                 "${SQLITE_ONLY}ALTER TABLE song_edges_compact RENAME TO song_edges",
                 "${SQLITE_ONLY}CREATE INDEX song_edges_to ON song_edges (to_song, scope, account_id)",
             ),
+            // 12: a play reported twice (the same person in a room from two devices) is in the history once
+            listOf(
+                """DELETE FROM plays WHERE id NOT IN (
+                    SELECT MIN(id) FROM plays GROUP BY account_id, song_id, played_at, room_code
+                )""",
+            ),
         )
 
         /** Migration 11 freed a lot of space: compact the file once after it. */

@@ -35,6 +35,9 @@ a setting on your account, or a toggle when joining as a guest.
 - This is separate from your own tracking: you can track your own history and still
   opt out of appearing in other people's.
 
+In a room from more than one device (your phone and your laptop, two tabs), a song goes into
+your history once: the same song in the same room starting at the same moment is one play.
+
 ### Solo vs. shared listening
 
 History is split into two kinds:

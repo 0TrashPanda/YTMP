@@ -165,7 +165,9 @@ export const authServer = {
 			if (!sent.ok) throw new ApiRequestError((await sent.json().catch(() => null))?.message ?? `Upload failed (${sent.status})`);
 		}
 		onPart?.(parts, parts);
-		const response = await fetch(`/api/account/imports?upload=${upload}`, { method: 'POST', headers: auth });
+		// The export's times are in your time zone (its HTML only says "CEST"): the server reads them in this browser's.
+		const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+		const response = await fetch(`/api/account/imports?upload=${upload}&tz=${tz}`, { method: 'POST', headers: auth });
 		const body = await response.json().catch(() => null);
 		if (!response.ok) throw new ApiRequestError(body?.message ?? `Import failed (${response.status})`);
 		return body as HistoryImport;

@@ -140,10 +140,15 @@ class AccountService(
     fun recordPlay(username: String, report: PlayReport) {
         val account = accounts.find(username) ?: return
         if (!settings(account).tracking) return
-        val graph = graph ?: return history.add(account.id, report)
+        val graph = graph
+        if (graph == null) {
+            history.add(account.id, report)
+            return
+        }
         // One at a time: the song graph counts a play heard by several accounts once.
         synchronized(graph) {
-            history.add(account.id, report)
+            // Reported twice (the same person in the room twice, a retry): the graph learns it once.
+            if (!history.add(account.id, report)) return
             runCatching { graph.played(account.id, report) }.onFailure { log.warn("The song graph couldn't learn a play: {}", it.message) }
         }
     }
@@ -315,17 +320,19 @@ class AccountService(
                 val account = call.account()
                 val parts = call.request.queryParameters["upload"]?.let { uploadFile(account, it) }
                 val whole = if (parts == null) call.receiveStream() else null
+                // The export's own times are in the time zone of whoever made it (the HTML says "CEST", not which one): the page's.
+                val zone = call.request.queryParameters["tz"]?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
                 val made = try {
                     io {
                         if (parts != null) {
                             if (!parts.isFile) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Nothing was uploaded")
                             try {
-                                parts.inputStream().buffered().use { history.importTakeout(account.id, Takeout.read(it, ZoneId.systemDefault())) }
+                                parts.inputStream().buffered().use { history.importTakeout(account.id, Takeout.read(it, zone)) }
                             } finally {
                                 parts.delete()
                             }
                         } else {
-                            history.importTakeout(account.id, Takeout.read(whole!!, ZoneId.systemDefault()))
+                            history.importTakeout(account.id, Takeout.read(whole!!, zone))
                         }
                     }
                 } catch (e: IllegalArgumentException) {
