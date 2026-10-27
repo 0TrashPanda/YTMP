@@ -45,6 +45,9 @@
 			out.push({ kind: 'header', key: 'autoplay-header' });
 			for (const item of s.autoplay) out.push({ kind: 'item', place: 'autoplay', item, key: `a:${item.itemId}` });
 		}
+		// Never a row twice (a list with the same key twice would stop the page): the first one stays.
+		const seen = new Set<string>();
+		out.splice(0, out.length, ...out.filter((slot) => !seen.has(slot.key) && !!seen.add(slot.key)));
 		// A dropped song stays where it was dropped while the host moves it.
 		const from = dropped ? out.findIndex((slot) => slot.key === dropped!.key) : -1;
 		if (from >= 0) out.splice(dropped!.to, 0, ...out.splice(from, 1));

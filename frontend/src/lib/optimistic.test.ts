@@ -188,3 +188,12 @@ describe('predict', () => {
 		expect(ids(s.history)).toEqual(['h1']);
 	});
 });
+
+describe('a skip while the host is halfway through it', () => {
+	it("doesn't put the song in the history twice (a list with it twice stops the page)", () => {
+		// The host already said "it's in the history", not yet "the next one plays".
+		const s = room({ history: [item('h1'), { ...item('now'), result: 'skipped' }] });
+		expect(predict(s, { kind: 'Skip', play: true }, sender())).toBe(true);
+		expect(ids(s.history)).toEqual(['h1', 'now']);
+	});
+});

@@ -201,8 +201,16 @@ function newItem(song: Song, index: number, by: Sender): QueueItem {
 /** The current song goes to the history, as skipped. */
 function retire(s: RoomState): void {
 	const item = s.nowPlaying?.item;
-	if (item) s.history.push({ ...item, result: 'skipped' });
+	if (item) toHistory(s, { ...item, result: 'skipped' });
 	s.nowPlaying = null;
+}
+
+/**
+ * Adds [item] to the history, unless it's there already: the host's events come one at a time,
+ * so it can already be in the history while it's still the current song.
+ */
+function toHistory(s: RoomState, item: QueueItem): void {
+	if (!s.history.some((i) => i.itemId === item.itemId)) s.history.push(item);
 }
 
 /** The next song from the queue (or else autoplay) becomes the current one. */
@@ -248,7 +256,7 @@ function jumpTo(s: RoomState, itemId: string, by: Sender): boolean {
 	if (queueIndex >= 0) {
 		// Songs before it are skipped.
 		retire(s);
-		for (const skipped of s.queue.splice(0, queueIndex)) s.history.push({ ...skipped, result: 'skipped' });
+		for (const skipped of s.queue.splice(0, queueIndex)) toHistory(s, { ...skipped, result: 'skipped' });
 		playNext(s, true, by);
 		return true;
 	}
