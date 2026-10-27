@@ -249,7 +249,7 @@
 		<GraphBuildBar load={() => listening.buildStatus()} onDone={() => load(around)} />
 	</div>
 	<div class="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-		<div class="flex min-w-0 flex-col lg:flex-1">
+		<div class="flex min-w-0 flex-col lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
 			<div class="flex gap-2 px-4 pb-2" role="tablist">
 				<button class="rounded-lg px-3 py-1.5 text-sm {tab === 'graph' ? 'bg-white text-black' : 'bg-raised'}" role="tab" aria-selected={tab === 'graph'} onclick={() => (tab = 'graph')}>Graph</button>
 				<button class="rounded-lg px-3 py-1.5 text-sm {tab === 'list' ? 'bg-white text-black' : 'bg-raised'}" role="tab" aria-selected={tab === 'list'} onclick={() => (tab = 'list')}>
@@ -265,7 +265,7 @@
 					{view.seed === null && around ? "YTMP hasn't learned anything about this song yet." : 'Nothing learned yet: play some music, import your Takeout history, or let it learn radios (Settings → Radio).'}
 				</p>
 			{:else if tab === 'graph'}
-				<div class="relative mx-auto aspect-square w-full max-w-[min(100%,calc(100dvh-14rem))] px-2 lg:max-w-[min(100%,calc(100dvh-9rem))]">
+				<div class="relative mx-auto aspect-square w-full max-w-[min(100%,calc(100dvh-14rem))] px-2 lg:max-w-[min(100%,calc(100dvh-15rem))]">
 					<svg
 						bind:this={svg}
 						viewBox="{cam.x} {cam.y} {cam.w} {cam.w}"
