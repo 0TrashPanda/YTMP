@@ -127,11 +127,15 @@ learns much faster in a small group of friends.
 
 ### On the phone, without your server
 
-The graph lives on your YTMP server, with your account. The app keeps a **copy for the songs
-it can play offline** (your music on the phone, and its saved songs): each one's best
-neighbours among them, weighed with your sliders. It's made again once a day when your server
-can be reached. When it can't (no internet, the server is down), radios use the copy: *Song
-graph* and *On this device* still bring the songs you play together.
+The graph lives on your YTMP server, with your account. The app keeps a **copy of it** (your
+links, everyone's on your server, YouTube Music's), made again once a day when your server can
+be reached (about 5 MB for 10,000 songs). When it can't (no internet, the server is down),
+radios use the copy: *Song graph* and *On this device* still bring the songs you play together.
+
+- Your music files and saved songs are found in it by their ID, or else by title, artist and
+  length, so a file you never played still gets the songs that go with it.
+- *Settings → Radio → The song graph on this phone*: switch it off (the copy is deleted), see
+  how big it is and when it was made, *Refresh now*.
 
 ### Importing from YouTube Music (Google Takeout)
 

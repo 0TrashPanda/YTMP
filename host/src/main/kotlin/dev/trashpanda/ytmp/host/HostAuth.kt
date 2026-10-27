@@ -4,8 +4,7 @@ import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.protocol.AuthServerInfo
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.ProtocolJson
-import dev.trashpanda.ytmp.protocol.GraphCopy
-import dev.trashpanda.ytmp.protocol.GraphCopyRequest
+import dev.trashpanda.ytmp.protocol.GraphFull
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
 import dev.trashpanda.ytmp.protocol.RadioHints
 import dev.trashpanda.ytmp.protocol.RadioHintsRequest
@@ -52,8 +51,8 @@ interface HostAuth {
      */
     suspend fun radioHints(token: String, request: RadioHintsRequest): RadioHints? = RadioHints(similar(token, request.seed))
 
-    /** The graph for a phone's songs from the account in [token]'s auth server ([GraphCopy]); null when it can't be had. */
-    suspend fun graphCopy(token: String, request: GraphCopyRequest): GraphCopy? = null
+    /** The whole song graph as the account in [token] sees it, from its auth server (a phone's copy); null when it can't be had. */
+    suspend fun graphFull(token: String): GraphFull? = null
 
     /**
      * Tells the account in [token]'s auth server about a YouTube Music radio this host fetched
@@ -167,21 +166,17 @@ class TrustedAuthServers(
             .getOrNull()
     }
 
-    override suspend fun graphCopy(token: String, request: GraphCopyRequest): GraphCopy? = withContext(Dispatchers.IO) {
+    override suspend fun graphFull(token: String): GraphFull? = withContext(Dispatchers.IO) {
         val (claims, server) = ownerOf(token) ?: return@withContext null
         val url = server.url ?: return@withContext null
         runCatching {
-            val connection = URI("${url.trimEnd('/')}/api/auth/graph-copy").toURL().openConnection() as HttpURLConnection
+            val connection = URI("${url.trimEnd('/')}/api/auth/graph").toURL().openConnection() as HttpURLConnection
             connection.connectTimeout = 10_000
-            connection.readTimeout = 60_000
-            connection.requestMethod = "POST"
-            connection.doOutput = true
+            connection.readTimeout = 120_000
             connection.setRequestProperty("Authorization", "Bearer $token")
-            connection.setRequestProperty("Content-Type", "application/json")
             try {
-                connection.outputStream.use { it.write(ProtocolJson.encodeToString(GraphCopyRequest.serializer(), request).toByteArray()) }
                 if (connection.responseCode != 200) throw SourceException("$url answered ${connection.responseCode}")
-                ProtocolJson.decodeFromString(GraphCopy.serializer(), connection.inputStream.bufferedReader().readText())
+                connection.inputStream.bufferedReader().use { ProtocolJson.decodeFromString(GraphFull.serializer(), it.readText()) }
             } finally {
                 connection.disconnect()
             }

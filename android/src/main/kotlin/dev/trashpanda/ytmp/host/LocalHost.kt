@@ -175,7 +175,9 @@ class LocalHost(private val context: Context) {
         File(context.filesDir, "graph-copy.json"),
         scope,
         songs = { (if (phoneMusicOn) local.songs(PhoneLibrary.ID) else emptyList()) + cache.songs() + matcher.all().map { it.second } },
-        fetch = { request -> authLink.ownerAccount?.let(sync::tokenFor)?.let { authLink.auth.graphCopy(it, request) } },
+        fetch = { authLink.ownerAccount?.let(sync::tokenFor)?.let { authLink.auth.graphFull(it) } },
+        loadEnabled = { localSettings.getBoolean(GRAPH_COPY, true) },
+        saveEnabled = { localSettings.edit().putBoolean(GRAPH_COPY, it).apply() },
     )
 
     private val crawlLog = RadioCrawl.FileLog(File(context.filesDir, "radio-crawl-log.json"))
@@ -441,6 +443,7 @@ class LocalHost(private val context: Context) {
                     cache = cache,
                     local = local,
                     radioCrawl = crawl,
+                    graphCopy = graphCopy,
                     zones = zones,
                     personal = youtube,
                     // Find similar and Related: the song graph of the asker's server, with their login.
@@ -542,6 +545,8 @@ class LocalHost(private val context: Context) {
     companion object {
         const val PORT = BuildConfig.HOST_PORT
         private const val PHONE_MUSIC = "phoneMusic"
+        /** Keep a copy of the song graph on the phone (Settings → Radio). */
+        private const val GRAPH_COPY = "graphCopy"
         private const val MEDIA_SCAN = "mediaScan"
         private const val CACHE_SIZE = "size"
         private const val CACHE_PLACE = "place"

@@ -115,25 +115,29 @@ data class RadioHints(
 )
 
 /**
- * `POST /api/auth/graph-copy` (a phone, with the account's host token): the song graph for the
- * songs it can play offline, kept on the phone for radios without the server.
+ * `GET /api/auth/graph` (a phone, with the account's host token): the whole song graph as the
+ * account sees it, kept on the phone for radios without the server (the phone matches its own
+ * songs to it, and ranks like the server, `core/GraphRank`). Compact: links are rows of numbers.
  */
 @Serializable
-@SerialName("GraphCopyRequest")
-data class GraphCopyRequest(
-    /** The songs to give neighbours for (a part of [among] at a time). */
-    val seeds: List<String>,
-    /** All the songs the phone can play offline: neighbours are only these. */
-    val among: List<String>,
-    val limit: Int = 50,
+@SerialName("GraphFull")
+data class GraphFull(
+    val now: Long,
+    val tuning: GraphTuning,
+    val use: HistoryRadio,
+    /** The songs; links point to them by their place in this list. */
+    val nodes: List<GraphFullNode>,
+    /**
+     * The links, each `[from, to, kind, solo, shared, skips, seen, bestRank (-1: none),
+     * rankSum, updatedAt, confirmed (0/1)]`, kind as [EdgeKind]'s place in its list.
+     */
+    val edges: List<List<Long>>,
 )
 
+/** A song of [GraphFull]: its versions' IDs, and its title-and-artist key and length, to match songs that aren't one of them. */
 @Serializable
-@SerialName("GraphCopy")
-data class GraphCopy(
-    /** Each seed's neighbours among the phone's songs, best first. */
-    val neighbours: Map<String, List<String>>,
-)
+@SerialName("GraphFullNode")
+data class GraphFullNode(val sources: List<String>, val key: String, val durationMs: Long)
 
 /** How a stored radio was fetched. */
 @Serializable

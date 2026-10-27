@@ -41,16 +41,36 @@ class Database private constructor(private val url: String, private val user: St
     }
 
     /** Brings the schema up to date: runs every migration newer than the stored version, in order. */
-    private fun migrate() = transaction { c ->
+    private fun migrate() {
+        val from = migrateInTransaction()
+        // SQLite keeps freed space in the file until it's compacted, which can't happen in a transaction.
+        if (sqlitePath != null && from < COMPACTED_AT && MIGRATIONS.size >= COMPACTED_AT) {
+            use { c -> c.createStatement().use { it.executeUpdate("VACUUM") } }
+            log.info("Database compacted")
+        }
+    }
+
+    /** Runs the migrations; returns the version it was at before. */
+    private fun migrateInTransaction(): Int = transaction { c ->
         c.createStatement().use { it.executeUpdate("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)") }
         val current = c.createStatement().use { s -> s.executeQuery("SELECT MAX(version) FROM schema_version").use { if (it.next()) it.getInt(1) else 0 } }
         for ((index, statements) in MIGRATIONS.withIndex()) {
             val version = index + 1
             if (version <= current) continue
-            c.createStatement().use { s -> statements.forEach(s::executeUpdate) }
+            // "sqlite:" / "postgres:" in front: only for that database.
+            c.createStatement().use { s ->
+                for (statement in statements) {
+                    when {
+                        statement.startsWith(SQLITE_ONLY) -> if (sqlitePath != null) s.executeUpdate(statement.removePrefix(SQLITE_ONLY))
+                        statement.startsWith(POSTGRES_ONLY) -> if (sqlitePath == null) s.executeUpdate(statement.removePrefix(POSTGRES_ONLY))
+                        else -> s.executeUpdate(statement)
+                    }
+                }
+            }
             c.prepareStatement("INSERT INTO schema_version (version) VALUES (?)").use { it.setInt(1, version); it.executeUpdate() }
             log.info("Database migrated to version {}", version)
         }
+        current
     }
 
     /** Closes the connection (SQLite then folds its journal into the file). */
@@ -236,7 +256,39 @@ class Database private constructor(private val url: String, private val user: St
             ),
             // 10: a Takeout link that happened once counts fully only once a radio confirms it (SongGraph.confirm)
             listOf("ALTER TABLE song_edges ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0"),
+            // 11: the song graph in less space, the same data: everyone's Takeout links are worked out from each
+            // account's when read (not kept twice), song_edges_from goes (the key starts with from_song), and on
+            // SQLite the edges live in their key's tree (WITHOUT ROWID: no second copy of the key).
+            listOf(
+                "DELETE FROM song_edges WHERE scope = 'server_imported'",
+                "DROP INDEX song_edges_from",
+                """${SQLITE_ONLY}CREATE TABLE song_edges_compact (
+                    from_song VARCHAR(32) NOT NULL,
+                    to_song VARCHAR(32) NOT NULL,
+                    scope VARCHAR(16) NOT NULL,
+                    account_id VARCHAR(32) NOT NULL,
+                    solo_plays INTEGER NOT NULL,
+                    shared_plays INTEGER NOT NULL,
+                    skips INTEGER NOT NULL,
+                    ytm_rank INTEGER,
+                    updated_at BIGINT NOT NULL,
+                    seen INTEGER NOT NULL DEFAULT 0,
+                    rank_sum INTEGER NOT NULL DEFAULT 0,
+                    confirmed INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (from_song, to_song, scope, account_id)
+                ) WITHOUT ROWID""",
+                """${SQLITE_ONLY}INSERT INTO song_edges_compact (from_song, to_song, scope, account_id, solo_plays, shared_plays, skips, ytm_rank, updated_at, seen, rank_sum, confirmed)
+                    SELECT from_song, to_song, scope, account_id, solo_plays, shared_plays, skips, ytm_rank, updated_at, seen, rank_sum, confirmed FROM song_edges""",
+                "${SQLITE_ONLY}DROP TABLE song_edges",
+                "${SQLITE_ONLY}ALTER TABLE song_edges_compact RENAME TO song_edges",
+                "${SQLITE_ONLY}CREATE INDEX song_edges_to ON song_edges (to_song, scope, account_id)",
+            ),
         )
+
+        /** Migration 11 freed a lot of space: compact the file once after it. */
+        private const val COMPACTED_AT = 11
+        private const val SQLITE_ONLY = "sqlite:"
+        private const val POSTGRES_ONLY = "postgres:"
 
         fun open(config: DatabaseConfig): Database = when (config.type.lowercase()) {
             "sqlite" -> {

@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.server
 
+import dev.trashpanda.ytmp.core.SongMatch
 import dev.trashpanda.ytmp.host.TakeoutSong
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.EdgeKind
@@ -260,12 +261,18 @@ class SongGraphTest {
     }
 
     @Test
-    fun `a phone's copy gives each of its songs the neighbours that are on the phone too`() {
+    fun `a phone's copy is the whole graph as the account sees it, compact`() {
         listOf("a", "b", "c").forEach { play("anna", song("ytm:$it")) }
-        // The phone has a and c (not b); its file of c, played on the phone, is the same song as c.
-        play("anna", song("ytm:a"), gapMs = 3 * 3_600_000L)
-        play("anna", song("local:phone:s:c.m4a", "Song ytm:c"))
-        val copy = graph.neighboursAmong(listOf("ytm:a", "ytm:b"), listOf("ytm:a", "local:phone:s:c.m4a"), "anna", HistoryRadio.ALL, GraphTuning(), 10)
-        assertEquals(mapOf("ytm:a" to listOf("local:phone:s:c.m4a")), copy)
+        play("bert", song("ytm:x"))
+        play("bert", song("ytm:y"))
+        val full = graph.full("anna", HistoryRadio.ALL, GraphTuning())
+        val ids = full.nodes.map { it.sources.single() }
+        fun kinds(from: String, to: String) =
+            full.edges.filter { ids[it[0].toInt()] == from && ids[it[1].toInt()] == to }.map { EdgeKind.entries[it[2].toInt()] }.toSet()
+        assertEquals(setOf(EdgeKind.PERSONAL, EdgeKind.SERVER), kinds("ytm:a", "ytm:b"))
+        assertEquals(setOf(EdgeKind.PERSONAL_NEAR), kinds("ytm:a", "ytm:c"))
+        // Bert's own links aren't in Anna's copy; everyone's are.
+        assertEquals(setOf(EdgeKind.SERVER), kinds("ytm:x", "ytm:y"))
+        assertEquals(SongMatch.key(song("ytm:a")), full.nodes[ids.indexOf("ytm:a")].key)
     }
 }

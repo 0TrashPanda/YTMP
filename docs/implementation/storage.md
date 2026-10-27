@@ -94,7 +94,7 @@ song_sources       -- the same song on different sources (merging)
 song_edges         -- the graph: "B was played after A"
   from_song → songs.id
   to_song   → songs.id
-  scope             -- 'personal' | 'imported' | 'server' | 'server_imported' | 'ytm' | 'ytm_account' | 'radio_near'
+  scope             -- 'personal' | 'imported' | 'server' | 'ytm' | 'ytm_account' | 'radio_near'
                     --   | 'personal_near' | 'imported_near' (account: the listener)
   account_id        -- the account for 'personal', 'imported' and 'ytm_account' ('radio_near': whose radio, '' none), '' otherwise
   solo_plays        -- counters, kept raw (see below)
@@ -117,7 +117,7 @@ radio_fetches      -- every YouTube Music radio fetched, as it came (migration 9
 history_imports    -- Google Takeout imports (plays.import_id points here; '' for plays in YTMP)
   id, account_id, at, plays, duplicates, first_at, last_at
   PRIMARY KEY (from_song, to_song, scope, account_id)
-  INDEX (from_song, scope, account_id), INDEX (to_song, scope, account_id)
+  INDEX (to_song, scope, account_id); on SQLite WITHOUT ROWID
 ```
 
 - **Personal graph** = rows with `scope = 'personal'` for one account.
@@ -189,12 +189,19 @@ it gets `GET /api/auth/radio` (only the songs).
 
 ### The phone's copy
 
-`host/GraphCopyStore.kt`: the phone sends its offline songs' IDs (`among`; phone music, the song
-cache, music files matched to YouTube Music) in parts of 400 (`seeds`) to `POST
-/api/auth/graph-copy`; `SongGraph.neighboursAmong` ranks each seed's neighbours like a radio
-and keeps those among the phone's songs (a file and its YouTube Music song are one node). The
-phone keeps them with those songs in `files/graph-copy.json`, once a day, and its rooms' radio
-hints fall back to it when `radioHints` can't reach the server (null).
+`GET /api/auth/graph` (`GraphFull`) is the whole graph as the account sees it, compact: every
+node with its versions' IDs, `match_key` and length, and every link as a row of numbers.
+`host/GraphCopyStore.kt` keeps it in `files/graph-copy.json` (once a day; off in *Settings →
+Radio*, `GET/PUT /api/graph-copy`, which deletes it), matches the phone's offline songs to its
+nodes by ID or `SongMatch` key and length, and ranks with `core/GraphRank` like the server. The
+phone's rooms use it when `radioHints` can't reach the server (null).
+
+### Space
+
+Migration 11: everyone's imported links (`server_imported`) aren't kept but added up from each
+account's `imported` links when read (`edges`); `song_edges_from` went (the key starts with
+`from_song`); on SQLite `song_edges` is `WITHOUT ROWID` (rows live in the key's tree), and the
+file is compacted once (`VACUUM`). With 31,000 imported plays the graph went from 32 MB to 16 MB.
 
 ### Takeout import
 

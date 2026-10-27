@@ -266,6 +266,27 @@ export async function keepOffline(song: Song): Promise<void> {
 	await request<unknown>('/api/cache/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(song) });
 }
 
+/** The phone's copy of the song graph (host/GraphCopyStore.kt). */
+export interface GraphCopyStatus {
+	enabled: boolean;
+	madeAt: number;
+	songs: number;
+	links: number;
+	bytes: number;
+}
+
+export function getGraphCopy(): Promise<GraphCopyStatus> {
+	return request<GraphCopyStatus>('/api/graph-copy');
+}
+
+export function setGraphCopy(enabled: boolean): Promise<GraphCopyStatus> {
+	return request<GraphCopyStatus>('/api/graph-copy', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
+}
+
+export function refreshGraphCopy(): Promise<GraphCopyStatus> {
+	return request<GraphCopyStatus>('/api/graph-copy/refresh', { method: 'POST' });
+}
+
 /** Learning radios of the music on this phone (its settings; a server's is on its admin page). */
 export function getRadioCrawl(): Promise<RadioCrawlStatus> {
 	return request<RadioCrawlStatus>('/api/radio-crawl');

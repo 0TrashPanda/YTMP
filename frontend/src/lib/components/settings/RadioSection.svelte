@@ -3,7 +3,7 @@
 	// is made unless you hold Start radio to choose for one; what radios leave out; and on the
 	// phone, learning YouTube Music's radios of your music for the song graph.
 	import { onMount } from 'svelte';
-	import { getRadioCrawl, setRadioCrawl } from '../../api';
+	import { getGraphCopy, getRadioCrawl, refreshGraphCopy, setGraphCopy, setRadioCrawl, type GraphCopyStatus } from '../../api';
 	import { listening } from '../../listening.svelte';
 	import type { RadioOptions } from '../../protocol.gen';
 	import { blockArtist, blockSong, DEFAULT_RADIO, RADIO_FROM, radioDefaults, setRadioDefaults } from '../../radio.svelte';
@@ -28,7 +28,37 @@
 		}
 	};
 
-	onMount(() => void listening.load());
+	let copy = $state<GraphCopyStatus | null>(null);
+	let refreshing = $state(false);
+	onMount(() => {
+		void listening.load();
+		if (onThisPhone) getGraphCopy().then((c) => (copy = c)).catch(() => {});
+	});
+
+	async function copyOn(on: boolean) {
+		try {
+			copy = await setGraphCopy(on);
+		} catch (e) {
+			onToast(e instanceof Error ? e.message : "Couldn't change it");
+		}
+	}
+
+	async function refreshCopy() {
+		refreshing = true;
+		try {
+			copy = await refreshGraphCopy();
+			if (!copy.madeAt) onToast("Couldn't reach your YTMP server");
+		} catch (e) {
+			onToast(e instanceof Error ? e.message : "Couldn't refresh it");
+		} finally {
+			refreshing = false;
+		}
+	}
+
+	const ago = (ms: number) => {
+		const h = Math.round((Date.now() - ms) / 3_600_000);
+		return h < 1 ? 'less than an hour ago' : h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
+	};
 
 	const card = 'flex flex-col gap-3 rounded-xl bg-raised/50 p-4';
 </script>
@@ -144,6 +174,29 @@
 		Radio choices back to how they were
 	</button>
 </section>
+
+{#if onThisPhone && copy}
+	<section class={card}>
+		<h3 class="font-bold">The song graph on this phone</h3>
+		<p class="text-xs text-muted">
+			A copy of your song graph, so radios still bring the songs you play together when your YTMP server can't be reached. Your music files and saved songs are found in it
+			by title, artist and length. Made again once a day.
+		</p>
+		<Toggle label="Keep a copy on this phone" hint="Off: it's deleted, and radios without your server use only your music files." checked={copy.enabled} onchange={copyOn} />
+		{#if copy.enabled}
+			<p class="text-sm">
+				{#if copy.madeAt}
+					{copy.songs.toLocaleString()} songs, {copy.links.toLocaleString()} links · {(copy.bytes / 1e6).toFixed(1)} MB · made {ago(copy.madeAt)}
+				{:else}
+					Not made yet: it needs your YTMP server.
+				{/if}
+			</p>
+			<button class="self-start rounded-full bg-raised px-4 py-2 text-sm hover:bg-line disabled:opacity-50" disabled={refreshing} onclick={refreshCopy}>
+				{refreshing ? 'Refreshing…' : 'Refresh now'}
+			</button>
+		{/if}
+	</section>
+{/if}
 
 {#if onThisPhone}
 	<CrawlSection
