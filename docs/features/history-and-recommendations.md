@@ -210,9 +210,10 @@ of **song connections**:
 *All your music* in the graph view: every song the graph knows, at once, laid out so songs
 that go together are close.
 
-- **Show**: *Mine* (your listening, in YTMP and imported), *Everyone* (everyone on your
-  server), *YouTube Music radios* (the radios it learned, the radio crawl's too), any of
-  them together.
+- **Show**: *Mine* (your listening, in YTMP and imported), *Everyone else* (everyone else on
+  your server, not you), *YouTube Music radios* (the radios it learned, the radio crawl's
+  too), any of them together. Switching is instant and every song stays in its place, so
+  you see what each part adds.
 - **Colour by**: *Groups* (songs often heard together; they come out much like genres or
   moods, named after their most played artists), *Artist* (your most played ones), *Played*
   (how often), *First heard*. A legend says which colour is what. Bigger: you played it more.
@@ -221,6 +222,8 @@ that go together are close.
   (artist, plays, group, the songs it goes with most) and *Show around this song*.
 - Songs Takeout only gives as a link (removed or private ones, mostly) show as *Song
   without a name*.
+- The map counts all your music alike, however long ago you played it (radios still favour
+  what you play now).
 - The first time, the server takes a few seconds to lay it out; then it's kept a while.
 
 ## Radio / Mix

@@ -5,7 +5,7 @@
 // this, from /connect. See docs/implementation/auth.md#your-history-on-other-pages.
 import { answer, ApiRequestError, getHost } from './api';
 import { APP_HOME_ORIGIN, identity, session } from './account';
-import type { EpisodeProgress, EpisodeProgressList, GraphBuildStatus, GraphMap, GraphPart, GraphTuning, GraphView, HistoryPage, HostInfo, MarkEpisodeRequest } from './protocol.gen';
+import type { EpisodeProgress, EpisodeProgressList, GraphBuildStatus, GraphMap, GraphTuning, GraphView, HistoryPage, HostInfo, MarkEpisodeRequest } from './protocol.gen';
 
 interface Access {
 	/** Your server's address. */
@@ -82,9 +82,9 @@ class ListeningHistory {
 		return this.call<GraphView>(`/api/account/graph${seed ? `?seed=${encodeURIComponent(seed)}` : ''}`);
 	}
 
-	/** The whole song graph, laid out by the server, as far as [parts] go (your listening, everyone's, YouTube Music's radios). */
-	graphMap(parts: GraphPart[]): Promise<GraphMap> {
-		return this.call<GraphMap>(`/api/account/graph/map?parts=${parts.join(',')}`);
+	/** The whole song graph, laid out by the server, with how much each link counts from your listening, everyone else's and YouTube Music's radios. */
+	graphMap(): Promise<GraphMap> {
+		return this.call<GraphMap>('/api/account/graph/map');
 	}
 
 	/** Whether the song graph is being built again on your server, and how far it got. */

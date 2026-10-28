@@ -229,20 +229,6 @@ data class GraphView(
     val now: Long,
 )
 
-/** What the whole-graph view shows, any of them together. */
-@Serializable
-@SerialName("GraphPart")
-enum class GraphPart {
-    /** Your own listening (in YTMP and imported). */
-    @SerialName("mine") MINE,
-
-    /** Everyone's listening on the server. */
-    @SerialName("everyone") EVERYONE,
-
-    /** YouTube Music's radios it learned, the radio crawl's too. */
-    @SerialName("radios") RADIOS,
-}
-
 /** A song in the whole-graph view, where the server laid it out. */
 @Serializable
 @SerialName("GraphMapNode")
@@ -266,18 +252,24 @@ data class GraphMapNode(
 data class GraphMapGroup(val songs: Int, val artists: List<String>)
 
 /**
- * `GET /api/account/graph/map?parts=mine,everyone,radios`: the whole graph as you see it, laid
- * out and in groups by the server. Links are weighed with your [GraphTuning], one per pair of songs.
+ * `GET /api/account/graph/map`: the whole graph as you see it, laid out and in groups by the
+ * server, from all of it at once (old plays count as much as new ones). Each link says how much
+ * it counts from each part, weighed with your [GraphTuning]: the page shows any of the parts
+ * together without asking again, and the songs stay where they are.
  */
 @Serializable
 @SerialName("GraphMap")
 data class GraphMap(
-    val parts: List<GraphPart>,
     val nodes: List<GraphMapNode>,
-    /** The links: [from] and [to] are places in [nodes], [weight] how much each counts. */
+    /** The links: [from] and [to] are places in [nodes]. */
     val from: List<Int>,
     val to: List<Int>,
-    val weight: List<Double>,
+    /** How much each link counts from your own listening (0: none). */
+    val mine: List<Double>,
+    /** From everyone else's listening on the server (their own, not yours). */
+    val others: List<Double>,
+    /** From YouTube Music's radios (the radio crawl's too). */
+    val radios: List<Double>,
     /** Biggest first. */
     val groups: List<GraphMapGroup>,
     val madeAt: Long,

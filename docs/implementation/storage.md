@@ -200,28 +200,31 @@ phone's rooms use it when `radioHints` can't reach the server (null).
 ### Groups
 
 `core/GraphGroups` finds groups of songs linked more to each other than to the rest: Louvain
-(modularity, resolution 1) on the whole graph as an account sees it, its links weighed with
-their `GraphTuning` and added up per pair of songs. Because it looks at all links at once, one
-stray jump to other music counts little against hundreds of links inside a group, so the groups
-come out much like genres or moods. The same links in the same order always give the same groups
-(0 is the biggest). On the server `SongGraph` works them out per account, history setting and
-tuning on its worker thread (about 0.1 s for 10,000 songs) when a radio or the graph view asks
-and they're missing or older than 6 hours, and keeps them in memory; till then the ones from
+(modularity, resolution 1) on the whole graph as an account sees it (`SongGraph.partLinks`): its
+own links (`personal`, `imported`, the two kinds of *soon after*), every other account's own
+links, and YouTube Music's (`ytm`, its own `ytm_account`, `radio_near`), weighed with its
+`GraphTuning` but without fading (all its music alike), added up per pair of songs. Not the
+server's links: they hold the account's own plays again, and counting those twice makes direct
+links outweigh *soon after* ones, which merges groups that should stay apart. Because it looks
+at all links at once, one stray jump to other music counts little against hundreds of links
+inside a group, so the groups come out much like genres or moods. The same links in the same
+order always give the same groups (0 is the biggest). `SongGraph` works them out per account and
+history setting on its worker thread (about 0.1 s for 10,000 songs) when a radio or the graph view
+asks and they're missing or older than 6 hours, and keeps them in memory; till then the ones from
 before count, or none. A rebuild marks them old. The graph view gets each node's group
-(`GraphNode.group`), for *Its radio*.
+(`GraphNode.group`), for *Its radio*; the whole-graph view's are the same.
 
 ### The whole-graph view
 
-`GET /api/account/graph/map?parts=mine,everyone,radios` (`GraphMap`; any of the parts, none:
-all). *mine* is the account's own links (`personal`, `imported` and the two kinds of *soon
-after*), *everyone* the server's (`server`, `server_imported`), *radios* YouTube Music's
-(`ytm`, `ytm_account`, `radio_near`). Links are weighed with the account's tuning, one per
-pair of songs. The server finds the groups of just these links and lays them out with
-`server/GraphLayout` (ForceAtlas2 with Barnes-Hut, 300 steps, the pushing on all cores; songs
-start near their group's spot, so the groups come apart fast): about 2–3 s for 10,000 songs
-and 60,000 links. The result is kept in memory for 6 hours (at most 8 of them; a rebuild
-drops them). Groups are named after their most played artists. The page draws it with
-sigma.js (WebGL; `GraphMapView.svelte`, loaded only when it opens).
+`GET /api/account/graph/map` (`GraphMap`): the links of `partLinks` (see [groups](#groups)),
+one per pair of songs, each with how much it counts from the account's own listening (`mine`),
+everyone else's (`others`) and YouTube Music's radios (`radios`). The server finds the groups and
+lays out all of it once with `server/GraphLayout` (ForceAtlas2 with Barnes-Hut, 300 steps, the
+pushing on all cores; songs start near their group's spot, so the groups come apart fast): about
+2–3 s for 10,000 songs and 60,000 links. The result is kept in memory for 6 hours (at most 8 of
+them; a rebuild drops them). Groups are named after their most played artists. The page adds up
+the parts shown and hides links and songs without them, so switching parts needs no new layout
+and every song stays in its place. It draws with sigma.js (WebGL; `GraphMapView.svelte`, loaded only when it opens).
 
 ### Space
 

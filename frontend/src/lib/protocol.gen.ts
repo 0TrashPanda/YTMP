@@ -1164,8 +1164,6 @@ export interface GraphView {
   now: number;
 }
 
-export type GraphPart = "mine" | "everyone" | "radios";
-
 export interface GraphMapNode {
   id: string;
   title: string;
@@ -1183,11 +1181,12 @@ export interface GraphMapGroup {
 }
 
 export interface GraphMap {
-  parts: GraphPart[];
   nodes: GraphMapNode[];
   from: number[];
   to: number[];
-  weight: number[];
+  mine: number[];
+  others: number[];
+  radios: number[];
   groups: GraphMapGroup[];
   madeAt: number;
 }

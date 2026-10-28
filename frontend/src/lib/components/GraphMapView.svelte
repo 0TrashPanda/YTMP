@@ -1,21 +1,23 @@
 <script lang="ts">
 	// The whole song graph (docs/features/history-and-recommendations.md#the-whole-graph): every
 	// song, laid out by the server so songs that go together are close, in groups much like
-	// genres. Your listening, everyone's and YouTube Music's radios, any of them together.
-	// Drawn with WebGL (sigma.js, loaded only here): thousands of songs stay smooth.
+	// genres. Your listening, everyone else's and YouTube Music's radios, any of them together:
+	// the server lays out all of it once, and the parts are shown and hidden here, at once, with
+	// every song in its place. Drawn with WebGL (sigma.js, loaded only here).
 	import { onDestroy, onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import type Graph from 'graphology';
 	import type Sigma from 'sigma';
 	import { listening } from '../listening.svelte';
-	import type { GraphMap, GraphPart } from '../protocol.gen';
+	import type { GraphMap } from '../protocol.gen';
 	import Icon from './Icon.svelte';
 
 	let { onClose, onAround }: { onClose: () => void; onAround: (songId: string) => void } = $props();
 
-	const PARTS: { part: GraphPart; label: string }[] = [
+	type Part = 'mine' | 'others' | 'radios';
+	const PARTS: { part: Part; label: string }[] = [
 		{ part: 'mine', label: 'Mine' },
-		{ part: 'everyone', label: 'Everyone' },
+		{ part: 'others', label: 'Everyone else' },
 		{ part: 'radios', label: 'YouTube Music radios' }
 	];
 	type Colour = 'group' | 'artist' | 'plays' | 'first';
@@ -60,7 +62,7 @@
 	const nameless = (title: string) => /^https?:\/\//.test(title) || !title;
 	const month = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 
-	let parts = $state<GraphPart[]>(['mine', 'everyone', 'radios']);
+	let parts = $state<Part[]>(['mine', 'others', 'radios']);
 	let colour = $state<Colour>('group');
 	let lines = $state<Lines>('strong');
 	// Raw: thousands of songs and links, read in loops; a deep proxy of them makes every read slow.
@@ -75,22 +77,24 @@
 	let renderer: Sigma | null = null;
 	let hovered: number | null = null;
 	let strongCut = 0;
-	let asked = 0;
+	/** How much each link counts with the parts shown, and which songs have a link then. */
+	let weights = new Float64Array(0);
+	let songOn = new Uint8Array(0);
+	let shown = $state({ songs: 0, links: 0 });
+	let groupShown = $state.raw<number[]>([]);
 
 	async function load() {
-		const mine = ++asked;
 		loading = true;
 		error = null;
 		picked = null;
 		try {
-			const [m] = await Promise.all([listening.graphMap(parts), libs()]);
-			if (mine !== asked) return;
+			const [m] = await Promise.all([listening.graphMap(), libs()]);
 			map = m;
 			draw();
 		} catch (e) {
-			if (mine === asked) error = e instanceof Error ? e.message : "Couldn't load the song graph";
+			error = e instanceof Error ? e.message : "Couldn't load the song graph";
 		} finally {
-			if (mine === asked) loading = false;
+			loading = false;
 		}
 	}
 
@@ -137,15 +141,14 @@
 		renderer?.kill();
 		renderer = null;
 		const g = new Lib.Graph({ type: 'undirected' });
-		const maxW = Math.max(1e-6, ...map.weight);
 		map.nodes.forEach((n, i) =>
 			g.addNode(i, { x: n.x, y: -n.y, size: 1.5 + 9 * Math.sqrt(n.plays / mostPlays), label: nameless(n.title) ? 'Song without a name' : n.title, color: REST })
 		);
 		map.from.forEach((a, k) => {
-			if (!g.hasEdge(a, map!.to[k])) g.addEdgeWithKey(k, a, map!.to[k], { w: map!.weight[k], size: 0.2 + 1.5 * Math.sqrt(map!.weight[k] / maxW) });
+			if (!g.hasEdge(a, map!.to[k])) g.addEdgeWithKey(k, a, map!.to[k], { w: 0, size: 0.2 });
 		});
-		strongCut = [...map.weight].sort((a, b) => b - a)[Math.min(map.weight.length - 1, 4000)] ?? 0;
 		graph = g;
+		show();
 		paint();
 		try {
 			renderer = new Lib.Sigma(g, box, {
@@ -161,6 +164,7 @@
 				minCameraRatio: 0.02,
 				maxCameraRatio: 3,
 				nodeReducer: (key, at) => {
+					if (at.off) return { ...at, hidden: true };
 					const f = picked ?? hovered;
 					if (f === null) return at;
 					const k = Number(key);
@@ -169,6 +173,7 @@
 					return { ...at, color: '#2a2a2a', label: '', zIndex: 0 };
 				},
 				edgeReducer: (key, at) => {
+					if ((at.w as number) <= 0) return { ...at, hidden: true };
 					const f = picked ?? hovered;
 					if (f !== null) {
 						if (g.hasExtremity(key, String(f))) return { ...at, color: 'rgb(220,220,220)', size: (at.size as number) + 0.5, zIndex: 1 };
@@ -186,6 +191,41 @@
 		renderer.on('leaveNode', () => ((hovered = null), renderer?.refresh({ skipIndexation: true })));
 		renderer.on('clickNode', ({ node }) => ((picked = picked === Number(node) ? null : Number(node)), renderer?.refresh({ skipIndexation: true })));
 		renderer.on('clickStage', () => ((picked = null), renderer?.refresh({ skipIndexation: true })));
+	}
+
+	/** The parts asked for: how much each link counts with them, and the songs without a link left out. */
+	function show() {
+		const g = graph;
+		if (!g || !map) return;
+		const on = { mine: parts.includes('mine'), others: parts.includes('others'), radios: parts.includes('radios') };
+		const n = map.from.length;
+		weights = new Float64Array(n);
+		songOn = new Uint8Array(map.nodes.length);
+		let links = 0;
+		for (let k = 0; k < n; k++) {
+			const w = (on.mine ? map.mine[k] : 0) + (on.others ? map.others[k] : 0) + (on.radios ? map.radios[k] : 0);
+			weights[k] = w;
+			if (w > 0) {
+				links++;
+				songOn[map.from[k]] = 1;
+				songOn[map.to[k]] = 1;
+			}
+		}
+		const maxW = Math.max(1e-6, ...weights);
+		strongCut = [...weights].sort((a, b) => b - a)[Math.min(n - 1, 4000)] ?? 0;
+		g.updateEachEdgeAttributes((key, at) => ({ ...at, w: weights[Number(key)], size: 0.2 + 1.5 * Math.sqrt(weights[Number(key)] / maxW) }), { attributes: ['w', 'size'] });
+		g.updateEachNodeAttributes((key, at) => ({ ...at, off: !songOn[Number(key)] }), { attributes: ['off'] });
+		const counts = new Array(map.groups.length).fill(0);
+		let songs = 0;
+		map.nodes.forEach((node, i) => {
+			if (!songOn[i]) return;
+			songs++;
+			counts[node.group]++;
+		});
+		shown = { songs, links };
+		groupShown = counts;
+		if (picked !== null && !songOn[picked]) picked = null;
+		renderer?.refresh();
 	}
 
 	/** Songs and their lines in the colours asked for. */
@@ -228,11 +268,11 @@
 		ctx.fillText(d.label, d.x + d.size + 3 + pad, d.y + size / 3);
 	}
 
-	function toggle(part: GraphPart) {
+	function toggle(part: Part) {
 		const next = parts.includes(part) ? parts.filter((p) => p !== part) : PARTS.map((p) => p.part).filter((p) => p === part || parts.includes(p));
 		if (!next.length) return;
 		parts = next;
-		void load();
+		show();
 	}
 	function setColour(c: Colour) {
 		colour = c;
@@ -247,9 +287,11 @@
 	const pickedNear = $derived.by(() => {
 		if (!map || picked === null) return [];
 		const near: { i: number; w: number }[] = [];
+		void shown;
 		map.from.forEach((a, k) => {
-			if (a === picked) near.push({ i: map!.to[k], w: map!.weight[k] });
-			else if (map!.to[k] === picked) near.push({ i: a, w: map!.weight[k] });
+			if (weights[k] <= 0) return;
+			if (a === picked) near.push({ i: map!.to[k], w: weights[k] });
+			else if (map!.to[k] === picked) near.push({ i: a, w: weights[k] });
 		});
 		return near.sort((a, b) => b.w - a.w).slice(0, 6);
 	});
@@ -257,13 +299,13 @@
 	const legend = $derived.by((): Row[] => {
 		if (!map) return [];
 		if (colour === 'group') {
-			const rest = map.groups.slice(CAT.length).reduce((s, g) => s + g.songs, 0);
+			const rest = groupShown.slice(CAT.length).reduce((s, n) => s + n, 0);
 			return [
-				...map.groups.slice(0, CAT.length).map((g, i) => ({ color: CAT[i], label: g.artists.join(', ') || 'Songs no one here played', n: g.songs })),
+				...map.groups.slice(0, CAT.length).map((g, i) => ({ color: CAT[i], label: g.artists.join(', ') || 'Songs no one here played', n: groupShown[i] ?? 0 })),
 				...(rest ? [{ color: REST, label: `${map.groups.length - CAT.length} smaller groups`, n: rest }] : [])
 			];
 		}
-		if (colour === 'artist') return [...topArtists.map((a, i) => ({ color: CAT[i], label: a })), { color: REST, label: 'Everyone else' }];
+		if (colour === 'artist') return [...topArtists.map((a, i) => ({ color: CAT[i], label: a })), { color: REST, label: 'Other artists' }];
 		return [];
 	});
 
@@ -279,7 +321,7 @@
 		<div class="min-w-0 flex-1">
 			<h2 class="truncate font-bold">All your music</h2>
 			<p class="truncate text-xs text-muted">
-				{#if map && !loading}{map.nodes.length.toLocaleString()} songs · {map.from.length.toLocaleString()} links · {map.groups.length} groups{:else}Laying out the graph…{/if}
+				{#if map && !loading}{shown.songs.toLocaleString()} songs · {shown.links.toLocaleString()} links{:else}Laying out the graph…{/if}
 			</p>
 		</div>
 	</header>
@@ -304,8 +346,8 @@
 			<p class="absolute inset-x-4 top-8 text-center text-sm text-muted">{error}</p>
 		{:else if loading}
 			<p class="pointer-events-none absolute inset-x-4 top-8 text-center text-sm text-muted">Laying out the graph… The first time, that takes a few seconds.</p>
-		{:else if map && map.nodes.length === 0}
-			<p class="absolute inset-x-4 top-8 text-center text-sm text-muted">Nothing learned here yet.</p>
+		{:else if map && shown.songs === 0}
+			<p class="absolute inset-x-4 top-8 text-center text-sm text-muted">{map.nodes.length ? 'Nothing learned from this yet.' : 'Nothing learned here yet.'}</p>
 		{/if}
 
 		{#if map && !loading && legend.length + (colour === 'plays' || colour === 'first' ? 1 : 0) > 0}

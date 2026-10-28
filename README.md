@@ -82,7 +82,7 @@ Music, without Premium, and not tied to a single music service.
 - The song graph: import your YouTube Music history from Google Takeout, see the graph
   (around a song, or your most played) and move sliders for how much each part counts.
   *All your music* shows the whole graph at once (thousands of songs, drawn with WebGL),
-  your listening, everyone's and YouTube Music's radios, any of them together, coloured by
+  your listening, everyone else's and YouTube Music's radios, any of them together, coloured by
   group (songs often heard together, much like genres), artist, plays or when first heard.
   Graph radios walk the graph and keep to the song's group.
   The server (and the phone, also overnight while it charges) can slowly learn YouTube
