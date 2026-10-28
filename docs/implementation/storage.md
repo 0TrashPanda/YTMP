@@ -116,6 +116,13 @@ radio_fetches      -- every YouTube Music radio fetched, as it came (migration 9
 
 history_imports    -- Google Takeout imports (plays.import_id points here; '' for plays in YTMP)
   id, account_id, at, plays, duplicates, first_at, last_at
+
+graph_groups       -- the song graph's groups, kept (migration 13; see "Groups" below)
+  account_id        -- '' for the graph without an account
+  variant           -- how it was weighed: the history setting and the tuning
+  song_id, grp
+graph_groups_made  -- what they were made from (rebuilds:plays and radios) and when
+  account_id, variant, made_from, made_at
   PRIMARY KEY (from_song, to_song, scope, account_id)
   INDEX (to_song, scope, account_id); on SQLite WITHOUT ROWID
 ```
@@ -191,10 +198,11 @@ it gets `GET /api/auth/radio` (only the songs).
 
 `GET /api/auth/graph` (`GraphFull`) is the whole graph as the account sees it, compact: every
 node with its versions' IDs, `match_key` and length, and every link as a row of numbers.
-`host/GraphCopyStore.kt` keeps it in `files/graph-copy.json` (once a day; off in *Settings →
-Radio*, `GET/PUT /api/graph-copy`, which deletes it), matches the phone's offline songs to its
+`host/GraphCopyStore.kt` keeps it in `files/graph-copy.json` (asked once a day with
+`?known=` its `version`: the server answers 304 while the graph is about the same, as for
+groups, and the copy stays; off in *Settings → Radio*, `GET/PUT /api/graph-copy`, which deletes it), matches the phone's offline songs to its
 nodes by ID or `SongMatch` key and length, and ranks with `core/GraphRank` like the server, with
-groups it finds in the copy itself (`core/GraphGroups`, once, when a radio first needs them). The
+the server's groups (`GraphFull.groups`; from an older server it finds them in the copy itself). The
 phone's rooms use it when `radioHints` can't reach the server (null).
 
 ### Groups
@@ -208,11 +216,18 @@ server's links: they hold the account's own plays again, and counting those twic
 links outweigh *soon after* ones, which merges groups that should stay apart. Because it looks
 at all links at once, one stray jump to other music counts little against hundreds of links
 inside a group, so the groups come out much like genres or moods. The same links in the same
-order always give the same groups (0 is the biggest). `SongGraph` works them out per account and
-history setting on its worker thread (about 0.1 s for 10,000 songs) when a radio or the graph view
-asks and they're missing or older than 6 hours, and keeps them in memory; till then the ones from
-before count, or none. A rebuild marks them old. The graph view gets each node's group
+order always give the same groups (0 is the biggest). The graph view gets each node's group
 (`GraphNode.group`), for *Its radio*; the whole-graph view's are the same.
+
+**When they're made.** Not by the clock, but when the graph changed: `SongGraph.MadeFrom` is how
+many full rebuilds it had (setting `song_graph_rebuilds`) and how many plays and radios it learned
+from (counted at most every 5 minutes). Groups are kept in the database (`graph_groups`,
+`graph_groups_made`: per account, '' without one, and *variant*: the history setting and the
+tuning, without the fade), so radios have them right after a start. When a radio or the graph view
+asks and the graph had a rebuild since, or more than 2% (at least 50) more plays and radios, the
+worker thread works them out again (about 0.1–0.3 s for 10,000 songs); till then the ones from
+before count. New sliders (*Use for my radios*) are a new variant: made on the first radio after.
+An account keeps only its latest variant.
 
 ### The whole-graph view
 
@@ -221,8 +236,10 @@ one per pair of songs, each with how much it counts from the account's own liste
 everyone else's (`others`) and YouTube Music's radios (`radios`). The server finds the groups and
 lays out all of it once with `server/GraphLayout` (ForceAtlas2 with Barnes-Hut, 300 steps, the
 pushing on all cores; songs start near their group's spot, so the groups come apart fast): about
-2–3 s for 10,000 songs and 60,000 links. The result is kept in memory for 6 hours (at most 8 of
-them; a rebuild drops them). Groups are named after their most played artists. The page adds up
+2–3 s for 10,000 songs and 60,000 links. It's made only when someone opens the view (it's seldom
+looked at), and kept in memory (at most 8) as long as the graph is about the same (`MadeFrom`, as
+for groups; a rebuild drops it). A new one starts from the last one's places: songs stay where
+they were, new ones start among their linked songs or in their group, and half the steps do. Groups are named after their most played artists. The page adds up
 the parts shown and hides links and songs without them, so switching parts needs no new layout
 and every song stays in its place. It draws with sigma.js (WebGL; `GraphMapView.svelte`, loaded only when it opens).
 

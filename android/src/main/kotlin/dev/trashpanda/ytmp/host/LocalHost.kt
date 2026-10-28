@@ -175,7 +175,7 @@ class LocalHost(private val context: Context) {
         File(context.filesDir, "graph-copy.json"),
         scope,
         songs = { (if (phoneMusicOn) local.songs(PhoneLibrary.ID) else emptyList()) + cache.songs() + matcher.all().map { it.second } },
-        fetch = { authLink.ownerAccount?.let(sync::tokenFor)?.let { authLink.auth.graphFull(it) } },
+        fetch = { known -> authLink.ownerAccount?.let(sync::tokenFor)?.let { authLink.auth.graphFull(it, known) } },
         loadEnabled = { localSettings.getBoolean(GRAPH_COPY, true) },
         saveEnabled = { localSettings.edit().putBoolean(GRAPH_COPY, it).apply() },
     )

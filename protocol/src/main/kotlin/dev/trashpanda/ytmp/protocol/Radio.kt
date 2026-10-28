@@ -134,6 +134,10 @@ data class GraphFull(
      * rankSum, updatedAt, confirmed (0/1)]`, kind as [EdgeKind]'s place in its list.
      */
     val edges: List<List<Long>>,
+    /** Each song's group (as radios on the server use them; -1: none), in [nodes]' order. */
+    val groups: List<Int> = emptyList(),
+    /** What it's made from and how it's weighed: asked again with `?known=`, the server says when it's still the same (304). */
+    val version: String = "",
 )
 
 /** A song of [GraphFull]: its versions' IDs, and its title-and-artist key and length, to match songs that aren't one of them. */

@@ -121,11 +121,11 @@ class Accounts(private val db: Database, private val clock: () -> Long = System:
 
     /**
      * Deletes an account and everything kept for it: logins, settings, listening history,
-     * podcast progress, its rooms' copies ([globalId] is `username@issuer`). Not the last admin.
+     * podcast progress, its song graph groups, its rooms' copies ([globalId] is `username@issuer`). Not the last admin.
      */
     fun delete(accountId: String, globalId: String) = db.transaction { c ->
         if (c.isLastAdmin(accountId)) throw AccountException("This is the only server admin. Make someone else admin first.")
-        for (table in listOf("sessions", "account_data", "plays", "episode_progress", "song_edges", "radio_fetches", "history_imports")) {
+        for (table in listOf("sessions", "account_data", "plays", "episode_progress", "song_edges", "radio_fetches", "history_imports", "graph_groups", "graph_groups_made")) {
             c.prepareStatement("DELETE FROM $table WHERE account_id = ?").use { it.setString(1, accountId); it.executeUpdate() }
         }
         c.prepareStatement("DELETE FROM invites WHERE created_by = ? AND used_by IS NULL").use { it.setString(1, accountId); it.executeUpdate() }

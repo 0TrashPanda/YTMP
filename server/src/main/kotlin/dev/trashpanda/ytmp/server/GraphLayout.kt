@@ -25,9 +25,20 @@ object GraphLayout {
     /**
      * Positions (x, y per song) for [n] songs with links [from]–[to] that count [weight]. With
      * [groups] (0: the biggest), each song starts near its group's spot: the groups come apart
-     * in far fewer steps than from one heap.
+     * in far fewer steps than from one heap. With [startX]/[startY] (NaN: a new song), songs start
+     * where they were on the map before, a new one among its linked songs or its group: the
+     * map stays as it was, and as it's almost laid out, half the steps do.
      */
-    fun place(n: Int, from: IntArray, to: IntArray, weight: DoubleArray, groups: IntArray? = null, iterations: Int = ITERATIONS): Pair<DoubleArray, DoubleArray> {
+    fun place(
+        n: Int,
+        from: IntArray,
+        to: IntArray,
+        weight: DoubleArray,
+        groups: IntArray? = null,
+        iterations: Int = ITERATIONS,
+        startX: DoubleArray? = null,
+        startY: DoubleArray? = null,
+    ): Pair<DoubleArray, DoubleArray> {
         val x = DoubleArray(n)
         val y = DoubleArray(n)
         // A fixed start: a spiral of groups (biggest in the middle), each a small spiral of its songs.
@@ -45,6 +56,53 @@ object GraphLayout {
             x[i] = gd * cos(ga) + d * cos(a)
             y[i] = gd * sin(ga) + d * sin(a)
         }
+        var steps = iterations
+        if (startX != null && startY != null) {
+            val known = BooleanArray(n) { !startX[it].isNaN() && !startY[it].isNaN() }
+            val count = known.count { it }
+            if (count > 0) {
+                // The map's size against the spiral's: a song with nothing placed to go by starts on the spiral at the map's size.
+                fun rms(xs: DoubleArray, ys: DoubleArray, which: (Int) -> Boolean) =
+                    sqrt((0 until n).filter(which).sumOf { xs[it] * xs[it] + ys[it] * ys[it] } / (0 until n).count(which).coerceAtLeast(1))
+                val scale = (rms(startX, startY) { known[it] } / rms(x, y) { known[it] }.coerceAtLeast(1e-9)).takeIf { it.isFinite() } ?: 1.0
+                for (i in 0 until n) if (!known[i]) {
+                    x[i] *= scale
+                    y[i] *= scale
+                }
+                for (i in 0 until n) if (known[i]) {
+                    x[i] = startX[i]
+                    y[i] = startY[i]
+                }
+                // A new song: in the middle of its linked songs that have a place, else of its group's.
+                val sx = DoubleArray(n)
+                val sy = DoubleArray(n)
+                val sn = IntArray(n)
+                for (k in from.indices) {
+                    val a = from[k]
+                    val b = to[k]
+                    if (known[b] && !known[a]) { sx[a] += x[b]; sy[a] += y[b]; sn[a]++ }
+                    if (known[a] && !known[b]) { sx[b] += x[a]; sy[b] += y[a]; sn[b]++ }
+                }
+                val gx = DoubleArray(size.size)
+                val gy = DoubleArray(size.size)
+                val gn = IntArray(size.size)
+                for (i in 0 until n) if (known[i]) { gx[group[i]] += x[i]; gy[group[i]] += y[i]; gn[group[i]]++ }
+                for (i in 0 until n) {
+                    if (known[i]) continue
+                    // A little apart, so new songs on the same spot don't sit on each other.
+                    val jx = cos(i * 2.399963)
+                    val jy = sin(i * 2.399963)
+                    if (sn[i] > 0) {
+                        x[i] = sx[i] / sn[i] + jx
+                        y[i] = sy[i] / sn[i] + jy
+                    } else if (gn[group[i]] > 0) {
+                        x[i] = gx[group[i]] / gn[group[i]] + jx
+                        y[i] = gy[group[i]] / gn[group[i]] + jy
+                    }
+                }
+                if (count >= n * 0.8) steps = iterations / 2
+            }
+        }
         if (n < 2) return x to y
         val mass = DoubleArray(n) { 1.0 }
         for (k in from.indices) {
@@ -57,7 +115,7 @@ object GraphLayout {
         val oldX = DoubleArray(n)
         val oldY = DoubleArray(n)
         val tree = Tree(n)
-        repeat(iterations) {
+        repeat(steps) {
             fx.copyInto(oldX)
             fy.copyInto(oldY)
             fx.fill(0.0)

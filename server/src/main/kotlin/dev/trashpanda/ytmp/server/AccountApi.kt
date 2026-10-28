@@ -198,12 +198,17 @@ class AccountService(
         return File(System.getProperty("java.io.tmpdir"), "ytmp-upload-${account.id}-$id")
     }
 
-    /** The whole song graph as [username] (one of ours) sees it, for their phone's copy; only everyone's when not [personal]. */
-    fun graphFull(username: String, personal: Boolean): GraphFull? {
-        val graph = graph ?: return null
+    /**
+     * The whole song graph as [username] (one of ours) sees it, for their phone's copy; only
+     * everyone's when not [personal]. Null when their copy of [known] version is still good.
+     */
+    fun graphFull(username: String, personal: Boolean, known: String? = null): GraphFull? {
+        val graph = graph ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No song graph here")
         val account = accounts.find(username)?.takeIf { personal }
         val use = account?.let(::settings)?.historyRadio ?: HistoryRadio.ALL
-        return graph.full(account?.id, use, account?.let(::tuning) ?: GraphTuning())
+        val tuning = account?.let(::tuning) ?: GraphTuning()
+        if (known != null && graph.copyStillGood(known, use, tuning)) return null
+        return graph.full(account?.id, use, tuning)
     }
 
     /** A host (a phone) fetched a YouTube Music radio for [username] (one of ours): the graph learns from it. */
@@ -252,7 +257,9 @@ class AccountService(
         // A phone's copy of the whole graph as the account sees it (radios without this server).
         get("/auth/graph") {
             val claims = call.ownToken() ?: throw notLoggedIn()
-            call.respond(io { graphFull(claims.sub, personal = mayReadHistory(claims)) } ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No song graph here"))
+            // ?known= its copy's version: 304 while that's still about the same.
+            val full = io { graphFull(claims.sub, personal = mayReadHistory(claims), known = call.request.queryParameters["known"]) }
+            if (full == null) call.respond(HttpStatusCode.NotModified) else call.respond(full)
         }
 
         // A phone fetched a YouTube Music radio (in a room, or to learn from): the graph keeps it.

@@ -36,7 +36,8 @@ class GraphCopyStoreTest {
         var reachable = true
         // On the phone: a, b, and a music file of c that was never played (only its title, artist and length say what it is).
         val songs = listOf(song("ytm:a"), song("ytm:b"), song("local:phone:s:c.m4a", "Song ytm:c"))
-        val store = GraphCopyStore(file, this, { songs }, { if (reachable) graph else null }, clock = { now })
+        val asked = mutableListOf<String?>()
+        val store = GraphCopyStore(file, this, { songs }, { known -> asked += known; if (reachable) GraphCopyAnswer.New(graph) else null }, clock = { now })
         assertTrue(store.refresh())
         assertEquals(listOf("ytm:b", "local:phone:s:c.m4a"), store.similar("ytm:a").map { it.id })
         // From c: b (played before it), and a before that, further along the walk.
@@ -45,12 +46,29 @@ class GraphCopyStoreTest {
         // Offline: the old copy stays, also for a new store reading it from the file.
         reachable = false
         assertFalse(store.refresh())
-        val again = GraphCopyStore(file, this, { songs }, { null }, clock = { now })
+        val again = GraphCopyStore(file, this, { songs }, { _ -> null }, clock = { now })
         assertEquals(listOf("ytm:b", "local:phone:s:c.m4a"), again.similar("ytm:a").map { it.id })
 
         // Switched off: the copy is gone, and radios get nothing from it.
         again.setEnabled(false)
         assertFalse(file.exists())
         assertEquals(emptyList(), again.similar("ytm:a"))
+    }
+
+    @Test
+    fun `the copy is fetched again only when the server says it changed, and uses the server's groups`() = runTest {
+        val file = Files.createTempDirectory("ytmp").resolve("graph-copy.json").toFile()
+        // The server put a and c in one group, b in another: a radio from a then has c before b.
+        val served = graph.copy(groups = listOf(0, 1, 0), version = "1:10/ALL|7", edges = graph.edges + listOf(listOf(0L, 2L, EdgeKind.entries.indexOf(EdgeKind.PERSONAL).toLong(), 3, 0, 0, 0, -1, 0, now, 0)))
+        val asked = mutableListOf<String?>()
+        var answer: GraphCopyAnswer = GraphCopyAnswer.New(served)
+        val songs = listOf(song("ytm:a"), song("ytm:b"), song("ytm:c"))
+        val store = GraphCopyStore(file, this, { songs }, { known -> asked += known; answer }, clock = { now })
+        assertTrue(store.refresh())
+        assertEquals(listOf("ytm:c", "ytm:b"), store.similar("ytm:a").map { it.id })
+        answer = GraphCopyAnswer.Unchanged
+        assertTrue(store.refresh())
+        assertEquals(listOf(null, "1:10/ALL|7"), asked)
+        assertEquals(listOf("ytm:c", "ytm:b"), store.similar("ytm:a").map { it.id })
     }
 }

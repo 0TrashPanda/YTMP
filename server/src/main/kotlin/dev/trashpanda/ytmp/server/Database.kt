@@ -289,6 +289,12 @@ class Database private constructor(private val url: String, private val user: St
                     SELECT MIN(id) FROM plays GROUP BY account_id, song_id, played_at, room_code
                 )""",
             ),
+            // 13: the song graph's groups, kept (per account and way of weighing; '' is without an
+            // account), with what they were made from, so radios have them also right after a start
+            listOf(
+                "CREATE TABLE graph_groups (account_id VARCHAR(32) NOT NULL, variant VARCHAR(64) NOT NULL, song_id VARCHAR(32) NOT NULL, grp INTEGER NOT NULL, PRIMARY KEY (account_id, variant, song_id))",
+                "CREATE TABLE graph_groups_made (account_id VARCHAR(32) NOT NULL, variant VARCHAR(64) NOT NULL, made_from VARCHAR(64) NOT NULL, made_at BIGINT NOT NULL, PRIMARY KEY (account_id, variant))",
+            ),
         )
 
         /** Migration 11 freed a lot of space: compact the file once after it. */

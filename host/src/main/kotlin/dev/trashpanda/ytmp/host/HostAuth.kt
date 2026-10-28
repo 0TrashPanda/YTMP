@@ -51,8 +51,11 @@ interface HostAuth {
      */
     suspend fun radioHints(token: String, request: RadioHintsRequest): RadioHints? = RadioHints(similar(token, request.seed))
 
-    /** The whole song graph as the account in [token] sees it, from its auth server (a phone's copy); null when it can't be had. */
-    suspend fun graphFull(token: String): GraphFull? = null
+    /**
+     * The whole song graph as the account in [token] sees it, from its auth server (a phone's
+     * copy), unless the copy of [known] version is still good; null when it can't be had.
+     */
+    suspend fun graphFull(token: String, known: String? = null): GraphCopyAnswer? = null
 
     /**
      * Tells the account in [token]'s auth server about a YouTube Music radio this host fetched
@@ -166,17 +169,19 @@ class TrustedAuthServers(
             .getOrNull()
     }
 
-    override suspend fun graphFull(token: String): GraphFull? = withContext(Dispatchers.IO) {
+    override suspend fun graphFull(token: String, known: String?): GraphCopyAnswer? = withContext(Dispatchers.IO) {
         val (claims, server) = ownerOf(token) ?: return@withContext null
         val url = server.url ?: return@withContext null
         runCatching {
-            val connection = URI("${url.trimEnd('/')}/api/auth/graph").toURL().openConnection() as HttpURLConnection
+            val ask = known?.let { "?known=${java.net.URLEncoder.encode(it, Charsets.UTF_8)}" }.orEmpty()
+            val connection = URI("${url.trimEnd('/')}/api/auth/graph$ask").toURL().openConnection() as HttpURLConnection
             connection.connectTimeout = 10_000
             connection.readTimeout = 120_000
             connection.setRequestProperty("Authorization", "Bearer $token")
             try {
+                if (connection.responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) return@runCatching GraphCopyAnswer.Unchanged
                 if (connection.responseCode != 200) throw SourceException("$url answered ${connection.responseCode}")
-                connection.inputStream.bufferedReader().use { ProtocolJson.decodeFromString(GraphFull.serializer(), it.readText()) }
+                GraphCopyAnswer.New(connection.inputStream.bufferedReader().use { ProtocolJson.decodeFromString(GraphFull.serializer(), it.readText()) })
             } finally {
                 connection.disconnect()
             }

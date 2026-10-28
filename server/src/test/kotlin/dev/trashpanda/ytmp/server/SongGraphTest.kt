@@ -334,4 +334,36 @@ class SongGraphTest {
         assertEquals((0 until 4).map { "ytm:r$it" }.toSet(), radio.filter { it.startsWith("ytm:r") }.toSet())
         assertTrue("ytm:p0" !in radio || radio.indexOf("ytm:p0") > (0 until 4).maxOf { radio.indexOf("ytm:r$it") })
     }
+
+    @Test
+    fun `groups are kept over a restart and made again once the graph changed, the map is reused till then`() {
+        twoKindsOfMusic()
+        val seed = "ytm:r0"
+        // Asked for the first time: none yet, worked out off the caller's thread.
+        assertEquals(null, graph.view("anna", seed, GraphTuning()).nodes.first().group)
+        graph.awaitIdle()
+        assertTrue(graph.view("anna", seed, GraphTuning()).nodes.all { it.group != null })
+        // A restart: they're there at once.
+        val again = SongGraph(db) { now }
+        assertTrue(again.view("anna", seed, GraphTuning()).nodes.all { it.group != null })
+
+        val map = again.map("anna", GraphTuning())
+        assertTrue(map === again.map("anna", GraphTuning()))
+        // A full rebuild (an import, a deletion): a new map, the songs where they were.
+        again.rebuild()
+        val next = again.map("anna", GraphTuning())
+        assertTrue(map !== next)
+        assertEquals(map.nodes.associate { it.id to (it.x to it.y) }.keys, next.nodes.map { it.id }.toSet())
+        val moved = map.nodes.zip(next.nodes).maxOf { (a, b) -> kotlin.math.hypot(a.x - b.x, a.y - b.y) }
+        val size = map.nodes.maxOf { kotlin.math.hypot(it.x, it.y) }
+        assertTrue(moved < size / 2, "moved $moved on a map of $size")
+
+        // About the same: no rebuild, and at most 2% (or 50) more plays and radios.
+        val made = SongGraph.MadeFrom(3, 10_000)
+        assertTrue(made.stillFor(SongGraph.MadeFrom(3, 10_200)))
+        assertFalse(made.stillFor(SongGraph.MadeFrom(3, 10_201)))
+        assertFalse(made.stillFor(SongGraph.MadeFrom(4, 10_000)))
+        assertTrue(SongGraph.MadeFrom(3, 100).stillFor(SongGraph.MadeFrom(3, 150)))
+        assertEquals(made, SongGraph.MadeFrom.parse(made.toString()))
+    }
 }

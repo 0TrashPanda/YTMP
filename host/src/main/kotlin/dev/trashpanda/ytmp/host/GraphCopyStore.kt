@@ -27,6 +27,14 @@ import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import java.io.File
 
+/** What the server said when a phone asked for its copy of the graph. */
+sealed interface GraphCopyAnswer {
+    data class New(val graph: GraphFull) : GraphCopyAnswer
+
+    /** The copy the phone has is still about the same ([GraphFull.version]). */
+    data object Unchanged : GraphCopyAnswer
+}
+
 /** The phone's copy of the song graph in the settings (`GET`/`PUT /api/graph-copy`). */
 @Serializable
 data class GraphCopyStatus(
@@ -52,8 +60,8 @@ class GraphCopyStore(
     private val scope: CoroutineScope,
     /** The songs that play here without internet. */
     private val songs: suspend () -> List<Song>,
-    /** The graph from the server; null when it can't be reached (or no account is linked). */
-    private val fetch: suspend () -> GraphFull?,
+    /** The graph from the server, unless the copy of that version (null: none) is still good; null when it can't be reached (or no account is linked). */
+    private val fetch: suspend (known: String?) -> GraphCopyAnswer?,
     /** Whether to keep it, as the owner set it, and saving that. */
     private val loadEnabled: () -> Boolean = { true },
     private val saveEnabled: (Boolean) -> Unit = {},
@@ -79,9 +87,10 @@ class GraphCopyStore(
         val bySource: Map<String, String> = graph.nodes.withIndex().flatMap { (i, n) -> n.sources.map { it to i.toString() } }.toMap()
         val byKey: Map<String, List<Int>> = graph.nodes.withIndex().groupBy({ it.value.key }, { it.index })
 
-        /** Each song's group in the whole copy (as on the server), worked out once, when a radio first needs it. */
+        /** Each song's group: the server's, or (from an older server) worked out in the copy once, when a radio first needs it. */
         val groups: Map<String, Int> by lazy {
             val n = graph.nodes.size
+            if (graph.groups.size == n) return@lazy graph.groups.withIndex().filter { it.value >= 0 }.associate { it.index.toString() to it.value }
             val weight = edges.map { GraphRank.weight(it, graph.use, graph.tuning, graph.now) }
             val group = GraphGroups.find(n, edges.map { it.from.toInt() }.toIntArray(), edges.map { it.to.toInt() }.toIntArray(), weight.toDoubleArray())
             (0 until n).associate { it.toString() to group[it] }
@@ -173,7 +182,12 @@ class GraphCopyStore(
     /** Makes the copy again. False when it's off or the server couldn't be asked (the old copy stays). */
     suspend fun refresh(): Boolean {
         if (!enabled) return false
-        val graph = fetch() ?: return false
+        val answer = fetch(index()?.graph?.version?.takeIf { it.isNotEmpty() }) ?: return false
+        val graph = when (answer) {
+            is GraphCopyAnswer.New -> answer.graph
+            // Still the same: kept, as checked now.
+            GraphCopyAnswer.Unchanged -> index()?.graph ?: return false
+        }
         val saved = Saved(clock(), graph)
         val temp = File(file.path + ".part")
         temp.writeText(ProtocolJson.encodeToString(Saved.serializer(), saved))
@@ -184,7 +198,8 @@ class GraphCopyStore(
         index = Index(graph, saved.madeAt)
         loaded = true
         mine = 0 to emptyMap()
-        log.info("Copy of the song graph: {} songs, {} links, {} KB", graph.nodes.size, graph.edges.size, file.length() / 1024)
+        if (answer == GraphCopyAnswer.Unchanged) log.info("Copy of the song graph: still the same")
+        else log.info("Copy of the song graph: {} songs, {} links, {} KB", graph.nodes.size, graph.edges.size, file.length() / 1024)
         return true
     }
 

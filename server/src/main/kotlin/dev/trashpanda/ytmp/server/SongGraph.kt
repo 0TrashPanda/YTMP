@@ -127,13 +127,19 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             building = null
             builtAt = clock()
             // Worked out again when next asked for; radios keep the groups from before till then.
-            groups.replaceAll { _, g -> Groups(0, g.of) }
+            // Groups and maps made before are old now (MadeFrom.rebuilds); the maps go at once (deleted plays).
+            madeFromNow = null
             maps.clear()
         }
     }
 
     private fun rebuild(b: Building) = db.transaction { c ->
         val started = System.currentTimeMillis()
+        c.prepareStatement("INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value").use {
+            it.setString(1, REBUILDS_SETTING)
+            it.setString(2, (rebuilds(c) + 1).toString())
+            it.executeUpdate()
+        }
         val total = c.createStatement().use { s -> s.executeQuery("SELECT COUNT(*) FROM plays").use { if (it.next()) it.getInt(1) else 0 } }
         c.createStatement().use { it.executeUpdate("DELETE FROM song_edges WHERE scope NOT IN ('$YTM', '$YTM_ACCOUNT') OR seen > 0") }
         val nodes = HashMap<String, String>()
@@ -372,7 +378,21 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
      * The whole graph as [accountId] sees it (their own links, everyone's, YouTube Music's), for a
      * phone's copy ([GraphFull]): every song with its versions, title-and-artist key and length.
      */
-    fun full(accountId: String?, use: HistoryRadio, tuning: GraphTuning): GraphFull = db.use { c ->
+    fun full(accountId: String?, use: HistoryRadio, tuning: GraphTuning): GraphFull {
+        val groupOf = groupsNow(accountId, use, tuning)
+        return db.use { c -> full(c, accountId, use, tuning, groupOf) }
+    }
+
+    /** The phone's copy's [GraphFull.version]: what the graph is made from, and how it's weighed. */
+    fun copyVersion(use: HistoryRadio, tuning: GraphTuning) = "${madeFrom()}/${variant(use, tuning)}"
+
+    /** Whether a phone's copy of [known] version is still about the same as the graph now. */
+    fun copyStillGood(known: String, use: HistoryRadio, tuning: GraphTuning): Boolean {
+        val (made, variant) = known.split('/', limit = 2).takeIf { it.size == 2 } ?: return false
+        return variant == variant(use, tuning) && MadeFrom.parse(made)?.stillFor(madeFrom()) == true
+    }
+
+    private fun full(c: Connection, accountId: String?, use: HistoryRadio, tuning: GraphTuning, groupOf: Map<String, Int>): GraphFull {
         val edges = edges(c, null, accountId, use, both = false)
         val used = HashSet<String>()
         for (e in edges) {
@@ -394,11 +414,14 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             }
         }
         val kinds = EdgeKind.entries
-        GraphFull(
+        val groups = IntArray(nodes.size) { -1 }.also { g -> for ((id, i) in index) g[i] = groupOf[id] ?: -1 }
+        return GraphFull(
             now = clock(),
             tuning = tuning,
             use = use,
             nodes = nodes,
+            groups = groups.toList(),
+            version = copyVersion(use, tuning),
             edges = edges.mapNotNull { e ->
                 val from = index[e.from] ?: return@mapNotNull null
                 val to = index[e.to] ?: return@mapNotNull null
@@ -609,26 +632,66 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         return links.nodes.withIndex().associate { it.value to group[it.index] }
     }
 
-    private class Groups(val madeAt: Long, val of: Map<String, Int>)
+    /**
+     * What the graph is made from: how many full rebuilds it had, and how many plays and radios
+     * it learned from. Groups and maps made from about the same ([stillFor]) are still good.
+     */
+    data class MadeFrom(val rebuilds: Int, val learned: Long) {
+        /** Nothing rebuilt since, and at most 2% (or 50) more plays and radios: still the same graph, as far as groups go. */
+        fun stillFor(now: MadeFrom) = now.rebuilds == rebuilds && now.learned >= learned && now.learned <= learned + max(MIN_CHANGE, learned / CHANGE_SHARE)
+
+        override fun toString() = "$rebuilds:$learned"
+
+        companion object {
+            fun parse(text: String): MadeFrom? {
+                val (r, l) = text.split(':').takeIf { it.size == 2 } ?: return null
+                return MadeFrom(r.toIntOrNull() ?: return null, l.toLongOrNull() ?: return null)
+            }
+        }
+    }
+
+    private fun rebuilds(c: Connection): Int =
+        c.prepareStatement("SELECT value FROM settings WHERE name = ?").use {
+            it.setString(1, REBUILDS_SETTING)
+            it.executeQuery().use { rows -> if (rows.next()) rows.getString(1).toIntOrNull() ?: 0 else 0 }
+        }
+
+    /** Counted at most every few minutes (radios ask often). */
+    @Volatile private var madeFromNow: Pair<Long, MadeFrom>? = null
+
+    /** What the graph is made from now. */
+    fun madeFrom(c: Connection? = null): MadeFrom {
+        madeFromNow?.takeIf { System.currentTimeMillis() - it.first < MADE_FROM_RECOUNT_MS }?.let { return it.second }
+        fun count(c: Connection) = MadeFrom(
+            rebuilds(c),
+            c.createStatement().use { st -> st.executeQuery("SELECT (SELECT COUNT(*) FROM plays) + (SELECT COUNT(*) FROM radio_fetches)").use { if (it.next()) it.getLong(1) else 0 } },
+        )
+        val made = if (c != null) count(c) else db.use(::count)
+        madeFromNow = System.currentTimeMillis() to made
+        return made
+    }
+
+    private class Groups(val madeFrom: MadeFrom, val of: Map<String, Int>)
     private val groups = ConcurrentHashMap<String, Groups>()
     private val groupsPending = ConcurrentHashMap.newKeySet<String>()
 
+    /** Groups differ by how the graph is weighed: the history setting and the tuning (not how fast plays fade: groups don't). */
+    private fun variant(use: HistoryRadio, tuning: GraphTuning) = "${use.name}|${tuning.copy(halfLifeDays = 0.0).hashCode()}"
+
     /**
      * The groups radios use for [accountId] (null: everyone's and YouTube Music's graph only).
-     * They take the whole graph, so they're worked out off this thread when they're missing or
-     * old; till then the ones from before count, or none.
+     * Kept in the database; when the graph changed since ([MadeFrom.stillFor]) they're worked
+     * out again off this thread, and till then the ones from before count (or none).
      */
-    private fun groupsFor(accountId: String?, use: HistoryRadio, tuning: GraphTuning): ((String) -> Int?)? {
-        val key = "${accountId.orEmpty()}|$use|${tuning.copy(halfLifeDays = 0.0).hashCode()}"
-        val have = groups[key]
-        if ((have == null || clock() - have.madeAt > GROUPS_FRESH_MS) && groupsPending.add(key)) {
+    private fun groupsFor(accountId: String?, use: HistoryRadio, tuning: GraphTuning, c: Connection? = null): ((String) -> Int?)? {
+        val account = accountId.orEmpty()
+        val variant = variant(use, tuning)
+        val key = "$account|$variant"
+        val have = groups[key] ?: (if (c != null) loadGroups(c, account, variant) else db.use { loadGroups(it, account, variant) })?.also { groups[key] = it }
+        if ((have == null || !have.madeFrom.stillFor(madeFrom(c))) && groupsPending.add(key)) {
             worker.execute {
                 try {
-                    val started = System.currentTimeMillis()
-                    val found = db.use { c -> findGroups(c, accountId, use, tuning) }
-                    if (groups.size >= MAX_KEPT_GROUPS) groups.clear()
-                    groups[key] = Groups(clock(), found)
-                    log.debug("Song graph groups for {}: {} songs, {} groups, in {} ms", accountId ?: "the server", found.size, found.values.distinct().size, System.currentTimeMillis() - started)
+                    makeGroups(accountId, use, tuning)
                 } catch (e: Exception) {
                     log.warn("Couldn't find the song graph's groups", e)
                 } finally {
@@ -639,28 +702,100 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         return have?.of?.let { m -> { id: String -> m[id] } }
     }
 
-    /** Works out the radios' groups for [accountId] now (tests, and before a radio that has to have them). */
-    fun findGroupsNow(accountId: String?, use: HistoryRadio = HistoryRadio.ALL, tuning: GraphTuning = GraphTuning()) {
-        groups["${accountId.orEmpty()}|$use|${tuning.copy(halfLifeDays = 0.0).hashCode()}"] = Groups(clock(), db.use { c -> findGroups(c, accountId, use, tuning) })
+    /** Works out [accountId]'s groups and keeps them (also in the database). */
+    private fun makeGroups(accountId: String?, use: HistoryRadio, tuning: GraphTuning): Groups {
+        val started = System.currentTimeMillis()
+        val account = accountId.orEmpty()
+        val variant = variant(use, tuning)
+        val made = db.use { c ->
+            val from = madeFrom(c)
+            val found = findGroups(c, accountId, use, tuning)
+            saveGroups(account, variant, from, found)
+            Groups(from, found)
+        }
+        groups["$account|$variant"] = made
+        log.info("Song graph groups for {}: {} songs, {} groups, in {} ms", accountId ?: "everyone", made.of.size, made.of.values.distinct().size, System.currentTimeMillis() - started)
+        return made
     }
 
-    private val maps = ConcurrentHashMap<String, GraphMap>()
+    private fun loadGroups(c: Connection, account: String, variant: String): Groups? {
+        val from = c.prepareStatement("SELECT made_from FROM graph_groups_made WHERE account_id = ? AND variant = ?").use {
+            it.setString(1, account)
+            it.setString(2, variant)
+            it.executeQuery().use { rows -> if (rows.next()) MadeFrom.parse(rows.getString(1)) else null }
+        } ?: return null
+        val of = HashMap<String, Int>()
+        c.prepareStatement("SELECT song_id, grp FROM graph_groups WHERE account_id = ? AND variant = ?").use {
+            it.setString(1, account)
+            it.setString(2, variant)
+            it.executeQuery().use { rows -> while (rows.next()) of[rows.getString(1)] = rows.getInt(2) }
+        }
+        return Groups(from, of)
+    }
+
+    /** Keeps [groups] as [account]'s only ones: the ones of another way of weighing go. */
+    private fun saveGroups(account: String, variant: String, from: MadeFrom, groups: Map<String, Int>) = db.transaction { t ->
+        for (table in listOf("graph_groups", "graph_groups_made")) {
+            t.prepareStatement("DELETE FROM $table WHERE account_id = ?").use { it.setString(1, account); it.executeUpdate() }
+        }
+        t.prepareStatement("INSERT INTO graph_groups (account_id, variant, song_id, grp) VALUES (?, ?, ?, ?)").use { insert ->
+            var n = 0
+            for ((song, group) in groups) {
+                insert.setString(1, account)
+                insert.setString(2, variant)
+                insert.setString(3, song)
+                insert.setInt(4, group)
+                insert.addBatch()
+                if (++n % 1_000 == 0) insert.executeBatch()
+            }
+            insert.executeBatch()
+        }
+        t.prepareStatement("INSERT INTO graph_groups_made (account_id, variant, made_from, made_at) VALUES (?, ?, ?, ?)").use {
+            it.setString(1, account)
+            it.setString(2, variant)
+            it.setString(3, from.toString())
+            it.setLong(4, clock())
+            it.executeUpdate()
+        }
+    }
+
+    /** Works out the radios' groups for [accountId] now, also when nothing changed (tests). */
+    fun findGroupsNow(accountId: String?, use: HistoryRadio = HistoryRadio.ALL, tuning: GraphTuning = GraphTuning()) {
+        madeFromNow = null
+        makeGroups(accountId, use, tuning)
+    }
+
+    /** [accountId]'s groups as they are now: kept ones still good, else worked out now (the phone's copy, once a day). */
+    fun groupsNow(accountId: String?, use: HistoryRadio, tuning: GraphTuning): Map<String, Int> {
+        val key = "${accountId.orEmpty()}|${variant(use, tuning)}"
+        val have = groups[key] ?: db.use { loadGroups(it, accountId.orEmpty(), variant(use, tuning)) }
+        if (have != null && have.madeFrom.stillFor(madeFrom())) return have.of.also { groups[key] = have }
+        return makeGroups(accountId, use, tuning).of
+    }
+
+    private class Kept(val map: GraphMap, val madeFrom: MadeFrom)
+    private val maps = ConcurrentHashMap<String, Kept>()
     private val mapLock = Any()
+
+    /** Where each account's songs were on its last map (by node): a new map starts from there, so it doesn't jump around. */
+    private val places = ConcurrentHashMap<String, Map<String, Pair<Double, Double>>>()
 
     /**
      * The whole graph as [accountId] sees it ([partLinks]), laid out and in groups ([GraphLayout],
-     * [GraphGroups]). Kept a while: laying out 10,000 songs takes seconds.
+     * [GraphGroups]). Made when asked for, and kept as long as the graph is about the same
+     * ([MadeFrom.stillFor]): it's seldom looked at, and laying out 10,000 songs takes seconds.
      */
     fun map(accountId: String, tuning: GraphTuning, use: HistoryRadio = HistoryRadio.ALL): GraphMap {
-        val key = "$accountId|$use|${tuning.copy(halfLifeDays = 0.0).hashCode()}"
-        fun fresh() = maps[key]?.takeIf { clock() - it.madeAt < MAP_FRESH_MS }
-        fresh()?.let { return it }
+        val key = "$accountId|${variant(use, tuning)}"
+        fun kept() = maps[key]?.takeIf { it.madeFrom.stillFor(madeFrom()) }?.map
+        kept()?.let { return it }
         synchronized(mapLock) {
-            fresh()?.let { return it }
+            kept()?.let { return it }
             val started = System.currentTimeMillis()
+            val from = madeFrom()
             val made = makeMap(accountId, tuning, use)
             if (maps.size >= MAX_KEPT_MAPS) maps.clear()
-            maps[key] = made
+            maps[key] = Kept(made, from)
             log.info("Whole song graph for {}: {} songs, {} links, {} groups, in {} ms", accountId, made.nodes.size, made.from.size, made.groups.size, System.currentTimeMillis() - started)
             return made
         }
@@ -676,8 +811,13 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         val read = System.currentTimeMillis()
         val group = GraphGroups.find(n, links.from, links.to, links.total)
         val grouped = System.currentTimeMillis()
-        val (x, y) = GraphLayout.place(n, links.from, links.to, links.total, group)
-        log.debug("Whole song graph: read in {} ms, groups in {} ms, laid out in {} ms", read - started, grouped - read, System.currentTimeMillis() - grouped)
+        // The songs on the last map start where they were.
+        val before = places[accountId].orEmpty()
+        val startX = DoubleArray(n) { before[links.nodes[it]]?.first ?: Double.NaN }
+        val startY = DoubleArray(n) { before[links.nodes[it]]?.second ?: Double.NaN }
+        val (x, y) = GraphLayout.place(n, links.from, links.to, links.total, group, startX = startX, startY = startY)
+        places[accountId] = links.nodes.withIndex().associate { (i, node) -> node to (x[i] to y[i]) }
+        log.debug("Whole song graph: read in {} ms, groups in {} ms, laid out in {} ms ({} songs where they were)", read - started, grouped - read, System.currentTimeMillis() - grouped, startX.count { !it.isNaN() })
         val nodes = links.nodes.mapIndexed { i, node ->
             val song = songs[node]?.first
             val (count, first) = plays[node] ?: (0 to null)
@@ -1015,11 +1155,12 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             else -> EdgeKind.YTM
         }
 
-        /** The radios' groups are worked out again after this long (and after a rebuild). */
-        private const val GROUPS_FRESH_MS = 6 * 3_600_000L
-        private const val MAX_KEPT_GROUPS = 32
-        /** A whole-graph view is laid out again after this long (and after a rebuild). */
-        private const val MAP_FRESH_MS = 6 * 3_600_000L
+        /** How many full rebuilds the graph had (for [MadeFrom]). */
+        private const val REBUILDS_SETTING = "song_graph_rebuilds"
+        /** Groups and maps are made again after this share more plays and radios (1/50: 2%), or at least this many. */
+        private const val CHANGE_SHARE = 50
+        private const val MIN_CHANGE = 50L
+        private const val MADE_FROM_RECOUNT_MS = 5 * 60_000L
         private const val MAX_KEPT_MAPS = 8
 
         /** A song started this long after the one before ended still follows it. */
