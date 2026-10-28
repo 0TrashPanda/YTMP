@@ -190,7 +190,8 @@ of **song connections**:
   cover from the device itself when it has one, else YouTube Music's. Lines are what YTMP
   learned goes together: as thick as it counts, coloured by what counts most (you, imported,
   everyone, YouTube Music's radios without or with your account, close together in a radio).
-  Tap a song to light up its lines and see them listed, with *Show around this song*.
+  Tap a song to light up its lines and see them listed in a card over the graph, with *Show
+  around this song*.
 - Scroll or pinch to zoom, drag to move, *All* to see it whole. Names show for the seed, the
   songs its radio would bring first and the one under the pointer, where they fit.
 - *Its radio* lists what a radio from the song would bring, best first.

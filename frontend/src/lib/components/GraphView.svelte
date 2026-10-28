@@ -33,7 +33,7 @@
 			tuning = { ...v.tuning };
 			saved = { ...v.tuning };
 			picked = null;
-			cam = { x: 0, y: 0, w: SIZE };
+			setCam({ x: 0, y: 0, w: SIZE });
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Couldn't load the song graph";
 		}
@@ -70,8 +70,12 @@
 		}
 	});
 
-	// Zoom and pan: the part of the graph that shows (a square: x, y, width).
+	// Zoom and pan: the part of the graph that shows (a square: x, y, width). Redrawing the SVG
+	// for every step of a pinch or drag is slow, so while one goes on only [live] moves, as a CSS
+	// transform of the picture drawn for [cam] (no redraw); when it stops, [cam] follows.
 	let cam = $state({ x: 0, y: 0, w: SIZE });
+	let live = { x: 0, y: 0, w: SIZE };
+	let frame = $state<HTMLDivElement>();
 	let svg = $state<SVGSVGElement>();
 	let hovered = $state<string | null>(null);
 	/** A drag just moved the graph: the click it ends with isn't a tap on a song. */
@@ -79,24 +83,53 @@
 	const pointers = new Map<number, { x: number; y: number }>();
 	let pinch: { d: number; w: number } | null = null;
 	const scale = $derived(cam.w / SIZE);
+	let drawing = 0;
+	let settle: ReturnType<typeof setTimeout> | undefined;
+
+	function setCam(next: { x: number; y: number; w: number }) {
+		clearTimeout(settle);
+		cancelAnimationFrame(drawing);
+		drawing = 0;
+		live = next;
+		cam = next;
+		if (svg) svg.style.transform = svg.style.willChange = '';
+	}
+	/** Shows [live] by moving the picture, once a frame. */
+	function moved() {
+		if (drawing) return;
+		drawing = requestAnimationFrame(() => {
+			drawing = 0;
+			if (!svg || !frame) return;
+			const px = frame.clientWidth / live.w;
+			const f = cam.w / live.w;
+			svg.style.willChange = 'transform';
+			svg.style.transform = `translate(${(cam.x - live.x) * px}px, ${(cam.y - live.y) * px}px) scale(${f})`;
+		});
+	}
+	/** Draws [live] sharp, once the gesture stopped. */
+	const settled = () => setCam(live);
 
 	function toGraph(clientX: number, clientY: number) {
-		const rect = svg!.getBoundingClientRect();
-		return { x: cam.x + ((clientX - rect.left) / rect.width) * cam.w, y: cam.y + ((clientY - rect.top) / rect.height) * cam.w };
+		const rect = frame!.getBoundingClientRect();
+		return { x: live.x + ((clientX - rect.left) / rect.width) * live.w, y: live.y + ((clientY - rect.top) / rect.height) * live.w };
 	}
 	function zoomAt(clientX: number, clientY: number, w: number) {
 		const next = Math.max(SIZE / 8, Math.min(SIZE, w));
 		const p = toGraph(clientX, clientY);
-		const f = next / cam.w;
-		cam = { x: p.x - (p.x - cam.x) * f, y: p.y - (p.y - cam.y) * f, w: next };
+		const f = next / live.w;
+		live = { x: p.x - (p.x - live.x) * f, y: p.y - (p.y - live.y) * f, w: next };
 	}
 	function zoomBy(f: number) {
-		const rect = svg!.getBoundingClientRect();
-		zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, cam.w * f);
+		const rect = frame!.getBoundingClientRect();
+		zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, live.w * f);
+		settled();
 	}
 	function wheel(e: WheelEvent) {
 		e.preventDefault();
-		zoomAt(e.clientX, e.clientY, cam.w * Math.exp(e.deltaY * 0.0015));
+		zoomAt(e.clientX, e.clientY, live.w * Math.exp(e.deltaY * 0.0015));
+		moved();
+		clearTimeout(settle);
+		settle = setTimeout(settled, 150);
 	}
 	function down(e: PointerEvent) {
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -114,19 +147,22 @@
 			const [a, b] = [...pointers.values()];
 			zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, (pinch.w * pinch.d) / Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)));
 			dragged = true;
+			moved();
 			return;
 		}
 		const dx = e.clientX - last.x;
 		const dy = e.clientY - last.y;
 		if (!dragged && Math.hypot(dx, dy) < 3) return;
-		if (!dragged) svg?.setPointerCapture(e.pointerId);
+		if (!dragged) frame?.setPointerCapture(e.pointerId);
 		dragged = true;
-		const per = cam.w / svg!.getBoundingClientRect().width;
-		cam = { ...cam, x: cam.x - dx * per, y: cam.y - dy * per };
+		const per = live.w / frame!.clientWidth;
+		live = { ...live, x: live.x - dx * per, y: live.y - dy * per };
+		moved();
 	}
 	function up(e: PointerEvent) {
 		pointers.delete(e.pointerId);
 		if (pointers.size < 2) pinch = null;
+		if (pointers.size === 0 && dragged) settled();
 	}
 	function tap(id: string) {
 		if (dragged) return;
@@ -266,17 +302,23 @@
 				</p>
 			{:else if tab === 'graph'}
 				<div class="relative mx-auto aspect-square w-full max-w-[min(100%,calc(100dvh-14rem))] px-2 lg:max-w-[min(100%,calc(100dvh-15rem))]">
-					<svg
-						bind:this={svg}
-						viewBox="{cam.x} {cam.y} {cam.w} {cam.w}"
-						class="block h-full w-full cursor-grab touch-none rounded-2xl bg-[radial-gradient(circle_at_center,#1c1c1c,transparent_70%)] select-none active:cursor-grabbing"
-						role="img"
-						aria-label="The songs and how they go together"
+					<div
+						bind:this={frame}
+						class="h-full w-full cursor-grab touch-none overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_center,#1c1c1c,transparent_70%)] select-none active:cursor-grabbing"
+						role="presentation"
 						onwheel={wheel}
 						onpointerdown={down}
 						onpointermove={move}
 						onpointerup={up}
 						onpointercancel={up}
+					>
+					<!-- overflow-visible: while zooming out, what's just outside the picture shows too. -->
+					<svg
+						bind:this={svg}
+						viewBox="{cam.x} {cam.y} {cam.w} {cam.w}"
+						class="block h-full w-full origin-top-left overflow-visible"
+						role="img"
+						aria-label="The songs and how they go together"
 					>
 						<defs>
 							{#each placed as p (p.node.id)}
@@ -369,16 +411,19 @@
 							{/if}
 						{/each}
 					</svg>
+					</div>
 					<div class="absolute right-4 bottom-2 flex flex-col overflow-hidden rounded-xl bg-raised/90 shadow-lg ring-1 ring-line">
 						<button class="px-3 py-2 hover:bg-line" aria-label="Zoom in" onclick={() => zoomBy(0.7)}><Icon name="add" size={18} /></button>
 						<button class="px-3 py-2 hover:bg-line" aria-label="Zoom out" onclick={() => zoomBy(1 / 0.7)}><span class="block h-[18px] w-[18px] text-center leading-[18px]">−</span></button>
-						<button class="px-3 py-2 text-xs hover:bg-line" aria-label="Show all" onclick={() => (cam = { x: 0, y: 0, w: SIZE })}>All</button>
+						<button class="px-3 py-2 text-xs hover:bg-line" aria-label="Show all" onclick={() => setCam({ x: 0, y: 0, w: SIZE })}>All</button>
 					</div>
-				</div>
-				<div class="mx-auto w-full max-w-3xl">
+					<!-- The tapped song, over the graph: below it, it was off the screen. -->
 					{#if pickedNode}
-						<div class="mx-2 mb-2 rounded-xl bg-raised p-3 text-sm">
-							<p class="truncate font-medium">{pickedNode.song.title}</p>
+						<div class="absolute top-2 left-4 max-h-[calc(100%-1rem)] w-[min(22rem,calc(100%-2rem))] overflow-y-auto rounded-xl bg-raised/95 p-3 text-sm shadow-lg ring-1 ring-line">
+							<div class="flex items-start gap-2">
+								<p class="min-w-0 flex-1 truncate font-medium">{pickedNode.song.title}</p>
+								<button class="-mt-1 -mr-1 shrink-0 rounded-full p-1 text-muted hover:bg-line hover:text-white" aria-label="Close" onclick={() => (picked = null)}><Icon name="close" size={16} /></button>
+							</div>
 							<p class="truncate text-xs text-muted">{artistNames(pickedNode.song)} · played {pickedNode.plays}× {pickedNode.local ? '· also a file here' : ''}</p>
 							{#each pickedEdges as { e, w }, i (i)}
 								{@const other = nodeById.get(e.from === picked ? e.to : e.from)}
@@ -391,6 +436,8 @@
 							<button class="mt-2 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-black" onclick={() => ((around = pickedNode.song.id), load(pickedNode.song.id))}>Show around this song</button>
 						</div>
 					{/if}
+				</div>
+				<div class="mx-auto w-full max-w-3xl">
 				<p class="px-4 pb-1 text-xs text-muted">A line's colour: what counts most for those two songs. Tap a song for all of it.</p>
 				<ul class="flex flex-wrap gap-x-4 gap-y-1 px-4 pb-3 text-xs text-muted" aria-label="Legend">
 					{#each KINDS as k (k.kind)}
