@@ -292,8 +292,19 @@
 			error = "This browser can't draw the whole graph (it needs WebGL)";
 			return;
 		}
-		renderer.on('enterNode', ({ node }) => ((hovered = Number(node)), renderer?.refresh({ skipIndexation: true })));
-		renderer.on('leaveNode', () => ((hovered = null), renderer?.refresh({ skipIndexation: true })));
+		// Hovering is a mouse's: a finger on a song while it drags the map isn't picking it (that
+		// would light it up and draw everything again on every move). A tap picks a song.
+		const touch = (e: { original: Event }) => 'touches' in e.original;
+		renderer.on('enterNode', ({ node, event }) => {
+			if (touch(event)) return;
+			hovered = Number(node);
+			renderer?.refresh({ skipIndexation: true });
+		});
+		renderer.on('leaveNode', ({ event }) => {
+			if (touch(event) || hovered === null) return;
+			hovered = null;
+			renderer?.refresh({ skipIndexation: true });
+		});
 		renderer.on('clickNode', ({ node }) => ((picked = picked === Number(node) ? null : Number(node)), renderer?.refresh({ skipIndexation: true })));
 		renderer.on('clickStage', () => ((picked = null), renderer?.refresh({ skipIndexation: true })));
 	}
@@ -367,9 +378,11 @@
 		renderer?.refresh();
 	}
 
+	/** The last pointer was a finger: no name under it (sigma counts a finger on a song as hovering it). */
+	let fingered = false;
 	/** The name of the song under the pointer: white on a dark box. */
 	function drawHover(ctx: CanvasRenderingContext2D, d: { x: number; y: number; size: number; label?: string | null }, st: { labelSize: number; labelFont: string }) {
-		if (!d.label) return;
+		if (!d.label || fingered) return;
 		const size = st.labelSize;
 		const pad = 4;
 		ctx.font = `500 ${size}px ${st.labelFont}`;
@@ -491,7 +504,14 @@
 				<div class="loading-run h-full w-2/5 bg-accent"></div>
 			</div>
 		{/if}
-		<div bind:this={box} class="absolute inset-0 touch-none" aria-label="The songs and how they go together" role="img"></div>
+		<div
+			bind:this={box}
+			class="absolute inset-0 touch-none"
+			aria-label="The songs and how they go together"
+			role="img"
+			onpointerdowncapture={(e) => (fingered = e.pointerType !== 'mouse')}
+			onpointermovecapture={(e) => e.pointerType === 'mouse' && (fingered = false)}
+		></div>
 		{#if error}
 			<p class="absolute inset-x-4 top-8 text-center text-sm text-muted">{error}</p>
 		{:else if loading}

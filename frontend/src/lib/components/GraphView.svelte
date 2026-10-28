@@ -368,7 +368,7 @@
 								opacity={dim ? 0.3 : 1}
 								style:transition="opacity 200ms"
 								onclick={() => tap(p.node.id)}
-								onpointerenter={() => (hovered = p.node.id)}
+								onpointerenter={(e) => e.pointerType === 'mouse' && (hovered = p.node.id)}
 								onpointerleave={() => hovered === p.node.id && (hovered = null)}
 								onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (picked = p.node.id)}
 							>
