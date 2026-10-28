@@ -1223,6 +1223,7 @@ export interface RadioCrawlStatus {
   waiting: string | null;
   until: number | null;
   lastAt: number | null;
+  overnight: boolean | null;
 }
 
 export interface PlayReport {

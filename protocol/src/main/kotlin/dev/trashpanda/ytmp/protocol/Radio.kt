@@ -338,4 +338,6 @@ data class RadioCrawlStatus(
     /** When it waits until, or null. */
     val until: Long? = null,
     val lastAt: Long? = null,
+    /** Also in the background while the phone charges on Wi-Fi (overnight); null: this host can't (the server always runs). */
+    val overnight: Boolean? = null,
 )

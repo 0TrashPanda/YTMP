@@ -24,7 +24,13 @@ import java.io.File
 
 /** What the radio crawl is set to (kept by whoever runs it). */
 @Serializable
-data class RadioCrawlSettings(val enabled: Boolean = false, val paceSeconds: Int = 90, val refreshDays: Int = 90)
+data class RadioCrawlSettings(
+    val enabled: Boolean = false,
+    val paceSeconds: Int = 90,
+    val refreshDays: Int = 90,
+    /** Also in the background while charging on Wi-Fi (a phone; see [RadioCrawl.overnight]). */
+    val overnight: Boolean = false,
+)
 
 /**
  * Learns YouTube Music's radios of the songs here, slowly ([songs]: local music with a YouTube
@@ -48,6 +54,11 @@ class RadioCrawl(
     /** Why it can't fetch right now ("Waiting for Wi-Fi", "Link a YTMP account…"), or null. */
     private val hold: () -> String? = { null },
     private val clock: () -> Long = System::currentTimeMillis,
+    /**
+     * Whether this host can also crawl in the background (a phone, while it charges on Wi-Fi:
+     * [RadioCrawlSettings.overnight]). Without it, the setting isn't offered.
+     */
+    private val overnight: Boolean = false,
 ) {
     private val log = LoggerFactory.getLogger(RadioCrawl::class.java)
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -66,15 +77,26 @@ class RadioCrawl(
 
     fun status(): RadioCrawlStatus {
         val s = settings
-        return RadioCrawlStatus(s.enabled, s.paceSeconds, s.refreshDays, counts.first, counts.second, hold() ?: waiting, until, lastAt)
+        return RadioCrawlStatus(s.enabled, s.paceSeconds, s.refreshDays, counts.first, counts.second, hold() ?: waiting, until, lastAt, s.overnight.takeIf { overnight })
     }
 
-    fun set(enabled: Boolean, paceSeconds: Int, refreshDays: Int): RadioCrawlStatus {
-        settings = RadioCrawlSettings(enabled, paceSeconds.coerceIn(MIN_PACE_S, MAX_PACE_S), refreshDays.coerceIn(7, 3650))
+    /** What it's set to now. */
+    val current: RadioCrawlSettings get() = settings
+
+    fun set(enabled: Boolean, paceSeconds: Int, refreshDays: Int, overnight: Boolean = settings.overnight): RadioCrawlStatus {
+        settings = RadioCrawlSettings(enabled, paceSeconds.coerceIn(MIN_PACE_S, MAX_PACE_S), refreshDays.coerceIn(7, 3650), overnight && this.overnight)
         save(settings)
         // A change (switched on, slower or faster) is looked at at once; a block from YouTube stays.
         if (until == null) wake.trySend(Unit)
         return status()
+    }
+
+    /**
+     * Looks again now: the app just woke up (a background run of the phone). Its waits went by
+     * the wall clock, so one that's over while the phone slept doesn't hold it up.
+     */
+    fun nudge() {
+        wake.trySend(Unit)
     }
 
     private suspend fun run() {
@@ -112,14 +134,14 @@ class RadioCrawl(
                     log.info("The radio crawl couldn't keep a radio: {}", e.message)
                     waiting = e.message ?: "Couldn't keep it"
                     until = clock() + FAILED_PAUSE_MS
-                    sleep(FAILED_PAUSE_MS)
+                    sleepUntil(until!!)
                     until = null
                     continue
                 }
                 lastAt = clock()
                 waiting = null
                 counts = (counts.first + 1) to counts.second
-                sleep(s.paceSeconds * 1000L)
+                sleepUntil(lastAt!! + s.paceSeconds * 1000L)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -128,7 +150,7 @@ class RadioCrawl(
                 waiting = if (blocked) "YouTube asked to confirm this isn't a bot" else "YouTube Music didn't answer: ${e.message}"
                 val pause = if (blocked) BLOCKED_PAUSE_MS else FAILED_PAUSE_MS
                 until = clock() + pause
-                sleep(pause)
+                sleepUntil(until!!)
                 until = null
             }
         }
@@ -137,6 +159,22 @@ class RadioCrawl(
     /** Waits [ms] (null: until [set]), or less when the settings change. */
     private suspend fun sleep(ms: Long?) {
         if (ms == null) wake.receive() else withTimeoutOrNull(ms) { wake.receive() }
+    }
+
+    /**
+     * Waits until [at] by the wall clock: a phone's timers stand still while it sleeps, so after
+     * waking ([nudge]) only what's left of the wait counts. A change of the settings still ends
+     * it early, except a pause after YouTube said no.
+     */
+    private suspend fun sleepUntil(at: Long) {
+        val paused = until != null
+        val from = settings
+        while (true) {
+            val left = at - clock()
+            if (left <= 0) return
+            sleep(left)
+            if (!paused && settings != from) return
+        }
     }
 
     /** When seeds had their radio learned, kept in a file (a phone, whose song graph is on its server). */
@@ -189,6 +227,6 @@ fun Route.radioCrawlRoutes(path: String, crawl: RadioCrawl?, allowed: suspend (A
         put {
             val crawl = call.crawl()
             val wanted = call.receive<RadioCrawlStatus>()
-            call.respond(crawl.set(wanted.enabled, wanted.paceSeconds, wanted.refreshDays))
+            call.respond(crawl.set(wanted.enabled, wanted.paceSeconds, wanted.refreshDays, wanted.overnight ?: crawl.current.overnight))
         }
     }

@@ -257,7 +257,12 @@ minutes, after a bot check 6 hours. The server's crawls its local music with a Y
 ID and its song cache, kept in its settings (`radio_crawl`, `GET/PUT /api/admin/radio-crawl`).
 A phone's crawls its matched music files and saved songs, sends each radio to its owner's
 server and keeps when in `radio-crawl-log.json` (`GET/PUT /api/radio-crawl`, only on the
-phone; it waits for the matcher's Wi-Fi and charging rules).
+phone; it waits for the matcher's Wi-Fi and charging rules). Its waits (the pace, the pauses)
+go by the wall clock, so time the phone spent asleep counts. **Overnight** (`overnight` in its
+settings and `RadioCrawlStatus`, null on the server): `android/.../CrawlJob.kt` is a periodic
+JobScheduler job (every 15 minutes, while charging on an unmetered network, kept over a
+restart) that wakes the app and keeps it awake 9 minutes, `RadioCrawl.nudge()` at the start;
+the crawl goes on at its pace meanwhile.
 
 ### Song matching
 

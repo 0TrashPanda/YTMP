@@ -179,7 +179,10 @@ of **song connections**:
 - **Learning radios**: the server (its admin page) and the phone (*Settings → Radio*) can
   slowly fetch the radio of every song they have: music files that are a YouTube Music song
   and saved songs. Without an account, one every 1½ minutes by default, each song again after
-  3 months; it stops for hours when YouTube asks whether it's a bot.
+  3 months; it stops for hours when YouTube asks whether it's a bot. On the phone it learns
+  while the app is open or playing, and with **Also overnight** in the background too while
+  the phone charges on Wi-Fi (Android wakes the app for 9 of every 15 minutes or so: about
+  20–25 radios an hour, a few hundred a night).
 
 ### The graph view
 

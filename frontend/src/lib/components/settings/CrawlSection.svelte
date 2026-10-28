@@ -44,6 +44,15 @@
 		<h3 class="font-bold">Learn radios</h3>
 		<p class="text-xs text-muted">{hint}</p>
 		<Toggle label="Learn radios" checked={crawl.enabled} onchange={(on) => change({ enabled: on })} />
+		{#if crawl.overnight != null}
+			<Toggle
+				label="Also overnight"
+				hint="In the background while the phone charges on Wi-Fi. Otherwise it only learns while the app is open or playing."
+				checked={crawl.overnight}
+				disabled={!crawl.enabled}
+				onchange={(on) => change({ overnight: on })}
+			/>
+		{/if}
 		<Choice
 			label="One radio every"
 			hint="Faster than this, YouTube soon asks whether it's a bot, and stops answering this network for hours."

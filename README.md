@@ -85,8 +85,9 @@ Music, without Premium, and not tied to a single music service.
   your listening, everyone's and YouTube Music's radios, any of them together, coloured by
   group (songs often heard together, much like genres), artist, plays or when first heard.
   Graph radios walk the graph and keep to the song's group.
-  The server (and the phone) can slowly learn YouTube Music's radios of your music; every
-  radio is kept as it came, so the graph can be weighed again without fetching anything.
+  The server (and the phone, also overnight while it charges) can slowly learn YouTube
+  Music's radios of your music; every radio is kept as it came, so the graph can be weighed
+  again without fetching anything.
 - Podcasts: subscribe, new episodes on Home, played marks and resume where you stopped (in
   any room, with a YTMP account), playback speed for the room, exact episode lengths, back
   10 s / ahead 30 s, no music radio after an episode.

@@ -198,14 +198,21 @@ class LocalHost(private val context: Context) {
             crawlLog.put(seed, System.currentTimeMillis())
         },
         load = { RadioCrawl.loadSettings(runCatching { crawlFile.readText() }.getOrNull()) },
-        save = { crawlFile.writeText(RadioCrawl.saveSettings(it)) },
+        save = {
+            crawlFile.writeText(RadioCrawl.saveSettings(it))
+            CrawlJob.schedule(context, it.enabled && it.overnight)
+        },
         hold = {
             when {
                 authLink.ownerAccount?.let(sync::tokenFor) == null -> "Link this phone to a YTMP account first: what it learns is kept there"
                 else -> dataRules.localHold()?.let { "Waiting for $it" }
             }
         },
+        overnight = true,
     )
+
+    /** The app woke up to learn radios in the background ([CrawlJob]): the crawl looks at once. */
+    fun crawlAwake() = crawl.nudge()
 
     /** Which of the phone's music is a YouTube Music song (Settings → Playback → Song cache). */
     private val matcher: LocalMatcher = LocalMatcher(
@@ -413,6 +420,7 @@ class LocalHost(private val context: Context) {
         rooms.startCleanup()
         sync.start()
         crawl.start()
+        crawl.current.let { CrawlJob.schedule(context, it.enabled && it.overnight) }
         graphCopy.start()
         outputs.attach(rooms)
         if (phoneMusicOn) local.add(phoneLibrary)
