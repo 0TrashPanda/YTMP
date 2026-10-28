@@ -199,7 +199,8 @@
 			save={authServer.setRadioCrawl}
 			card
 			{onToast}
-			hint="Slowly fetches YouTube Music's radio (without an account) of the server's local music that has a YouTube Music ID and of the songs in its cache, for the song graph: everyone's radios and On this device get better from it."
+			hint="Slowly fetches YouTube Music's radio (without an account) of the server's local music that has a YouTube Music ID, of the songs in its cache and of the songs below, for the song graph: everyone's radios and On this device get better from it."
+			historyHint="What everyone on this server played (in YTMP and imported from Takeout), most played first."
 		/>
 	</section>
 

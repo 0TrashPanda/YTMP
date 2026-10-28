@@ -11,9 +11,18 @@
 		load,
 		save,
 		hint,
+		historyHint,
 		onToast,
 		card = false
-	}: { load: () => Promise<RadioCrawlStatus>; save: (s: RadioCrawlStatus) => Promise<RadioCrawlStatus>; hint: string; onToast: (text: string) => void; card?: boolean } = $props();
+	}: {
+		load: () => Promise<RadioCrawlStatus>;
+		save: (s: RadioCrawlStatus) => Promise<RadioCrawlStatus>;
+		hint: string;
+		/** Whose history *Also songs played in the last* means here. */
+		historyHint: string;
+		onToast: (text: string) => void;
+		card?: boolean;
+	} = $props();
 
 	let crawl = $state<RadioCrawlStatus | null>(null);
 	let timer: ReturnType<typeof setInterval> | null = null;
@@ -52,6 +61,22 @@
 				disabled={!crawl.enabled}
 				onchange={(on) => change({ overnight: on })}
 			/>
+		{/if}
+		<Choice
+			label="Also songs played in the last"
+			hint={historyHint}
+			value={crawl.historyDays}
+			onchange={(v) => change({ historyDays: v })}
+			options={[
+				[0, 'Off'],
+				[90, '3 months'],
+				[365, '1 year'],
+				[1095, '3 years'],
+				[3650, 'All of it']
+			]}
+		/>
+		{#if crawl.likes != null}
+			<Toggle label="Also your liked songs" hint="The songs you liked on YouTube Music, on this phone (looked up twice a day)." checked={crawl.likes} onchange={(on) => change({ likes: on })} />
 		{/if}
 		<Choice
 			label="One radio every"

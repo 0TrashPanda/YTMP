@@ -345,4 +345,13 @@ data class RadioCrawlStatus(
     val lastAt: Long? = null,
     /** Also in the background while the phone charges on Wi-Fi (overnight); null: this host can't (the server always runs). */
     val overnight: Boolean? = null,
+    /** Also the songs played in the last this many days (the phone: yours; the server: everyone's); 0: not. */
+    val historyDays: Int = 0,
+    /** Also the songs liked on YouTube Music; null: this host can't (no YouTube Music account: the server). */
+    val likes: Boolean? = null,
 )
+
+/** `GET /api/auth/played?days=` (a phone, with its owner's host token): the YouTube Music songs they played lately, most played first. */
+@Serializable
+@SerialName("PlayedSongs")
+data class PlayedSongs(val ids: List<String>)

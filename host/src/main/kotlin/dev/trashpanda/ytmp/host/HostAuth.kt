@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.protocol.AuthServerInfo
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.GraphFull
+import dev.trashpanda.ytmp.protocol.PlayedSongs
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
 import dev.trashpanda.ytmp.protocol.RadioHints
 import dev.trashpanda.ytmp.protocol.RadioHintsRequest
@@ -56,6 +57,9 @@ interface HostAuth {
      * copy), unless the copy of [known] version is still good; null when it can't be had.
      */
     suspend fun graphFull(token: String, known: String? = null): GraphCopyAnswer? = null
+
+    /** The YouTube Music songs the account in [token] played in the last [days], most played first (its radio crawl); null when it can't be had. */
+    suspend fun playedSongs(token: String, days: Int): List<String>? = null
 
     /**
      * Tells the account in [token]'s auth server about a YouTube Music radio this host fetched
@@ -194,6 +198,23 @@ class TrustedAuthServers(
         runCatching { postJson(url, "/api/auth/radio-fetch", token, ProtocolJson.encodeToString(RadioFetchReport.serializer(), report)) }
             .onFailure { e -> log.info("Couldn't send a radio to {}: {}", claims.iss, e.message) }
             .isSuccess
+    }
+
+    override suspend fun playedSongs(token: String, days: Int): List<String>? = withContext(Dispatchers.IO) {
+        val (claims, server) = ownerOf(token) ?: return@withContext null
+        val url = server.url ?: return@withContext null
+        runCatching {
+            val connection = URI("${url.trimEnd('/')}/api/auth/played?days=$days").toURL().openConnection() as HttpURLConnection
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 60_000
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            try {
+                if (connection.responseCode != 200) throw SourceException("$url answered ${connection.responseCode}")
+                connection.inputStream.bufferedReader().use { ProtocolJson.decodeFromString(PlayedSongs.serializer(), it.readText()).ids }
+            } finally {
+                connection.disconnect()
+            }
+        }.onFailure { log.info("No played songs from {}: {}", claims.iss, it.message) }.getOrNull()
     }
 
     override suspend fun episodeProgress(token: String, episodeId: String): EpisodeProgress? = withContext(Dispatchers.IO) {

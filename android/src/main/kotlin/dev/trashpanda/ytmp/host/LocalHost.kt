@@ -183,10 +183,40 @@ class LocalHost(private val context: Context) {
     private val crawlLog = RadioCrawl.FileLog(File(context.filesDir, "radio-crawl-log.json"))
     private val crawlFile = File(context.filesDir, "radio-crawl.json")
 
-    /** Learning YouTube Music's radios of the music on the phone and its saved songs, for the song graph on the owner's server. */
+    /**
+     * Songs the crawl gets from elsewhere, fetched at most every few hours (each is a few
+     * requests): the owner's likes on YouTube Music, and what they played lately (their server).
+     */
+    private class Kept(val at: Long, val key: Int, val ids: List<String>)
+    @Volatile private var likedKept: Kept? = null
+    @Volatile private var playedKept: Kept? = null
+
+    private suspend fun liked(): List<String> {
+        likedKept?.takeIf { System.currentTimeMillis() - it.at < CRAWL_LISTS_MS }?.let { return it.ids }
+        if (youtube.account() == null) return emptyList()
+        val ids = runCatching { youtube.recentLikes(MAX_CRAWL_LIKES).filter { it.podcast == null }.map { it.id } }.getOrNull() ?: return likedKept?.ids.orEmpty()
+        likedKept = Kept(System.currentTimeMillis(), 0, ids)
+        return ids
+    }
+
+    private suspend fun played(days: Int): List<String> {
+        playedKept?.takeIf { it.key == days && System.currentTimeMillis() - it.at < CRAWL_LISTS_MS }?.let { return it.ids }
+        val token = authLink.ownerAccount?.let(sync::tokenFor) ?: return emptyList()
+        val ids = authLink.auth.playedSongs(token, days) ?: return playedKept?.ids.orEmpty()
+        playedKept = Kept(System.currentTimeMillis(), days, ids)
+        return ids
+    }
+
+    /**
+     * Learning YouTube Music's radios of the music on the phone and its saved songs, and (as set)
+     * of its owner's likes and of what they played lately, for the song graph on their server.
+     */
     private val crawl = RadioCrawl(
         scope,
-        songs = { matcher.all().map { it.second.id } + cache.songIds().filter { it.startsWith("ytm:") } },
+        songs = { s ->
+            matcher.all().map { it.second.id } + cache.songIds().filter { it.startsWith("ytm:") } +
+                (if (s.likes) liked() else emptyList()) + (if (s.historyDays > 0) played(s.historyDays) else emptyList())
+        },
         lastFetched = { seeds -> crawlLog.get(seeds) },
         fetch = { seed -> ytm.radio(seed) },
         learned = { seed, songs ->
@@ -209,6 +239,7 @@ class LocalHost(private val context: Context) {
             }
         },
         overnight = true,
+        likes = true,
     )
 
     /** The app woke up to learn radios in the background ([CrawlJob]): the crawl looks at once. */
@@ -552,6 +583,10 @@ class LocalHost(private val context: Context) {
 
     companion object {
         const val PORT = BuildConfig.HOST_PORT
+        /** The crawl's likes and recent history are fetched again after this long. */
+        private const val CRAWL_LISTS_MS = 12 * 3_600_000L
+        /** At most this many likes (the newest): Liked music comes 100 at a time. */
+        private const val MAX_CRAWL_LIKES = 5_000
         private const val PHONE_MUSIC = "phoneMusic"
         /** Keep a copy of the song graph on the phone (Settings → Radio). */
         private const val GRAPH_COPY = "graphCopy"

@@ -374,4 +374,18 @@ class SongGraphTest {
         assertTrue(SongGraph.MadeFrom(3, 100).stillFor(SongGraph.MadeFrom(3, 150)))
         assertEquals(made, SongGraph.MadeFrom.parse(made.toString()))
     }
+
+    @Test
+    fun `the radio crawl gets the songs played lately, most played first, not skipped ones`() {
+        play("anna", song("ytm:a"))
+        play("anna", song("ytm:b"))
+        play("anna", song("ytm:a"))
+        play("anna", song("ytm:s"), skippedAt = 5_000)
+        play("anna", song("local:f.mp3"))
+        val later = at
+        play("bob", song("ytm:c"))
+        assertEquals(listOf("ytm:a", "ytm:b"), history.played("anna", 0))
+        assertEquals(setOf("ytm:a", "ytm:b", "ytm:c"), history.played(null, 0).toSet())
+        assertEquals(listOf("ytm:c"), history.played(null, later))
+    }
 }

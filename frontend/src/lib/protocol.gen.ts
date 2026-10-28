@@ -1226,6 +1226,8 @@ export interface RadioCrawlStatus {
   until: number | null;
   lastAt: number | null;
   overnight: boolean | null;
+  historyDays: number;
+  likes: boolean | null;
 }
 
 export interface PlayReport {

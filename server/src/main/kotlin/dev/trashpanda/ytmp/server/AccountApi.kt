@@ -57,6 +57,7 @@ import dev.trashpanda.ytmp.protocol.GraphBuildStatus
 import dev.trashpanda.ytmp.protocol.GraphFull
 import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.HistoryImportList
+import dev.trashpanda.ytmp.protocol.PlayedSongs
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
 import dev.trashpanda.ytmp.protocol.RadioHints
 import dev.trashpanda.ytmp.protocol.RadioHintsRequest
@@ -260,6 +261,15 @@ class AccountService(
             // ?known= its copy's version: 304 while that's still about the same.
             val full = io { graphFull(claims.sub, personal = mayReadHistory(claims), known = call.request.queryParameters["known"]) }
             if (full == null) call.respond(HttpStatusCode.NotModified) else call.respond(full)
+        }
+
+        // A phone's radio crawl: the songs its owner played in the last ?days= (most played first).
+        get("/auth/played") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            if (!mayReadHistory(claims)) throw ApiException(HttpStatusCode.Forbidden, ErrorCode.PERMISSION_DENIED, "Your history is only for your own devices")
+            val account = accounts.find(claims.sub) ?: throw notLoggedIn()
+            val days = (call.request.queryParameters["days"]?.toIntOrNull() ?: 365).coerceIn(1, 3650)
+            call.respond(PlayedSongs(io { history.played(account.id, clock() - days * 86_400_000L) }))
         }
 
         // A phone fetched a YouTube Music radio (in a room, or to learn from): the graph keeps it.

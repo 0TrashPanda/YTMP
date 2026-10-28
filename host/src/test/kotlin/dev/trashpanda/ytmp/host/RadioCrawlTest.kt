@@ -56,4 +56,29 @@ class RadioCrawlTest {
         assertEquals(true, crawl(overnight = true).set(true, 90, 90, overnight = true).overnight)
         assertEquals(true, settings.overnight)
     }
+
+    @Test
+    fun `the songs to learn come as the settings say, and likes are only offered where the host has them`() = runTest {
+        val asked = mutableListOf<RadioCrawlSettings>()
+        val crawl = RadioCrawl(
+            backgroundScope,
+            songs = { s -> asked += s; listOf("ytm:a", "ytm:a", "ytm:b") },
+            lastFetched = { emptyMap() },
+            fetch = { seed -> fetched += seed; emptyList() },
+            learned = { _, _ -> },
+            load = { settings },
+            save = { settings = it },
+            clock = { wall },
+            likes = true,
+        )
+        val status = crawl.set(true, 90, 90, historyDays = 9_999, likes = false)
+        assertEquals(3650, status.historyDays)
+        assertEquals(false, status.likes)
+        crawl.start()
+        runCurrent()
+        assertEquals(3650, asked.last().historyDays)
+        // The same song twice is one song to learn.
+        assertEquals(2, crawl.status().total)
+        assertNull(crawl().status().likes)
+    }
 }

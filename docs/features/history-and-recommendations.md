@@ -178,7 +178,10 @@ of **song connections**:
 - A phone sends the radios it fetches to its owner's server.
 - **Learning radios**: the server (its admin page) and the phone (*Settings → Radio*) can
   slowly fetch the radio of every song they have: music files that are a YouTube Music song
-  and saved songs. Without an account, one every 1½ minutes by default, each song again after
+  and saved songs, and also the songs played in the last 3 months, year (the default), 3
+  years or all of it (the phone: yours, in YTMP and imported; the server: everyone's), and
+  on the phone your liked songs on YouTube Music (on by default). Songs here go first, then
+  likes, then the history, most played first. Without an account, one every 1½ minutes by default, each song again after
   3 months; it stops for hours when YouTube asks whether it's a bot. On the phone it learns
   while the app is open or playing, and with **Also overnight** in the background too while
   the phone charges on Wi-Fi (Android wakes the app for 9 of every 15 minutes or so: about

@@ -115,10 +115,15 @@ fun main(args: Array<String>) {
         // Songs played here, kept so they start at once without a YouTube lookup.
         val songCache = SongCache(config.cache.folder(config.database), live.cacheBytes, lookup = ytm, audio = ytm, scope = this)
         log.info("Song cache: {} ({} MB at most)", songCache.dir, songCache.maxBytes / (1024 * 1024))
-        // YouTube Music's radios of the songs here, learned slowly for the song graph (the admin switches it on).
+        val history = History(db)
+        // YouTube Music's radios of the songs here, learned slowly for the song graph (the admin switches it on):
+        // the local music and song cache, and what everyone here played lately.
         val crawl = RadioCrawl(
             this,
-            songs = { local.ytmSongIds() + songCache.songIds().filter { it.startsWith("ytm:") } },
+            songs = { s ->
+                val played = if (s.historyDays > 0) withContext(Dispatchers.IO) { history.played(null, System.currentTimeMillis() - s.historyDays * 86_400_000L) } else emptyList()
+                local.ytmSongIds() + songCache.songIds().filter { it.startsWith("ytm:") } + played
+            },
             lastFetched = { seeds -> withContext(Dispatchers.IO) { graph.lastFetched(seeds) } },
             fetch = { seed -> ytm.radio(seed) },
             learned = { seed, songs -> graph.learnRadio(seed, songs, way = RadioWay.CRAWL) },
@@ -132,7 +137,7 @@ fun main(args: Array<String>) {
         val key = accounts.signingKey()
         val isOwnOrigin = { origin: String -> origin == ownUrl || origin in localOrigins(config.server.port) }
         val service = AccountService(
-            accounts, issuer, key, live.signup, History(db), live.trackingDefault,
+            accounts, issuer, key, live.signup, history, live.trackingDefault,
             graph = graph, isOwnOrigin = isOwnOrigin, episodes = Episodes(db),
         )
         val auth = TrustedAuthServers(

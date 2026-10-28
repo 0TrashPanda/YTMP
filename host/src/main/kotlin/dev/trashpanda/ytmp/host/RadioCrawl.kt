@@ -30,6 +30,10 @@ data class RadioCrawlSettings(
     val refreshDays: Int = 90,
     /** Also in the background while charging on Wi-Fi (a phone; see [RadioCrawl.overnight]). */
     val overnight: Boolean = false,
+    /** Also the songs played in the last this many days; 0: not. */
+    val historyDays: Int = 365,
+    /** Also the songs liked on YouTube Music (a phone; see [RadioCrawl.likes]). */
+    val likes: Boolean = true,
 )
 
 /**
@@ -41,8 +45,8 @@ data class RadioCrawlSettings(
  */
 class RadioCrawl(
     private val scope: CoroutineScope,
-    /** The YouTube Music song IDs to learn the radio of. */
-    private val songs: suspend () -> List<String>,
+    /** The YouTube Music song IDs to learn the radio of, as far as the settings say (history, likes). */
+    private val songs: suspend (RadioCrawlSettings) -> List<String>,
     /** When each of these seeds last had its radio learned (a seed not in it: never). */
     private val lastFetched: suspend (seeds: Collection<String>) -> Map<String, Long>,
     /** YouTube Music's radio of a song, without an account (its 50 songs). */
@@ -59,6 +63,8 @@ class RadioCrawl(
      * [RadioCrawlSettings.overnight]). Without it, the setting isn't offered.
      */
     private val overnight: Boolean = false,
+    /** Whether this host can also learn the radios of the songs liked on YouTube Music (a phone signed in). */
+    private val likes: Boolean = false,
 ) {
     private val log = LoggerFactory.getLogger(RadioCrawl::class.java)
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -77,14 +83,24 @@ class RadioCrawl(
 
     fun status(): RadioCrawlStatus {
         val s = settings
-        return RadioCrawlStatus(s.enabled, s.paceSeconds, s.refreshDays, counts.first, counts.second, hold() ?: waiting, until, lastAt, s.overnight.takeIf { overnight })
+        return RadioCrawlStatus(s.enabled, s.paceSeconds, s.refreshDays, counts.first, counts.second, hold() ?: waiting, until, lastAt, s.overnight.takeIf { overnight }, s.historyDays, s.likes.takeIf { likes })
     }
 
     /** What it's set to now. */
     val current: RadioCrawlSettings get() = settings
 
-    fun set(enabled: Boolean, paceSeconds: Int, refreshDays: Int, overnight: Boolean = settings.overnight): RadioCrawlStatus {
-        settings = RadioCrawlSettings(enabled, paceSeconds.coerceIn(MIN_PACE_S, MAX_PACE_S), refreshDays.coerceIn(7, 3650), overnight && this.overnight)
+    fun set(
+        enabled: Boolean,
+        paceSeconds: Int,
+        refreshDays: Int,
+        overnight: Boolean = settings.overnight,
+        historyDays: Int = settings.historyDays,
+        likes: Boolean = settings.likes,
+    ): RadioCrawlStatus {
+        settings = RadioCrawlSettings(
+            enabled, paceSeconds.coerceIn(MIN_PACE_S, MAX_PACE_S), refreshDays.coerceIn(7, 3650), overnight && this.overnight,
+            historyDays.coerceIn(0, 3650), likes,
+        )
         save(settings)
         // A change (switched on, slower or faster) is looked at at once; a block from YouTube stays.
         if (until == null) wake.trySend(Unit)
@@ -111,7 +127,8 @@ class RadioCrawl(
                 sleep(HOLD_RECHECK_MS)
                 continue
             }
-            val all = runCatching { songs() }.getOrDefault(emptyList())
+            // Each song once, in the order given (music here first, then likes, then the history, most played first).
+            val all = runCatching { songs(s) }.getOrDefault(emptyList()).distinct()
             val last = runCatching { lastFetched(all) }.getOrDefault(emptyMap())
             val now = clock()
             val fresh = now - s.refreshDays * DAY_MS
@@ -227,6 +244,6 @@ fun Route.radioCrawlRoutes(path: String, crawl: RadioCrawl?, allowed: suspend (A
         put {
             val crawl = call.crawl()
             val wanted = call.receive<RadioCrawlStatus>()
-            call.respond(crawl.set(wanted.enabled, wanted.paceSeconds, wanted.refreshDays, wanted.overnight ?: crawl.current.overnight))
+            call.respond(crawl.set(wanted.enabled, wanted.paceSeconds, wanted.refreshDays, wanted.overnight ?: crawl.current.overnight, wanted.historyDays, wanted.likes ?: crawl.current.likes))
         }
     }

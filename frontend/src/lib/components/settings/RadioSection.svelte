@@ -203,6 +203,7 @@
 		load={getRadioCrawl}
 		save={setRadioCrawl}
 		{onToast}
-		hint="Slowly fetches YouTube Music's radio of each song on this phone that is a YouTube Music song, and of the saved songs, without your account. Your server keeps them in the song graph, so radios from your music and On this device get better. Lookups follow the Wi-Fi and charging rules of Music on this phone."
+		hint="Slowly fetches YouTube Music's radio of each song on this phone that is a YouTube Music song, of the saved songs, and of the songs below, without your account. Your server keeps them in the song graph, so radios from your music and On this device get better. Lookups follow the Wi-Fi and charging rules of Music on this phone."
+		historyHint="Your listening history (in YTMP and imported from Takeout), most played first."
 	/>
 {/if}

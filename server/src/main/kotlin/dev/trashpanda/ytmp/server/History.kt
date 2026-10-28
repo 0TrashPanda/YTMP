@@ -76,6 +76,22 @@ class History(private val db: Database) {
     }
 
     /** Everything, oldest first (for export). */
+    /**
+     * The YouTube Music songs [accountId] (null: everyone here) played since [since] and didn't
+     * skip, most played first, at most [limit]: the radio crawl learns their radios too.
+     */
+    fun played(accountId: String?, since: Long, limit: Int = MAX_PLAYED): List<String> = db.use { c ->
+        c.prepareStatement(
+            "SELECT song_id, COUNT(*) AS n FROM plays WHERE played_at >= ? AND skipped = ? AND song_id LIKE 'ytm:%'" +
+                (if (accountId != null) " AND account_id = ?" else "") + " GROUP BY song_id ORDER BY n DESC, song_id LIMIT $limit",
+        ).use {
+            it.setLong(1, since)
+            it.setBoolean(2, false)
+            if (accountId != null) it.setString(3, accountId)
+            it.executeQuery().use { rows -> buildList { while (rows.next()) add(rows.getString(1)) } }
+        }
+    }
+
     fun all(accountId: String): List<HistoryEntry> = db.use { c ->
         c.prepareStatement("SELECT * FROM plays WHERE account_id = ? ORDER BY played_at").use {
             it.setString(1, accountId)
@@ -226,6 +242,8 @@ class History(private val db: Database) {
 
     companion object {
         private const val MAX_LISTENED_WITH = 100
+        /** [played] gives at most this many songs. */
+        const val MAX_PLAYED = 20_000
         /** The room imported plays are in (so they only follow each other in the song graph). */
         const val IMPORT_ROOM = "takeout"
         const val IMPORT_ROOM_NAME = "YouTube Music"
