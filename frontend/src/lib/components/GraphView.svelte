@@ -59,9 +59,13 @@
 			img.onerror = () => done(false);
 			img.src = url;
 		});
+	// Each song's cover is looked for once: [covers] changing (a cover came in) runs this again,
+	// and without [looking] every song still without one would start loading again, over and over.
+	const looking = new Set<string>();
 	$effect(() => {
 		for (const node of view?.nodes ?? []) {
-			if (node.id in covers) continue;
+			if (looking.has(node.id)) continue;
+			looking.add(node.id);
 			void (async () => {
 				for (const url of coverUrls(node, 120, thumbUrl, !!nativeBridge)) {
 					if (await loads(url)) return void (covers = { ...covers, [node.id]: url });
