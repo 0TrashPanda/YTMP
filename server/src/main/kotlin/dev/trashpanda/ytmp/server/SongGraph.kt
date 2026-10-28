@@ -675,8 +675,8 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
     private val groups = ConcurrentHashMap<String, Groups>()
     private val groupsPending = ConcurrentHashMap.newKeySet<String>()
 
-    /** Groups differ by how the graph is weighed: the history setting and the tuning (not how fast plays fade: groups don't). */
-    private fun variant(use: HistoryRadio, tuning: GraphTuning) = "${use.name}|${tuning.copy(halfLifeDays = 0.0).hashCode()}"
+    /** Groups differ by how they're found ([GraphGroups.VERSION]) and how the graph is weighed: the history setting and the tuning (not how fast plays fade: groups don't). */
+    private fun variant(use: HistoryRadio, tuning: GraphTuning) = "${GraphGroups.VERSION}|${use.name}|${tuning.copy(halfLifeDays = 0.0).hashCode()}"
 
     /**
      * The groups radios use for [accountId] (null: everyone's and YouTube Music's graph only).
@@ -815,7 +815,10 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         val before = places[accountId].orEmpty()
         val startX = DoubleArray(n) { before[links.nodes[it]]?.first ?: Double.NaN }
         val startY = DoubleArray(n) { before[links.nodes[it]]?.second ?: Double.NaN }
-        val (x, y) = GraphLayout.place(n, links.from, links.to, links.total, group, startX = startX, startY = startY)
+        // The layout starts from coarser groups (modularity's usual resolution): about a dozen big
+        // areas come apart fast, and the finer groups find their place inside them.
+        val coarse = GraphGroups.find(n, links.from, links.to, links.total, resolution = 1.0)
+        val (x, y) = GraphLayout.place(n, links.from, links.to, links.total, coarse, startX = startX, startY = startY)
         places[accountId] = links.nodes.withIndex().associate { (i, node) -> node to (x[i] to y[i]) }
         log.debug("Whole song graph: read in {} ms, groups in {} ms, laid out in {} ms ({} songs where they were)", read - started, grouped - read, System.currentTimeMillis() - grouped, startX.count { !it.isNaN() })
         val nodes = links.nodes.mapIndexed { i, node ->

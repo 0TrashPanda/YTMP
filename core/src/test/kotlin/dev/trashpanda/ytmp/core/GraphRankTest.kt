@@ -20,10 +20,17 @@ class GraphRankTest {
         add(link("r0", "p0", plays = 3))
     }
 
+    /** As [links], but every song of a group linked to every other one (groups as dense as real ones). */
+    private val dense = buildList {
+        for (g in listOf("r", "p")) for (i in 0 until 6) for (j in i + 1 until 6) add(link("$g$i", "$g$j", plays = 3))
+        add(link("r0", "p0", plays = 3))
+    }
+
     private fun around(nodes: List<String>) = links.filter { it.from in nodes || it.to in nodes }
 
     @Test
     fun `songs linked more to each other than to the rest are a group`() {
+        val links = dense
         val names = links.flatMap { listOf(it.from, it.to) }.distinct()
         val index = names.withIndex().associate { it.value to it.index }
         val groups = GraphGroups.find(

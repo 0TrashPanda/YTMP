@@ -215,7 +215,8 @@ that go together are close.
   too), any of them together. Switching is instant and every song stays in its place, so
   you see what each part adds.
 - **Colour by**: *Groups* (songs often heard together; they come out much like genres or
-  moods, named after their most played artists), *Artist* (your most played ones), *Played*
+  moods, often finer: hardstyle as frenchcore, happy hardcore and uptempo; named after their
+  most played artists; groups side by side get different colours), *Artist* (your most played ones), *Played*
   (how often), *First heard*. A legend says which colour is what. Bigger: you played it more.
 - **Lines**: none, the strongest, or all.
 - Scroll or pinch to zoom, drag to move; names show as you zoom in. Tap a song for its card

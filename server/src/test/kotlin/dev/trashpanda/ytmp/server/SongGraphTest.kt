@@ -288,14 +288,12 @@ class SongGraphTest {
         assertEquals(mapOf("ytm:a>ytm:b" to listOf(1, 0, 0)), edges(SongGraph.PERSONAL))
     }
 
-    /** Rock (r0–r4) and pop (p0–p4) played round and round, and once from r0 straight to p0. */
+    /** Rock (r0–r4) and pop (p0–p4), each played in a few orders (so every two go together), and once from r0 straight to p0. */
     private fun twoKindsOfMusic() {
-        repeat(3) {
-            for (i in 0 until 5) play("anna", song("ytm:r$i", artist = "Rock band"))
-            play("anna", song("ytm:r0", artist = "Rock band"), gapMs = 3_600_000)
-        }
-        repeat(3) {
-            for (i in 0 until 5) play("anna", song("ytm:p$i", artist = "Pop star"), gapMs = if (i == 0) 3_600_000 else 0)
+        for (kind in listOf("r" to "Rock band", "p" to "Pop star")) {
+            for (order in listOf(listOf(0, 1, 2, 3, 4), listOf(4, 3, 2, 1, 0), listOf(0, 2, 4, 1, 3), listOf(3, 1, 4, 2, 0), listOf(1, 3, 0, 4, 2), listOf(2, 0, 3, 1, 4))) {
+                order.forEachIndexed { k, i -> play("anna", song("ytm:${kind.first}$i", artist = kind.second), gapMs = if (k == 0) 3_600_000 else 0) }
+            }
         }
         play("anna", song("ytm:r0", artist = "Rock band"), gapMs = 3_600_000)
         play("anna", song("ytm:p0", artist = "Pop star"))

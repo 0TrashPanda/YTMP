@@ -36,6 +36,9 @@
 	/** Categorical colours (validated for the dark surface), then grey for the rest. */
 	const CAT = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#3fb5c4', '#b8b03d', '#e06666', '#6aa84f', '#a64d79', '#e69138'];
 	const REST = '#5a5a5a';
+	/** Groups this small stay grey; the legend lists this many. */
+	const MIN_COLOURED = 10;
+	const LEGEND_GROUPS = 20;
 	const BG = [15, 15, 15];
 	const RAMP = [
 		[40, 52, 110],
@@ -105,6 +108,31 @@
 		return (Lib = { Graph: g.default, Sigma: s.default });
 	}
 
+	/**
+	 * A colour for every group (there are many more than colours): biggest first, each the colour
+	 * its linked groups (side by side on the map) have least of, so neighbours differ.
+	 */
+	const groupColours = $derived.by(() => {
+		if (!map) return [] as string[];
+		const k = map.groups.length;
+		const touch = Array.from({ length: k }, () => new Map<number, number>());
+		map.from.forEach((a, i) => {
+			const ga = map!.nodes[a].group;
+			const gb = map!.nodes[map!.to[i]].group;
+			if (ga === gb) return;
+			const w = map!.mine[i] + map!.others[i] + map!.radios[i];
+			touch[ga].set(gb, (touch[ga].get(gb) ?? 0) + w);
+			touch[gb].set(ga, (touch[gb].get(ga) ?? 0) + w);
+		});
+		const chosen = new Array<number>(k).fill(-1);
+		for (let g = 0; g < k; g++) {
+			if (map.groups[g].songs < MIN_COLOURED) continue;
+			const clash = new Array<number>(CAT.length).fill(0);
+			for (const [other, w] of touch[g]) if (chosen[other] >= 0) clash[chosen[other]] += w;
+			chosen[g] = clash.indexOf(Math.min(...clash));
+		}
+		return chosen.map((c) => (c < 0 ? REST : CAT[c]));
+	});
 	const artistOf = (i: number) => map!.nodes[i].artist.split(', ')[0];
 	const topArtists = $derived.by(() => {
 		if (!map) return [] as string[];
@@ -124,7 +152,7 @@
 		const n = map!.nodes[i];
 		switch (colour) {
 			case 'group':
-				return n.group < CAT.length ? CAT[n.group] : REST;
+				return groupColours[n.group] ?? REST;
 			case 'artist': {
 				const k = nameless(n.title) ? -1 : topArtists.indexOf(artistOf(i));
 				return k < 0 ? REST : CAT[k];
@@ -299,10 +327,13 @@
 	const legend = $derived.by((): Row[] => {
 		if (!map) return [];
 		if (colour === 'group') {
-			const rest = groupShown.slice(CAT.length).reduce((s, n) => s + n, 0);
+			const rest = groupShown.slice(LEGEND_GROUPS).reduce((s, n) => s + n, 0);
 			return [
-				...map.groups.slice(0, CAT.length).map((g, i) => ({ color: CAT[i], label: g.artists.join(', ') || 'Songs no one here played', n: groupShown[i] ?? 0 })),
-				...(rest ? [{ color: REST, label: `${map.groups.length - CAT.length} smaller groups`, n: rest }] : [])
+				...map.groups
+					.slice(0, LEGEND_GROUPS)
+					.map((g, i) => ({ color: groupColours[i], label: g.artists.join(', ') || 'Songs no one here played', n: groupShown[i] ?? 0 }))
+					.filter((row) => row.n > 0),
+				...(rest ? [{ color: REST, label: `and ${map.groups.length - LEGEND_GROUPS} smaller groups`, n: rest }] : [])
 			];
 		}
 		if (colour === 'artist') return [...topArtists.map((a, i) => ({ color: CAT[i], label: a })), { color: REST, label: 'Other artists' }];

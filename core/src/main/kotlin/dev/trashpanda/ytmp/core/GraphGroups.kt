@@ -9,11 +9,22 @@ package dev.trashpanda.ytmp.core
  */
 object GraphGroups {
     /**
+     * Higher than modularity's usual 1: there, a small group of its own (65 lo-fi songs in a graph
+     * of 60,000 links) gains too little standing alone and goes with its strongest neighbour
+     * (power metal). At 2 it stays apart, and big ones split into their kinds (hardstyle:
+     * frenchcore, happy hardcore, uptempo).
+     */
+    const val RESOLUTION = 2.0
+
+    /** Goes up when the groups come out differently from the same links: groups kept from before are made again. */
+    const val VERSION = 2
+
+    /**
      * The group of each of the [n] nodes (0: the biggest group, then smaller), from undirected
      * links [from]–[to] with [weight]s (links that don't count more than 0 are left out; the
      * same pair twice adds up).
      */
-    fun find(n: Int, from: IntArray, to: IntArray, weight: DoubleArray, resolution: Double = 1.0): IntArray {
+    fun find(n: Int, from: IntArray, to: IntArray, weight: DoubleArray, resolution: Double = RESOLUTION): IntArray {
         // Each node's group in the graph of this level, and which node of the level each song is.
         var level = firstLevel(n, from, to, weight)
         val nodeOf = IntArray(n) { it }

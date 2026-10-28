@@ -208,7 +208,7 @@ phone's rooms use it when `radioHints` can't reach the server (null).
 ### Groups
 
 `core/GraphGroups` finds groups of songs linked more to each other than to the rest: Louvain
-(modularity, resolution 1) on the whole graph as an account sees it (`SongGraph.partLinks`): its
+(modularity, resolution 2) on the whole graph as an account sees it (`SongGraph.partLinks`): its
 own links (`personal`, `imported`, the two kinds of *soon after*), every other account's own
 links, and YouTube Music's (`ytm`, its own `ytm_account`, `radio_near`), weighed with its
 `GraphTuning` but without fading (all its music alike), added up per pair of songs. Not the
@@ -216,7 +216,13 @@ server's links: they hold the account's own plays again, and counting those twic
 links outweigh *soon after* ones, which merges groups that should stay apart. Because it looks
 at all links at once, one stray jump to other music counts little against hundreds of links
 inside a group, so the groups come out much like genres or moods. The same links in the same
-order always give the same groups (0 is the biggest). The graph view gets each node's group
+order always give the same groups (0 is the biggest). Resolution 2, not modularity's usual 1:
+at 1 a small group of its own (65 lo-fi songs among 60,000 links) gains too little standing alone
+and goes with its strongest neighbour (power metal); at 2 it stays apart, and big groups split
+into their kinds (hardstyle into frenchcore, happy hardcore, uptempo): about 100 groups for 10,000
+songs. `GraphGroups.VERSION` is part of the kept groups' variant, so a change makes them again.
+The whole-graph view gives each group of 10 songs or more one of 12 colours, biggest first, the
+one its linked groups have least of, so groups side by side differ. The graph view gets each node's group
 (`GraphNode.group`), for *Its radio*; the whole-graph view's are the same.
 
 **When they're made.** Not by the clock, but when the graph changed: `SongGraph.MadeFrom` is how
@@ -235,7 +241,8 @@ An account keeps only its latest variant.
 one per pair of songs, each with how much it counts from the account's own listening (`mine`),
 everyone else's (`others`) and YouTube Music's radios (`radios`). The server finds the groups and
 lays out all of it once with `server/GraphLayout` (ForceAtlas2 with Barnes-Hut, 300 steps, the
-pushing on all cores; songs start near their group's spot, so the groups come apart fast): about
+pushing on all cores; songs start near the spot of their group at resolution 1, about a dozen big
+areas that come apart fast, with the finer groups finding their place inside them): about
 2–3 s for 10,000 songs and 60,000 links. It's made only when someone opens the view (it's seldom
 looked at), and kept in memory (at most 8) as long as the graph is about the same (`MadeFrom`, as
 for groups; a rebuild drops it). A new one starts from the last one's places: songs stay where
