@@ -63,7 +63,8 @@
 	let parts = $state<GraphPart[]>(['mine', 'everyone', 'radios']);
 	let colour = $state<Colour>('group');
 	let lines = $state<Lines>('strong');
-	let map = $state<GraphMap | null>(null);
+	// Raw: thousands of songs and links, read in loops; a deep proxy of them makes every read slow.
+	let map = $state.raw<GraphMap | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let picked = $state<number | null>(null);
@@ -191,11 +192,19 @@
 	function paint() {
 		const g = graph;
 		if (!g || !map) return;
-		g.forEachNode((key) => g.setNodeAttribute(key, 'color', colourOf(Number(key))));
-		g.forEachEdge((key, _at, s, t) => {
-			const a = g.getNodeAttribute(s, 'color') as string;
-			g.setEdgeAttribute(key, 'color', a === g.getNodeAttribute(t, 'color') && a !== REST ? dim(a, 0.45) : dim('#ffffff', 0.12));
-		});
+		// All at once: one change for sigma, not one per song and line.
+		const colours = map.nodes.map((_, i) => colourOf(i));
+		const same = new Map<string, string>();
+		const line = (c: string) => same.get(c) ?? (same.set(c, dim(c, 0.45)), same.get(c)!);
+		const grey = dim('#ffffff', 0.12);
+		g.updateEachNodeAttributes((key, at) => ({ ...at, color: colours[Number(key)] }), { attributes: ['color'] });
+		g.updateEachEdgeAttributes(
+			(_key, at, s, t) => {
+				const a = colours[Number(s)];
+				return { ...at, color: a === colours[Number(t)] && a !== REST ? line(a) : grey };
+			},
+			{ attributes: ['color'] }
+		);
 		renderer?.refresh();
 	}
 
