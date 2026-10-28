@@ -217,14 +217,16 @@ that go together are close.
   by the radios. *Lines*: none, the strongest, or all. *You played it at least*: any, 1× (your
   history), 2×, 5×, 10×, 25×. Which songs show changes at once, every song in its place;
   other links lay the map out again (a few seconds the first time), and the songs slide to
-  their new places. Songs without any of those links stay where they were, grey. Radios
-  always use all links.
+  their new places. *Songs without lines* (with the links chosen): hidden, or shown where they
+  were, grey. Radios always use all links.
 - **Colour by**: *Groups* (songs often heard together; they come out much like genres or
   moods, often finer: hardstyle as frenchcore, happy hardcore and uptempo; named after their
   most played artists. Bigger areas, such as all hardstyle, have a colour each, and the groups
   in them shades of it), *Artist* (your most played ones), *Played*
   (how often), *First heard*. A legend says which colour is what. Bigger: you played it more.
-- Scroll or pinch to zoom, drag to move; names show as you zoom in. Tap a song for its card
+- Scroll or pinch to zoom, drag to move, or the buttons (*All* shows it whole again); names
+  show as you zoom in. Dots and lines are smaller on a small screen, so the groups don't run
+  together. Tap a song for its card
   (artist, plays, group, the songs it goes with most) and *Show around this song*.
 - Songs Takeout only gives as a link (removed or private ones, mostly) show as *Song
   without a name*.

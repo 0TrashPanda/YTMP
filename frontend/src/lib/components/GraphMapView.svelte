@@ -80,6 +80,8 @@
 	let songParts = $state<Part[]>(['mine', 'others', 'radios']);
 	let linkParts = $state<Part[]>(['mine', 'others', 'radios']);
 	let minPlays = $state(0);
+	/** Songs without any line (with the links chosen) left out: grey dust otherwise. */
+	let hideLonely = $state(true);
 	let filtersOpen = $state(false);
 	/** Anything left out: the Filters button says so. */
 	const filtered = $derived(songParts.length < 3 || linkParts.length < 3 || minPlays > 0);
@@ -241,18 +243,34 @@
 		}
 	}
 
+	/**
+	 * A song's dot: bigger when you played it more, and smaller on a small screen (the same map
+	 * in less room: at full size the dots would make one blob). Zooming in makes them bigger.
+	 */
+	const sizeScale = () => Math.max(0.3, Math.min(1, (box?.clientWidth ?? 1100) / 1100));
+	const songSize = (plays: number) => (1.5 + 9 * Math.sqrt(plays / mostPlays)) * sizeScale();
+	let sizedFor = 0;
+	function resized() {
+		if (!graph || !map || Math.abs((box?.clientWidth ?? 0) - sizedFor) < 40) return;
+		sizedFor = box?.clientWidth ?? 0;
+		const nodes = map.nodes;
+		graph.updateEachNodeAttributes((key, at) => ({ ...at, size: songSize(nodes[Number(key)].plays) }), { attributes: ['size'] });
+		show();
+	}
+
 	function draw() {
 		if (!map || !Lib || !box) return;
 		renderer?.kill();
 		renderer = null;
 		const g = new Lib.Graph({ type: 'undirected' });
 		map.nodes.forEach((n, i) =>
-			g.addNode(i, { x: n.x, y: -n.y, size: 1.5 + 9 * Math.sqrt(n.plays / mostPlays), label: nameless(n.title) ? 'Song without a name' : n.title, color: REST })
+			g.addNode(i, { x: n.x, y: -n.y, size: songSize(n.plays), label: nameless(n.title) ? 'Song without a name' : n.title, color: REST })
 		);
 		map.from.forEach((a, k) => {
 			if (!g.hasEdge(a, map!.to[k])) g.addEdgeWithKey(k, a, map!.to[k], { w: 0, size: 0.2 });
 		});
 		graph = g;
+		sizedFor = box.clientWidth;
 		show();
 		paint();
 		try {
@@ -330,16 +348,24 @@
 		}
 		if (minPlays > 0) map.nodes.forEach((node, i) => node.plays < minPlays && (songOn[i] = 0));
 		let links = 0;
+		const lineCount = new Uint32Array(map.nodes.length);
 		for (let k = 0; k < n; k++) {
 			if (!songOn[map.from[k]] || !songOn[map.to[k]]) continue;
 			const w = (line.mine ? map.mine[k] : 0) + (line.others ? map.others[k] : 0) + (line.radios ? map.radios[k] : 0);
 			weights[k] = w;
-			if (w > 0) links++;
+			if (w > 0) {
+				links++;
+				lineCount[map.from[k]]++;
+				lineCount[map.to[k]]++;
+			}
 		}
+		if (hideLonely) for (let i = 0; i < songOn.length; i++) if (!lineCount[i]) songOn[i] = 0;
 		let maxW = 1e-6;
 		for (const w of weights) if (w > maxW) maxW = w;
-		strongCut = [...weights].sort((a, b) => b - a)[Math.min(n - 1, 4000)] ?? 0;
-		g.updateEachEdgeAttributes((key, at) => ({ ...at, w: weights[Number(key)], size: 0.2 + 1.5 * Math.sqrt(weights[Number(key)] / maxW) }), { attributes: ['w', 'size'] });
+		// The strongest 4,000 lines; fewer on a small screen, where they'd hide the songs.
+		strongCut = [...weights].sort((a, b) => b - a)[Math.min(n - 1, Math.round(4000 * sizeScale()))] ?? 0;
+		const thin = sizeScale();
+		g.updateEachEdgeAttributes((key, at) => ({ ...at, w: weights[Number(key)], size: (0.2 + 1.5 * Math.sqrt(weights[Number(key)] / maxW)) * thin }), { attributes: ['w', 'size'] });
 		g.updateEachNodeAttributes((key, at) => ({ ...at, off: !songOn[Number(key)] }), { attributes: ['off'] });
 		const counts = new Array(map.groups.length).fill(0);
 		const areaCounts = new Array(map.areas.length).fill(0);
@@ -416,6 +442,11 @@
 		void withBar(show);
 		void placeBy();
 	}
+	function setLonely(hide: boolean) {
+		hideLonely = hide;
+		void withBar(show);
+	}
+	const camera = () => renderer?.getCamera();
 	function setMinPlays(n: number) {
 		minPlays = n;
 		void withBar(show);
@@ -475,28 +506,30 @@
 	onDestroy(() => renderer?.kill());
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} />
+<svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} onresize={resized} />
 
 <div class="fixed inset-0 z-[70] flex flex-col bg-surface" role="dialog" aria-label="Whole song graph" transition:fade|global={{ duration: 120 }}>
-	<header class="flex shrink-0 items-center gap-2 px-2 pt-[max(env(safe-area-inset-top),0.5rem)] pb-1">
-		<button class="rounded-full p-2 hover:bg-raised" aria-label="Back" onclick={onClose}><Icon name="back" /></button>
-		<div class="min-w-0 flex-1">
-			<h2 class="truncate font-bold">All your music</h2>
-			<p class="truncate text-xs text-muted">
-				{#if map && !loading}{shown.songs.toLocaleString()} songs · {shown.links.toLocaleString()} links{placing ? ' · placing them…' : ''}{:else}Laying out the graph…{/if}
-			</p>
+	<!-- One slim row: the map gets the room. -->
+	<header class="flex shrink-0 items-center gap-1.5 px-1.5 pt-[max(env(safe-area-inset-top),0.25rem)] pb-1">
+		<button class="shrink-0 rounded-full p-1.5 hover:bg-raised" aria-label="Back" onclick={onClose}><Icon name="back" size={22} /></button>
+		<div class="hidden min-w-0 shrink-0 leading-tight sm:block">
+			<h2 class="text-sm font-bold">All your music</h2>
+			<p class="text-[11px] text-muted">{@render counts()}</p>
+		</div>
+		<div class="flex min-w-0 flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none] sm:ml-2" role="group" aria-label="Colour by">
+			<button
+				class="shrink-0 rounded-lg px-2.5 py-1 text-sm {filtersOpen || filtered ? 'bg-white text-black' : 'bg-raised'}"
+				aria-expanded={filtersOpen}
+				onclick={() => (filtersOpen = !filtersOpen)}>Filters{filtered ? ' ·' : ''}</button
+			>
+			{#each COLOURS as c (c.colour)}
+				<button class="shrink-0 rounded-full px-2.5 py-1 text-xs {colour === c.colour ? 'bg-white/90 text-black' : 'bg-raised text-muted'}" aria-pressed={colour === c.colour} onclick={() => setColour(c.colour)}>{c.label}</button>
+			{/each}
 		</div>
 	</header>
-	<div class="flex shrink-0 gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]" role="group" aria-label="Colour by">
-		<button
-			class="flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-sm {filtersOpen || filtered ? 'bg-white text-black' : 'bg-raised'}"
-			aria-expanded={filtersOpen}
-			onclick={() => (filtersOpen = !filtersOpen)}>Filters{filtered ? ' ·' : ''}</button
-		>
-		{#each COLOURS as c (c.colour)}
-			<button class="shrink-0 rounded-full px-3 py-1.5 text-xs {colour === c.colour ? 'bg-white/90 text-black' : 'bg-raised text-muted'}" aria-pressed={colour === c.colour} onclick={() => setColour(c.colour)}>{c.label}</button>
-		{/each}
-	</div>
+	{#snippet counts()}
+		{#if map && !loading}{shown.songs.toLocaleString()} songs · {shown.links.toLocaleString()} links{placing ? ' · placing them…' : ''}{:else}Laying out the graph…{/if}
+	{/snippet}
 
 	<div class="relative min-h-0 flex-1">
 		{#if busy}
@@ -512,6 +545,13 @@
 			onpointerdowncapture={(e) => (fingered = e.pointerType !== 'mouse')}
 			onpointermovecapture={(e) => e.pointerType === 'mouse' && (fingered = false)}
 		></div>
+		{#if map && !loading && !error}
+			<div class="absolute bottom-[max(env(safe-area-inset-bottom),0.5rem)] left-2 z-10 flex flex-col overflow-hidden rounded-xl bg-raised/90 shadow-lg ring-1 ring-line">
+				<button class="px-3 py-2 hover:bg-line" aria-label="Zoom in" onclick={() => camera()?.animatedZoom({ duration: 250 })}><Icon name="add" size={18} /></button>
+				<button class="px-3 py-2 hover:bg-line" aria-label="Zoom out" onclick={() => camera()?.animatedUnzoom({ duration: 250 })}><span class="block h-[18px] w-[18px] text-center leading-[18px]">−</span></button>
+				<button class="px-3 py-2 text-xs hover:bg-line" aria-label="Recenter" onclick={() => camera()?.animatedReset({ duration: 300 })}>All</button>
+			</div>
+		{/if}
 		{#if error}
 			<p class="absolute inset-x-4 top-8 text-center text-sm text-muted">{error}</p>
 		{:else if loading}
@@ -530,6 +570,7 @@
 						{/each}
 					</div>
 				{/snippet}
+				<p class="mb-2 text-xs text-muted sm:hidden">{@render counts()}</p>
 				{@render chips('Songs from', songParts, setSongs)}
 				{@render chips('Placed and grouped by', linkParts, setLinks)}
 				<p class="mb-1 text-xs text-muted">Lines</p>
@@ -543,6 +584,11 @@
 					{#each PLAYS as n (n)}
 						<button class="rounded-lg px-2.5 py-1 text-xs {minPlays === n ? 'bg-white text-black' : 'bg-line'}" aria-pressed={minPlays === n} onclick={() => setMinPlays(n)}>{n === 0 ? 'Any' : `${n}×`}</button>
 					{/each}
+				</div>
+				<p class="mt-3 mb-1 text-xs text-muted">Songs without lines</p>
+				<div class="flex flex-wrap gap-1.5" role="group" aria-label="Songs without lines">
+					<button class="rounded-lg px-2.5 py-1 text-xs {hideLonely ? 'bg-white text-black' : 'bg-line'}" aria-pressed={hideLonely} onclick={() => setLonely(true)}>Hide</button>
+					<button class="rounded-lg px-2.5 py-1 text-xs {!hideLonely ? 'bg-white text-black' : 'bg-line'}" aria-pressed={!hideLonely} onclick={() => setLonely(false)}>Show</button>
 				</div>
 			</div>
 		{/if}
