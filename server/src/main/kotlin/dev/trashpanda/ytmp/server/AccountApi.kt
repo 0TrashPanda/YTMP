@@ -285,11 +285,16 @@ class AccountService(
                 val seed = call.request.queryParameters["seed"]?.trim()?.takeIf { it.isNotEmpty() }
                 call.respond(io { graph.view(account.id, seed, tuning(account), settings(account).historyRadio) })
             }
-            // The whole graph, laid out, with how much each link counts from each part.
+            // The whole graph, laid out, with how much each link counts from each part; placed and
+            // grouped by the links of ?by=mine,others,radios (any of them; none given: all).
             get("/map") {
                 val account = call.historyAccount()
                 val graph = graph ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No song graph here")
-                call.respond(io { graph.map(account.id, tuning(account), settings(account).historyRadio) })
+                val by = call.request.queryParameters["by"]?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty().map { name ->
+                    SongGraph.MapPart.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+                        ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "No such part of the graph: $name")
+                }.toSet().ifEmpty { SongGraph.MapPart.entries.toSet() }
+                call.respond(io { graph.map(account.id, tuning(account), settings(account).historyRadio, by) })
             }
             get("/tuning") {
                 val account = call.historyAccount()

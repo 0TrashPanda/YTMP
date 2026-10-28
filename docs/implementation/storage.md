@@ -251,8 +251,12 @@ for groups; a rebuild drops it). A new one starts from the last one's places: so
 they were, new ones start among their linked songs or in their group, and half the steps do. Groups are named after their most played artists. The page adds up
 the parts shown and hides links and songs without them, so switching parts needs no new layout
 and every song stays in its place: songs show with a link from the parts asked for (and, if asked,
-played at least so often), lines between them count the links of other parts if asked (your songs
-with the radios' lines). It draws with sigma.js (WebGL; `GraphMapView.svelte`, loaded only when it opens).
+played at least so often). `?by=mine,others,radios` lays it out and groups it by those parts'
+links only (the songs and links sent stay the same, so the page slides the songs to their new
+places with sigma's `animateNodes`): only songs with such a link take part, starting where they
+were on the map by all links (each account's last one, in memory), with all the steps, and scaled
+to the size they had there; the others stay put, in one group marked `unlinked`. Each `by` is kept
+like the map by all links. It draws with sigma.js (WebGL; `GraphMapView.svelte`, loaded only when it opens).
 
 ### Space
 

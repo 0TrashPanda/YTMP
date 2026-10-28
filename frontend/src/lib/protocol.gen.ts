@@ -1179,6 +1179,7 @@ export interface GraphMapNode {
 export interface GraphMapGroup {
   songs: number;
   artists: string[];
+  unlinked: boolean;
 }
 
 export interface GraphMap {

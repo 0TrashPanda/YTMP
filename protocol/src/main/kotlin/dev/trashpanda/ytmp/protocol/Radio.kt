@@ -255,7 +255,12 @@ data class GraphMapNode(
 /** A group of songs often heard together (much like a genre), named after its most played artists. */
 @Serializable
 @SerialName("GraphMapGroup")
-data class GraphMapGroup(val songs: Int, val artists: List<String>)
+data class GraphMapGroup(
+    val songs: Int,
+    val artists: List<String>,
+    /** The songs without any of the links the map is placed by: they stay where they were, in no real group. */
+    val unlinked: Boolean = false,
+)
 
 /**
  * `GET /api/account/graph/map`: the whole graph as you see it, laid out and in groups by the

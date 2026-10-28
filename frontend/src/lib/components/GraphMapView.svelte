@@ -2,9 +2,9 @@
 	// The whole song graph (docs/features/history-and-recommendations.md#the-whole-graph): every
 	// song, laid out by the server so songs that go together are close, in groups much like
 	// genres. Your listening, everyone else's and YouTube Music's radios, any of them together,
-	// for the songs and for the lines apart (your songs with the radios' lines): the server lays
-	// out all of it once, and the filters show and hide here, at once, with every song in its
-	// place. Drawn with WebGL (sigma.js, loaded only here).
+	// for the songs shown and for the links that place and group them, apart (your songs, placed
+	// by the radios): which songs show changes here at once; other links ask the server for a map
+	// by them, and the songs slide to their new places. Drawn with WebGL (sigma.js, loaded only here).
 	import { onDestroy, onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import type Graph from 'graphology';
@@ -76,7 +76,7 @@
 	const nameless = (title: string) => /^https?:\/\//.test(title) || !title;
 	const month = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 
-	/** Which parts make a song show, which parts' links are drawn, and how often you must have played a song. */
+	/** Which parts make a song show, which parts' links place and group the songs (and are drawn), and how often you must have played a song. */
 	let songParts = $state<Part[]>(['mine', 'others', 'radios']);
 	let linkParts = $state<Part[]>(['mine', 'others', 'radios']);
 	let minPlays = $state(0);
@@ -119,11 +119,37 @@
 		}
 	}
 
-	let Lib: { Graph: typeof Graph; Sigma: typeof Sigma } | null = null;
+	let Lib: { Graph: typeof Graph; Sigma: typeof Sigma; animateNodes: typeof import('sigma/utils').animateNodes } | null = null;
 	async function libs() {
 		if (Lib) return Lib;
-		const [g, s] = await Promise.all([import('graphology'), import('sigma')]);
-		return (Lib = { Graph: g.default, Sigma: s.default });
+		const [g, s, u] = await Promise.all([import('graphology'), import('sigma'), import('sigma/utils')]);
+		return (Lib = { Graph: g.default, Sigma: s.default, animateNodes: u.animateNodes });
+	}
+
+	/** The map placed and grouped by [linkParts]: asked of the server, then the songs slide there. */
+	let placing = $state(false);
+	let placeAsked = 0;
+	async function placeBy() {
+		const mine = ++placeAsked;
+		placing = true;
+		try {
+			const next = await listening.graphMap(linkParts.length === PARTS.length ? undefined : linkParts);
+			if (mine !== placeAsked) return;
+			const g = graph;
+			if (!g || !map || !Lib || next.nodes.length !== map.nodes.length) {
+				map = next;
+				draw();
+				return;
+			}
+			map = next;
+			paint();
+			show();
+			Lib.animateNodes(g, Object.fromEntries(next.nodes.map((n, i) => [String(i), { x: n.x, y: -n.y }])), { duration: 700, easing: 'quadraticInOut' });
+		} catch (e) {
+			if (mine === placeAsked) error = e instanceof Error ? e.message : "Couldn't load the song graph";
+		} finally {
+			if (mine === placeAsked) placing = false;
+		}
 	}
 
 	/**
@@ -144,7 +170,7 @@
 		});
 		const chosen = new Array<number>(k).fill(-1);
 		for (let g = 0; g < k; g++) {
-			if (map.areas[g].songs < MIN_COLOURED) continue;
+			if (map.areas[g].songs < MIN_COLOURED || map.areas[g].unlinked) continue;
 			const clash = new Array<number>(CAT.length).fill(0);
 			for (const [other, w] of touch[g]) if (chosen[other] >= 0) clash[chosen[other]] += w;
 			chosen[g] = clash.indexOf(Math.min(...clash));
@@ -357,8 +383,11 @@
 		show();
 	}
 	function setLinks(part: Part) {
-		linkParts = toggled(linkParts, part);
+		const next = toggled(linkParts, part);
+		if (next === linkParts) return;
+		linkParts = next;
 		show();
+		void placeBy();
 	}
 	function setMinPlays(n: number) {
 		minPlays = n;
@@ -391,11 +420,16 @@
 		if (colour === 'group') {
 			const rows: Row[] = [];
 			const groupsOf = new Map<number, number[]>();
-			map.groups.forEach((_, g) => groupsOf.set(groupArea[g], [...(groupsOf.get(groupArea[g]) ?? []), g]));
+			map.groups.forEach((_, g) => {
+				const list = groupsOf.get(groupArea[g]);
+				if (list) list.push(g);
+				else groupsOf.set(groupArea[g], [g]);
+			});
 			let rest = 0;
 			map.areas.forEach((area, a) => {
 				const n = areaShown[a] ?? 0;
 				if (!n) return;
+				if (area.unlinked) return void rows.push({ color: REST, label: 'Not linked by the links chosen in Filters', n });
 				if (a >= LEGEND_AREAS || areaColours[a] === REST) return void (rest += n);
 				rows.push({ color: areaColours[a], label: area.artists.join(', ') || 'Songs no one here played', n });
 				const inside = (groupsOf.get(a) ?? []).filter((g) => (groupShown[g] ?? 0) > 0);
@@ -422,7 +456,7 @@
 		<div class="min-w-0 flex-1">
 			<h2 class="truncate font-bold">All your music</h2>
 			<p class="truncate text-xs text-muted">
-				{#if map && !loading}{shown.songs.toLocaleString()} songs · {shown.links.toLocaleString()} links{:else}Laying out the graph…{/if}
+				{#if map && !loading}{shown.songs.toLocaleString()} songs · {shown.links.toLocaleString()} links{placing ? ' · placing them…' : ''}{:else}Laying out the graph…{/if}
 			</p>
 		</div>
 	</header>
@@ -458,7 +492,7 @@
 					</div>
 				{/snippet}
 				{@render chips('Songs from', songParts, setSongs)}
-				{@render chips('Lines from', linkParts, setLinks)}
+				{@render chips('Placed and grouped by', linkParts, setLinks)}
 				<p class="mb-1 text-xs text-muted">Lines</p>
 				<div class="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Lines">
 					{#each LINES as l (l.lines)}
@@ -497,7 +531,7 @@
 								{/each}
 							</ul>
 						{/if}
-						<p class="mt-2 text-muted">Bigger: you played it more. Groups are songs often heard together, much like genres; radios keep to a song's group. Groups in one area are shades of its colour.</p>
+						<p class="mt-2 text-muted">Bigger: you played it more. Groups are songs often heard together, much like genres; radios keep to a song's group. Groups in one area are shades of its colour.{linkParts.length < PARTS.length ? ' Placed and grouped by fewer links (Filters): radios still use all of them.' : ''}</p>
 					</div>
 				{/if}
 			</div>

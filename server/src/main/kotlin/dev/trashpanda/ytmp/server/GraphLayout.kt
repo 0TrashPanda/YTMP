@@ -15,7 +15,7 @@ import kotlin.math.sqrt
  * See docs/implementation/storage.md#the-whole-graph-view.
  */
 object GraphLayout {
-    private const val ITERATIONS = 300
+    const val ITERATIONS = 300
     private const val SCALING = 4.0
     private const val GRAVITY = 1.0
     private const val WEIGHT_INFLUENCE = 0.5

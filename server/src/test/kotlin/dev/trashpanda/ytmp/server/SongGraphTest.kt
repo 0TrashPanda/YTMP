@@ -325,6 +325,16 @@ class SongGraphTest {
         assertTrue(map.others[link("ytm:r2", "ytm:x")] > 0)
         assertEquals(0.0, map.others[link("ytm:r3", "ytm:r4")])
         assertTrue(map.radios.all { it == 0.0 })
+        // Placed and grouped by Bob's links only: the same songs and links, but the pop songs (Bob
+        // never played them) stay where they were, in the group of songs without such links.
+        val byOthers = graph.map("anna", GraphTuning(), by = setOf(SongGraph.MapPart.OTHERS))
+        assertEquals(map.nodes.map { it.id }, byOthers.nodes.map { it.id })
+        assertEquals(map.mine, byOthers.mine)
+        val p0 = byOthers.nodes.single { it.id == "ytm:p0" }
+        assertTrue(byOthers.groups[p0.group].unlinked)
+        assertFalse(byOthers.groups[byOthers.nodes.single { it.id == "ytm:x" }.group].unlinked)
+        val p0Before = map.nodes.single { it.id == "ytm:p0" }
+        assertEquals(p0Before.x to p0Before.y, p0.x to p0.y)
 
         // A radio from r4: its own group's songs, and the song of the one jump away after them, if at all.
         graph.findGroupsNow("anna")

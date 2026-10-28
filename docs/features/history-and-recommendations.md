@@ -210,12 +210,15 @@ of **song connections**:
 *All your music* in the graph view: every song the graph knows, at once, laid out so songs
 that go together are close.
 
-- **Filters**: *Songs from* and *Lines from*, each any of *Mine* (your listening, in YTMP and
-  imported), *Everyone else* (everyone else on your server, not you) and *YouTube Music
-  radios* (the radios it learned, the radio crawl's too): for example your songs with the
-  radios' lines between them. *Lines*: none, the strongest, or all. *You played it at least*:
-  any, 1× (your history), 2×, 5×, 10×, 25×. Switching is instant and every song stays in its
-  place, so you see what each part adds.
+- **Filters**: *Songs from* (which songs show) and *Placed and grouped by* (which links pull
+  songs together and make the groups, and are drawn), each any of *Mine* (your listening, in
+  YTMP and imported), *Everyone else* (everyone else on your server, not you) and *YouTube
+  Music radios* (the radios it learned, the radio crawl's too): for example your songs, placed
+  by the radios. *Lines*: none, the strongest, or all. *You played it at least*: any, 1× (your
+  history), 2×, 5×, 10×, 25×. Which songs show changes at once, every song in its place;
+  other links lay the map out again (a few seconds the first time), and the songs slide to
+  their new places. Songs without any of those links stay where they were, grey. Radios
+  always use all links.
 - **Colour by**: *Groups* (songs often heard together; they come out much like genres or
   moods, often finer: hardstyle as frenchcore, happy hardcore and uptempo; named after their
   most played artists. Bigger areas, such as all hardstyle, have a colour each, and the groups

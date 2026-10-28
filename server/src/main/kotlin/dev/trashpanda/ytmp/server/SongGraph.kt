@@ -773,6 +773,9 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         return makeGroups(accountId, use, tuning).of
     }
 
+    /** The parts of the whole graph a map can be laid out and grouped by. */
+    enum class MapPart { MINE, OTHERS, RADIOS }
+
     private class Kept(val map: GraphMap, val madeFrom: MadeFrom)
     private val maps = ConcurrentHashMap<String, Kept>()
     private val mapLock = Any()
@@ -785,23 +788,23 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
      * [GraphGroups]). Made when asked for, and kept as long as the graph is about the same
      * ([MadeFrom.stillFor]): it's seldom looked at, and laying out 10,000 songs takes seconds.
      */
-    fun map(accountId: String, tuning: GraphTuning, use: HistoryRadio = HistoryRadio.ALL): GraphMap {
-        val key = "$accountId|${variant(use, tuning)}"
+    fun map(accountId: String, tuning: GraphTuning, use: HistoryRadio = HistoryRadio.ALL, by: Set<MapPart> = MapPart.entries.toSet()): GraphMap {
+        val key = "$accountId|${variant(use, tuning)}|${by.sorted()}"
         fun kept() = maps[key]?.takeIf { it.madeFrom.stillFor(madeFrom()) }?.map
         kept()?.let { return it }
         synchronized(mapLock) {
             kept()?.let { return it }
             val started = System.currentTimeMillis()
             val from = madeFrom()
-            val made = makeMap(accountId, tuning, use)
+            val made = makeMap(accountId, tuning, use, by)
             if (maps.size >= MAX_KEPT_MAPS) maps.clear()
             maps[key] = Kept(made, from)
-            log.info("Whole song graph for {}: {} songs, {} links, {} groups, in {} ms", accountId, made.nodes.size, made.from.size, made.groups.size, System.currentTimeMillis() - started)
+            log.info("Whole song graph for {} (by {}): {} songs, {} links, {} groups, in {} ms", accountId, by.joinToString(), made.nodes.size, made.from.size, made.groups.size, System.currentTimeMillis() - started)
             return made
         }
     }
 
-    private fun makeMap(accountId: String, tuning: GraphTuning, use: HistoryRadio): GraphMap {
+    private fun makeMap(accountId: String, tuning: GraphTuning, use: HistoryRadio, by: Set<MapPart>): GraphMap {
         val started = System.currentTimeMillis()
         val (links, songs, plays) = db.use { c ->
             val links = partLinks(c, accountId, use, tuning)
@@ -809,18 +812,64 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         }
         val n = links.nodes.size
         val read = System.currentTimeMillis()
-        val group = GraphGroups.find(n, links.from, links.to, links.total)
+        // Placed and grouped by the links of [by] only (the songs and links sent are all of them).
+        val all = by.size == MapPart.entries.size
+        val counted = DoubleArray(links.from.size) {
+            (if (MapPart.MINE in by) links.mine[it] else 0.0) + (if (MapPart.OTHERS in by) links.others[it] else 0.0) + (if (MapPart.RADIOS in by) links.radios[it] else 0.0)
+        }
+        val keep = counted.indices.filter { counted[it] > 0 }
+        // Only songs with such a link are placed and grouped: the others would push the rest
+        // around without anything to pull them; they stay where they were, in one group of no-ones.
+        val active = BooleanArray(n)
+        for (k in keep) {
+            active[links.from[k]] = true
+            active[links.to[k]] = true
+        }
+        val sub = IntArray(n) { -1 }
+        var m = 0
+        for (i in 0 until n) if (active[i]) sub[i] = m++
+        val from = IntArray(keep.size) { sub[links.from[keep[it]]] }
+        val to = IntArray(keep.size) { sub[links.to[keep[it]]] }
+        val weight = DoubleArray(keep.size) { counted[keep[it]] }
+        val subGroup = GraphGroups.find(m, from, to, weight)
         val grouped = System.currentTimeMillis()
-        // The songs on the last map start where they were.
+        // The songs start where they were on the map by all links (when there is one): a map by
+        // fewer links is that one, moved, and the same each time.
         val before = places[accountId].orEmpty()
         val startX = DoubleArray(n) { before[links.nodes[it]]?.first ?: Double.NaN }
         val startY = DoubleArray(n) { before[links.nodes[it]]?.second ?: Double.NaN }
+        val subIndex = (0 until n).filter { active[it] }
         // The layout starts from coarser groups (modularity's usual resolution): about a dozen big
         // areas come apart fast, and the finer groups find their place inside them.
-        val coarse = GraphGroups.find(n, links.from, links.to, links.total, resolution = 1.0)
-        val (x, y) = GraphLayout.place(n, links.from, links.to, links.total, coarse, startX = startX, startY = startY)
-        places[accountId] = links.nodes.withIndex().associate { (i, node) -> node to (x[i] to y[i]) }
-        log.debug("Whole song graph: read in {} ms, groups in {} ms, laid out in {} ms ({} songs where they were)", read - started, grouped - read, System.currentTimeMillis() - grouped, startX.count { !it.isNaN() })
+        val subCoarse = GraphGroups.find(m, from, to, weight, resolution = 1.0)
+        // By fewer links, songs have far to go from there: all the steps (twice what half of is taken when most start in place).
+        val steps = if (all) GraphLayout.ITERATIONS else 2 * GraphLayout.ITERATIONS
+        val (sx, sy) = GraphLayout.place(
+            m, from, to, weight, subCoarse, steps,
+            startX = DoubleArray(m) { startX[subIndex[it]] }, startY = DoubleArray(m) { startY[subIndex[it]] },
+        )
+        // Fewer songs make a smaller round: as big as these songs were on the map by all links, so it fills the same view.
+        run {
+            fun spread(xs: DoubleArray, ys: DoubleArray, of: List<Int>): Double =
+                if (of.isEmpty()) 0.0 else kotlin.math.sqrt(of.sumOf { xs[it] * xs[it] + ys[it] * ys[it] } / of.size)
+            val placedBefore = (0 until m).filter { !startX[subIndex[it]].isNaN() }
+            val was = spread(DoubleArray(m) { startX[subIndex[it]] }, DoubleArray(m) { startY[subIndex[it]] }, placedBefore)
+            val now = spread(sx, sy, placedBefore)
+            if (!all && was > 0 && now > 0) for (i in 0 until m) {
+                sx[i] *= was / now
+                sy[i] *= was / now
+            }
+        }
+        val none = (subGroup.maxOrNull() ?: -1) + 1
+        val noneCoarse = (subCoarse.maxOrNull() ?: -1) + 1
+        val group = IntArray(n) { if (active[it]) subGroup[sub[it]] else none }
+        val coarse = IntArray(n) { if (active[it]) subCoarse[sub[it]] else noneCoarse }
+        // The others: where they were, or (no map by all links yet) on a ring around the rest.
+        val ring = 1.1 * (0 until m).maxOfOrNull { kotlin.math.hypot(sx[it], sy[it]) }.let { it ?: 100.0 }
+        val x = DoubleArray(n) { if (active[it]) sx[sub[it]] else startX[it].takeUnless(Double::isNaN) ?: (ring * kotlin.math.cos(it * 2.399963)) }
+        val y = DoubleArray(n) { if (active[it]) sy[sub[it]] else startY[it].takeUnless(Double::isNaN) ?: (ring * kotlin.math.sin(it * 2.399963)) }
+        if (all) places[accountId] = links.nodes.withIndex().associate { (i, node) -> node to (x[i] to y[i]) }
+        log.debug("Whole song graph: read in {} ms, groups in {} ms, laid out {} of {} songs in {} ms", read - started, grouped - read, m, n, System.currentTimeMillis() - grouped)
         val nodes = links.nodes.mapIndexed { i, node ->
             val song = songs[node]?.first
             val (count, first) = plays[node] ?: (0 to null)
@@ -830,15 +879,15 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             )
         }
         // A group is named after its most played artists (or, played by no one here, its biggest).
-        fun named(by: (GraphMapNode) -> Int) = nodes.groupBy(by).toSortedMap().map { (_, members) ->
+        fun named(by: (GraphMapNode) -> Int, unlinked: Int) = nodes.groupBy(by).toSortedMap().map { (g, members) ->
             val byArtist = HashMap<String, Int>()
             for (m in members) m.artist.split(", ").first().takeIf { it.isNotBlank() }?.let { byArtist.merge(it, 1000 * m.plays + 1, Int::plus) }
-            GraphMapGroup(members.size, byArtist.entries.sortedByDescending { it.value }.take(3).map { it.key })
+            GraphMapGroup(members.size, if (g == unlinked) emptyList() else byArtist.entries.sortedByDescending { it.value }.take(3).map { it.key }, unlinked = g == unlinked)
         }
         fun DoubleArray.rounded() = map { (it * 100).roundToLong() / 100.0 }
         return GraphMap(
             nodes, links.from.toList(), links.to.toList(), links.mine.rounded(), links.others.rounded(), links.radios.rounded(),
-            groups = named { it.group }, areas = named { it.area }, madeAt = clock(),
+            groups = named({ it.group }, none), areas = named({ it.area }, noneCoarse), madeAt = clock(),
         )
     }
 

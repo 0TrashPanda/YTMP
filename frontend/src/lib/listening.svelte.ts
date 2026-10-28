@@ -82,9 +82,13 @@ class ListeningHistory {
 		return this.call<GraphView>(`/api/account/graph${seed ? `?seed=${encodeURIComponent(seed)}` : ''}`);
 	}
 
-	/** The whole song graph, laid out by the server, with how much each link counts from your listening, everyone else's and YouTube Music's radios. */
-	graphMap(): Promise<GraphMap> {
-		return this.call<GraphMap>('/api/account/graph/map');
+	/**
+	 * The whole song graph, laid out by the server, with how much each link counts from your
+	 * listening, everyone else's and YouTube Music's radios; placed and grouped by the links of
+	 * [by] (`mine`, `others`, `radios`; all when not given).
+	 */
+	graphMap(by?: string[]): Promise<GraphMap> {
+		return this.call<GraphMap>(`/api/account/graph/map${by ? `?by=${by.join(',')}` : ''}`);
 	}
 
 	/** Whether the song graph is being built again on your server, and how far it got. */
