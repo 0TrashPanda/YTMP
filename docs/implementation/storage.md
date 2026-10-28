@@ -293,11 +293,13 @@ ID and its song cache, kept in its settings (`radio_crawl`, `GET/PUT /api/admin/
 A phone's crawls its matched music files and saved songs, sends each radio to its owner's
 server and keeps when in `radio-crawl-log.json` (`GET/PUT /api/radio-crawl`, only on the
 phone; it waits for the matcher's Wi-Fi and charging rules). Its songs, in this order (each once): the music here, the saved
-songs, the account's likes (a phone signed in to YouTube Music: Liked music, the newest 5,000,
-looked up every 12 hours) and the songs played in the last `historyDays` (default 365, 0: not;
+songs, the account's likes (a phone signed in to YouTube Music: Liked music, the newest
+`likesCount`, default 1,000, at most 5,000, looked up every 12 hours) and the songs played in the last `historyDays` (default 365, 0: not;
 `History.played`: not skipped, most played first, at most 20,000; a phone asks its owner's server,
 `GET /api/auth/played?days=` with its host token, every 12 hours; the server takes everyone's).
-Its waits (the pace, the pauses)
+Before them all come the songs that just played here (`playing`, default on;
+`RadioCrawl.played` from the rooms' `onPlayFinished`, latest first, at most 50 waiting; not a
+podcast or a song skipped within 30 s) whose radio is older than `refreshDays`. Its waits (the pace, the pauses)
 go by the wall clock, so time the phone spent asleep counts. **Overnight** (`overnight` in its
 settings and `RadioCrawlStatus`, null on the server): `android/.../CrawlJob.kt` is a periodic
 JobScheduler job (every 15 minutes, while charging on an unmetered network, kept over a

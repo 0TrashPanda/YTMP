@@ -180,8 +180,11 @@ of **song connections**:
   slowly fetch the radio of every song they have: music files that are a YouTube Music song
   and saved songs, and also the songs played in the last 3 months, year (the default), 3
   years or all of it (the phone: yours, in YTMP and imported; the server: everyone's), and
-  on the phone your liked songs on YouTube Music (on by default). Songs here go first, then
-  likes, then the history, most played first. Without an account, one every 1½ minutes by default, each song again after
+  on the phone your newest liked songs on YouTube Music (250, 1,000 by default, 5,000 or
+  off). Songs here go first, then likes, then the history, most played first. With **First
+  the songs you play** (on by default), a song that played here goes before all of them once
+  it ends, if its radio is older than *Again after*, so it doesn't wait weeks in line; a song
+  skipped in its first 30 seconds doesn't. Without an account, one every 1½ minutes by default, each song again after
   3 months; it stops for hours when YouTube asks whether it's a bot. On the phone it learns
   while the app is open or playing, and with **Also overnight** in the background too while
   the phone charges on Wi-Fi (Android wakes the app for 9 of every 15 minutes or so: about

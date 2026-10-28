@@ -180,7 +180,7 @@ class AdminApi(
             val crawl = crawl ?: throw notHere()
             val wanted = call.receive<RadioCrawlStatus>()
             val before = crawl.status()
-            val status = crawl.set(wanted.enabled, wanted.paceSeconds, wanted.refreshDays, historyDays = wanted.historyDays)
+            val status = crawl.set(wanted.enabled, wanted.paceSeconds, wanted.refreshDays, historyDays = wanted.historyDays, playing = wanted.playing ?: crawl.current.playing)
             if (before.enabled != status.enabled) audit?.record(admin.username, if (status.enabled) "Switched on learning radios" else "Switched off learning radios")
             call.respond(status)
         }

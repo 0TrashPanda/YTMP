@@ -191,11 +191,11 @@ class LocalHost(private val context: Context) {
     @Volatile private var likedKept: Kept? = null
     @Volatile private var playedKept: Kept? = null
 
-    private suspend fun liked(): List<String> {
-        likedKept?.takeIf { System.currentTimeMillis() - it.at < CRAWL_LISTS_MS }?.let { return it.ids }
+    private suspend fun liked(count: Int): List<String> {
+        likedKept?.takeIf { it.key == count && System.currentTimeMillis() - it.at < CRAWL_LISTS_MS }?.let { return it.ids }
         if (youtube.account() == null) return emptyList()
-        val ids = runCatching { youtube.recentLikes(MAX_CRAWL_LIKES).filter { it.podcast == null }.map { it.id } }.getOrNull() ?: return likedKept?.ids.orEmpty()
-        likedKept = Kept(System.currentTimeMillis(), 0, ids)
+        val ids = runCatching { youtube.recentLikes(count).filter { it.podcast == null }.map { it.id } }.getOrNull() ?: return likedKept?.ids.orEmpty()
+        likedKept = Kept(System.currentTimeMillis(), count, ids)
         return ids
     }
 
@@ -215,7 +215,7 @@ class LocalHost(private val context: Context) {
         scope,
         songs = { s ->
             matcher.all().map { it.second.id } + cache.songIds().filter { it.startsWith("ytm:") } +
-                (if (s.likes) liked() else emptyList()) + (if (s.historyDays > 0) played(s.historyDays) else emptyList())
+                (if (s.likes) liked(s.likesCount) else emptyList()) + (if (s.historyDays > 0) played(s.historyDays) else emptyList())
         },
         lastFetched = { seeds -> crawlLog.get(seeds) },
         fetch = { seed -> ytm.radio(seed) },
@@ -324,6 +324,7 @@ class LocalHost(private val context: Context) {
                 plays.report(play)
                 addToYoutubeHistory(play)
                 cache.finished(play)
+                crawl.played(play)
             },
             onSongStarted = cache::started,
             onRoomSaved = { sync.saved(it) },
@@ -585,8 +586,6 @@ class LocalHost(private val context: Context) {
         const val PORT = BuildConfig.HOST_PORT
         /** The crawl's likes and recent history are fetched again after this long. */
         private const val CRAWL_LISTS_MS = 12 * 3_600_000L
-        /** At most this many likes (the newest): Liked music comes 100 at a time. */
-        private const val MAX_CRAWL_LIKES = 5_000
         private const val PHONE_MUSIC = "phoneMusic"
         /** Keep a copy of the song graph on the phone (Settings → Radio). */
         private const val GRAPH_COPY = "graphCopy"

@@ -1228,6 +1228,8 @@ export interface RadioCrawlStatus {
   overnight: boolean | null;
   historyDays: number;
   likes: boolean | null;
+  likesCount: number | null;
+  playing: boolean | null;
 }
 
 export interface PlayReport {

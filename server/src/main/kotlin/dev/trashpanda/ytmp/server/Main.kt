@@ -187,6 +187,7 @@ fun main(args: Array<String>) {
                     plays.report(play)
                     youtube.report(play, ::localAccount)
                     songCache.finished(play)
+                    crawl.played(play)
                 },
                 onSongStarted = songCache::started,
             ),

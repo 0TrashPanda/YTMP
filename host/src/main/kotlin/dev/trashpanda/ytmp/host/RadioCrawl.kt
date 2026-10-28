@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.host
 
+import dev.trashpanda.ytmp.core.FinishedPlay
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.RadioCrawlStatus
 import io.ktor.http.HttpStatusCode
@@ -34,6 +35,10 @@ data class RadioCrawlSettings(
     val historyDays: Int = 365,
     /** Also the songs liked on YouTube Music (a phone; see [RadioCrawl.likes]). */
     val likes: Boolean = true,
+    /** At most this many likes, the newest. */
+    val likesCount: Int = 1000,
+    /** Also a song played here, first, when its radio is older than [refreshDays] (once it ends, not when skipped early). */
+    val playing: Boolean = true,
 )
 
 /**
@@ -75,6 +80,8 @@ class RadioCrawl(
     @Volatile private var until: Long? = null
     @Volatile private var lastAt: Long? = null
     @Volatile private var counts = 0 to 0
+    /** Songs just played here, to learn next ([played]). */
+    private val started = LinkedHashSet<String>()
 
     fun start() {
         if (job != null) return
@@ -83,7 +90,7 @@ class RadioCrawl(
 
     fun status(): RadioCrawlStatus {
         val s = settings
-        return RadioCrawlStatus(s.enabled, s.paceSeconds, s.refreshDays, counts.first, counts.second, hold() ?: waiting, until, lastAt, s.overnight.takeIf { overnight }, s.historyDays, s.likes.takeIf { likes })
+        return RadioCrawlStatus(s.enabled, s.paceSeconds, s.refreshDays, counts.first, counts.second, hold() ?: waiting, until, lastAt, s.overnight.takeIf { overnight }, s.historyDays, s.likes.takeIf { likes }, s.likesCount.takeIf { likes }, s.playing)
     }
 
     /** What it's set to now. */
@@ -96,10 +103,12 @@ class RadioCrawl(
         overnight: Boolean = settings.overnight,
         historyDays: Int = settings.historyDays,
         likes: Boolean = settings.likes,
+        likesCount: Int = settings.likesCount,
+        playing: Boolean = settings.playing,
     ): RadioCrawlStatus {
         settings = RadioCrawlSettings(
             enabled, paceSeconds.coerceIn(MIN_PACE_S, MAX_PACE_S), refreshDays.coerceIn(7, 3650), overnight && this.overnight,
-            historyDays.coerceIn(0, 3650), likes,
+            historyDays.coerceIn(0, 3650), likes, likesCount.coerceIn(1, MAX_LIKES), playing,
         )
         save(settings)
         // A change (switched on, slower or faster) is looked at at once; a block from YouTube stays.
@@ -112,6 +121,24 @@ class RadioCrawl(
      * the wall clock, so one that's over while the phone slept doesn't hold it up.
      */
     fun nudge() {
+        wake.trySend(Unit)
+    }
+
+    /**
+     * A song ended here (a room's hook): when set ([RadioCrawlSettings.playing]), its radio is
+     * learned next if it's older than [RadioCrawlSettings.refreshDays], still at the pace. Not a
+     * song skipped in its first [SKIPPED_EARLY_MS]: that one wasn't what you wanted.
+     */
+    fun played(play: FinishedPlay) {
+        val s = settings
+        val song = play.item.song
+        if (!s.enabled || !s.playing || song.podcast != null || !song.id.startsWith("ytm:")) return
+        if (play.skipped && play.heardMs < SKIPPED_EARLY_MS) return
+        synchronized(started) {
+            started.remove(song.id)
+            started += song.id
+            while (started.size > MAX_STARTED) started.remove(started.first())
+        }
         wake.trySend(Unit)
     }
 
@@ -129,12 +156,16 @@ class RadioCrawl(
             }
             // Each song once, in the order given (music here first, then likes, then the history, most played first).
             val all = runCatching { songs(s) }.getOrDefault(emptyList()).distinct()
-            val last = runCatching { lastFetched(all) }.getOrDefault(emptyMap())
+            // Songs just played here go first, the latest first.
+            val playing = if (s.playing) synchronized(started) { started.reversed() } else emptyList()
+            val last = runCatching { lastFetched((playing + all).distinct()) }.getOrDefault(emptyMap())
             val now = clock()
             val fresh = now - s.refreshDays * DAY_MS
+            val playingTodo = playing.filter { (last[it] ?: 0) < fresh }
+            synchronized(started) { started.removeAll((playing - playingTodo.toSet()).toSet()) }
             val todo = all.filter { (last[it] ?: 0) < fresh }.sortedBy { last[it] ?: 0 }
             counts = (all.size - todo.size) to all.size
-            val seed = todo.firstOrNull()
+            val seed = playingTodo.firstOrNull() ?: todo.firstOrNull()
             if (seed == null) {
                 waiting = null
                 sleep(IDLE_RECHECK_MS)
@@ -157,7 +188,8 @@ class RadioCrawl(
                 }
                 lastAt = clock()
                 waiting = null
-                counts = (counts.first + 1) to counts.second
+                synchronized(started) { started.remove(seed) }
+                if (seed in todo) counts = (counts.first + 1) to counts.second
                 sleepUntil(lastAt!! + s.paceSeconds * 1000L)
             } catch (e: CancellationException) {
                 throw e
@@ -220,6 +252,12 @@ class RadioCrawl(
         /** Faster than this, YouTube soon wants to know if it's a bot. */
         const val MIN_PACE_S = 30
         const val MAX_PACE_S = 3600
+        /** At most this many likes (the newest): Liked music comes 100 at a time. */
+        const val MAX_LIKES = 5000
+        /** Songs that started playing, waiting to be learned, at most. */
+        private const val MAX_STARTED = 50
+        /** A song skipped before this isn't learned when it ends. */
+        const val SKIPPED_EARLY_MS = 30_000L
         private const val DAY_MS = 24L * 3600 * 1000
         private const val HOLD_RECHECK_MS = 60_000L
         private const val IDLE_RECHECK_MS = 3_600_000L
@@ -244,6 +282,6 @@ fun Route.radioCrawlRoutes(path: String, crawl: RadioCrawl?, allowed: suspend (A
         put {
             val crawl = call.crawl()
             val wanted = call.receive<RadioCrawlStatus>()
-            call.respond(crawl.set(wanted.enabled, wanted.paceSeconds, wanted.refreshDays, wanted.overnight ?: crawl.current.overnight, wanted.historyDays, wanted.likes ?: crawl.current.likes))
+            call.respond(crawl.set(wanted.enabled, wanted.paceSeconds, wanted.refreshDays, wanted.overnight ?: crawl.current.overnight, wanted.historyDays, wanted.likes ?: crawl.current.likes, wanted.likesCount ?: crawl.current.likesCount, wanted.playing ?: crawl.current.playing))
         }
     }

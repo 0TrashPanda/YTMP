@@ -76,7 +76,26 @@
 			]}
 		/>
 		{#if crawl.likes != null}
-			<Toggle label="Also your liked songs" hint="The songs you liked on YouTube Music, on this phone (looked up twice a day)." checked={crawl.likes} onchange={(on) => change({ likes: on })} />
+			<Choice
+				label="Also your liked songs"
+				hint="The newest songs you liked on YouTube Music, on this phone (looked up twice a day)."
+				value={crawl.likes ? (crawl.likesCount ?? 1000) : 0}
+				onchange={(v) => change(v === 0 ? { likes: false } : { likes: true, likesCount: v })}
+				options={[
+					[0, 'Off'],
+					[250, '250'],
+					[1000, '1,000'],
+					[5000, '5,000']
+				]}
+			/>
+		{/if}
+		{#if crawl.playing != null}
+			<Toggle
+				label="First the songs you play"
+				hint="A song that played here is learned next, once it ends, if its radio is older than Again after. Not a song you skipped in the first 30 seconds."
+				checked={crawl.playing}
+				onchange={(on) => change({ playing: on })}
+			/>
 		{/if}
 		<Choice
 			label="One radio every"

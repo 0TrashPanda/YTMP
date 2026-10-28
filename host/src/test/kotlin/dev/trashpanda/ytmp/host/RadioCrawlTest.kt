@@ -1,5 +1,9 @@
 package dev.trashpanda.ytmp.host
 
+import dev.trashpanda.ytmp.core.FinishedPlay
+import dev.trashpanda.ytmp.protocol.ArtistRef
+import dev.trashpanda.ytmp.protocol.QueueItem
+import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -12,14 +16,15 @@ class RadioCrawlTest {
     /** The wall clock: on a phone it goes on while the coroutines' timers stand still (asleep). */
     private var wall = 1_000_000_000_000L
     private val fetched = mutableListOf<String>()
+    private val learnedAt = mutableMapOf<String, Long>()
     private var settings = RadioCrawlSettings(enabled = true, paceSeconds = 90)
 
     private fun TestScope.crawl(overnight: Boolean = false) = RadioCrawl(
         backgroundScope,
         songs = { listOf("ytm:a", "ytm:b", "ytm:c") },
-        lastFetched = { emptyMap() },
+        lastFetched = { seeds -> learnedAt.filterKeys { it in seeds } },
         fetch = { seed -> fetched += seed; emptyList() },
-        learned = { _, _ -> },
+        learned = { seed, _ -> learnedAt[seed] = wall },
         load = { settings },
         save = { settings = it },
         clock = { wall },
@@ -81,4 +86,29 @@ class RadioCrawlTest {
         assertEquals(2, crawl.status().total)
         assertNull(crawl().status().likes)
     }
+
+    @Test
+    fun `a song played here is learned next, once it ends, but not one skipped early`() = runTest {
+        val crawl = crawl()
+        crawl.start()
+        runCurrent()
+        assertEquals(listOf("ytm:a"), fetched)
+        crawl.played(play("ytm:x", heardMs = 5_000, skipped = true))
+        crawl.played(play("ytm:y", heardMs = 200_000, skipped = false))
+        // The pace still holds.
+        runCurrent()
+        assertEquals(1, fetched.size)
+        wall += 90_000
+        advanceTimeBy(90_001)
+        runCurrent()
+        assertEquals(listOf("ytm:a", "ytm:y"), fetched)
+        wall += 90_000
+        advanceTimeBy(90_001)
+        runCurrent()
+        assertEquals(listOf("ytm:a", "ytm:y", "ytm:b"), fetched)
+    }
+
+    private fun play(id: String, heardMs: Long, skipped: Boolean) = FinishedPlay(
+        QueueItem("i1", Song(id, "Song", listOf(ArtistRef(null, "Artist")), null, 200_000, emptyList()), "p1", "Anna", 0), startedAt = 0, heardMs = heardMs, skipped = skipped, roomCode = "ABCD", roomName = "Room", listeners = emptyList(),
+    )
 }

@@ -349,6 +349,10 @@ data class RadioCrawlStatus(
     val historyDays: Int = 0,
     /** Also the songs liked on YouTube Music; null: this host can't (no YouTube Music account: the server). */
     val likes: Boolean? = null,
+    /** At most this many likes, the newest; null: no likes here. */
+    val likesCount: Int? = null,
+    /** Also a song played here, first, once it ends (not when skipped early), when its radio is older than [refreshDays]; null: an older host. */
+    val playing: Boolean? = null,
 )
 
 /** `GET /api/auth/played?days=` (a phone, with its owner's host token): the YouTube Music songs they played lately, most played first. */
