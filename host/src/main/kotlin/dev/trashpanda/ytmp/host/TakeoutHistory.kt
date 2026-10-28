@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.protocol.TakeoutRule
 import dev.trashpanda.ytmp.protocol.TakeoutSummary
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -79,10 +80,17 @@ class TakeoutHistory(private val file: File) {
      * The songs played at least [minPlays] times in the last [days] days (0: the whole export),
      * most played there first, then the ones played last.
      */
-    fun pick(days: Int, minPlays: Int, now: Long): List<TakeoutSong> {
-        val since = if (days > 0) now - days * DAY_MS else Long.MIN_VALUE
-        val least = minPlays.coerceAtLeast(1)
-        return songs.mapNotNull { song -> song.plays.count { it >= since }.takeIf { it >= least }?.let { song to it } }
+    fun pick(days: Int, minPlays: Int, now: Long): List<TakeoutSong> = pick(listOf(TakeoutRule(days, minPlays)), now)
+
+    /**
+     * The songs that fit any of [rules], each once: most played first (in the rule that counts
+     * the most plays of it), then the ones played last.
+     */
+    fun pick(rules: List<TakeoutRule>, now: Long): List<TakeoutSong> {
+        val windows = rules.map { (if (it.days > 0) now - it.days * DAY_MS else Long.MIN_VALUE) to it.minPlays.coerceAtLeast(1) }
+        return songs.mapNotNull { song ->
+            windows.maxOfOrNull { (since, least) -> song.plays.count { it >= since }.takeIf { it >= least } ?: -1 }?.takeIf { it >= 0 }?.let { song to it }
+        }
             .sortedWith(compareByDescending<Pair<TakeoutSong, Int>> { it.second }.thenByDescending { it.first.plays.last() })
             .map { it.first }
     }

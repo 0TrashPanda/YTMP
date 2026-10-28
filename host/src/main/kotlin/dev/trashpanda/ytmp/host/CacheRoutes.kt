@@ -9,6 +9,7 @@ import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.UnmatchedSongs
 import dev.trashpanda.ytmp.protocol.SongCacheStatus
 import dev.trashpanda.ytmp.protocol.TakeoutPreviewRequest
+import dev.trashpanda.ytmp.protocol.TakeoutRule
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
@@ -38,7 +39,7 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
                 val youtube = settings.fromYoutube() ?: return@let s
                 s.copy(keepLiked = youtube.liked, likedOf = youtube.likedOf, likedCached = youtube.likedCached, fromHistory = youtube.fromHistory, fromYoutubeWaiting = youtube.waiting,
                     fromYoutubeBusy = youtube.busy, fromYoutubeError = youtube.error, fromYoutubeNextAt = youtube.nextAt, takeoutGone = if (youtube.fromTakeout) youtube.takeoutGone else 0,
-                    takeout = youtube.takeoutSummary(), fromTakeout = youtube.fromTakeout, takeoutDays = youtube.takeoutDays, takeoutMinPlays = youtube.takeoutMinPlays,
+                    takeout = youtube.takeoutSummary(), fromTakeout = youtube.fromTakeout, takeoutDays = youtube.takeoutDays, takeoutMinPlays = youtube.takeoutMinPlays, takeoutRules = youtube.takeoutRules,
                     takeoutOf = if (youtube.fromTakeout) youtube.takeoutOf else 0, takeoutCached = if (youtube.fromTakeout) youtube.takeoutCached else 0)
             }
     }
@@ -100,7 +101,7 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
         post("/preview") {
             val prefill = call.prefill()
             val wanted = call.receive<TakeoutPreviewRequest>()
-            call.respond(withContext(Dispatchers.Default) { prefill.preview(wanted.days, wanted.minPlays) })
+            call.respond(withContext(Dispatchers.Default) { prefill.preview(wanted.rules ?: listOf(TakeoutRule(wanted.days, wanted.minPlays))) })
         }
     }
     // Download's hold: keep a song in the cache (it stays like the songs played most), not as a music file.

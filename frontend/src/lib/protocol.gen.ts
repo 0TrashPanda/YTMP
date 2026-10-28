@@ -1403,6 +1403,11 @@ export interface TakeoutSummary {
   last: number;
 }
 
+export interface TakeoutRule {
+  days: number;
+  minPlays: number;
+}
+
 export interface SongCachePlace {
   id: string;
   name: string;
@@ -1436,6 +1441,7 @@ export interface SongCacheStatus {
   fromTakeout: boolean;
   takeoutDays: number;
   takeoutMinPlays: number;
+  takeoutRules: TakeoutRule[];
   takeoutOf: number;
   takeoutCached: number;
   takeoutGone: number;
@@ -1459,11 +1465,13 @@ export interface SongCacheSettings {
   fromTakeout: boolean | null;
   takeoutDays: number | null;
   takeoutMinPlays: number | null;
+  takeoutRules: TakeoutRule[] | null;
 }
 
 export interface TakeoutPreviewRequest {
   days: number;
   minPlays: number;
+  rules: TakeoutRule[] | null;
 }
 
 export interface TakeoutPreview {

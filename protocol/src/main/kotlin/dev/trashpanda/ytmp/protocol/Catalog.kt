@@ -389,10 +389,12 @@ data class SongCacheStatus(
     val fromYoutubeNextAt: Long? = null,
     /** The imported Google Takeout history, or null (none yet, or not a setting here). */
     val takeout: TakeoutSummary? = null,
-    /** Songs from it are kept: those played at least [takeoutMinPlays] times in the last [takeoutDays] days (0: all of it). */
+    /** Songs from it are kept: those that fit any of [takeoutRules], each once. */
     val fromTakeout: Boolean = false,
+    /** The first of [takeoutRules] (an older web app shows only one). */
     val takeoutDays: Int = 0,
     val takeoutMinPlays: Int = 0,
+    val takeoutRules: List<TakeoutRule> = emptyList(),
     /** Of the songs those settings pick (that can be kept): how many, and how many are here. */
     val takeoutOf: Int = 0,
     val takeoutCached: Int = 0,
@@ -427,7 +429,14 @@ data class SongCacheSettings(
     val fromTakeout: Boolean? = null,
     val takeoutDays: Int? = null,
     val takeoutMinPlays: Int? = null,
+    /** All the rules (wins over [takeoutDays] and [takeoutMinPlays]). */
+    val takeoutRules: List<TakeoutRule>? = null,
 )
+
+/** Takeout songs played at least [minPlays] times in the last [days] days (0: all of it). */
+@Serializable
+@SerialName("TakeoutRule")
+data class TakeoutRule(val days: Int, val minPlays: Int)
 
 /** A Google Takeout history imported on a phone: its YouTube Music [plays] of [songs] songs, from [first] to [last] (ms). */
 @Serializable
@@ -437,7 +446,7 @@ data class TakeoutSummary(val songs: Int, val plays: Int, val first: Long, val l
 /** `POST /api/cache/takeout/preview`: which songs these Takeout settings would pick. */
 @Serializable
 @SerialName("TakeoutPreviewRequest")
-data class TakeoutPreviewRequest(val days: Int, val minPlays: Int)
+data class TakeoutPreviewRequest(val days: Int = 0, val minPlays: Int = 1, val rules: List<TakeoutRule>? = null)
 
 /** The [songs] they pick, [cached] of them already here, and about how much room all of them take ([bytes]). */
 @Serializable

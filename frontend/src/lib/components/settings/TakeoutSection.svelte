@@ -1,10 +1,10 @@
 <script lang="ts">
 	// Settings → Playback → Song cache → Songs from Google Takeout: your whole YouTube Music
-	// history from a Takeout export, and which of it to keep (how recent, how often played),
-	// with how many songs that is while you choose.
+	// history from a Takeout export, and which of it to keep: one or more rules (how recent, how
+	// often played; a song that fits several is kept once), with how many songs that is while you choose.
 	import { untrack } from 'svelte';
 	import { forgetTakeout, importTakeout, previewTakeout } from '../../api';
-	import type { SongCacheSettings, SongCacheStatus, TakeoutPreview } from '../../protocol.gen';
+	import type { SongCacheSettings, SongCacheStatus, TakeoutPreview, TakeoutRule } from '../../protocol.gen';
 	import NumberField from '../NumberField.svelte';
 	import Choice from './Choice.svelte';
 	import Switch from './Switch.svelte';
@@ -29,8 +29,10 @@
 	let failed = $state<string | null>(null);
 	let input = $state<HTMLInputElement>();
 	// What's chosen right now: the count follows it at once, the setting is saved meanwhile.
-	let days = $state(untrack(() => status.takeoutDays));
-	let minPlays = $state(untrack(() => status.takeoutMinPlays));
+	let rules = $state<TakeoutRule[]>(
+		untrack(() => (status.takeoutRules.length ? status.takeoutRules : [{ days: status.takeoutDays, minPlays: status.takeoutMinPlays }]).map((r) => ({ ...r })))
+	);
+	const MAX_RULES = 6;
 	let preview = $state<TakeoutPreview | null>(null);
 	let asked = 0;
 
@@ -52,23 +54,39 @@
 		if (!status.takeout) return;
 		const mine = ++asked;
 		try {
-			const answer = await previewTakeout(days, minPlays);
+			const answer = await previewTakeout(rules);
 			if (mine === asked) preview = answer;
 		} catch {
 			// The count stays as it was; the next change asks again.
 		}
 	}
+	// Again when a new export comes in (not when a saved change brings the same one back).
+	const exportPlays = $derived(status.takeout?.plays);
 	$effect(() => {
-		// Again when a new export comes in.
-		void status.takeout?.plays;
-		count();
+		void exportPlays;
+		untrack(count);
 	});
 
-	function choose(changes: { days?: number; minPlays?: number }) {
-		if (changes.days != null) days = changes.days;
-		if (changes.minPlays != null) minPlays = changes.minPlays;
+	/** The rules to save: each once. */
+	const saved = () => rules.filter((r, i) => rules.findIndex((o) => o.days === r.days && o.minPlays === r.minPlays) === i).map((r) => ({ ...r }));
+	function changed() {
 		count();
-		attempt(() => patch({ takeoutDays: days, takeoutMinPlays: minPlays }));
+		attempt(() => patch({ takeoutRules: saved() }));
+	}
+	function choose(i: number, changes: Partial<TakeoutRule>) {
+		rules[i] = { ...rules[i], ...changes };
+		changed();
+	}
+	function addRule() {
+		// Another way in: by default the last 3 months, at least 2 plays (or what isn't there yet).
+		const taken = (r: TakeoutRule) => rules.some((o) => o.days === r.days && o.minPlays === r.minPlays);
+		const next = [{ days: 90, minPlays: 2 }, { days: 30, minPlays: 2 }, { days: 0, minPlays: 10 }, { days: 365, minPlays: 3 }].find((r) => !taken(r)) ?? { days: 90, minPlays: 3 };
+		rules = [...rules, next];
+		changed();
+	}
+	function removeRule(i: number) {
+		rules = rules.filter((_, k) => k !== i);
+		changed();
 	}
 
 	async function pick(event: Event) {
@@ -126,7 +144,7 @@
 			</p>
 		</div>
 		{#if status.takeout}
-			<Switch checked={status.fromTakeout} label="Keep songs from Takeout" disabled={busy} onchange={(on) => attempt(() => patch({ fromTakeout: on, takeoutDays: days, takeoutMinPlays: minPlays }))} />
+			<Switch checked={status.fromTakeout} label="Keep songs from Takeout" disabled={busy} onchange={(on) => attempt(() => patch({ fromTakeout: on, takeoutRules: saved() }))} />
 		{/if}
 	</div>
 	<input bind:this={input} class="hidden" type="file" accept=".zip,.html,.json,application/zip,text/html,application/json" onchange={pick} />
@@ -134,15 +152,30 @@
 		<p class="text-xs text-muted">
 			{number(status.takeout.songs)} songs, {number(status.takeout.plays)} plays, {month(status.takeout.first)} to {month(status.takeout.last)}
 		</p>
-		<Choice label="Played in the last" options={dayOptions} value={String(days)} onchange={(v) => choose({ days: Number(v) })}>
-			<NumberField value={days} min={0} max={3650} step={1} unit="days" label="Days back (0: all of it)" onchange={(v) => choose({ days: Math.round(v) })} />
-		</Choice>
-		<Choice label="At least" options={playOptions} value={String(minPlays)} onchange={(v) => choose({ minPlays: Number(v) })}>
-			<NumberField value={minPlays} min={1} max={1000} step={1} unit="plays" label="Plays at least" onchange={(v) => choose({ minPlays: Math.round(v) })} />
-		</Choice>
+		{#each rules as rule, i (i)}
+			<div class="flex flex-col gap-3 {rules.length > 1 ? 'rounded-lg border border-line p-3' : ''}">
+				{#if rules.length > 1}
+					<div class="flex items-center gap-2">
+						<p class="min-w-0 flex-1 text-xs text-muted">{i === 0 ? 'Keep songs' : 'Or'}</p>
+						<button class="shrink-0 rounded-full px-2 py-1 text-xs text-muted hover:bg-line hover:text-white" aria-label="Remove this rule" onclick={() => removeRule(i)}>Remove</button>
+					</div>
+				{/if}
+				<Choice label="Played in the last" options={dayOptions} value={String(rule.days)} onchange={(v) => choose(i, { days: Number(v) })}>
+					<NumberField value={rule.days} min={0} max={3650} step={1} unit="days" label="Days back (0: all of it)" onchange={(v) => choose(i, { days: Math.round(v) })} />
+				</Choice>
+				<Choice label="At least" options={playOptions} value={String(rule.minPlays)} onchange={(v) => choose(i, { minPlays: Number(v) })}>
+					<NumberField value={rule.minPlays} min={1} max={1000} step={1} unit="plays" label="Plays at least" onchange={(v) => choose(i, { minPlays: Math.round(v) })} />
+				</Choice>
+			</div>
+		{/each}
+		{#if rules.length < MAX_RULES}
+			<button class="self-start rounded-full bg-raised px-3 py-1.5 text-xs font-medium hover:bg-line" onclick={addRule}>Add another rule</button>
+		{/if}
 		{#if preview}
 			<div class="rounded-lg bg-raised p-3">
-				<p class="text-sm font-medium">{number(preview.songs)} {preview.songs === 1 ? 'song' : 'songs'}, about {size(preview.bytes)}</p>
+				<p class="text-sm font-medium">
+					{number(preview.songs)} {preview.songs === 1 ? 'song' : 'songs'}, about {size(preview.bytes)}{rules.length > 1 ? ' (a song that fits more than one rule counts once)' : ''}
+				</p>
 				<p class="text-xs text-muted">
 					{#if preview.cached}{preview.cached === preview.songs ? (preview.songs === 1 ? "It's" : 'All of them are') : `${number(preview.cached)} of them are`} here already.{/if}
 					{#if tooBig}
@@ -165,7 +198,7 @@
 							<button
 								class="shrink-0 rounded-full bg-surface px-3 py-1.5 text-xs font-medium hover:bg-line disabled:opacity-40"
 								disabled={busy}
-								onclick={() => attempt(() => patch({ fromTakeout: true, takeoutDays: days, takeoutMinPlays: minPlays }))}>Retry now</button
+								onclick={() => attempt(() => patch({ fromTakeout: true, takeoutRules: saved() }))}>Retry now</button
 							>
 						{/if}
 					</div>

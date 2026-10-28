@@ -123,14 +123,18 @@ The settings show why an export was refused under its button until the next one 
 `TakeoutHistory` keeps the result in `takeout-history.json` in the app's files (per song: ID,
 title, artist, the play times; about 1.5 MB for 31,000 plays) and replaces it on the next
 import; `DELETE /api/cache/takeout` removes it and switches the setting off.
-`TakeoutHistory.pick(days, minPlays, now)` gives the songs with at least `minPlays` plays in the
-last `days` days (0: all), by those plays, then the last play. `POST /api/cache/takeout/preview`
+`TakeoutHistory.pick(rules, now)` gives the songs that fit any `TakeoutRule(days, minPlays)` (at
+least `minPlays` plays in the last `days` days, 0: all), each once, by their plays (in the rule
+that counts the most of them), then the last play. `POST /api/cache/takeout/preview` takes
+`rules` (an older web app sends one `days` and `minPlays`). It
 (`TakeoutPreviewRequest` → `TakeoutPreview`) answers that count for the settings while you
 choose, with how many are here and about how much room they take (`SongCache.usualSongBytes`:
 the cached songs' average, 4 MB when empty).
 
 `CachePrefill` does the rest in its round, after likes and history (prefs `fromTakeout`,
-`takeoutDays` 0–3650 (365), `takeoutMinPlays` 1–1000 (5)): every Takeout play goes into
+`takeoutRules`, JSON, `CachePrefill.cleanRules`: days 0–3650, plays 1–1000, each rule once, at
+most 6, default one rule of 365 days and 5 plays; from before, `takeoutDays` and
+`takeoutMinPlays` as that one rule): every Takeout play goes into
 `SongCache.importPlays` (the last 90 days count, once a day), and each picked song that's wanted
 is looked up first (`songInfo`: `ytm.song`, for its title, length and cover; the Takeout entry
 has only an ID and title), then fetched like the others: 20 s apart, only into free room. A
@@ -139,8 +143,8 @@ until the app restarts. Old histories have many songs YouTube no longer plays ("
 unavailable"), so after three failed lookups in a row it looks up a song YouTube answered for
 (this round, or one already cached): if that works the three were gone songs and it goes on;
 otherwise YouTube itself fails (a bot check, no internet) and the round stops (`error`, again in
-30 minutes). The status has `takeout` (`TakeoutSummary`), `fromTakeout`, `takeoutDays`,
-`takeoutMinPlays`, `takeoutOf`, `takeoutCached` and `takeoutGone` (skipped as gone), and for
+30 minutes). The status has `takeout` (`TakeoutSummary`), `fromTakeout`, `takeoutRules`
+(and its first as `takeoutDays` and `takeoutMinPlays`, for an older web app), `takeoutOf`, `takeoutCached` and `takeoutGone` (skipped as gone), and for
 all of it `fromYoutubeWaiting` (why not now), `fromYoutubeBusy`, `fromYoutubeError` and
 `fromYoutubeNextAt` (when it looks again by itself); saving the settings (*Retry now*) looks at
 once.

@@ -88,6 +88,7 @@
 			fromTakeout: null,
 			takeoutDays: null,
 			takeoutMinPlays: null,
+			takeoutRules: null,
 			...changes
 		});
 	}

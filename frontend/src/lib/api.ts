@@ -4,6 +4,7 @@ import type {
 	SongCacheSettings,
 	SongCacheStatus,
 	TakeoutPreview,
+	TakeoutRule,
 	UnmatchedSongs,
 	AlbumPage,
 	ApiError,
@@ -620,9 +621,9 @@ export function forgetTakeout(): Promise<SongCacheStatus> {
 	return request('/api/cache/takeout', { method: 'DELETE' });
 }
 
-/** Which Takeout songs [days] and [minPlays] would keep. */
-export function previewTakeout(days: number, minPlays: number): Promise<TakeoutPreview> {
-	return request('/api/cache/takeout/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days, minPlays }) });
+/** Which Takeout songs [rules] would keep (a song that fits several, once). */
+export function previewTakeout(rules: TakeoutRule[]): Promise<TakeoutPreview> {
+	return request('/api/cache/takeout/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rules }) });
 }
 
 export function getDownloadQueue(): Promise<DownloadItems> {

@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp.host
 
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.TakeoutPreview
+import dev.trashpanda.ytmp.protocol.TakeoutRule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -58,18 +59,18 @@ class CachePrefill(
     var fromHistory = false
         private set
 
-    /** Songs from [takeout] are cached: the ones played at least [takeoutMinPlays] times in the last [takeoutDays] days (0: all of it). */
+    /** Songs from [takeout] are cached: the ones that fit any of [takeoutRules], each once. */
     @Volatile
     var fromTakeout = false
         private set
 
     @Volatile
-    var takeoutDays = DEFAULT_TAKEOUT_DAYS
+    var takeoutRules = listOf(DEFAULT_TAKEOUT_RULE)
         private set
 
-    @Volatile
-    var takeoutMinPlays = DEFAULT_TAKEOUT_MIN_PLAYS
-        private set
+    /** The first rule (an older web app shows only one). */
+    val takeoutDays: Int get() = takeoutRules.first().days
+    val takeoutMinPlays: Int get() = takeoutRules.first().minPlays
 
     /** Takeout songs that turned out not to be kept (an episode, too long, gone from YouTube): not tried again until the app restarts. */
     private val unkeepable = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
@@ -82,7 +83,7 @@ class CachePrefill(
     private var answered: String? = null
 
     /** Of the songs the Takeout settings pick: how many YouTube doesn't have any more (skipped). */
-    val takeoutGone: Int get() = if (takeout == null || gone.isEmpty()) 0 else takeout.pick(takeoutDays, takeoutMinPlays, clock()).count { it.song().id in gone }
+    val takeoutGone: Int get() = if (takeout == null || gone.isEmpty()) 0 else takeout.pick(takeoutRules, clock()).count { it.song().id in gone }
 
     /** Looking and fetching right now (between two songs too). */
     @Volatile
@@ -104,9 +105,9 @@ class CachePrefill(
 
     val takeoutCached: Int get() = takeoutPicks().count { !cache.wanted(it) }
 
-    private fun takeoutPicks(days: Int = takeoutDays, minPlays: Int = takeoutMinPlays): List<Song> =
+    private fun takeoutPicks(rules: List<TakeoutRule> = takeoutRules): List<Song> =
         if (takeout == null) emptyList()
-        else takeout.pick(days, minPlays, clock()).map { it.song() }.filter { cache.takes(it) && it.id !in unkeepable }
+        else takeout.pick(rules, clock()).map { it.song() }.filter { cache.takes(it) && it.id !in unkeepable }
 
     /** The imported Takeout history, or null. */
     fun takeoutSummary() = takeout?.summary()
@@ -124,9 +125,9 @@ class CachePrefill(
         takeout?.forget()
     }
 
-    /** What [days] and [minPlays] would pick: the live count next to the settings. */
-    fun preview(days: Int, minPlays: Int): TakeoutPreview {
-        val songs = takeoutPicks(days.coerceIn(0, MAX_TAKEOUT_DAYS), minPlays.coerceIn(1, MAX_TAKEOUT_MIN_PLAYS))
+    /** What [rules] would pick: the live count next to the settings. */
+    fun preview(rules: List<TakeoutRule>): TakeoutPreview {
+        val songs = takeoutPicks(cleanRules(rules))
         val cached = songs.count { !cache.wanted(it) }
         return TakeoutPreview(songs.size, cached, songs.size * cache.usualSongBytes())
     }
@@ -145,12 +146,11 @@ class CachePrefill(
         private set
 
     /** Applies the settings and looks again at once (also when nothing changed: the owner asked). */
-    fun set(liked: Int, fromHistory: Boolean, fromTakeout: Boolean = false, takeoutDays: Int = DEFAULT_TAKEOUT_DAYS, takeoutMinPlays: Int = DEFAULT_TAKEOUT_MIN_PLAYS) {
+    fun set(liked: Int, fromHistory: Boolean, fromTakeout: Boolean = false, takeoutRules: List<TakeoutRule> = listOf(DEFAULT_TAKEOUT_RULE)) {
         this.liked = liked.coerceIn(0, MAX_LIKED)
         this.fromHistory = fromHistory
         this.fromTakeout = fromTakeout && takeout != null
-        this.takeoutDays = takeoutDays.coerceIn(0, MAX_TAKEOUT_DAYS)
-        this.takeoutMinPlays = takeoutMinPlays.coerceIn(1, MAX_TAKEOUT_MIN_PLAYS)
+        this.takeoutRules = cleanRules(takeoutRules)
         if (this.liked == 0) lastLiked = emptyList()
         if (this.liked == 0 && !fromHistory && !this.fromTakeout) {
             job?.cancel()
@@ -301,6 +301,14 @@ class CachePrefill(
         const val MAX_TAKEOUT_MIN_PLAYS = 1000
         const val DEFAULT_TAKEOUT_DAYS = 365
         const val DEFAULT_TAKEOUT_MIN_PLAYS = 5
+        val DEFAULT_TAKEOUT_RULE = TakeoutRule(DEFAULT_TAKEOUT_DAYS, DEFAULT_TAKEOUT_MIN_PLAYS)
+        /** At most this many Takeout rules. */
+        const val MAX_TAKEOUT_RULES = 6
+
+        /** [rules] within bounds, each once, at most [MAX_TAKEOUT_RULES]; none: the default. */
+        fun cleanRules(rules: List<TakeoutRule>): List<TakeoutRule> =
+            rules.map { TakeoutRule(it.days.coerceIn(0, MAX_TAKEOUT_DAYS), it.minPlays.coerceIn(1, MAX_TAKEOUT_MIN_PLAYS)) }
+                .distinct().take(MAX_TAKEOUT_RULES).ifEmpty { listOf(DEFAULT_TAKEOUT_RULE) }
         /** Takeout songs it couldn't look up in a row before it checks YouTube itself still answers (else it stops the round). */
         private const val MAX_FAILED_LOOKUPS = 3
         /** Between two songs it fetches. */

@@ -25,6 +25,7 @@ import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.ShareAddress
 import dev.trashpanda.ytmp.protocol.SongCachePlace
+import dev.trashpanda.ytmp.protocol.TakeoutRule
 import dev.trashpanda.ytmp.protocol.SearchItem
 import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
@@ -269,9 +270,13 @@ class LocalHost(private val context: Context) {
 
     private fun applyFromYoutube() = prefill.set(
         cacheSettings.getInt(CACHE_LIKED, 0), cacheSettings.getBoolean(CACHE_HISTORY, false),
-        cacheSettings.getBoolean(CACHE_TAKEOUT, false),
-        cacheSettings.getInt(CACHE_TAKEOUT_DAYS, CachePrefill.DEFAULT_TAKEOUT_DAYS), cacheSettings.getInt(CACHE_TAKEOUT_MIN_PLAYS, CachePrefill.DEFAULT_TAKEOUT_MIN_PLAYS),
+        cacheSettings.getBoolean(CACHE_TAKEOUT, false), takeoutRules(),
     )
+
+    /** The Takeout rules kept; from before there could be several: the one rule. */
+    private fun takeoutRules(): List<TakeoutRule> =
+        cacheSettings.getString(CACHE_TAKEOUT_RULES, null)?.let { runCatching { ProtocolJson.decodeFromString<List<TakeoutRule>>(it) }.getOrNull() }
+            ?: listOf(TakeoutRule(cacheSettings.getInt(CACHE_TAKEOUT_DAYS, CachePrefill.DEFAULT_TAKEOUT_DAYS), cacheSettings.getInt(CACHE_TAKEOUT_MIN_PLAYS, CachePrefill.DEFAULT_TAKEOUT_MIN_PLAYS)))
 
     /** The setting is on and Android lets us read the music. */
     private fun localSongsOn() = cacheSettings.getBoolean(CACHE_LOCAL, false) && phoneMusicOn
@@ -403,6 +408,11 @@ class LocalHost(private val context: Context) {
                 settings.fromTakeout?.let { putBoolean(CACHE_TAKEOUT, it) }
                 settings.takeoutDays?.let { putInt(CACHE_TAKEOUT_DAYS, it.coerceIn(0, CachePrefill.MAX_TAKEOUT_DAYS)) }
                 settings.takeoutMinPlays?.let { putInt(CACHE_TAKEOUT_MIN_PLAYS, it.coerceIn(1, CachePrefill.MAX_TAKEOUT_MIN_PLAYS)) }
+                // One rule from an older web app replaces them all.
+                val rules = settings.takeoutRules ?: if (settings.takeoutDays != null || settings.takeoutMinPlays != null) {
+                    listOf(TakeoutRule(settings.takeoutDays ?: CachePrefill.DEFAULT_TAKEOUT_DAYS, settings.takeoutMinPlays ?: CachePrefill.DEFAULT_TAKEOUT_MIN_PLAYS))
+                } else null
+                rules?.let { putString(CACHE_TAKEOUT_RULES, ProtocolJson.encodeToString(CachePrefill.cleanRules(it))) }
             }
             settings.fetchWifiOnly?.let { dataRules.fetchWifiOnly = it }
             settings.downloadsWifiOnly?.let { dataRules.downloadsWifiOnly = it }
@@ -413,7 +423,7 @@ class LocalHost(private val context: Context) {
             cache.setMaxBytes(settings.maxBytes)
             cache.moveTo(cacheDir(place))
             showCacheLibrary()
-            if (listOf(settings.keepLiked, settings.fromHistory, settings.fromTakeout, settings.takeoutDays, settings.takeoutMinPlays).any { it != null }) applyFromYoutube()
+            if (listOf(settings.keepLiked, settings.fromHistory, settings.fromTakeout, settings.takeoutDays, settings.takeoutMinPlays, settings.takeoutRules).any { it != null }) applyFromYoutube()
         }
     }
 
@@ -599,6 +609,7 @@ class LocalHost(private val context: Context) {
         private const val CACHE_TAKEOUT = "fromTakeout"
         private const val CACHE_TAKEOUT_DAYS = "takeoutDays"
         private const val CACHE_TAKEOUT_MIN_PLAYS = "takeoutMinPlays"
+        private const val CACHE_TAKEOUT_RULES = "takeoutRules"
         private const val PLACE_PHONE = "phone"
         private const val PLACE_SD = "sd"
         /** About 250 songs. */

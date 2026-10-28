@@ -5,6 +5,7 @@ import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.protocol.AlbumRef
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.protocol.TakeoutRule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -160,10 +161,13 @@ class CachePrefillTest {
             },
             clock = { now }, zone = zone, gapMs = 0, retryMs = 60_000, intervalMs = 60_000,
         )
-        assertEquals(4, prefill.preview(days = 365, minPlays = 1).songs)
-        assertEquals(2, prefill.preview(days = 365, minPlays = 2).songs)
-        assertEquals(3, prefill.preview(days = 0, minPlays = 2).songs)
-        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutDays = 365, takeoutMinPlays = 1)
+        assertEquals(4, prefill.preview(listOf(TakeoutRule(365, 1))).songs)
+        assertEquals(2, prefill.preview(listOf(TakeoutRule(365, 2))).songs)
+        assertEquals(3, prefill.preview(listOf(TakeoutRule(0, 2))).songs)
+        // Several rules: a song that fits more than one counts once.
+        assertEquals(5, prefill.preview(listOf(TakeoutRule(365, 2), TakeoutRule(0, 2), TakeoutRule(365, 1))).songs)
+        assertEquals(3, prefill.preview(listOf(TakeoutRule(365, 2), TakeoutRule(0, 2))).songs)
+        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutRules = listOf(TakeoutRule(365, 1)))
         eventually { cache.has("ytm:$often") && cache.has("ytm:$once") }
         assertEquals(listOf(often, episode, once, gone), looked.toList())
         assertEquals(listOf("ytm:$often", "ytm:$once"), youtube.downloads.toList())
@@ -196,7 +200,7 @@ class CachePrefillTest {
             songInfo = { id -> if (id in gone) throw IllegalStateException("Video unavailable") else song(id) },
             clock = { now }, zone = zone, gapMs = 0, retryMs = 60_000, intervalMs = 60_000,
         )
-        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutDays = 365, takeoutMinPlays = 1)
+        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutRules = listOf(TakeoutRule(365, 1)))
         eventually { cache.has("ytm:$last") }
         eventually { !prefill.busy }
         assertEquals(null, prefill.waiting)
@@ -216,7 +220,7 @@ class CachePrefillTest {
             songInfo = { id -> if (down) throw IllegalStateException("Sign in to confirm you're not a bot") else song(id).also { if (id == ids[0]) down = true } },
             clock = { now }, zone = zone, gapMs = 0, retryMs = 60_000, intervalMs = 60_000,
         )
-        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutDays = 365, takeoutMinPlays = 1)
+        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutRules = listOf(TakeoutRule(365, 1)))
         eventually { prefill.waiting == "error" && !prefill.busy }
         assertEquals("Sign in to confirm you're not a bot", prefill.error)
         assertEquals(now + 60_000, prefill.nextAt)
@@ -226,7 +230,7 @@ class CachePrefillTest {
 
         // YouTube is back; Retry looks at once.
         down = false
-        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutDays = 365, takeoutMinPlays = 1)
+        prefill.set(liked = 0, fromHistory = false, fromTakeout = true, takeoutRules = listOf(TakeoutRule(365, 1)))
         eventually { ids.all { cache.has("ytm:$it") } }
         eventually { !prefill.busy && prefill.waiting == null }
         assertEquals(null, prefill.error)
