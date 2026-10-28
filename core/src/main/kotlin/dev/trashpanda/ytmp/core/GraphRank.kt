@@ -21,8 +21,14 @@ object GraphRank {
     /** In a radio, each song goes with this many after it. */
     const val NEAR_WINDOW = 3
 
-    private const val SECOND_HOP_FROM = 8
-    private const val MIN_SCORE = 0.05
+    /** How far the walk goes, in steps. */
+    private const val WALK_STEPS = 6
+
+    /** After the seed's links, the links of this many of the best songs so far are looked at, round after round. */
+    private val EXPAND = listOf(8, 24)
+
+    /** Songs that count less than this share of the best one are left out. */
+    private const val MIN_SHARE = 0.01
 
     /** What [e] counts, the way [t] says; [use]: what of your own listening counts. */
     fun weight(e: GraphEdge, use: HistoryRadio, t: GraphTuning, now: Long): Double {
@@ -59,30 +65,71 @@ object GraphRank {
     private fun oneOff(e: GraphEdge, t: GraphTuning) = if (e.solo <= 1 && !e.confirmed) t.oneOff else 1.0
 
     /**
-     * The songs (nodes) that go with [seed], best first: its neighbours, and theirs (weaker).
-     * [around] gives the links of some nodes, both ways round.
+     * The songs (nodes) that go with [seed], best first: a walk from it along the links. Each
+     * step goes on to a song in proportion to how much that link counts against the song's other
+     * links (a song played before counts [GraphTuning.reverse]; songs close together in a radio
+     * either way round), and each step after the first counts [GraphTuning.secondHop] of the one
+     * before. So a song reached along many ways counts more than one behind a single stray link,
+     * and a song with many links doesn't drown out the rest. Songs in the seed's [group] then
+     * count [GraphTuning.sameGroup] extra. [around] gives the links of some nodes, both ways round.
      */
-    fun rank(seed: String, around: (nodes: List<String>) -> List<GraphEdge>, use: HistoryRadio, t: GraphTuning, now: Long): List<String> {
-        val scores = HashMap<String, Double>()
-        for (edge in around(listOf(seed))) {
-            if (edge.from != seed && edge.to != seed) continue
-            val other = if (edge.from == seed) edge.to else edge.from
-            // Songs close together in a radio go together either way round.
-            val back = if (edge.from == seed || edge.kind == EdgeKind.RADIO_NEAR) 1.0 else t.reverse
-            scores.merge(other, weight(edge, use, t, now) * back, Double::plus)
-        }
-        scores.remove(seed)
-        val near = scores.entries.filter { it.value > 0 }.sortedByDescending { it.value }.take(SECOND_HOP_FROM)
-        val best = near.firstOrNull()?.value
-        if (best != null && t.secondHop > 0) {
-            val strength = near.associate { it.key to it.value / best }
-            for (edge in around(strength.keys.toList())) {
-                // Onwards from a neighbour; songs close together in a radio either way round.
-                val w = weight(edge, use, t, now) * t.secondHop
-                strength[edge.from]?.let { if (edge.to != seed) scores.merge(edge.to, it * w, Double::plus) }
-                if (edge.kind == EdgeKind.RADIO_NEAR) strength[edge.to]?.let { if (edge.from != seed) scores.merge(edge.from, it * w, Double::plus) }
+    fun rank(
+        seed: String,
+        around: (nodes: List<String>) -> List<GraphEdge>,
+        use: HistoryRadio,
+        t: GraphTuning,
+        now: Long,
+        group: ((String) -> Int?)? = null,
+    ): List<String> {
+        // Where a step from a song can go, and how much each way counts (only songs looked at so far).
+        val out = HashMap<String, HashMap<String, Double>>()
+        val expanded = HashSet<String>()
+        // Links already counted onwards from their first song, and back from their second (a link comes again with its other song).
+        val onwards = HashSet<GraphEdge>()
+        val backwards = HashSet<GraphEdge>()
+        fun learn(nodes: List<String>) {
+            val fresh = nodes.filter { expanded.add(it) }
+            if (fresh.isEmpty()) return
+            for (edge in around(fresh)) {
+                if (edge.from == edge.to) continue
+                val w = weight(edge, use, t, now)
+                if (edge.from in expanded && onwards.add(edge)) out.getOrPut(edge.from) { HashMap() }.merge(edge.to, w, Double::plus)
+                if (edge.to in expanded && backwards.add(edge)) {
+                    val back = if (edge.kind == EdgeKind.RADIO_NEAR) 1.0 else t.reverse
+                    out.getOrPut(edge.to) { HashMap() }.merge(edge.from, w * back, Double::plus)
+                }
             }
         }
-        return scores.entries.filter { it.value >= MIN_SCORE }.sortedByDescending { it.value }.map { it.key }
+        // Each song's ways on, as shares (only the ones that count more than 0).
+        fun shares(from: String): List<Pair<String, Double>> {
+            val ways = out[from]?.filter { it.value > 0 } ?: return emptyList()
+            val sum = ways.values.sum()
+            return ways.map { (to, w) -> to to w / sum }
+        }
+        val onward = t.secondHop.coerceIn(0.0, 0.9)
+        fun walk(): HashMap<String, Double> {
+            val scores = HashMap<String, Double>()
+            var at = mapOf(seed to 1.0)
+            for (step in 1..WALK_STEPS) {
+                val next = HashMap<String, Double>()
+                for ((node, p) in at) for ((to, share) in shares(node)) if (to != seed) next.merge(to, p * share, Double::plus)
+                for ((node, p) in next) scores.merge(node, p, Double::plus)
+                at = next.mapValues { it.value * onward }
+                if (onward == 0.0 || at.isEmpty()) break
+            }
+            return scores
+        }
+        // The seed's links, then those of the best songs found so far, a few more each time.
+        learn(listOf(seed))
+        var scores = walk()
+        for (width in EXPAND) {
+            if (onward == 0.0) break
+            learn(scores.entries.sortedByDescending { it.value }.map { it.key }.filter { it !in expanded }.take(width))
+            scores = walk()
+        }
+        val home = group?.invoke(seed)
+        if (home != null && t.sameGroup != 0.0) for (key in scores.keys) if (group(key) == home) scores[key] = scores.getValue(key) * (1 + t.sameGroup)
+        val best = scores.values.maxOrNull() ?: return emptyList()
+        return scores.entries.filter { it.value >= best * MIN_SHARE }.sortedByDescending { it.value }.map { it.key }
     }
 }

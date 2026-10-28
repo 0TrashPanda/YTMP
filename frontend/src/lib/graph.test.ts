@@ -45,6 +45,13 @@ describe('the graph view weighs edges like the server', () => {
 		expect(radioFrom('s', edges, DEFAULT_TUNING, now).map((r) => r.id)).toEqual(['a', 'b', 'c']);
 		expect(radioFrom('s', edges, { ...DEFAULT_TUNING, secondHop: 0 }, now).map((r) => r.id)).toEqual(['a', 'b']);
 	});
+
+	it('walks further than two steps, and puts songs of the seed\'s group first', () => {
+		const edges = [edge('s', 'a', 'personal', { solo: 3 }), edge('a', 'c', 'personal', { solo: 3 }), edge('c', 'd', 'personal', { solo: 3 }), edge('s', 'x', 'personal', { solo: 4 })];
+		expect(radioFrom('s', edges, DEFAULT_TUNING, now).map((r) => r.id)).toEqual(['x', 'a', 'c', 'd']);
+		const group = (id: string) => (id === 'x' ? 1 : 0);
+		expect(radioFrom('s', edges, DEFAULT_TUNING, now, group).map((r) => r.id)).toEqual(['a', 'x', 'c', 'd']);
+	});
 });
 
 describe('radio choices', () => {

@@ -83,8 +83,10 @@ data class GraphTuning(
     val skip: Double = 1.0,
     /** A song played before the seed, against one after it. */
     val reverse: Double = 0.5,
-    /** Neighbours of the seed's best neighbours. */
+    /** Neighbours of the seed's neighbours, and further along (each step this much of the one before). */
     val secondHop: Double = 0.35,
+    /** Extra for songs in the seed's group (songs often heard together, much like a genre): 1 counts them double. */
+    val sameGroup: Double = 1.0,
     /** After this many days an edge counts half. */
     val halfLifeDays: Double = 180.0,
     /** How far down a YouTube Music radio still counts (1–50). */
@@ -185,11 +187,12 @@ enum class EdgeKind {
 /**
  * A song in the graph view. [plays]: how often you played it (with imported plays). [sources]:
  * all its versions' IDs (`ytm:…`, `local:…`): the page shows a cover its own host has (a music
- * file's, a saved song's) before YouTube's.
+ * file's, a saved song's) before YouTube's. [group]: its group in the whole graph (songs often
+ * heard together, much like a genre), as radios use it; null while it isn't known yet.
  */
 @Serializable
 @SerialName("GraphNode")
-data class GraphNode(val id: String, val song: Song, val plays: Int = 0, val local: Boolean = false, val sources: List<String> = emptyList())
+data class GraphNode(val id: String, val song: Song, val plays: Int = 0, val local: Boolean = false, val sources: List<String> = emptyList(), val group: Int? = null)
 
 /** An edge with its raw counts: the page weighs it with the sliders ([GraphTuning]). */
 @Serializable
@@ -224,6 +227,60 @@ data class GraphView(
     val tuning: GraphTuning,
     /** Server time, for how old edges are. */
     val now: Long,
+)
+
+/** What the whole-graph view shows, any of them together. */
+@Serializable
+@SerialName("GraphPart")
+enum class GraphPart {
+    /** Your own listening (in YTMP and imported). */
+    @SerialName("mine") MINE,
+
+    /** Everyone's listening on the server. */
+    @SerialName("everyone") EVERYONE,
+
+    /** YouTube Music's radios it learned, the radio crawl's too. */
+    @SerialName("radios") RADIOS,
+}
+
+/** A song in the whole-graph view, where the server laid it out. */
+@Serializable
+@SerialName("GraphMapNode")
+data class GraphMapNode(
+    /** A song ID of it (YouTube Music's when it has one), for *Show around this song*. */
+    val id: String,
+    val title: String,
+    val artist: String,
+    /** How often you played it (not skipped), and when first. */
+    val plays: Int = 0,
+    val firstAt: Long? = null,
+    val x: Double,
+    val y: Double,
+    /** Its place in [GraphMap.groups]. */
+    val group: Int,
+)
+
+/** A group of songs often heard together (much like a genre), named after its most played artists. */
+@Serializable
+@SerialName("GraphMapGroup")
+data class GraphMapGroup(val songs: Int, val artists: List<String>)
+
+/**
+ * `GET /api/account/graph/map?parts=mine,everyone,radios`: the whole graph as you see it, laid
+ * out and in groups by the server. Links are weighed with your [GraphTuning], one per pair of songs.
+ */
+@Serializable
+@SerialName("GraphMap")
+data class GraphMap(
+    val parts: List<GraphPart>,
+    val nodes: List<GraphMapNode>,
+    /** The links: [from] and [to] are places in [nodes], [weight] how much each counts. */
+    val from: List<Int>,
+    val to: List<Int>,
+    val weight: List<Double>,
+    /** Biggest first. */
+    val groups: List<GraphMapGroup>,
+    val madeAt: Long,
 )
 
 /** `GET /api/account/graph/status`: the song graph being built again (after an import, a deletion, a new version). */

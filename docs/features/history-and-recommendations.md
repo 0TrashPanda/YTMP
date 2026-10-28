@@ -196,9 +196,29 @@ of **song connections**:
   songs its radio would bring first and the one under the pointer, where they fit.
 - *Its radio* lists what a radio from the song would bring, best first.
 - **Sliders** set how much each part counts: your listening, imported, everyone's, the two
-  kinds of radios, a party play, a skip, songs played before it, neighbours of neighbours,
-  how fast old plays fade, how far down a radio counts. The graph changes at once; *Use for
-  my radios* makes your radios, Find similar and Related use them.
+  kinds of radios, a party play, a skip, songs played before it, neighbours of neighbours
+  (and further), the extra for songs in the song's group, how fast old plays fade, how far
+  down a radio counts. The graph changes at once; *Use for my radios* makes your radios,
+  Find similar and Related use them.
+- *All your music* opens [the whole graph](#the-whole-graph).
+
+### The whole graph
+
+*All your music* in the graph view: every song the graph knows, at once, laid out so songs
+that go together are close.
+
+- **Show**: *Mine* (your listening, in YTMP and imported), *Everyone* (everyone on your
+  server), *YouTube Music radios* (the radios it learned, the radio crawl's too), any of
+  them together.
+- **Colour by**: *Groups* (songs often heard together; they come out much like genres or
+  moods, named after their most played artists), *Artist* (your most played ones), *Played*
+  (how often), *First heard*. A legend says which colour is what. Bigger: you played it more.
+- **Lines**: none, the strongest, or all.
+- Scroll or pinch to zoom, drag to move; names show as you zoom in. Tap a song for its card
+  (artist, plays, group, the songs it goes with most) and *Show around this song*.
+- Songs Takeout only gives as a link (removed or private ones, mostly) show as *Song
+  without a name*.
+- The first time, the server takes a few seconds to lay it out; then it's kept a while.
 
 ## Radio / Mix
 
@@ -241,6 +261,9 @@ it from the [song menu](ui.md#song-menu):
 
 Using the song graph, YTMP can generate a radio starting from a song, an
 artist or the current queue: it walks the graph to find songs that often go together.
+Songs reached along many ways count more than one behind a single jump (you once went
+from Cavetown to S3RL), and songs in the starting song's **group** (see [the whole
+graph](#the-whole-graph)) count extra, so a radio keeps to its vibe.
 
 - Works for **any source**, including **local files**, which have no recommendation
   service of their own.

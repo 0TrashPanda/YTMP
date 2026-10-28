@@ -55,6 +55,7 @@ import org.slf4j.LoggerFactory
 import dev.trashpanda.ytmp.host.Takeout
 import dev.trashpanda.ytmp.protocol.GraphBuildStatus
 import dev.trashpanda.ytmp.protocol.GraphFull
+import dev.trashpanda.ytmp.protocol.GraphPart
 import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.HistoryImportList
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
@@ -277,6 +278,17 @@ class AccountService(
                 val graph = graph ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No song graph here")
                 val seed = call.request.queryParameters["seed"]?.trim()?.takeIf { it.isNotEmpty() }
                 call.respond(io { graph.view(account.id, seed, tuning(account), settings(account).historyRadio) })
+            }
+            // The whole graph, laid out: ?parts=mine,everyone,radios (any of them; none given: all).
+            get("/map") {
+                val account = call.historyAccount()
+                val graph = graph ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No song graph here")
+                val asked = call.request.queryParameters["parts"]?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+                val parts = asked.map { name ->
+                    GraphPart.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+                        ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "No such part of the graph: $name")
+                }.toSet().ifEmpty { GraphPart.entries.toSet() }
+                call.respond(io { graph.map(account.id, parts, tuning(account), settings(account).historyRadio) })
             }
             get("/tuning") {
                 val account = call.historyAccount()

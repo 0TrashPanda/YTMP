@@ -13,6 +13,7 @@
 	import { artistNames } from '../format';
 	import Icon from './Icon.svelte';
 	import GraphBuildBar from './GraphBuildBar.svelte';
+	import GraphMapView from './GraphMapView.svelte';
 
 	let { seed = null, onClose, onToast }: { seed?: Song | null; onClose: () => void; onToast: (text: string) => void } = $props();
 
@@ -24,6 +25,8 @@
 	let saved = $state<GraphTuning>({ ...DEFAULT_TUNING });
 	let picked = $state<string | null>(null);
 	let tab = $state<'graph' | 'list'>('graph');
+	/** The whole graph is open over this. */
+	let whole = $state(false);
 
 	async function load(songId: string | null) {
 		error = null;
@@ -199,8 +202,8 @@
 		return [...pairs.values()].sort((x, y) => x.w - y.w);
 	});
 	const strongest = $derived(Math.max(1e-6, ...lines.map((x) => x.w)));
-	const radio = $derived(view?.seed ? radioFrom(view.seed, view.edges, tuning, view.now) : []);
 	const nodeById = $derived(new Map((view?.nodes ?? []).map((n) => [n.id, n])));
+	const radio = $derived(view?.seed ? radioFrom(view.seed, view.edges, tuning, view.now, (id) => nodeById.get(id)?.group) : []);
 	// Names next to the seed and the songs its radio would bring first (not on every song).
 	// …and only where they don't run into each other.
 	const labelled = $derived.by(() => {
@@ -261,7 +264,8 @@
 		{ key: 'party', label: 'A party play, against one alone', min: 0, max: 2, step: 0.05 },
 		{ key: 'skip', label: 'How much a skip takes off', min: 0, max: 5, step: 0.1 },
 		{ key: 'reverse', label: 'Songs played before it', min: 0, max: 2, step: 0.05 },
-		{ key: 'secondHop', label: 'Neighbours of neighbours', min: 0, max: 1, step: 0.05 },
+		{ key: 'secondHop', label: 'Neighbours of neighbours, and further', min: 0, max: 0.9, step: 0.05 },
+		{ key: 'sameGroup', label: 'Extra for songs in its group (like a genre)', min: 0, max: 3, step: 0.1 },
 		{ key: 'halfLifeDays', label: 'Counts half after', min: 0, max: 1095, step: 15, unit: 'days' },
 		{ key: 'radioDepth', label: 'How far down a radio counts', min: 1, max: 50, step: 1, unit: 'songs' }
 	];
@@ -282,6 +286,7 @@
 		{#if view?.seed}
 			<button class="rounded-full px-3 py-1.5 text-sm text-muted hover:bg-raised hover:text-white" onclick={() => ((around = null), load(null))}>Most played</button>
 		{/if}
+		<button class="rounded-full px-3 py-1.5 text-sm text-muted hover:bg-raised hover:text-white" onclick={() => (whole = true)}>All your music</button>
 	</header>
 
 	<!-- Being built again: it loads again by itself when that's done. -->
@@ -500,3 +505,7 @@
 		</aside>
 	</div>
 </div>
+
+{#if whole}
+	<GraphMapView onClose={() => (whole = false)} onAround={(id) => ((whole = false), (around = id), (tab = 'graph'), load(id))} />
+{/if}

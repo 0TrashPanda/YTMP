@@ -1119,6 +1119,7 @@ export interface GraphNode {
   plays: number;
   local: boolean;
   sources: string[];
+  group: number | null;
 }
 
 export type EdgeKind = "personal" | "server" | "imported" | "server_imported" | "ytm" | "ytm_account" | "radio_near" | "personal_near" | "imported_near";
@@ -1150,6 +1151,7 @@ export interface GraphTuning {
   skip: number;
   reverse: number;
   secondHop: number;
+  sameGroup: number;
   halfLifeDays: number;
   radioDepth: number;
 }
@@ -1160,6 +1162,34 @@ export interface GraphView {
   edges: GraphEdge[];
   tuning: GraphTuning;
   now: number;
+}
+
+export type GraphPart = "mine" | "everyone" | "radios";
+
+export interface GraphMapNode {
+  id: string;
+  title: string;
+  artist: string;
+  plays: number;
+  firstAt: number | null;
+  x: number;
+  y: number;
+  group: number;
+}
+
+export interface GraphMapGroup {
+  songs: number;
+  artists: string[];
+}
+
+export interface GraphMap {
+  parts: GraphPart[];
+  nodes: GraphMapNode[];
+  from: number[];
+  to: number[];
+  weight: number[];
+  groups: GraphMapGroup[];
+  madeAt: number;
 }
 
 export interface GraphBuildStatus {

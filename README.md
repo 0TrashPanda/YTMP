@@ -81,6 +81,10 @@ Music, without Premium, and not tied to a single music service.
   defaults, songs per artist, leave out songs you skip or just played, never-in-radios.
 - The song graph: import your YouTube Music history from Google Takeout, see the graph
   (around a song, or your most played) and move sliders for how much each part counts.
+  *All your music* shows the whole graph at once (thousands of songs, drawn with WebGL),
+  your listening, everyone's and YouTube Music's radios, any of them together, coloured by
+  group (songs often heard together, much like genres), artist, plays or when first heard.
+  Graph radios walk the graph and keep to the song's group.
   The server (and the phone) can slowly learn YouTube Music's radios of your music; every
   radio is kept as it came, so the graph can be weighed again without fetching anything.
 - Podcasts: subscribe, new episodes on Home, played marks and resume where you stopped (in

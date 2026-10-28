@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.host
 
+import dev.trashpanda.ytmp.core.GraphGroups
 import dev.trashpanda.ytmp.core.GraphRank
 import dev.trashpanda.ytmp.core.SongMatch
 import dev.trashpanda.ytmp.protocol.EdgeKind
@@ -42,7 +43,8 @@ data class GraphCopyStatus(
  * A phone's copy of the whole song graph as its owner sees it, from their server ([fetch]),
  * kept in [file]: radios use it when the server can't be reached. The phone's own songs that
  * play offline ([songs]) are matched to it by their ID, or else by title, artist and length,
- * so a music file never played still finds its song. Ranked like the server ([GraphRank]).
+ * so a music file never played still finds its song. Ranked like the server ([GraphRank]), with
+ * groups found in the copy itself ([GraphGroups]).
  * Refreshed once a day; [enabled] off deletes it. See docs/features/history-and-recommendations.md.
  */
 class GraphCopyStore(
@@ -76,6 +78,14 @@ class GraphCopyStore(
         }
         val bySource: Map<String, String> = graph.nodes.withIndex().flatMap { (i, n) -> n.sources.map { it to i.toString() } }.toMap()
         val byKey: Map<String, List<Int>> = graph.nodes.withIndex().groupBy({ it.value.key }, { it.index })
+
+        /** Each song's group in the whole copy (as on the server), worked out once, when a radio first needs it. */
+        val groups: Map<String, Int> by lazy {
+            val n = graph.nodes.size
+            val weight = edges.map { GraphRank.weight(it, graph.use, graph.tuning, graph.now) }
+            val group = GraphGroups.find(n, edges.map { it.from.toInt() }.toIntArray(), edges.map { it.to.toInt() }.toIntArray(), weight.toDoubleArray())
+            (0 until n).associate { it.toString() to group[it] }
+        }
 
         /** The song (node) [song] is: one of its versions, or the same title, artist and length. */
         fun nodeOf(song: Song): String? = bySource[song.id]
@@ -137,7 +147,7 @@ class GraphCopyStore(
         }
         val seedSong = here.firstOrNull { it.id == seedSongId }
         val seed = seedSong?.let(i::nodeOf) ?: i.bySource[seedSongId] ?: return emptyList()
-        val ranked = GraphRank.rank(seed, { nodes -> nodes.flatMap { i.around[it].orEmpty() } }, i.graph.use, i.graph.tuning, clock())
+        val ranked = GraphRank.rank(seed, { nodes -> nodes.flatMap { i.around[it].orEmpty() } }, i.graph.use, i.graph.tuning, clock(), i.groups::get)
         return ranked.asSequence().mapNotNull { mine.second[it]?.firstOrNull() }.filter { it.id != seedSongId }.take(limit).toList()
     }
 

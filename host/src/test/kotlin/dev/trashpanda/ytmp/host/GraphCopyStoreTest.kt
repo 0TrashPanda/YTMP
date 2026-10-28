@@ -39,7 +39,8 @@ class GraphCopyStoreTest {
         val store = GraphCopyStore(file, this, { songs }, { if (reachable) graph else null }, clock = { now })
         assertTrue(store.refresh())
         assertEquals(listOf("ytm:b", "local:phone:s:c.m4a"), store.similar("ytm:a").map { it.id })
-        assertEquals(listOf("ytm:b"), store.similar("local:phone:s:c.m4a").map { it.id })
+        // From c: b (played before it), and a before that, further along the walk.
+        assertEquals(listOf("ytm:b", "ytm:a"), store.similar("local:phone:s:c.m4a").map { it.id })
 
         // Offline: the old copy stays, also for a new store reading it from the file.
         reachable = false

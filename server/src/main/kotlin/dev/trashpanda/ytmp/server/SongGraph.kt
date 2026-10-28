@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.server
 
+import dev.trashpanda.ytmp.core.GraphGroups
 import dev.trashpanda.ytmp.core.GraphRank
 import dev.trashpanda.ytmp.core.SongMatch
 import dev.trashpanda.ytmp.protocol.EdgeKind
@@ -7,7 +8,11 @@ import dev.trashpanda.ytmp.protocol.GraphBuildStatus
 import dev.trashpanda.ytmp.protocol.GraphEdge
 import dev.trashpanda.ytmp.protocol.GraphFull
 import dev.trashpanda.ytmp.protocol.GraphFullNode
+import dev.trashpanda.ytmp.protocol.GraphMap
+import dev.trashpanda.ytmp.protocol.GraphMapGroup
+import dev.trashpanda.ytmp.protocol.GraphMapNode
 import dev.trashpanda.ytmp.protocol.GraphNode
+import dev.trashpanda.ytmp.protocol.GraphPart
 import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.GraphView
 import dev.trashpanda.ytmp.protocol.HistoryRadio
@@ -27,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
 /**
@@ -121,6 +127,9 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         } finally {
             building = null
             builtAt = clock()
+            // Worked out again when next asked for; radios keep the groups from before till then.
+            groups.replaceAll { _, g -> Groups(0, g.of) }
+            maps.clear()
         }
     }
 
@@ -402,9 +411,9 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         )
     }
 
-    /** The nodes that go with [seed], best first (enough to pass [MIN_SCORE]). */
+    /** The nodes that go with [seed], best first ([GraphRank.rank]: a walk from it, its group first). */
     private fun ranked(c: Connection, seed: String, accountId: String?, use: HistoryRadio, tuning: GraphTuning): List<String> =
-        GraphRank.rank(seed, { nodes -> edges(c, nodes, accountId, use, both = true).map { it.toGraphEdge() } }, use, tuning, clock())
+        GraphRank.rank(seed, { nodes -> edges(c, nodes, accountId, use, both = true).map { it.toGraphEdge() } }, use, tuning, clock(), groupsFor(accountId, use, tuning))
 
     /**
      * What the graph says about a radio from [seed] for [accountId]: its songs, and of those and
@@ -482,9 +491,10 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         }
         val songs = nodeSongs(c, nodes)
         val plays = nodePlays(c, accountId, nodes)
+        val group = groupsFor(accountId, use, tuning)
         GraphView(
             seed = seed,
-            nodes = nodes.mapNotNull { n -> songs[n]?.let { (song, sources) -> GraphNode(n, song, plays[n] ?: 0, sources.any { it.startsWith("local:") }, sources) } },
+            nodes = nodes.mapNotNull { n -> songs[n]?.let { (song, sources) -> GraphNode(n, song, plays[n] ?: 0, sources.any { it.startsWith("local:") }, sources, group?.invoke(n)) } },
             edges = edges.distinctBy { listOf(it.from, it.to, it.scope) }.map { it.toGraphEdge() },
             tuning = tuning,
             now = now,
@@ -533,6 +543,141 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
                 ?: songs.firstOrNull { it.thumbnails.isNotEmpty() } ?: songs.firstOrNull { it.id.startsWith("ytm:") } ?: songs.first()
             best to songs.map { it.id }
         }
+    }
+
+    // --- groups and the whole-graph view ---------------------------------------------------
+
+    /** The whole graph's links in [parts] as [accountId] sees them, weighed, one per pair of songs (nodes in order). */
+    private class Links(val nodes: List<String>, val from: IntArray, val to: IntArray, val weight: DoubleArray)
+
+    private fun links(c: Connection, accountId: String?, use: HistoryRadio, tuning: GraphTuning, parts: Set<GraphPart>): Links {
+        val now = clock()
+        val pairs = HashMap<Pair<String, String>, Double>()
+        for (e in edges(c, null, accountId, use, both = false)) {
+            if (e.from == e.to || partOf(kindOf(e.scope)) !in parts) continue
+            pairs.merge(if (e.from < e.to) e.from to e.to else e.to to e.from, weight(e, use, tuning, now), Double::plus)
+        }
+        pairs.values.removeIf { it <= 0 }
+        val nodes = pairs.keys.flatMap { listOf(it.first, it.second) }.distinct().sorted()
+        val index = nodes.withIndex().associate { it.value to it.index }
+        val list = pairs.entries.sortedWith(compareBy({ it.key.first }, { it.key.second }))
+        return Links(
+            nodes,
+            IntArray(list.size) { index.getValue(list[it].key.first) },
+            IntArray(list.size) { index.getValue(list[it].key.second) },
+            DoubleArray(list.size) { list[it].value },
+        )
+    }
+
+    /** Each node's group (0: the biggest), from all of [accountId]'s graph. */
+    private fun findGroups(c: Connection, accountId: String?, use: HistoryRadio, tuning: GraphTuning): Map<String, Int> {
+        val links = links(c, accountId, use, tuning, GraphPart.entries.toSet())
+        val group = GraphGroups.find(links.nodes.size, links.from, links.to, links.weight)
+        return links.nodes.withIndex().associate { it.value to group[it.index] }
+    }
+
+    private class Groups(val madeAt: Long, val of: Map<String, Int>)
+    private val groups = ConcurrentHashMap<String, Groups>()
+    private val groupsPending = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * The groups radios use for [accountId] (null: the server's and YouTube Music's graph only).
+     * They take the whole graph, so they're worked out off this thread when they're missing or
+     * old; till then the ones from before count, or none.
+     */
+    private fun groupsFor(accountId: String?, use: HistoryRadio, tuning: GraphTuning): ((String) -> Int?)? {
+        val key = "${accountId.orEmpty()}|$use|${tuning.hashCode()}"
+        val have = groups[key]
+        if ((have == null || clock() - have.madeAt > GROUPS_FRESH_MS) && groupsPending.add(key)) {
+            worker.execute {
+                try {
+                    val started = System.currentTimeMillis()
+                    val found = db.use { c -> findGroups(c, accountId, use, tuning) }
+                    if (groups.size >= MAX_KEPT_GROUPS) groups.clear()
+                    groups[key] = Groups(clock(), found)
+                    log.debug("Song graph groups for {}: {} songs, {} groups, in {} ms", accountId ?: "the server", found.size, found.values.distinct().size, System.currentTimeMillis() - started)
+                } catch (e: Exception) {
+                    log.warn("Couldn't find the song graph's groups", e)
+                } finally {
+                    groupsPending.remove(key)
+                }
+            }
+        }
+        return have?.of?.let { m -> { id: String -> m[id] } }
+    }
+
+    /** Works out the radios' groups for [accountId] now (tests, and before a radio that has to have them). */
+    fun findGroupsNow(accountId: String?, use: HistoryRadio = HistoryRadio.ALL, tuning: GraphTuning = GraphTuning()) {
+        groups["${accountId.orEmpty()}|$use|${tuning.hashCode()}"] = Groups(clock(), db.use { c -> findGroups(c, accountId, use, tuning) })
+    }
+
+    private val maps = ConcurrentHashMap<String, GraphMap>()
+    private val mapLock = Any()
+
+    /**
+     * The whole graph as [accountId] sees it, as far as [parts] go, laid out and in groups
+     * ([GraphLayout], [GraphGroups]). Kept a while: laying out 10,000 songs takes seconds.
+     */
+    fun map(accountId: String, parts: Set<GraphPart>, tuning: GraphTuning, use: HistoryRadio = HistoryRadio.ALL): GraphMap {
+        val key = "$accountId|${parts.sorted()}|$use|${tuning.hashCode()}"
+        fun fresh() = maps[key]?.takeIf { clock() - it.madeAt < MAP_FRESH_MS }
+        fresh()?.let { return it }
+        synchronized(mapLock) {
+            fresh()?.let { return it }
+            val started = System.currentTimeMillis()
+            val made = makeMap(accountId, parts, tuning, use)
+            if (maps.size >= MAX_KEPT_MAPS) maps.clear()
+            maps[key] = made
+            log.info("Whole song graph for {} ({}): {} songs, {} links, {} groups, in {} ms", accountId, parts.joinToString(), made.nodes.size, made.from.size, made.groups.size, System.currentTimeMillis() - started)
+            return made
+        }
+    }
+
+    private fun makeMap(accountId: String, parts: Set<GraphPart>, tuning: GraphTuning, use: HistoryRadio): GraphMap {
+        val started = System.currentTimeMillis()
+        val (links, songs, plays) = db.use { c ->
+            val links = links(c, accountId, use, tuning, parts)
+            Triple(links, nodeSongs(c, links.nodes), firstPlays(c, accountId, links.nodes))
+        }
+        val n = links.nodes.size
+        val read = System.currentTimeMillis()
+        val group = GraphGroups.find(n, links.from, links.to, links.weight)
+        val grouped = System.currentTimeMillis()
+        val (x, y) = GraphLayout.place(n, links.from, links.to, links.weight, group)
+        log.debug("Whole song graph: read in {} ms, groups in {} ms, laid out in {} ms", read - started, grouped - read, System.currentTimeMillis() - grouped)
+        val nodes = links.nodes.mapIndexed { i, node ->
+            val song = songs[node]?.first
+            val (count, first) = plays[node] ?: (0 to null)
+            GraphMapNode(
+                song?.id ?: node, song?.title.orEmpty(), song?.artists?.joinToString(", ") { it.name }.orEmpty(),
+                count, first, (x[i] * 10).roundToLong() / 10.0, (y[i] * 10).roundToLong() / 10.0, group[i],
+            )
+        }
+        // A group is named after its most played artists (or, played by no one here, its biggest).
+        val groups = nodes.groupBy { it.group }.toSortedMap().map { (_, members) ->
+            val byArtist = HashMap<String, Int>()
+            for (m in members) m.artist.split(", ").first().takeIf { it.isNotBlank() }?.let { byArtist.merge(it, 1000 * m.plays + 1, Int::plus) }
+            GraphMapGroup(members.size, byArtist.entries.sortedByDescending { it.value }.take(3).map { it.key })
+        }
+        return GraphMap(GraphPart.entries.filter { it in parts }, nodes, links.from.toList(), links.to.toList(), links.weight.map { (it * 100).roundToLong() / 100.0 }, groups, clock())
+    }
+
+    /** How often [accountId] played each of [nodes] (not skipped, any version), and when first. */
+    private fun firstPlays(c: Connection, accountId: String, nodes: List<String>): Map<String, Pair<Int, Long>> {
+        val nodeOfSource = HashMap<String, String>()
+        inList(c, "SELECT source_id, song_id FROM song_sources WHERE song_id", nodes) { nodeOfSource[it.getString(1)] = it.getString(2) }
+        val out = HashMap<String, Pair<Int, Long>>()
+        c.prepareStatement("SELECT song_id, COUNT(*), MIN(played_at) FROM plays WHERE account_id = ? AND skipped = ? GROUP BY song_id").use {
+            it.setString(1, accountId)
+            it.setBoolean(2, false)
+            it.executeQuery().use { rows ->
+                while (rows.next()) {
+                    val node = nodeOfSource[rows.getString(1)] ?: continue
+                    out.merge(node, rows.getInt(2) to rows.getLong(3)) { a, b -> (a.first + b.first) to min(a.second, b.second) }
+                }
+            }
+        }
+        return out
     }
 
     // --- nodes and edges ------------------------------------------------------------------
@@ -836,6 +981,20 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             else -> EdgeKind.YTM
         }
 
+        /** Which part of the whole-graph view a kind of link is. */
+        fun partOf(kind: EdgeKind) = when (kind) {
+            EdgeKind.PERSONAL, EdgeKind.PERSONAL_NEAR, EdgeKind.IMPORTED, EdgeKind.IMPORTED_NEAR -> GraphPart.MINE
+            EdgeKind.SERVER, EdgeKind.SERVER_IMPORTED -> GraphPart.EVERYONE
+            EdgeKind.YTM, EdgeKind.YTM_ACCOUNT, EdgeKind.RADIO_NEAR -> GraphPart.RADIOS
+        }
+
+        /** The radios' groups are worked out again after this long (and after a rebuild). */
+        private const val GROUPS_FRESH_MS = 6 * 3_600_000L
+        private const val MAX_KEPT_GROUPS = 32
+        /** A whole-graph view is laid out again after this long (and after a rebuild). */
+        private const val MAP_FRESH_MS = 6 * 3_600_000L
+        private const val MAX_KEPT_MAPS = 8
+
         /** A song started this long after the one before ended still follows it. */
         private const val GAP_MS = 30 * 60_000L
         /** A song skipped within this long says nothing about what comes after it. */
@@ -852,8 +1011,6 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
         private const val READ_SHARE = 0.35
         private const val SAVE_SHARE = 0.5
         private const val PROGRESS_EVERY = 500
-        private const val SECOND_HOP_FROM = 8
-        private const val MIN_SCORE = 0.05
         private const val MAX_HINT_SONGS = 200
         const val SIMILAR_LIMIT = 50
         private const val VIEW_NEIGHBOURS = 24

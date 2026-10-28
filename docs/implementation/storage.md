@@ -168,7 +168,7 @@ decay           = 0.5 ^ (days since updated_at / halfLifeDays)
 ```
 
 The numbers are the account's `GraphTuning` (account data `graph_tuning`; defaults P 2, I 1,
-S 1, Y 1.5, A 0.5, N 0.5, L 0.3, oneOff 0.3, party 0.6, skip 1, reverse 0.5, second hop 0.35, 180 days, depth 50),
+S 1, Y 1.5, A 0.5, N 0.5, L 0.3, oneOff 0.3, party 0.6, skip 1, reverse 0.5, second hop 0.35, same group 1, 180 days, depth 50),
 set with the sliders of the graph view (`GET/PUT /api/account/graph/tuning`). The page
 weighs the raw edges of `GET /api/account/graph` with the same formula
 (`frontend/src/lib/graph.ts`), so the sliders redraw at once. Because what the graph learns
@@ -193,8 +193,35 @@ it gets `GET /api/auth/radio` (only the songs).
 node with its versions' IDs, `match_key` and length, and every link as a row of numbers.
 `host/GraphCopyStore.kt` keeps it in `files/graph-copy.json` (once a day; off in *Settings →
 Radio*, `GET/PUT /api/graph-copy`, which deletes it), matches the phone's offline songs to its
-nodes by ID or `SongMatch` key and length, and ranks with `core/GraphRank` like the server. The
+nodes by ID or `SongMatch` key and length, and ranks with `core/GraphRank` like the server, with
+groups it finds in the copy itself (`core/GraphGroups`, once, when a radio first needs them). The
 phone's rooms use it when `radioHints` can't reach the server (null).
+
+### Groups
+
+`core/GraphGroups` finds groups of songs linked more to each other than to the rest: Louvain
+(modularity, resolution 1) on the whole graph as an account sees it, its links weighed with
+their `GraphTuning` and added up per pair of songs. Because it looks at all links at once, one
+stray jump to other music counts little against hundreds of links inside a group, so the groups
+come out much like genres or moods. The same links in the same order always give the same groups
+(0 is the biggest). On the server `SongGraph` works them out per account, history setting and
+tuning on its worker thread (about 0.1 s for 10,000 songs) when a radio or the graph view asks
+and they're missing or older than 6 hours, and keeps them in memory; till then the ones from
+before count, or none. A rebuild marks them old. The graph view gets each node's group
+(`GraphNode.group`), for *Its radio*.
+
+### The whole-graph view
+
+`GET /api/account/graph/map?parts=mine,everyone,radios` (`GraphMap`; any of the parts, none:
+all). *mine* is the account's own links (`personal`, `imported` and the two kinds of *soon
+after*), *everyone* the server's (`server`, `server_imported`), *radios* YouTube Music's
+(`ytm`, `ytm_account`, `radio_near`). Links are weighed with the account's tuning, one per
+pair of songs. The server finds the groups of just these links and lays them out with
+`server/GraphLayout` (ForceAtlas2 with Barnes-Hut, 300 steps, the pushing on all cores; songs
+start near their group's spot, so the groups come apart fast): about 2–3 s for 10,000 songs
+and 60,000 links. The result is kept in memory for 6 hours (at most 8 of them; a rebuild
+drops them). Groups are named after their most played artists. The page draws it with
+sigma.js (WebGL; `GraphMapView.svelte`, loaded only when it opens).
 
 ### Space
 
@@ -260,15 +287,24 @@ Audio fingerprinting (AcoustID) can be added later as an extra step for local fi
 
 ### Generating a radio
 
-`SongGraph.similar(seed, account)`:
+`SongGraph.similar(seed, account)` ranks with `core/GraphRank.rank`, a walk from the start song:
 
-1. Load the edges from and to the start song (one indexed query; the ones *to* it count
-   half), for the server, YTM and (as the account's setting allows) the account's own graph,
-   and add up their weights per neighbour.
-2. The best 8 neighbours' own neighbours get a share too (0.35 × how strong that neighbour is).
-3. The best 50 come back as songs, each from the start song's source when the graph knows it
-   there (a local file's radio stays local), else from YTM. Hosts drop local songs from
-   libraries they don't have.
+1. Load the edges from and to the start song (one indexed query), for the server, YTM and
+   (as the account's setting allows) the account's own graph. Then those of the best 8
+   songs found so far, then of the best 24: three queries in all.
+2. From each song, a step goes on to another in proportion to how much that link counts
+   against all the song's links (a song played *before* counts `reverse`, 0.5; songs close
+   together in a radio count either way round). Each step after the first counts `secondHop`
+   (0.35) of the one before, up to 6 steps. So the first step ranks the neighbours as before;
+   a song reached along many ways adds up, and a song with very many links doesn't drown out
+   the rest.
+3. Songs in the start song's [group](#groups) count `sameGroup` (1) extra: double.
+4. Songs under 1% of the best one are left out; the best 50 come back as songs, each from the
+   start song's source when the graph knows it there (a local file's radio stays local), else
+   from YTM. Hosts drop local songs from libraries they don't have.
+
+The graph view's *Its radio* does the same over the songs it has (`radioFrom` in
+`frontend/src/lib/graph.ts`).
 
 That list is **mixed** into the radio (`mixRadio` in core): one graph song after every two
 of YTM's radio, each song once. Without a YTM radio (local music, or YTM failing) the graph's
@@ -290,9 +326,9 @@ cached in memory. That's unlikely to be needed at this scale.
 
 ### Maybe later: a graph database
 
-If the graph ever grows a lot, or we want more advanced graph queries (communities,
-"songs between A and B", …), a real graph database could be added as an optional
-backend. See [future ideas](../features/future-ideas.md#graph-database-maybe).
+If the graph ever grows a lot, or we want more advanced graph queries ("songs between A
+and B", …), a real graph database could be added as an optional backend. Groups (communities)
+and the whole-graph layout run in memory in Kotlin and don't need one. See [future ideas](../features/future-ideas.md#graph-database-maybe).
 
 ## Backup and restore
 

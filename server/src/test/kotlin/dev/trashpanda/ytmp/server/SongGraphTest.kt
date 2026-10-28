@@ -4,6 +4,7 @@ import dev.trashpanda.ytmp.core.SongMatch
 import dev.trashpanda.ytmp.host.TakeoutSong
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.EdgeKind
+import dev.trashpanda.ytmp.protocol.GraphPart
 import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.RadioOptions
 import dev.trashpanda.ytmp.protocol.RadioWay
@@ -286,5 +287,42 @@ class SongGraphTest {
         assertFalse(history.add("anna", report))
         assertEquals(2, history.page("anna", null, 10, null).first.size)
         assertEquals(mapOf("ytm:a>ytm:b" to listOf(1, 0, 0)), edges(SongGraph.PERSONAL))
+    }
+
+    /** Rock (r0–r4) and pop (p0–p4) played round and round, and once from r0 straight to p0. */
+    private fun twoKindsOfMusic() {
+        repeat(3) {
+            for (i in 0 until 5) play("anna", song("ytm:r$i", artist = "Rock band"))
+            play("anna", song("ytm:r0", artist = "Rock band"), gapMs = 3_600_000)
+        }
+        repeat(3) {
+            for (i in 0 until 5) play("anna", song("ytm:p$i", artist = "Pop star"), gapMs = if (i == 0) 3_600_000 else 0)
+        }
+        play("anna", song("ytm:r0", artist = "Rock band"), gapMs = 3_600_000)
+        play("anna", song("ytm:p0", artist = "Pop star"))
+    }
+
+    @Test
+    fun `the whole graph is laid out in groups, as far as the parts asked for go, and radios keep to the seed's group`() {
+        twoKindsOfMusic()
+        val map = graph.map("anna", setOf(GraphPart.MINE), GraphTuning())
+        assertEquals(10, map.nodes.size)
+        assertEquals(2, map.groups.size)
+        val groupOf = map.nodes.associate { it.id to it.group }
+        assertEquals(1, (0 until 5).map { groupOf["ytm:r$it"] }.distinct().size)
+        assertTrue(groupOf["ytm:r0"] != groupOf["ytm:p0"])
+        assertEquals(listOf("Rock band"), map.groups[groupOf.getValue("ytm:r0")].artists)
+        assertTrue(map.nodes.all { it.x.isFinite() && it.y.isFinite() })
+        assertEquals(map.from.size, map.weight.size)
+        // Only YouTube Music's radios: none learned here.
+        assertEquals(0, graph.map("anna", setOf(GraphPart.RADIOS), GraphTuning()).nodes.size)
+        // Everyone's: the server learned the same plays.
+        assertEquals(10, graph.map("anna", setOf(GraphPart.EVERYONE), GraphTuning()).nodes.size)
+
+        // A radio from r4: its own group's songs, and the song of the one jump away after them, if at all.
+        graph.findGroupsNow("anna")
+        val radio = similar("ytm:r4")
+        assertEquals((0 until 4).map { "ytm:r$it" }.toSet(), radio.filter { it.startsWith("ytm:r") }.toSet())
+        assertTrue("ytm:p0" !in radio || radio.indexOf("ytm:p0") > (0 until 4).maxOf { radio.indexOf("ytm:r$it") })
     }
 }

@@ -21,6 +21,7 @@ export const DEFAULT_TUNING: GraphTuning = {
 	skip: 1,
 	reverse: 0.5,
 	secondHop: 0.35,
+	sameGroup: 1,
 	halfLifeDays: 180,
 	radioDepth: 50
 };
@@ -77,30 +78,50 @@ export function weight(e: GraphEdge, t: GraphTuning, now: number, party = true):
 /** A Takeout link that happened once and no radio confirms counts [GraphTuning.oneOff] of it. */
 const oneOff = (e: GraphEdge, t: GraphTuning) => (e.solo <= 1 && !e.confirmed ? t.oneOff : 1);
 
-/** What a radio from [seed] would bring, best first (SongGraph.similar, without the limits). */
-export function radioFrom(seed: string, edges: GraphEdge[], t: GraphTuning, now: number): { id: string; score: number }[] {
-	const scores = new Map<string, number>();
-	const add = (id: string, v: number) => scores.set(id, (scores.get(id) ?? 0) + v);
+/**
+ * What a radio from [seed] would bring, best first (GraphRank.rank on the server, here over the
+ * songs the view has): a walk along the links, each step to a song in proportion to how much
+ * that link counts against the song's other links, each step after the first [secondHop] of the
+ * one before; songs in the seed's [group] then count [sameGroup] extra.
+ */
+export function radioFrom(seed: string, edges: GraphEdge[], t: GraphTuning, now: number, group?: (id: string) => number | null | undefined): { id: string; score: number }[] {
+	const out = new Map<string, Map<string, number>>();
+	const add = (from: string, to: string, w: number) => {
+		const ways = out.get(from) ?? new Map<string, number>();
+		ways.set(to, (ways.get(to) ?? 0) + w);
+		out.set(from, ways);
+	};
 	for (const e of edges) {
-		if (e.from === seed) add(e.to, weight(e, t, now));
-		// Songs close together in a radio go together either way round.
-		else if (e.to === seed) add(e.from, weight(e, t, now) * (e.kind === 'radio_near' ? 1 : t.reverse));
+		if (e.from === e.to) continue;
+		const w = weight(e, t, now);
+		add(e.from, e.to, w);
+		// Back to the song before: songs close together in a radio go together either way round.
+		add(e.to, e.from, w * (e.kind === 'radio_near' ? 1 : t.reverse));
 	}
-	scores.delete(seed);
-	const near = [...scores].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
-	const best = near[0]?.[1];
-	if (best && t.secondHop > 0) {
-		const strength = new Map(near.map(([id, v]) => [id, v / best]));
-		for (const e of edges) {
-			const w = weight(e, t, now) * t.secondHop;
-			const s = strength.get(e.from);
-			if (s !== undefined && e.to !== seed) add(e.to, s * w);
-			const back = e.kind === 'radio_near' ? strength.get(e.to) : undefined;
-			if (back !== undefined && e.from !== seed) add(e.from, back * w);
-		}
+	const shares = new Map<string, [string, number][]>();
+	for (const [from, ways] of out) {
+		const on = [...ways].filter(([, w]) => w > 0);
+		const sum = on.reduce((s, [, w]) => s + w, 0);
+		shares.set(from, on.map(([to, w]) => [to, w / sum]));
 	}
-	return [...scores].filter(([, v]) => v >= 0.05).sort((a, b) => b[1] - a[1]).map(([id, score]) => ({ id, score }));
+	const onward = Math.max(0, Math.min(0.9, t.secondHop));
+	const scores = new Map<string, number>();
+	let at = new Map([[seed, 1]]);
+	for (let step = 0; step < WALK_STEPS && at.size; step++) {
+		const next = new Map<string, number>();
+		for (const [node, p] of at) for (const [to, share] of shares.get(node) ?? []) if (to !== seed) next.set(to, (next.get(to) ?? 0) + p * share);
+		for (const [node, p] of next) scores.set(node, (scores.get(node) ?? 0) + p);
+		if (onward === 0) break;
+		at = new Map([...next].map(([k, v]) => [k, v * onward]));
+	}
+	const home = group?.(seed);
+	if (home != null && t.sameGroup) for (const [id, v] of scores) if (group!(id) === home) scores.set(id, v * (1 + t.sameGroup));
+	const best = Math.max(0, ...scores.values());
+	return [...scores].filter(([, v]) => best > 0 && v >= best * 0.01).sort((a, b) => b[1] - a[1]).map(([id, score]) => ({ id, score }));
 }
+
+/** How far the walk goes, in steps (GraphRank.WALK_STEPS). */
+const WALK_STEPS = 6;
 
 export interface Placed {
 	node: GraphNode;
