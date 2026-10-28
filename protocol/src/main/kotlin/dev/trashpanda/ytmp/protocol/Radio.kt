@@ -248,6 +248,8 @@ data class GraphMapNode(
     val y: Double,
     /** Its place in [GraphMap.groups]. */
     val group: Int,
+    /** Its place in [GraphMap.areas]: the coarser groups the map is laid out by (a group's songs are mostly in one). */
+    val area: Int = 0,
 )
 
 /** A group of songs often heard together (much like a genre), named after its most played artists. */
@@ -276,6 +278,8 @@ data class GraphMap(
     val radios: List<Double>,
     /** Biggest first. */
     val groups: List<GraphMapGroup>,
+    /** Coarser groups (about a dozen big ones), biggest first: the map's areas, a colour each. */
+    val areas: List<GraphMapGroup> = emptyList(),
     val madeAt: Long,
 )
 

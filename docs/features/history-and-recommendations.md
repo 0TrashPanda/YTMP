@@ -210,15 +210,17 @@ of **song connections**:
 *All your music* in the graph view: every song the graph knows, at once, laid out so songs
 that go together are close.
 
-- **Show**: *Mine* (your listening, in YTMP and imported), *Everyone else* (everyone else on
-  your server, not you), *YouTube Music radios* (the radios it learned, the radio crawl's
-  too), any of them together. Switching is instant and every song stays in its place, so
-  you see what each part adds.
+- **Filters**: *Songs from* and *Lines from*, each any of *Mine* (your listening, in YTMP and
+  imported), *Everyone else* (everyone else on your server, not you) and *YouTube Music
+  radios* (the radios it learned, the radio crawl's too): for example your songs with the
+  radios' lines between them. *Lines*: none, the strongest, or all. *You played it at least*:
+  any, 1× (your history), 2×, 5×, 10×, 25×. Switching is instant and every song stays in its
+  place, so you see what each part adds.
 - **Colour by**: *Groups* (songs often heard together; they come out much like genres or
   moods, often finer: hardstyle as frenchcore, happy hardcore and uptempo; named after their
-  most played artists; groups side by side get different colours), *Artist* (your most played ones), *Played*
+  most played artists. Bigger areas, such as all hardstyle, have a colour each, and the groups
+  in them shades of it), *Artist* (your most played ones), *Played*
   (how often), *First heard*. A legend says which colour is what. Bigger: you played it more.
-- **Lines**: none, the strongest, or all.
 - Scroll or pinch to zoom, drag to move; names show as you zoom in. Tap a song for its card
   (artist, plays, group, the songs it goes with most) and *Show around this song*.
 - Songs Takeout only gives as a link (removed or private ones, mostly) show as *Song

@@ -1173,6 +1173,7 @@ export interface GraphMapNode {
   x: number;
   y: number;
   group: number;
+  area: number;
 }
 
 export interface GraphMapGroup {
@@ -1188,6 +1189,7 @@ export interface GraphMap {
   others: number[];
   radios: number[];
   groups: GraphMapGroup[];
+  areas: GraphMapGroup[];
   madeAt: number;
 }
 

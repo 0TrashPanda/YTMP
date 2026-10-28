@@ -1,9 +1,10 @@
 <script lang="ts">
 	// The whole song graph (docs/features/history-and-recommendations.md#the-whole-graph): every
 	// song, laid out by the server so songs that go together are close, in groups much like
-	// genres. Your listening, everyone else's and YouTube Music's radios, any of them together:
-	// the server lays out all of it once, and the parts are shown and hidden here, at once, with
-	// every song in its place. Drawn with WebGL (sigma.js, loaded only here).
+	// genres. Your listening, everyone else's and YouTube Music's radios, any of them together,
+	// for the songs and for the lines apart (your songs with the radios' lines): the server lays
+	// out all of it once, and the filters show and hide here, at once, with every song in its
+	// place. Drawn with WebGL (sigma.js, loaded only here).
 	import { onDestroy, onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import type Graph from 'graphology';
@@ -36,9 +37,13 @@
 	/** Categorical colours (validated for the dark surface), then grey for the rest. */
 	const CAT = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#3fb5c4', '#b8b03d', '#e06666', '#6aa84f', '#a64d79', '#e69138'];
 	const REST = '#5a5a5a';
-	/** Groups this small stay grey; the legend lists this many. */
+	/** Areas this small stay grey; the legend lists this many areas, each with this many of its groups. */
 	const MIN_COLOURED = 10;
-	const LEGEND_GROUPS = 20;
+	const LEGEND_AREAS = 12;
+	const LEGEND_GROUPS = 3;
+	/** Lighter (up) and darker (down) steps of an area's colour, for its groups, biggest first. */
+	const SHADES = [0, 0.38, -0.32, 0.2, -0.18, 0.55, -0.45, 0.28, -0.25, 0.46, -0.38, 0.12];
+	const PLAYS = [0, 1, 2, 5, 10, 25];
 	const BG = [15, 15, 15];
 	const RAMP = [
 		[40, 52, 110],
@@ -61,11 +66,23 @@
 		const v = BG.map((b, i) => Math.round(b + ((m[i] ?? 0) - b) * a));
 		return `rgb(${v[0]},${v[1]},${v[2]})`;
 	};
+	/** [c] lighter (towards white, [t] > 0) or darker (towards black). */
+	const shade = (c: string, t: number) => {
+		const m = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+		const v = m.map((x) => Math.round(t >= 0 ? x + (255 - x) * t : x * (1 + t)));
+		return `rgb(${v[0]},${v[1]},${v[2]})`;
+	};
 	/** Takeout gives some songs (removed or private ones, mostly) only as their link. */
 	const nameless = (title: string) => /^https?:\/\//.test(title) || !title;
 	const month = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 
-	let parts = $state<Part[]>(['mine', 'others', 'radios']);
+	/** Which parts make a song show, which parts' links are drawn, and how often you must have played a song. */
+	let songParts = $state<Part[]>(['mine', 'others', 'radios']);
+	let linkParts = $state<Part[]>(['mine', 'others', 'radios']);
+	let minPlays = $state(0);
+	let filtersOpen = $state(false);
+	/** Anything left out: the Filters button says so. */
+	const filtered = $derived(songParts.length < 3 || linkParts.length < 3 || minPlays > 0);
 	let colour = $state<Colour>('group');
 	let lines = $state<Lines>('strong');
 	// Raw: thousands of songs and links, read in loops; a deep proxy of them makes every read slow.
@@ -85,6 +102,7 @@
 	let songOn = new Uint8Array(0);
 	let shown = $state({ songs: 0, links: 0 });
 	let groupShown = $state.raw<number[]>([]);
+	let areaShown = $state.raw<number[]>([]);
 
 	async function load() {
 		loading = true;
@@ -109,16 +127,16 @@
 	}
 
 	/**
-	 * A colour for every group (there are many more than colours): biggest first, each the colour
-	 * its linked groups (side by side on the map) have least of, so neighbours differ.
+	 * A colour for every area (the coarse groups, about a dozen): biggest first, each the colour its
+	 * linked areas (side by side on the map) have least of, so neighbours differ.
 	 */
-	const groupColours = $derived.by(() => {
+	const areaColours = $derived.by(() => {
 		if (!map) return [] as string[];
-		const k = map.groups.length;
+		const k = map.areas.length;
 		const touch = Array.from({ length: k }, () => new Map<number, number>());
 		map.from.forEach((a, i) => {
-			const ga = map!.nodes[a].group;
-			const gb = map!.nodes[map!.to[i]].group;
+			const ga = map!.nodes[a].area;
+			const gb = map!.nodes[map!.to[i]].area;
 			if (ga === gb) return;
 			const w = map!.mine[i] + map!.others[i] + map!.radios[i];
 			touch[ga].set(gb, (touch[ga].get(gb) ?? 0) + w);
@@ -126,12 +144,31 @@
 		});
 		const chosen = new Array<number>(k).fill(-1);
 		for (let g = 0; g < k; g++) {
-			if (map.groups[g].songs < MIN_COLOURED) continue;
+			if (map.areas[g].songs < MIN_COLOURED) continue;
 			const clash = new Array<number>(CAT.length).fill(0);
 			for (const [other, w] of touch[g]) if (chosen[other] >= 0) clash[chosen[other]] += w;
 			chosen[g] = clash.indexOf(Math.min(...clash));
 		}
 		return chosen.map((c) => (c < 0 ? REST : CAT[c]));
+	});
+	/** Each group's area: where most of its songs are. */
+	const groupArea = $derived.by(() => {
+		if (!map) return [] as number[];
+		const counts = map.groups.map(() => new Map<number, number>());
+		for (const n of map.nodes) counts[n.group].set(n.area, (counts[n.group].get(n.area) ?? 0) + 1);
+		return counts.map((c) => [...c].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0);
+	});
+	/** A group: a shade of its area's colour, the biggest group of an area in the colour itself. */
+	const groupColours = $derived.by(() => {
+		if (!map) return [] as string[];
+		const seen = new Map<number, number>();
+		return map.groups.map((_, g) => {
+			const area = groupArea[g];
+			const base = areaColours[area] ?? REST;
+			const k = seen.get(area) ?? 0;
+			seen.set(area, k + 1);
+			return base === REST ? REST : shade(base, SHADES[k % SHADES.length]);
+		});
 	});
 	const artistOf = (i: number) => map!.nodes[i].artist.split(', ')[0];
 	const topArtists = $derived.by(() => {
@@ -221,37 +258,51 @@
 		renderer.on('clickStage', () => ((picked = null), renderer?.refresh({ skipIndexation: true })));
 	}
 
-	/** The parts asked for: how much each link counts with them, and the songs without a link left out. */
+	/**
+	 * The filters: songs with a link from [songParts] (and played at least [minPlays] times) show;
+	 * lines between them count their links from [linkParts].
+	 */
 	function show() {
 		const g = graph;
 		if (!g || !map) return;
-		const on = { mine: parts.includes('mine'), others: parts.includes('others'), radios: parts.includes('radios') };
+		const has = (parts: Part[]) => ({ mine: parts.includes('mine'), others: parts.includes('others'), radios: parts.includes('radios') });
+		const song = has(songParts);
+		const line = has(linkParts);
 		const n = map.from.length;
 		weights = new Float64Array(n);
 		songOn = new Uint8Array(map.nodes.length);
-		let links = 0;
 		for (let k = 0; k < n; k++) {
-			const w = (on.mine ? map.mine[k] : 0) + (on.others ? map.others[k] : 0) + (on.radios ? map.radios[k] : 0);
-			weights[k] = w;
-			if (w > 0) {
-				links++;
+			if ((song.mine && map.mine[k] > 0) || (song.others && map.others[k] > 0) || (song.radios && map.radios[k] > 0)) {
 				songOn[map.from[k]] = 1;
 				songOn[map.to[k]] = 1;
 			}
 		}
-		const maxW = Math.max(1e-6, ...weights);
+		if (minPlays > 0) map.nodes.forEach((node, i) => node.plays < minPlays && (songOn[i] = 0));
+		let links = 0;
+		for (let k = 0; k < n; k++) {
+			if (!songOn[map.from[k]] || !songOn[map.to[k]]) continue;
+			const w = (line.mine ? map.mine[k] : 0) + (line.others ? map.others[k] : 0) + (line.radios ? map.radios[k] : 0);
+			weights[k] = w;
+			if (w > 0) links++;
+		}
+		let maxW = 1e-6;
+		for (const w of weights) if (w > maxW) maxW = w;
 		strongCut = [...weights].sort((a, b) => b - a)[Math.min(n - 1, 4000)] ?? 0;
 		g.updateEachEdgeAttributes((key, at) => ({ ...at, w: weights[Number(key)], size: 0.2 + 1.5 * Math.sqrt(weights[Number(key)] / maxW) }), { attributes: ['w', 'size'] });
 		g.updateEachNodeAttributes((key, at) => ({ ...at, off: !songOn[Number(key)] }), { attributes: ['off'] });
 		const counts = new Array(map.groups.length).fill(0);
+		const areaCounts = new Array(map.areas.length).fill(0);
 		let songs = 0;
 		map.nodes.forEach((node, i) => {
 			if (!songOn[i]) return;
 			songs++;
 			counts[node.group]++;
+			// By its group's area, as its colour goes.
+			areaCounts[groupArea[node.group] ?? node.area]++;
 		});
 		shown = { songs, links };
 		groupShown = counts;
+		areaShown = areaCounts;
 		if (picked !== null && !songOn[picked]) picked = null;
 		renderer?.refresh();
 	}
@@ -296,10 +347,21 @@
 		ctx.fillText(d.label, d.x + d.size + 3 + pad, d.y + size / 3);
 	}
 
-	function toggle(part: Part) {
-		const next = parts.includes(part) ? parts.filter((p) => p !== part) : PARTS.map((p) => p.part).filter((p) => p === part || parts.includes(p));
-		if (!next.length) return;
-		parts = next;
+	/** Turns [part] on or off in [list] (one stays on), in the parts' order. */
+	const toggled = (list: Part[], part: Part) => {
+		const next = list.includes(part) ? list.filter((p) => p !== part) : PARTS.map((p) => p.part).filter((p) => p === part || list.includes(p));
+		return next.length ? next : list;
+	};
+	function setSongs(part: Part) {
+		songParts = toggled(songParts, part);
+		show();
+	}
+	function setLinks(part: Part) {
+		linkParts = toggled(linkParts, part);
+		show();
+	}
+	function setMinPlays(n: number) {
+		minPlays = n;
 		show();
 	}
 	function setColour(c: Colour) {
@@ -323,18 +385,26 @@
 		});
 		return near.sort((a, b) => b.w - a.w).slice(0, 6);
 	});
-	type Row = { color: string; label: string; n?: number };
+	type Row = { color: string; label: string; n?: number; sub?: boolean };
 	const legend = $derived.by((): Row[] => {
 		if (!map) return [];
 		if (colour === 'group') {
-			const rest = groupShown.slice(LEGEND_GROUPS).reduce((s, n) => s + n, 0);
-			return [
-				...map.groups
-					.slice(0, LEGEND_GROUPS)
-					.map((g, i) => ({ color: groupColours[i], label: g.artists.join(', ') || 'Songs no one here played', n: groupShown[i] ?? 0 }))
-					.filter((row) => row.n > 0),
-				...(rest ? [{ color: REST, label: `and ${map.groups.length - LEGEND_GROUPS} smaller groups`, n: rest }] : [])
-			];
+			const rows: Row[] = [];
+			const groupsOf = new Map<number, number[]>();
+			map.groups.forEach((_, g) => groupsOf.set(groupArea[g], [...(groupsOf.get(groupArea[g]) ?? []), g]));
+			let rest = 0;
+			map.areas.forEach((area, a) => {
+				const n = areaShown[a] ?? 0;
+				if (!n) return;
+				if (a >= LEGEND_AREAS || areaColours[a] === REST) return void (rest += n);
+				rows.push({ color: areaColours[a], label: area.artists.join(', ') || 'Songs no one here played', n });
+				const inside = (groupsOf.get(a) ?? []).filter((g) => (groupShown[g] ?? 0) > 0);
+				if (inside.length > 1)
+					for (const g of inside.slice(0, LEGEND_GROUPS))
+						rows.push({ color: groupColours[g], label: map!.groups[g].artists.join(', ') || '—', n: groupShown[g], sub: true });
+			});
+			if (rest) rows.push({ color: REST, label: 'Smaller areas', n: rest });
+			return rows;
 		}
 		if (colour === 'artist') return [...topArtists.map((a, i) => ({ color: CAT[i], label: a })), { color: REST, label: 'Other artists' }];
 		return [];
@@ -356,18 +426,14 @@
 			</p>
 		</div>
 	</header>
-	<div class="flex shrink-0 gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]" role="group" aria-label="Show">
-		{#each PARTS as p (p.part)}
-			<button class="shrink-0 rounded-lg px-3 py-1.5 text-sm {parts.includes(p.part) ? 'bg-white text-black' : 'bg-raised'}" aria-pressed={parts.includes(p.part)} onclick={() => toggle(p.part)}>{p.label}</button>
-		{/each}
-	</div>
 	<div class="flex shrink-0 gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]" role="group" aria-label="Colour by">
+		<button
+			class="flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-sm {filtersOpen || filtered ? 'bg-white text-black' : 'bg-raised'}"
+			aria-expanded={filtersOpen}
+			onclick={() => (filtersOpen = !filtersOpen)}>Filters{filtered ? ' ·' : ''}</button
+		>
 		{#each COLOURS as c (c.colour)}
-			<button class="shrink-0 rounded-full px-3 py-1 text-xs {colour === c.colour ? 'bg-white/90 text-black' : 'bg-raised text-muted'}" aria-pressed={colour === c.colour} onclick={() => setColour(c.colour)}>{c.label}</button>
-		{/each}
-		<span class="w-2 shrink-0"></span>
-		{#each LINES as l (l.lines)}
-			<button class="shrink-0 rounded-full px-3 py-1 text-xs {lines === l.lines ? 'bg-white/90 text-black' : 'bg-raised text-muted'}" aria-pressed={lines === l.lines} onclick={() => setLines(l.lines)}>{l.label}</button>
+			<button class="shrink-0 rounded-full px-3 py-1.5 text-xs {colour === c.colour ? 'bg-white/90 text-black' : 'bg-raised text-muted'}" aria-pressed={colour === c.colour} onclick={() => setColour(c.colour)}>{c.label}</button>
 		{/each}
 	</div>
 
@@ -379,6 +445,33 @@
 			<p class="pointer-events-none absolute inset-x-4 top-8 text-center text-sm text-muted">Laying out the graph… The first time, that takes a few seconds.</p>
 		{:else if map && shown.songs === 0}
 			<p class="absolute inset-x-4 top-8 text-center text-sm text-muted">{map.nodes.length ? 'Nothing learned from this yet.' : 'Nothing learned here yet.'}</p>
+		{/if}
+
+		{#if filtersOpen && map}
+			<div class="absolute top-2 right-2 z-10 max-h-[calc(100%-1rem)] w-[min(20rem,calc(100%-1rem))] overflow-y-auto rounded-xl bg-raised/95 p-3 text-sm shadow-lg ring-1 ring-line">
+				{#snippet chips(label: string, list: Part[], pick: (p: Part) => void)}
+					<p class="mb-1 text-xs text-muted">{label}</p>
+					<div class="mb-3 flex flex-wrap gap-1.5" role="group" aria-label={label}>
+						{#each PARTS as p (p.part)}
+							<button class="rounded-lg px-2.5 py-1 text-xs {list.includes(p.part) ? 'bg-white text-black' : 'bg-line'}" aria-pressed={list.includes(p.part)} onclick={() => pick(p.part)}>{p.label}</button>
+						{/each}
+					</div>
+				{/snippet}
+				{@render chips('Songs from', songParts, setSongs)}
+				{@render chips('Lines from', linkParts, setLinks)}
+				<p class="mb-1 text-xs text-muted">Lines</p>
+				<div class="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Lines">
+					{#each LINES as l (l.lines)}
+						<button class="rounded-lg px-2.5 py-1 text-xs {lines === l.lines ? 'bg-white text-black' : 'bg-line'}" aria-pressed={lines === l.lines} onclick={() => setLines(l.lines)}>{l.label}</button>
+					{/each}
+				</div>
+				<p class="mb-1 text-xs text-muted">You played it at least</p>
+				<div class="flex flex-wrap gap-1.5" role="group" aria-label="You played it at least">
+					{#each PLAYS as n (n)}
+						<button class="rounded-lg px-2.5 py-1 text-xs {minPlays === n ? 'bg-white text-black' : 'bg-line'}" aria-pressed={minPlays === n} onclick={() => setMinPlays(n)}>{n === 0 ? 'Any' : `${n}×`}</button>
+					{/each}
+				</div>
+			</div>
 		{/if}
 
 		{#if map && !loading && legend.length + (colour === 'plays' || colour === 'first' ? 1 : 0) > 0}
@@ -395,8 +488,8 @@
 							</div>
 						{:else}
 							<ul class="grid gap-1">
-								{#each legend as row (row.label)}
-									<li class="flex items-baseline gap-2">
+								{#each legend as row, i (i)}
+									<li class="flex items-baseline gap-2 {row.sub ? 'pl-4 text-muted' : ''}">
 										<span class="inline-block h-2.5 w-2.5 shrink-0 translate-y-px rounded-full" style:background={row.color}></span>
 										<span class="min-w-0 flex-1">{row.label}</span>
 										{#if row.n}<span class="text-muted tabular-nums">{row.n.toLocaleString()}</span>{/if}
@@ -404,7 +497,7 @@
 								{/each}
 							</ul>
 						{/if}
-						<p class="mt-2 text-muted">Bigger: you played it more. Groups are songs often heard together, much like genres; radios keep to a song's group.</p>
+						<p class="mt-2 text-muted">Bigger: you played it more. Groups are songs often heard together, much like genres; radios keep to a song's group. Groups in one area are shades of its colour.</p>
 					</div>
 				{/if}
 			</div>

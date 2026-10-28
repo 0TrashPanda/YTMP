@@ -221,8 +221,10 @@ at 1 a small group of its own (65 lo-fi songs among 60,000 links) gains too litt
 and goes with its strongest neighbour (power metal); at 2 it stays apart, and big groups split
 into their kinds (hardstyle into frenchcore, happy hardcore, uptempo): about 100 groups for 10,000
 songs. `GraphGroups.VERSION` is part of the kept groups' variant, so a change makes them again.
-The whole-graph view gives each group of 10 songs or more one of 12 colours, biggest first, the
-one its linked groups have least of, so groups side by side differ. The graph view gets each node's group
+The whole-graph view gets the resolution-1 groups too (`GraphMap.areas`, `GraphMapNode.area`):
+each area of 10 songs or more one of 12 colours, biggest first, the one its linked areas have
+least of, so areas side by side differ; the groups in it (where most of a group's songs are)
+lighter and darker shades of it, its biggest in the colour itself. The graph view gets each node's group
 (`GraphNode.group`), for *Its radio*; the whole-graph view's are the same.
 
 **When they're made.** Not by the clock, but when the graph changed: `SongGraph.MadeFrom` is how
@@ -248,7 +250,9 @@ looked at), and kept in memory (at most 8) as long as the graph is about the sam
 for groups; a rebuild drops it). A new one starts from the last one's places: songs stay where
 they were, new ones start among their linked songs or in their group, and half the steps do. Groups are named after their most played artists. The page adds up
 the parts shown and hides links and songs without them, so switching parts needs no new layout
-and every song stays in its place. It draws with sigma.js (WebGL; `GraphMapView.svelte`, loaded only when it opens).
+and every song stays in its place: songs show with a link from the parts asked for (and, if asked,
+played at least so often), lines between them count the links of other parts if asked (your songs
+with the radios' lines). It draws with sigma.js (WebGL; `GraphMapView.svelte`, loaded only when it opens).
 
 ### Space
 

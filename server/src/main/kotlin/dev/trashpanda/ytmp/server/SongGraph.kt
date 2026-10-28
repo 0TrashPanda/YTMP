@@ -826,17 +826,20 @@ class SongGraph(private val db: Database, private val clock: () -> Long = System
             val (count, first) = plays[node] ?: (0 to null)
             GraphMapNode(
                 song?.id ?: node, song?.title.orEmpty(), song?.artists?.joinToString(", ") { it.name }.orEmpty(),
-                count, first, (x[i] * 10).roundToLong() / 10.0, (y[i] * 10).roundToLong() / 10.0, group[i],
+                count, first, (x[i] * 10).roundToLong() / 10.0, (y[i] * 10).roundToLong() / 10.0, group[i], coarse[i],
             )
         }
         // A group is named after its most played artists (or, played by no one here, its biggest).
-        val groups = nodes.groupBy { it.group }.toSortedMap().map { (_, members) ->
+        fun named(by: (GraphMapNode) -> Int) = nodes.groupBy(by).toSortedMap().map { (_, members) ->
             val byArtist = HashMap<String, Int>()
             for (m in members) m.artist.split(", ").first().takeIf { it.isNotBlank() }?.let { byArtist.merge(it, 1000 * m.plays + 1, Int::plus) }
             GraphMapGroup(members.size, byArtist.entries.sortedByDescending { it.value }.take(3).map { it.key })
         }
         fun DoubleArray.rounded() = map { (it * 100).roundToLong() / 100.0 }
-        return GraphMap(nodes, links.from.toList(), links.to.toList(), links.mine.rounded(), links.others.rounded(), links.radios.rounded(), groups, clock())
+        return GraphMap(
+            nodes, links.from.toList(), links.to.toList(), links.mine.rounded(), links.others.rounded(), links.radios.rounded(),
+            groups = named { it.group }, areas = named { it.area }, madeAt = clock(),
+        )
     }
 
     /** How often [accountId] played each of [nodes] (not skipped, any version), and when first. */
