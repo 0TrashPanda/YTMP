@@ -128,6 +128,20 @@
 
 	/** The map placed and grouped by [linkParts]: asked of the server, then the songs slide there. */
 	let placing = $state(false);
+	/** Filters or colours being worked out on the page (thousands of songs: a moment on a phone). */
+	let filtering = $state(false);
+	const busy = $derived(loading || placing || filtering);
+
+	/** Does [work] after the loading bar had a frame to show. */
+	async function withBar(work: () => void) {
+		filtering = true;
+		await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+		try {
+			work();
+		} finally {
+			filtering = false;
+		}
+	}
 	let placeAsked = 0;
 	async function placeBy() {
 		const mine = ++placeAsked;
@@ -380,22 +394,22 @@
 	};
 	function setSongs(part: Part) {
 		songParts = toggled(songParts, part);
-		show();
+		void withBar(show);
 	}
 	function setLinks(part: Part) {
 		const next = toggled(linkParts, part);
 		if (next === linkParts) return;
 		linkParts = next;
-		show();
+		void withBar(show);
 		void placeBy();
 	}
 	function setMinPlays(n: number) {
 		minPlays = n;
-		show();
+		void withBar(show);
 	}
 	function setColour(c: Colour) {
 		colour = c;
-		paint();
+		void withBar(paint);
 	}
 	function setLines(l: Lines) {
 		lines = l;
@@ -472,6 +486,11 @@
 	</div>
 
 	<div class="relative min-h-0 flex-1">
+		{#if busy}
+			<div class="pointer-events-none absolute inset-x-0 top-0 z-20 h-[3px] overflow-hidden bg-accent/20" role="progressbar" aria-label="Updating the graph">
+				<div class="loading-run h-full w-2/5 bg-accent"></div>
+			</div>
+		{/if}
 		<div bind:this={box} class="absolute inset-0 touch-none" aria-label="The songs and how they go together" role="img"></div>
 		{#if error}
 			<p class="absolute inset-x-4 top-8 text-center text-sm text-muted">{error}</p>
