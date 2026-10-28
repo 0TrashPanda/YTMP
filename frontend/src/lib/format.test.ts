@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatTime, fuzzyFind, timeAgo, typedNumber } from './format';
+import { formatTime, fuzzyFind, fuzzyIndex, timeAgo, typedNumber } from './format';
 
 describe('formatTime', () => {
 	it('is minutes and seconds', () => {
@@ -19,6 +19,15 @@ describe('timeAgo', () => {
 		expect(timeAgo(now - 30 * 3_600_000, now)).toBe('yesterday');
 		expect(timeAgo(now - 4 * 86_400_000, now)).toBe('4 days ago');
 		expect(timeAgo(now - 90 * 86_400_000, now)).toContain('2026');
+	});
+});
+
+describe('fuzzyIndex', () => {
+	it('searches the prepared list again and again, like fuzzyFind', () => {
+		const search = fuzzyIndex(['Primo Victoria – Sabaton', 'Lungs – potsu', 'Sparta – Sabaton'], (s) => s);
+		expect(search('sabatn primo')).toEqual(['Primo Victoria – Sabaton']);
+		expect(search('potsu')).toEqual(['Lungs – potsu']);
+		expect(search('sabaton')).toHaveLength(2);
 	});
 });
 

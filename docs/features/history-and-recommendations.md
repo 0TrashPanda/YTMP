@@ -234,6 +234,10 @@ that go together are close.
   show as you zoom in. Dots and lines are smaller on a small screen, so the groups don't run
   together. Tap a song for its card
   (artist, plays, group, the songs it goes with most) and *Show around this song*.
+- **Search** (the magnifier): type a song or artist, forgiving like the library's search
+  (typos, accents, the first letters). The songs shown that fit light up and the rest go
+  dark, and a list shows them, most fitting first; pick one (or press Enter for the first)
+  and the map flies to it with its card open. Escape closes the search.
 - Songs Takeout only gives as a link (removed or private ones, mostly) show as *Song
   without a name*.
 - The map counts all your music alike, however long ago you played it (radios still favour

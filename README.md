@@ -84,6 +84,7 @@ Music, without Premium, and not tied to a single music service.
   *All your music* shows the whole graph at once (thousands of songs, drawn with WebGL),
   your listening, everyone else's and YouTube Music's radios, any of them together, coloured by
   group (songs often heard together, much like genres), artist, plays or when first heard.
+  Search it for a song or artist, typos and all, and it flies there.
   Graph radios walk the graph and keep to the song's group.
   The server (and the phone, also overnight while it charges) can slowly learn YouTube
   Music's radios of your music; every radio is kept as it came, so the graph can be weighed

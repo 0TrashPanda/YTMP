@@ -5,10 +5,11 @@
 	// for the songs shown and for the links that place and group them, apart (your songs, placed
 	// by the radios): which songs show changes here at once; other links ask the server for a map
 	// by them, and the songs slide to their new places. Drawn with WebGL (sigma.js, loaded only here).
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import type Graph from 'graphology';
 	import type Sigma from 'sigma';
+	import { fuzzyIndex } from '../format';
 	import { listening } from '../listening.svelte';
 	import type { GraphMap } from '../protocol.gen';
 	import Icon from './Icon.svelte';
@@ -104,6 +105,13 @@
 	let songOn = new Uint8Array(0);
 	let shown = $state({ songs: 0, links: 0 });
 	let groupShown = $state.raw<number[]>([]);
+	// Search: the songs shown that fit what's typed light up (the others go dark); one picked flies there.
+	let searchOpen = $state(false);
+	let query = $state('');
+	let searchInput = $state<HTMLInputElement>();
+	/** The list steps aside once a song is picked from it (until you type again). */
+	let listAside = $state(false);
+	let matches: Set<number> | null = null;
 	let areaShown = $state.raw<number[]>([]);
 
 	async function load() {
@@ -289,7 +297,11 @@
 				nodeReducer: (key, at) => {
 					if (at.off) return { ...at, hidden: true };
 					const f = picked ?? hovered;
-					if (f === null) return at;
+					if (f === null) {
+						if (!matches) return at;
+						if (matches.has(Number(key))) return { ...at, zIndex: 1, forceLabel: matches.size <= 12 };
+						return { ...at, color: '#2a2a2a', label: '', zIndex: 0 };
+					}
 					const k = Number(key);
 					if (k === f) return { ...at, highlighted: true, zIndex: 2 };
 					if (g.areNeighbors(String(f), key)) return { ...at, zIndex: 1, forceLabel: g.degree(String(f)) < 25 };
@@ -302,6 +314,7 @@
 						if (g.hasExtremity(key, String(f))) return { ...at, color: 'rgb(220,220,220)', size: (at.size as number) + 0.5, zIndex: 1 };
 						return { ...at, hidden: true };
 					}
+					if (matches) return { ...at, hidden: true };
 					if (lines === 'none' || (lines === 'strong' && (at.w as number) < strongCut)) return { ...at, hidden: true };
 					return at;
 				}
@@ -460,6 +473,37 @@
 		renderer?.refresh({ skipIndexation: true });
 	}
 
+	/** The songs shown with a name, prepared for search (again only when the filters change). */
+	const searchable = $derived.by(() => {
+		if (!map || !searchOpen) return null;
+		void shown;
+		const on: number[] = [];
+		for (let i = 0; i < map.nodes.length; i++) if (songOn[i] && !nameless(map.nodes[i].title)) on.push(i);
+		return fuzzyIndex(on, (i) => `${map!.nodes[i].title} ${map!.nodes[i].artist}`);
+	});
+	const found = $derived(searchable && query.trim().length >= 2 ? searchable(query.trim()) : null);
+	$effect(() => {
+		matches = found ? new Set(found) : null;
+		renderer?.refresh({ skipIndexation: true });
+	});
+	/** Picks song [i] and flies to it. */
+	function goTo(i: number) {
+		picked = i;
+		listAside = true;
+		renderer?.refresh({ skipIndexation: true });
+		const at = renderer?.getNodeDisplayData(String(i));
+		if (at) camera()?.animate({ x: at.x, y: at.y, ratio: Math.min(camera()!.ratio, 0.15) }, { duration: 500 });
+	}
+	function closeSearch() {
+		searchOpen = false;
+		query = '';
+	}
+	function escape(e: KeyboardEvent) {
+		if (e.key !== 'Escape') return;
+		if (searchOpen) closeSearch();
+		else onClose();
+	}
+
 	const pickedNode = $derived(map && picked !== null ? map.nodes[picked] : null);
 	const pickedNear = $derived.by(() => {
 		if (!map || picked === null) return [];
@@ -506,26 +550,51 @@
 	onDestroy(() => renderer?.kill());
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} onresize={resized} />
+<svelte:window onkeydown={escape} onresize={resized} />
 
 <div class="fixed inset-0 z-[70] flex flex-col bg-surface" role="dialog" aria-label="Whole song graph" transition:fade|global={{ duration: 120 }}>
 	<!-- One slim row: the map gets the room. -->
 	<header class="flex shrink-0 items-center gap-1.5 px-1.5 pt-[max(env(safe-area-inset-top),0.25rem)] pb-1">
 		<button class="shrink-0 rounded-full p-1.5 hover:bg-raised" aria-label="Back" onclick={onClose}><Icon name="back" size={22} /></button>
-		<div class="hidden min-w-0 shrink-0 leading-tight sm:block">
-			<h2 class="text-sm font-bold">All your music</h2>
-			<p class="text-[11px] text-muted">{@render counts()}</p>
-		</div>
-		<div class="flex min-w-0 flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none] sm:ml-2" role="group" aria-label="Colour by">
+		{#if searchOpen}
+			<input
+				bind:this={searchInput}
+				bind:value={query}
+				class="min-w-0 flex-1 rounded-full bg-raised px-3 py-1.5 text-sm outline-none placeholder:text-muted focus:ring-1 focus:ring-line"
+				type="search"
+				placeholder="Find a song or artist"
+				aria-label="Find a song or artist"
+				oninput={() => (listAside = false)}
+				onfocus={() => (listAside = false)}
+				onkeydown={(e) => e.key === 'Enter' && found?.length && goTo(found[0])}
+			/>
+			<button class="shrink-0 rounded-full p-1.5 hover:bg-raised" aria-label="Close search" onclick={closeSearch}><Icon name="close" size={20} /></button>
+		{:else}
+			<div class="hidden min-w-0 shrink-0 leading-tight sm:block">
+				<h2 class="text-sm font-bold">All your music</h2>
+				<p class="text-[11px] text-muted">{@render counts()}</p>
+			</div>
 			<button
-				class="shrink-0 rounded-lg px-2.5 py-1 text-sm {filtersOpen || filtered ? 'bg-white text-black' : 'bg-raised'}"
-				aria-expanded={filtersOpen}
-				onclick={() => (filtersOpen = !filtersOpen)}>Filters{filtered ? ' ·' : ''}</button
+				class="shrink-0 rounded-full p-1.5 hover:bg-raised sm:order-last"
+				aria-label="Search"
+				disabled={!map || loading}
+				onclick={async () => {
+					searchOpen = true;
+					await tick();
+					searchInput?.focus();
+				}}><Icon name="search" size={20} /></button
 			>
-			{#each COLOURS as c (c.colour)}
-				<button class="shrink-0 rounded-full px-2.5 py-1 text-xs {colour === c.colour ? 'bg-white/90 text-black' : 'bg-raised text-muted'}" aria-pressed={colour === c.colour} onclick={() => setColour(c.colour)}>{c.label}</button>
-			{/each}
-		</div>
+			<div class="flex min-w-0 flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none] sm:ml-2" role="group" aria-label="Colour by">
+				<button
+					class="shrink-0 rounded-lg px-2.5 py-1 text-sm {filtersOpen || filtered ? 'bg-white text-black' : 'bg-raised'}"
+					aria-expanded={filtersOpen}
+					onclick={() => (filtersOpen = !filtersOpen)}>Filters{filtered ? ' ·' : ''}</button
+				>
+				{#each COLOURS as c (c.colour)}
+					<button class="shrink-0 rounded-full px-2.5 py-1 text-xs {colour === c.colour ? 'bg-white/90 text-black' : 'bg-raised text-muted'}" aria-pressed={colour === c.colour} onclick={() => setColour(c.colour)}>{c.label}</button>
+				{/each}
+			</div>
+		{/if}
 	</header>
 	{#snippet counts()}
 		{#if map && !loading}{shown.songs.toLocaleString()} songs · {shown.links.toLocaleString()} links{placing ? ' · placing them…' : ''}{:else}Laying out the graph…{/if}
@@ -619,6 +688,21 @@
 						<p class="mt-2 text-muted">Bigger: you played it more. Groups are songs often heard together, much like genres; radios keep to a song's group. Groups in one area are shades of its colour.{linkParts.length < PARTS.length ? ' Placed and grouped by fewer links (Filters): radios still use all of them.' : ''}</p>
 					</div>
 				{/if}
+			</div>
+		{/if}
+
+		{#if found && map && !listAside}
+			<div class="absolute top-2 left-2 z-30 max-h-[min(22rem,calc(100%-1rem))] w-[min(22rem,calc(100%-1rem))] overflow-y-auto rounded-xl bg-raised/95 py-1 text-sm shadow-lg ring-1 ring-line">
+				<p class="px-3 py-1.5 text-xs text-muted">
+					{found.length ? `${found.length.toLocaleString()} ${found.length === 1 ? 'song' : 'songs'}` : 'No song shown fits that'}{found.length && filtered ? ' (as filtered)' : ''}
+				</p>
+				{#each found.slice(0, 30) as i (i)}
+					<button class="flex w-full items-baseline gap-2 px-3 py-1.5 text-left hover:bg-line {picked === i ? 'bg-line' : ''}" onclick={() => goTo(i)}>
+						<span class="inline-block h-2.5 w-2.5 shrink-0 translate-y-px rounded-full" style:background={colourOf(i)}></span>
+						<span class="min-w-0 flex-1 truncate">{map.nodes[i].title} <span class="text-muted">{map.nodes[i].artist}</span></span>
+						{#if map.nodes[i].plays}<span class="shrink-0 text-xs text-muted tabular-nums">{map.nodes[i].plays}×</span>{/if}
+					</button>
+				{/each}
 			</div>
 		{/if}
 

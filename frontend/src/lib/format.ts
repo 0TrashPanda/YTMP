@@ -33,18 +33,25 @@ export function artUrl(song: Song, size: number): string | null {
 /** Lowercase, without accents: "cafe" finds "Café". */
 const plain = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
+/** Rows for [editDistance], kept between calls (it runs for every word of every item). */
+let rows = [new Uint16Array(32), new Uint16Array(32), new Uint16Array(32)];
+
 /** Edits (a letter added, removed, changed, or two swapped) between [a] and [b]. */
 function editDistance(a: string, b: string): number {
-	const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
-	for (let j = 1; j <= b.length; j++) d[0][j] = j;
+	if (rows[0].length <= b.length) rows = rows.map(() => new Uint16Array(b.length * 2 + 1));
+	let [before, prev, cur] = rows;
+	for (let j = 0; j <= b.length; j++) prev[j] = j;
 	for (let i = 1; i <= a.length; i++) {
+		cur[0] = i;
 		for (let j = 1; j <= b.length; j++) {
 			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-			d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
-			if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+			let d = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+			if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d = Math.min(d, before[j - 2] + 1);
+			cur[j] = d;
 		}
+		[before, prev, cur] = [prev, cur, before];
 	}
-	return d[a.length][b.length];
+	return prev[b.length];
 }
 
 /** [word]'s letters in order, starting at the start of a word, not too spread out ("rt" in "road trip"). */
@@ -69,8 +76,11 @@ function wordScore(word: string, text: string, words: string[]): number | null {
 	// Typos: one mistake per 4 letters, in a whole word or the start of one.
 	const allowed = Math.floor(word.length / 4);
 	if (allowed > 0) {
+		// A part whose length is off by more than the typos allowed can't be close.
 		const close = words.some((w) =>
-			[w, w.slice(0, word.length - 1), w.slice(0, word.length), w.slice(0, word.length + 1)].some((part) => part.length && editDistance(word, part) <= allowed)
+			[w, w.slice(0, word.length - 1), w.slice(0, word.length), w.slice(0, word.length + 1)].some(
+				(part) => part.length && Math.abs(part.length - word.length) <= allowed && editDistance(word, part) <= allowed
+			)
 		);
 		if (close) return 40;
 	}
@@ -85,24 +95,36 @@ function wordScore(word: string, text: string, words: string[]): number | null {
  * Returns the matching [items], best first (ties keep their order).
  */
 export function fuzzyFind<T>(items: T[], query: string, text: (item: T) => string): T[] {
-	const typed = plain(query).split(/\s+/).filter(Boolean);
-	if (!typed.length) return items;
-	const scored: [T, number][] = [];
-	for (const item of items) {
+	return fuzzyIndex(items, text)(query);
+}
+
+/**
+ * [fuzzyFind] for a list searched again on every typed letter (the whole song graph): each
+ * item's text is prepared once, and the returned function searches it.
+ */
+export function fuzzyIndex<T>(items: T[], text: (item: T) => string): (query: string) => T[] {
+	const prepared = items.map((item) => {
 		const haystack = plain(text(item));
-		const words = haystack.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-		let total = 0;
-		for (const word of typed) {
-			const score = wordScore(word, haystack, words);
-			if (score === null) {
-				total = -1;
-				break;
+		return { item, haystack, words: haystack.split(/[^\p{L}\p{N}]+/u).filter(Boolean) };
+	});
+	return (query) => {
+		const typed = plain(query).split(/\s+/).filter(Boolean);
+		if (!typed.length) return items;
+		const scored: [T, number][] = [];
+		for (const { item, haystack, words } of prepared) {
+			let total = 0;
+			for (const word of typed) {
+				const score = wordScore(word, haystack, words);
+				if (score === null) {
+					total = -1;
+					break;
+				}
+				total += score;
 			}
-			total += score;
+			if (total >= 0) scored.push([item, total]);
 		}
-		if (total >= 0) scored.push([item, total]);
-	}
-	return scored.sort((a, b) => b[1] - a[1]).map(([item]) => item);
+		return scored.sort((a, b) => b[1] - a[1]).map(([item]) => item);
+	};
 }
 
 /** Shows a number with as many decimals as [step] has (0.1 → one), without trailing zeros. */
