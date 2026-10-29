@@ -177,6 +177,26 @@ class QueueTest {
         assertEquals(ErrorCode.PERMISSION_DENIED, room.run(guest, Command.ShuffleQueue)?.code)
     }
 
+    // --- jumping ---
+
+    @Test
+    fun `jumping far ahead looks up the new song and the one after it, not each song passed`() = runTest {
+        val lookups = mutableListOf<String>()
+        val room = Room("ABCD", "Party", "owner-token", RoomVisibility.PUBLIC, { lookups += it; "https://s/$it" }, backgroundScope) { testScheduler.currentTime }
+        val owner = room.connect("Owner", owner = true)
+        room.run(owner, Command.AddSongs((1..20).map { song(it) }, QueuePosition.END))
+        runCurrent()
+        assertEquals(listOf("ytm:1", "ytm:2"), lookups)
+
+        lookups.clear()
+        val target = room.state(owner).queue[15]
+        assertNull(room.run(owner, Command.JumpTo(target.itemId)))
+        runCurrent()
+        assertEquals(listOf("ytm:17", "ytm:18"), lookups)
+        // The one that played and the 15 passed.
+        assertEquals(16, room.state(owner).history.count { it.result == QueueItemResult.SKIPPED })
+    }
+
     // --- repeat ---
 
     @Test

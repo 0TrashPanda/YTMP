@@ -48,6 +48,10 @@ services:
       YTMP_YTM_LOG_LEVEL: info
       # PO tokens make song lookups look like YouTube's own player, so its bot check comes later.
       YTMP_YTM_POT_URL: http://pot:4416
+    # Song lookups start Deno (~250 MB each, at most 2 at once). If that still runs away, only
+    # this service hits the limit, not the server next to it (memswap = mem: no swapping).
+    mem_limit: 1536m
+    memswap_limit: 1536m
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     restart: unless-stopped

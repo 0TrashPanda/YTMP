@@ -138,7 +138,10 @@ Costs and risks:
 
 - Larger APK (Python runtime), and slower cold start of the Python part.
 - **JavaScript runtime:** recent yt-dlp versions need a JS runtime (Deno, Node, Bun or
-  QuickJS) for full YouTube support. The server's image has Deno. On Android the app gives
+  QuickJS) for full YouTube support. The server's image has Deno, which yt-dlp starts once
+  per lookup (~250 MB) and waits for without a time limit; `ytmp_ytm/deno.py` lets at most 2
+  run at once, caps their heap and stops one after 30 s (the lookup then takes a client that
+  needs no challenge). Docker Compose also gives the module a memory limit. On Android the app gives
   yt-dlp the WebView's JavaScript engine instead, through `ytmp_ytm/jsc.py` (see
   [Android app](android-app.md)).
 - Loading downloaded code at runtime would conflict with Play Store policy. This is not an

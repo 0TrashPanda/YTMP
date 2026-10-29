@@ -213,6 +213,8 @@ class Room(
     private var resolveJob: Job? = null
     /** The song after this one whose stream was looked up ahead of time (see [warmUpNext]). */
     private var warmedUp: String? = null
+    /** A warm-up waits for the change at hand to finish (see [warmUpNext]). */
+    private var warmUpPending = false
     private var endJob: Job? = null
     /** Pauses the music when nothing plays it any more (see [pauseWhenNobodyHears]). */
     private var emptyJob: Job? = null
@@ -2064,10 +2066,20 @@ class Room(
      * this one plays, instead of when this one ends. Once per song.
      */
     private fun warmUpNext() {
-        val next = queue.firstOrNull()?.song ?: return
-        if (streamUrl == null || next.id == warmedUp) return
-        warmedUp = next.id
-        scope.launch { warm(next) }
+        if (warmUpPending) return
+        warmUpPending = true
+        // Once the change at hand is done (a jump takes the songs before it off one by one):
+        // only the song that ends up next, not each one on the way.
+        scope.launch {
+            val next = mutex.withLock {
+                warmUpPending = false
+                val next = queue.firstOrNull()?.song
+                if (next == null || streamUrl == null || next.id == warmedUp) return@launch
+                warmedUp = next.id
+                next
+            }
+            warm(next)
+        }
     }
 
     private suspend fun warm(song: Song) {

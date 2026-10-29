@@ -7,7 +7,8 @@ Feature description: [features/playback-and-outputs.md](../features/playback-and
 1. The host resolves the **stream URL** for the current song (on demand, through the
    source module). The next song in the queue is looked up ahead of time: when a song
    starts, and again when another song becomes next (added to play next, moved up), once
-   per song (`Room.warmUpNext`).
+   per song (`Room.warmUpNext`). It waits until the change is done, so jumping far ahead in
+   the queue looks up only the song that ends up next, not each one passed.
 2. The host sends the stream URL and the **playback state** (song, position, playing or
    paused, the timestamp of that state) to each playing client over the WebSocket
    (`wss://` on servers, `ws://` on the LAN by default, see [networking](networking.md)).

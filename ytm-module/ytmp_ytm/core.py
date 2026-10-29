@@ -26,8 +26,10 @@ from ytmusicapi.helpers import initialize_headers
 from ytmusicapi.navigation import NAVIGATION_BROWSE_ID, SECTION_LIST, SINGLE_COLUMN_TAB, TAB_CONTENT, TITLE, TWO_COLUMN_RENDERER, nav
 from ytmusicapi.parsers.playlists import parse_playlist_items
 
-from . import keep, parse, pot
+from . import deno, keep, parse, pot
 from .parse import MODULE_ID
+
+deno.limit()
 
 _PREFIXES = ("ytm:", "yt:")
 _ARTIST_SONGS = 20
