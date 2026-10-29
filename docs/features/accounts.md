@@ -35,8 +35,8 @@ and your room defaults are saved to your account.
 - Playlists are **private** or **public**.
 - They can be **shared** with other people, with a permission per person: **view** or
   **edit**.
-- Playlists can be **imported** from YouTube Music. Importing from Spotify is part of
-  the future [Spotify module](future-ideas.md#spotify-module).
+- Playlists can be [imported](importing-playlists.md) from YouTube Music, a Spotify export
+  and others; a YTMP playlist is then a choice next to a YouTube Music playlist.
 - With a linked YouTube account you can also **create** YTM playlists.
 
 ### Linked media servers

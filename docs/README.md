@@ -24,6 +24,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [features/queue.md](features/queue.md) | Queue, autoplay queue, history, fair ordering, shuffle, repeat, vote to skip, limits |
 | [features/room-management.md](features/room-management.md) | Permissions, kicking, access control, co-admins |
 | [features/accounts.md](features/accounts.md) | Optional accounts, room transfer, playlists, linked YouTube account and media servers |
+| [features/importing-playlists.md](features/importing-playlists.md) | Importing playlists from a Spotify export (later Takeout, linked accounts) into YouTube Music (later YTMP playlists) |
 | [features/history-and-recommendations.md](features/history-and-recommendations.md) | Listening history, recap, song graph, radio/mix, find similar |
 | [features/ui.md](features/ui.md) | YTM-like UI, gestures, song menu, party screen, themes |
 | [features/sources.md](features/sources.md) | Where music comes from (YTM, YT, local files, …) |
@@ -46,6 +47,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [implementation/module-api.md](implementation/module-api.md) | HTTP API for remote source modules (draft) |
 | [implementation/storage.md](implementation/storage.md) | Database (SQLite/PostgreSQL), song graph storage, radio generation |
 | [implementation/android-app.md](implementation/android-app.md) | Android app structure, native audio playback, app updates |
+| [implementation/playlist-converter.md](implementation/playlist-converter.md) | Playlist converter: readers, matching, stored jobs, writers |
 | [implementation/downloads.md](implementation/downloads.md) | How downloads are made (tagging, formats) |
 | [implementation/song-cache.md](implementation/song-cache.md) | The song cache on server and phone: storing, serving, removing |
 | [implementation/chromecast.md](implementation/chromecast.md) | Chromecast output module |

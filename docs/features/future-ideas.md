@@ -69,13 +69,20 @@ more advanced recommendations. Not needed at the current scale (see
 
 ## Spotify module
 
-A full **Spotify source module**: search, albums, artists, playlists, radio, a linked
-Spotify account (library, likes), and **importing Spotify playlists**.
+A full **Spotify source module**: search, albums, artists, playlists, radio and a linked
+Spotify account (library, likes). Importing a Spotify **data export** is planned on its own,
+without any of this: see [importing playlists](importing-playlists.md).
 
 - To research: playing Spotify audio needs a **Spotify Premium** account and goes through
   DRM / unofficial clients, which may be hard or against Spotify's terms. A fallback is to
   use Spotify for **search and metadata only**, and [match](../implementation/storage.md#song-matching)
   each song to a playable source (mostly YTM).
+- Spotify's Web API (since February 2026) for an app like YTMP: the app's owner needs
+  **Premium**, at most **5** Spotify accounts can link (each added by hand), and a
+  playlist's songs can only be read when the account **owns or collaborates on** it (not
+  Spotify's own playlists). There are no recommendations or related artists for new apps.
+  A linked Spotify account would be one more reader for
+  [importing playlists](importing-playlists.md).
 
 ## Automatic sync with the microphone
 

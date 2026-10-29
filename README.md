@@ -188,6 +188,8 @@ Music, without Premium, and not tied to a single music service.
 
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
+- Importing playlists: a Spotify data export into YouTube Music playlists first, later other
+  exports and YTMP playlists
 - YTMP playlists, explore page
 
 ## Platforms

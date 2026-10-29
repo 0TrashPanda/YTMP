@@ -317,8 +317,8 @@ the same **match key** (title and main artist, lowercase, without accents, brack
 (or unknown); otherwise it's a new node. Radio mixing uses the same key so one song isn't
 in a radio twice.
 
-Planned, for importing playlists (done by the **host**, one implementation for all sources;
-modules only provide candidates through their normal `search`):
+Planned, for [importing playlists](playlist-converter.md#matching) (done by the **host**, one
+implementation for all sources; modules only provide candidates through their normal `search`):
 
 1. If the song has an **ISRC** and the target module supports `isrc_lookup`, use that.
    It's an exact match.
