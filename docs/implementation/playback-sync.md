@@ -65,13 +65,18 @@ song whose own link fails too. Songs that aren't YouTube's (`ytm:` IDs) keep the
   `LocalHost.ytm`), not for rooms on the phone itself. Links are kept per song while they
   have 10 min left; the next song (queue, else autoplay, from `RoomFollower`) is looked up
   as soon as one starts.
-- **Browser** (`WebPlayer`, `ownModule.ts`): a YTM module the listener runs on their own
-  computer, set in *Settings → Your own module* (`saved.ownModule`: address and key, checked with
-  `GET /info`). The player calls `GET /songs/{id}/stream` there and prefetches the next
+- **Browser** (`WebPlayer`, `ownModule.svelte.ts`, `songSources.ts`): a YTM module the listener
+  runs on their own computer, set in *Settings → Where songs play from* (`saved.ownModule`:
+  address, key and on/off). `moduleStatus` checks it with `GET /info` when the page opens and
+  every minute while it doesn't answer (or a lookup can't reach it); meanwhile it's skipped
+  and the room shows a line until it answers or is switched off. The player tries the ways in
+  `saved.songSources` (default: room's link, own module, host) with `pickSource`, once each per
+  song; a room link from YouTube that failed is skipped for the next songs too, until nothing
+  worked for a song. The player calls `GET /songs/{id}/stream` there and prefetches the next
   song. The module answers pages from any origin only when it has a key (CORS, including
   Chrome's private network preflight; see [module API](module-api.md)).
 - A lookup that fails (module unreachable, wrong key, unavailable) is reported to the host
-  log and the song goes through the proxy.
+  log and the song goes to the next way in the order.
 
 **Fetching in pieces** ✅: YouTube sends a request for the whole rest of a file (no end to its
 `Range`) only about as fast as the song plays, so a player's buffer runs dry: short pauses

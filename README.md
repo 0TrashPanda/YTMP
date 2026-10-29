@@ -133,7 +133,9 @@ Music, without Premium, and not tied to a single music service.
   cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app
   looks songs up itself, and a browser can use a YouTube Music module on your own computer
-  (*Settings → Your own module*), instead of streaming through the server.
+  (*Settings → Where songs play from*), instead of streaming through the server. In a
+  browser you choose the order (for example your own module first), and the room says so
+  while your module doesn't answer.
 - A *Local* tab with your own music: a Raspberry Pi's music folder (shared with MPD) and the
   music on your phone, with albums, artists, songs, genres, folders, search and Shuffle all.
   It remembers where you were.
@@ -229,7 +231,7 @@ server's own internet connection. Elsewhere they fall back to streaming through 
 To keep music off a slow upload, set `[audio] proxy = "lan"` in `ytmp.toml`: then only
 devices on the server's network (like speakers at home) may do that. See the guide.
 The app doesn't need the server for that: it looks songs up itself. In a browser, run the
-YouTube Music module on your own computer and enter it under *Settings → Your own module*:
+YouTube Music module on your own computer and enter it under *Settings → Where songs play from*:
 `docker run -d -p 127.0.0.1:8401:8401 -e YTMP_MODULE_KEY=<a key you choose> ghcr.io/0trashpanda/ytmp-ytm`.
 
 ## Development

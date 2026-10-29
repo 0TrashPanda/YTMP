@@ -12,7 +12,7 @@
 	import { getLyrics, prefetch } from '../api';
 	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
-	import { isYoutubeSong } from '../ownModule';
+	import { isYoutubeSong } from '../ownModule.svelte';
 	import { shows } from '../soloLook.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { PageHandlers } from '../cards';

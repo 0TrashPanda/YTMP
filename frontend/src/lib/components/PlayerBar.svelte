@@ -9,7 +9,7 @@
 	import { artistNames, formatTime } from '../format';
 	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
-	import { isYoutubeSong } from '../ownModule';
+	import { isYoutubeSong } from '../ownModule.svelte';
 	import { shows } from '../soloLook.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef } from '../protocol.gen';

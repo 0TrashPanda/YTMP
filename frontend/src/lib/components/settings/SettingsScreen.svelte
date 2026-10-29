@@ -157,7 +157,7 @@
 					[
 						['local', 'Local music', 'local', true],
 						['storage', 'Song cache and downloads', 'download', inApp],
-						['module', 'Your own module', 'server', !inApp]
+						['module', 'Where songs play from', 'server', !inApp]
 					]
 				],
 				[

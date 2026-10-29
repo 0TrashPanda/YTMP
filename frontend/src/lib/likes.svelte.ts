@@ -2,7 +2,7 @@
 // player, the player bar and the song menu so they always agree. Needs your YouTube Music sign-in.
 import { SvelteMap } from 'svelte/reactivity';
 import { getRating, setRating } from './api';
-import { isYoutubeSong } from './ownModule';
+import { isYoutubeSong } from './ownModule.svelte';
 import type { LikeStatus } from './protocol.gen';
 import { youtube } from './youtube.svelte';
 

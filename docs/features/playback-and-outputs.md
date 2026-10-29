@@ -68,9 +68,15 @@ permissions say otherwise (permission: *Play audio locally*).
   only work on the internet connection of the host that asked for them, so elsewhere:
   - **the app** looks songs up itself, on the phone, and plays them straight from YouTube;
   - **a browser** does the same with **your own YouTube Music module** on your computer, if
-    you set one up (*Settings → Your own module*: its address and key);
+    you set one up (*Settings → Where songs play from*: its address and key). It can be
+    switched off (kept for later) or removed. It's checked when the page opens and every
+    minute while it doesn't answer; meanwhile the room says so and songs play another way;
   - otherwise, or when that fails, the host streams the song to you (if the server allows
     that on your network, see [server admin](server-admin.md)).
+  - **The order** ✅: in a browser, *Settings → Where songs play from* sets which way is
+    tried first: the room's link, your own module or through the server (for example your
+    module first). When one doesn't work for a song, the next one is tried; through the
+    server is always the last try. Search and pages always come from the room's server.
   - When YouTube won't send a song for a while, the app tries it again a few times and the
     player says so, instead of staying quiet.
 

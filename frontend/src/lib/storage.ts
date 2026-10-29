@@ -42,8 +42,11 @@ export type ImageQuality = 'high' | 'low';
 export type VideoArt = 'crop' | 'fit';
 /** The songs a long list shows at a time: 100, 300 or 1000, or a number typed in between these. */
 export const PAGE_SIZES = { min: 10, max: 5000 };
-/** A YouTube Music module on this computer, to get stream links from your own internet connection. */
-export type OwnModule = { url: string; key: string };
+/** A YouTube Music module on this computer, to get stream links from your own internet connection. Switched off: kept, not used. */
+export type OwnModule = { url: string; key: string; on: boolean };
+/** Where a browser plays a song from: the room's link, your own module, or through the host. */
+export type SongSource = 'direct' | 'own' | 'host';
+export const SONG_SOURCES: readonly SongSource[] = ['direct', 'own', 'host'];
 
 function pick<T extends string>(key: string, options: readonly T[], fallback: T): T {
 	const value = read(key);
@@ -157,12 +160,27 @@ export const saved = {
 	get ownModule(): OwnModule | null {
 		try {
 			const value = JSON.parse(read('ytmp.ownModule') ?? 'null');
-			return typeof value?.url === 'string' && typeof value?.key === 'string' && value.url ? value : null;
+			if (typeof value?.url !== 'string' || typeof value?.key !== 'string' || !value.url) return null;
+			// Saved before it could be switched off: on.
+			return { url: value.url, key: value.key, on: value.on !== false };
 		} catch {
 			return null;
 		}
 	},
 	set ownModule(value: OwnModule | null) {
 		write('ytmp.ownModule', JSON.stringify(value));
+	},
+	/** The order this browser tries the ways to play a song in; each one once. */
+	get songSources(): SongSource[] {
+		try {
+			const value = JSON.parse(read('ytmp.songSources') ?? 'null');
+			if (Array.isArray(value) && value.length === SONG_SOURCES.length && SONG_SOURCES.every((s) => value.includes(s))) return value;
+		} catch {
+			// The default below.
+		}
+		return [...SONG_SOURCES];
+	},
+	set songSources(order: SongSource[]) {
+		write('ytmp.songSources', JSON.stringify(order));
 	}
 };

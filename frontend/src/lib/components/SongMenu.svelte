@@ -38,7 +38,7 @@
 	import { listening } from '../listening.svelte';
 	import { likes } from '../likes.svelte';
 	import type { RoomConnection } from '../room.svelte';
-	import { isYoutubeSong } from '../ownModule';
+	import { isYoutubeSong } from '../ownModule.svelte';
 	import { canDownload, downloadSong } from '../downloads';
 	import { youtube } from '../youtube.svelte';
 	import { sleepTimer } from '../sleepTimer.svelte';

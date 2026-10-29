@@ -5,7 +5,7 @@
 import type { Song } from './protocol.gen';
 import { downloadFile } from './api';
 import { nativeBridge } from './native';
-import { isYoutubeSong } from './ownModule';
+import { isYoutubeSong } from './ownModule.svelte';
 
 /** Songs that can be downloaded: YouTube Music's (not someone's local music). */
 export const canDownload = (song: Song) => isYoutubeSong(song.id);

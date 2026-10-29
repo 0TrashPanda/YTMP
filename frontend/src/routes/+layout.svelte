@@ -6,6 +6,7 @@
 	import { appUpdate, reloadOnUpdate } from '../lib/appUpdate.svelte';
 	import { dev } from '$app/env';
 	import { nativeBridge } from '../lib/native';
+	import { checkOwnModule } from '../lib/ownModule.svelte';
 	import { appLink, webLink } from '../lib/openInApp';
 
 	// Coming back from logging in on an auth server (/connect), or (the app) logged in on your server's pages?
@@ -35,6 +36,9 @@
 	if (!nativeBridge && !dev && !location.pathname.startsWith('/tv') && isSecureContext && 'serviceWorker' in navigator) {
 		navigator.serviceWorker.register('/service-worker.js').catch(() => {});
 	}
+
+	// Your own module, if you set one up: does it answer? (Then every minute while it doesn't.)
+	if (!nativeBridge && !location.pathname.startsWith('/tv')) void checkOwnModule();
 
 	// The host has a newer version of this page (the server was updated): reload to get it.
 	reloadOnUpdate();

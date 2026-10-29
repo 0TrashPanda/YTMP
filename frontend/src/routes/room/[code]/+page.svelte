@@ -47,6 +47,7 @@
 	import { shows } from '../../../lib/soloLook.svelte';
 	import { load as loadSettings, settings } from '../../../lib/settings.svelte';
 	import { saved } from '../../../lib/storage';
+	import { moduleStatus, switchOffOwnModule } from '../../../lib/ownModule.svelte';
 	import { appUpdate } from '../../../lib/appUpdate.svelte';
 	import { ListenRequests } from '../../../lib/listenRequests';
 	import { nativeBridge } from '../../../lib/native';
@@ -676,6 +677,13 @@
 							{#if room.status === 'reconnecting' && room.state && room.can('clone_room')}
 								<button class="ml-1 text-white underline" onclick={() => (sheet = { kind: 'clone' })}>Keep the queue: clone it</button>
 							{/if}
+						</div>
+					{/if}
+					{#if moduleStatus.state === 'down'}
+						<!-- Until it answers again (asked every minute) or you switch it off. -->
+						<div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-raised px-4 py-1 text-center text-sm text-muted">
+							<span>Your own module doesn’t answer ({moduleStatus.text}). Songs play another way meanwhile.</span>
+							<button class="text-white underline" onclick={switchOffOwnModule}>Switch it off</button>
 						</div>
 					{/if}
 					{#if room.state?.migration && room.state.migration.target.code !== code && migrationDismissed !== room.state.migration.target.url}

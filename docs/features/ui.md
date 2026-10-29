@@ -340,7 +340,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
     (the tabs, the dislike button), **Home**, **Song menu**, **Taps and swipes** and **Solo
     rooms** (what a solo room leaves out, below).
   - **Music and storage**: **Local music**, **Song cache and downloads** (the app) and
-    **Your own module** (browsers).
+    **Where songs play from** (browsers: the order, and your own module).
   - **App** (version, updates, logs, opening the room you were in, the Back button) and **Server admin** (invites, accounts).
 - **Your settings on all your devices** ✅: logged in with your YTMP account, almost every
   setting is kept on your account, so all your devices have it, and a change on one shows up

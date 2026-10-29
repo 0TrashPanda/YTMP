@@ -5,11 +5,12 @@ import { DeviceVolume } from './deviceVolume';
 import { artUrl, artistNames } from './format';
 import { EQ_BANDS, EQ_Q, eqHeadroom, equalizer, type EqSettings } from './equalizer.svelte';
 import { nativeBridge, type NativeBridge } from './native';
-import { forgetOwnStream, isYoutubeSong, ownStreamUrl, prefetchOwnStream } from './ownModule';
+import { forgetOwnStream, isYoutubeSong, moduleUsable, ownStreamUrl, prefetchOwnStream } from './ownModule.svelte';
 import type { NowPlaying } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 import { settings } from './settings.svelte';
-import { saved } from './storage';
+import { saved, type SongSource } from './storage';
+import { pickSource, SOURCE_NAMES } from './songSources';
 import { correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
 
 /** Plays the room's audio on this device. */
@@ -63,9 +64,8 @@ interface EqGraph {
 	gain: GainNode;
 }
 
-/** Where the audio comes from: the room's link, a link from your own module, or the host streaming it. */
-type Source = 'direct' | 'own' | 'host';
-const SOURCE_NAMES: Record<Source, string> = { direct: 'the direct link', own: 'your own module', host: 'through the host' };
+/** Where the audio comes from: the room's link, a link from your own module, or the host streaming it (see songSources.ts). */
+type Source = SongSource;
 
 /**
  * Pause, from YTMP's own buttons. With *Pause only stops it here* on, in a party room where
@@ -124,12 +124,12 @@ class WebPlayer implements RoomPlayer {
 	/** This device's volume in the room, for your other devices (see [followVolume]). */
 	private deviceVolume = new DeviceVolume();
 	private volumeReport: ReturnType<typeof setTimeout> | undefined;
-	/** Where songs in this room come from, after what worked so far. */
-	private preferred: Source = 'direct';
+	/** The room's YouTube links didn't play on this connection: passed over for the next songs. */
+	private directFails = false;
 	/** Where the loaded song comes from. */
 	private source = $state<Source>('direct');
-	/** This item goes through the host: its own link didn't work. */
-	private hostItemId: string | null = null;
+	/** The ways already tried for this item (the next one in the order comes after a failure). */
+	private tried: { itemId: string | null; sources: Set<Source> } = { itemId: null, sources: new Set() };
 	/** Counts loads, so a lookup that finishes after the song changed is ignored. */
 	private loads = 0;
 	private loadedItemId: string | null = null;
@@ -378,10 +378,24 @@ class WebPlayer implements RoomPlayer {
 		return { context, filters, gain };
 	}
 
+	private triedFor(itemId: string): Set<Source> {
+		if (this.tried.itemId !== itemId) this.tried = { itemId, sources: new Set() };
+		return this.tried.sources;
+	}
+
+	/** The next way to try for [now] in the chosen order, or null when all were tried. */
+	private nextSource(now: NowPlaying): Source | null {
+		return pickSource(saved.songSources, {
+			tried: this.triedFor(now.item.itemId),
+			youtube: isYoutubeSong(now.item.song.id),
+			directIsYoutube: !(now.streamUrl ?? '').startsWith('/'),
+			moduleUsable: moduleUsable(),
+			directFails: this.directFails
+		});
+	}
+
 	private sourceFor(now: NowPlaying): Source {
-		if (this.hostItemId === now.item.itemId) return 'host';
-		if (this.preferred === 'own') return isYoutubeSong(now.item.song.id) ? 'own' : 'direct';
-		return this.preferred;
+		return this.nextSource(now) ?? 'host';
 	}
 
 	private load(now: NowPlaying, streamUrl: string): void {
@@ -407,8 +421,9 @@ class WebPlayer implements RoomPlayer {
 			},
 			(e: Error) => {
 				if (load !== this.loads) return;
-				reportProblem(`browser: ${e.message} (${songId}), playing it through the host`, this.room.roomCode);
-				this.hostItemId = now.item.itemId;
+				this.triedFor(now.item.itemId).add('own');
+				const next = this.sourceFor(now);
+				reportProblem(`browser: ${e.message} (${songId}), playing it from ${SOURCE_NAMES[next]}`, this.room.roomCode);
 				this.load(now, streamUrl);
 			}
 		);
@@ -541,34 +556,29 @@ class WebPlayer implements RoomPlayer {
 		const error = this.audio.error;
 		const songId = now.item.song.id;
 		const from = this.source;
-		let next: Source = 'host';
-		if (from === 'direct' && isYoutubeSong(songId)) {
-			// The direct URL is probably tied to the host's IP: use your own module for the rest of
-			// the room, or stream through the host.
-			next = saved.ownModule ? 'own' : 'host';
-			this.preferred = next;
-		} else if (from !== 'host') {
-			// Your module's link (or a host's file) didn't play: this song through the host.
-			if (from === 'own') forgetOwnStream(songId);
-			this.hostItemId = now.item.itemId;
-		}
+		this.triedFor(now.item.itemId).add(from);
+		// The room's YouTube link is probably tied to the host's internet connection: the next
+		// songs skip it too.
+		if (from === 'direct' && isYoutubeSong(songId) && !(now.streamUrl ?? '').startsWith('/')) this.directFails = true;
+		if (from === 'own') forgetOwnStream(songId);
+		const next = this.nextSource(now);
 		reportProblem(
 			`browser can't play ${songId} from ${SOURCE_NAMES[from]}: ` +
 				`${MEDIA_ERRORS[error?.code ?? 0] ?? 'unknown error'}${error?.message ? ` (${error.message})` : ''} at ${Math.round(this.audio.currentTime)} s` +
 				(this.eq ? ' with the equalizer (CORS)' : '') +
-				(from === 'host' ? '' : `, switching to ${SOURCE_NAMES[next]}`),
+				(next ? `, switching to ${SOURCE_NAMES[next]}` : ''),
 			this.room.roomCode
 		);
-		if (from !== 'host') {
+		if (next) {
 			this.loadedItemId = null;
 			this.sync();
 		} else {
 			this.error = `Can't play "${now.item.song.title}" on this device.`;
 			// The room doesn't wait for it.
 			this.reportReady(now.item.itemId);
-			// The host can't help either (it may not stream to this network): the next song tries
-			// its direct link again, which often works, instead of failing the same way.
-			if (this.preferred === 'host') this.preferred = 'direct';
+			// Nothing worked (the host may not stream to this network): the next song tries the
+			// room's link again, which often works, instead of failing the same way.
+			this.directFails = false;
 		}
 	}
 
