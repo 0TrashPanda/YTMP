@@ -152,7 +152,7 @@ allows these paths, `AccountService.verifyYoutubeToken`).
 | GET | `/api/me/convert/jobs` | `ConvertJobList`, newest first |
 | GET | `/api/me/convert/jobs/{id}` | `ConvertJob`: status, waiting and until when, time left, counts, lists |
 | GET | `/api/me/convert/jobs/{id}/items?state=&cursor=` | `ConvertItemPage`: its songs, each once, 50 at a time, by state |
-| PUT | `/api/me/convert/jobs/{id}/items/{key}` | `ConvertPick { song }` or `{ leftOut: true }` |
+| PUT | `/api/me/convert/jobs/{id}/items/{key}` | `ConvertPick { song }`, `{ leftOut: true }` (its match becomes the first option) or `{ back: true }` (left out → what it was before, kept as `leftFrom`) |
 | POST | `/api/me/convert/jobs/{id}/accept-unsure`, `/pause`, `/resume`, `/cancel` | → `ConvertJob` |
 | DELETE | `/api/me/convert/jobs/{id}` | Off the list; its playlists stay |
 

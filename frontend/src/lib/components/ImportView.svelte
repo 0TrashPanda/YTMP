@@ -183,7 +183,7 @@
 
 	// --- one import's songs ---
 
-	type Filter = 'unsure' | 'not_found' | 'all';
+	type Filter = 'unsure' | 'not_found' | 'left_out' | 'all';
 	let filter = $state<Filter>('unsure');
 	let rows = $state<ConvertItemRow[]>([]);
 	let next = $state<string | null>(null);
@@ -221,14 +221,15 @@
 		found = [];
 	}
 
-	async function choose(row: ConvertItemRow, song: Song | null) {
+	/** [song] for this row, or (null) leave it out; [back]: a song left out, back as it was. */
+	async function choose(row: ConvertItemRow, song: Song | null, back = false) {
 		if (!jobId) return;
 		const index = rows.findIndex((r) => r.key === row.key);
 		try {
-			const picked = await pickImportSong(jobId, row.key, song ? { song, leftOut: false } : { song: null, leftOut: true });
+			const picked = await pickImportSong(jobId, row.key, { song, leftOut: !song && !back, back });
 			// Out of this filter now (unless it's All).
 			stopListening();
-			rows = filter === 'all' ? rows.map((r) => (r.key === row.key ? picked : r)) : rows.filter((r) => r.key !== row.key);
+			rows = filter === 'all' || filter === picked.state ? rows.map((r) => (r.key === row.key ? picked : r)) : rows.filter((r) => r.key !== row.key);
 			open = null;
 			// Back to the list where you were: the row closed (or the next one, when it left this filter).
 			await tick();
@@ -424,8 +425,8 @@
 
 			<section class="flex flex-col gap-3">
 				<h2 class="text-lg font-bold">Checking songs</h2>
-				<div class="flex gap-2">
-					{#each [['unsure', 'Not sure'], ['not_found', 'Not found'], ['all', 'All']] as [value, label] (value)}
+				<div class="flex flex-wrap gap-2">
+					{#each [['unsure', 'Not sure'], ['not_found', 'Not found'], ['left_out', 'Left out'], ['all', 'All']] as [value, label] (value)}
 						<button
 							class="rounded-lg px-3 py-1.5 text-sm font-medium {filter === value ? 'bg-white text-black' : 'bg-raised hover:bg-line'}"
 							onclick={() => (filter = value as Filter)}>{label}</button
@@ -467,7 +468,12 @@
 										</button>
 									{/if}
 								{:else}
-									<p class="px-1 text-sm text-muted">{row.state === 'left_out' ? "Not added. Pick one below to add it after all." : 'Nothing yet: pick one below, or search'}</p>
+									<p class="px-1 text-sm text-muted">{row.state === 'left_out' ? 'Not added. Pick one below to add it after all, or put it back.' : 'Nothing yet: pick one below, or search'}</p>
+									{#if row.state === 'left_out'}
+										<button class="flex items-center gap-2 self-start rounded-full bg-raised px-4 py-1.5 text-sm font-medium hover:bg-line" onclick={() => choose(row, null, true)}>
+											<Icon name="replay" size={18} />Put it back
+										</button>
+									{/if}
 								{/if}
 								{#if others.length}
 									<p class="pt-2 text-xs font-medium uppercase tracking-wide text-muted">{current ? 'Or one of these' : 'Maybe one of these'}</p>
@@ -492,7 +498,7 @@
 						{/if}
 					</div>
 				{:else}
-					<p class="text-muted">{loadingRows ? 'Loading…' : filter === 'unsure' ? 'No songs to check.' : filter === 'not_found' ? 'Every song was found.' : 'No songs.'}</p>
+					<p class="text-muted">{loadingRows ? 'Loading…' : filter === 'unsure' ? 'No songs to check.' : filter === 'not_found' ? 'Every song was found.' : filter === 'left_out' ? 'No songs left out.' : 'No songs.'}</p>
 				{/each}
 				{#if next}
 					<button class="self-center rounded-full bg-raised px-4 py-2 text-sm hover:bg-line disabled:opacity-50" disabled={loadingRows} onclick={() => loadRows(false)}>More</button>

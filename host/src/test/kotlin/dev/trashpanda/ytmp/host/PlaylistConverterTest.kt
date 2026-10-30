@@ -181,6 +181,11 @@ class PlaylistConverterTest {
         // Not matched to anything now; what it was stays an option.
         assertNull(left.song)
         assertEquals("ytm:cover", left.candidates.first().id)
+        // Put back: not sure again, with the same guess; then left out for the rest of the test.
+        val back = converter.pick("me", first.id, unsure.key, ConvertPick(back = true))
+        assertEquals(ConvertItemState.UNSURE, back.state)
+        assertEquals("ytm:cover", back.song?.id)
+        converter.pick("me", first.id, unsure.key, ConvertPick(leftOut = true))
         converter.waitFor(first.id) { it.status == ConvertJobStatus.DONE }
         val asked = search.asked.size
 

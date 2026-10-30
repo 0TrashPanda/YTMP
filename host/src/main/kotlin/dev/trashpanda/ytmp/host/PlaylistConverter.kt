@@ -182,7 +182,16 @@ class PlaylistConverter(
         val entry = job.entries[key] ?: throw ConvertException("That song isn't in this import", notFound = true)
         val song = pick.song
         when {
+            pick.back -> {
+                if (entry.state != ConvertItemState.LEFT_OUT) throw ConvertException("That song isn't left out")
+                putBack(entry)
+                forget(key, entry.item)
+                save(job)
+                wake.trySend(Unit)
+                return@withLock row(key, entry, job.lists.filter { key in it.keys }.map { it.name })
+            }
             pick.leftOut -> {
+                if (entry.state != ConvertItemState.LEFT_OUT) entry.leftFrom = entry.state
                 // What it was matched to stays one of the options, to pick after all.
                 entry.candidates = (listOfNotNull(entry.song) + entry.candidates).distinctBy { it.id }.take(CANDIDATES)
                 entry.song = null
@@ -201,6 +210,34 @@ class PlaylistConverter(
         save(job)
         wake.trySend(Unit)
         row(key, entry, job.lists.filter { key in it.keys }.map { it.name })
+    }
+
+    /**
+     * A song you left out, as it was before: found, not sure (with what it was matched to, the
+     * first of the options now) or not found. Left out before that was kept: by how sure YTMP was.
+     */
+    private fun putBack(entry: StoredEntry) {
+        // Left out before its match moved to the options.
+        entry.song?.let { old -> entry.candidates = (listOf(old) + entry.candidates).distinctBy { it.id } }
+        val score = entry.score
+        val was = entry.leftFrom ?: when {
+            entry.candidates.isEmpty() || score == null -> ConvertItemState.NOT_FOUND
+            score >= ConvertMatcher.MATCH -> ConvertItemState.MATCHED
+            score >= ConvertMatcher.UNSURE -> ConvertItemState.UNSURE
+            else -> ConvertItemState.NOT_FOUND
+        }
+        val matched = was == ConvertItemState.MATCHED || was == ConvertItemState.UNSURE
+        entry.song = if (matched) entry.candidates.firstOrNull() else null
+        if (matched) entry.candidates = entry.candidates.drop(1)
+        entry.state = if (matched && entry.song == null) ConvertItemState.NOT_FOUND else was
+        entry.leftFrom = null
+        entry.manual = false
+    }
+
+    /** Forgets that [item] was left out by hand, so the next import looks it up again. */
+    private fun forget(key: String, item: ConvertItem) {
+        for (k in setOf(key, textKey(item))) if (memory[k]?.let { it.manual && it.song == null } == true) memory.remove(k)
+        memoryDirty = true
     }
 
     /** Accepts every song it wasn't sure about as it is. */
@@ -607,6 +644,8 @@ class PlaylistConverter(
         var candidates: List<Song> = emptyList(),
         var score: Double? = null,
         var manual: Boolean = false,
+        /** What it was before you left it out, to put it back as that. */
+        var leftFrom: ConvertItemState? = null,
     ) {
         fun writable() = state == ConvertItemState.MATCHED && song != null
     }

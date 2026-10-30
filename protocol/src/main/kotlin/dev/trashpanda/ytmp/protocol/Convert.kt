@@ -205,7 +205,7 @@ data class ConvertItemRow(
 @SerialName("ConvertItemPage")
 data class ConvertItemPage(val items: List<ConvertItemRow>, val next: String?)
 
-/** `PUT /api/me/convert/jobs/{id}/items/{key}`: this song, or leave it out. */
+/** `PUT /api/me/convert/jobs/{id}/items/{key}`: this song, leave it out, or put a song left out back as it was ([back]). */
 @Serializable
 @SerialName("ConvertPick")
-data class ConvertPick(val song: Song? = null, val leftOut: Boolean = false)
+data class ConvertPick(val song: Song? = null, val leftOut: Boolean = false, val back: Boolean = false)

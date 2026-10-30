@@ -1605,6 +1605,7 @@ export interface ConvertItemPage {
 export interface ConvertPick {
   song: Song | null;
   leftOut: boolean;
+  back: boolean;
 }
 
 export interface BackupInfo {
