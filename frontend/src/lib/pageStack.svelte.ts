@@ -1,6 +1,6 @@
 // The pages you opened in a room, in order: Home at the bottom, then Library or Local (the
 // bottom bar starts over from there), then search, find similar, artist, album, playlist,
-// podcast, genre, folder and history pages. Back (the phone's, or the back arrow) goes to the
+// podcast, genre, folder, history and import pages. Back (the phone's, or the back arrow) goes to the
 // one before, scrolled as you left it. A new kind of page is a new View.
 import { forgetLocalPlace, localPlace } from './local.svelte';
 import type { RadioFrom, Song } from './protocol.gen';
@@ -18,7 +18,8 @@ export type View =
 	| { kind: 'podcast'; id: string; title: string }
 	| { kind: 'genre'; library: string; name: string }
 	| { kind: 'folder'; library: string; path: string }
-	| { kind: 'history' };
+	| { kind: 'history' }
+	| { kind: 'import'; jobId?: string };
 
 export type Page = ({ kind: Section } | View) & { scrollTop?: number };
 

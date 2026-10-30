@@ -1,190 +1,180 @@
 # Playlist converter
 
-> Status: **planned**. First step: the Spotify export reader, the matcher, the YTM playlist
-> writer, the stored jobs and the screens. Readers and writers after that are separate steps.
+> Status: **built**: the Spotify export reader, the matcher with its match memory, stored
+> jobs, the YouTube Music writer (new or existing playlists, likes, follows), the API and the
+> screens. Tried in a browser against a local server with a fake module (an import of two
+> playlists, a song picked by hand put in its place); not yet with a real Spotify export or real
+> YouTube Music. Not built yet: listening to a candidate while checking, a phone notification,
+> matches in the song graph's `song_sources`, other readers and writers.
 
 Feature: [importing playlists](../features/importing-playlists.md).
 
 ## The shape
 
-One converter for every input and output, in the **host** (`host/.../convert/`), so the
-server and the phone run the same code:
+One converter for every input and output, in the **host**, so the server and the phone run
+the same code:
 
 ```
 reader  →  lists (one shared format)  →  matcher  →  writer
 ```
 
-- A **reader** turns an input into lists. File readers: the Spotify export (first), later
-  Google Takeout's playlists. Account readers: YTM (`/me/playlists`, `/me/playlists/{id}`),
-  later Spotify. A reader first answers a **preview** (the lists and how many items each has),
-  then the items.
-- The **matcher** turns an item into a song of the target source, using that source's normal
-  module `search` (modules don't match; see [song matching](storage.md#song-matching)).
-  When the reader's source is the target's (YTM to YTMP playlists), the IDs go straight
-  through, without matching.
-- A **writer** puts the matched songs somewhere: a YTM playlist (first), later a YTMP
-  playlist. It says what it can do (make a new playlist, add to an existing one, put a song in
-  its place).
+| Part | Where |
+|---|---|
+| Readers | `SpotifyExport.kt` (later Google Takeout's playlists, YTM and Spotify accounts) |
+| Matcher | `ConvertMatcher.kt`: searches the target source with its normal module `search` (modules don't match; see [song matching](storage.md#song-matching)) |
+| Jobs, the match memory, the worker, the YTM writer | `PlaylistConverter.kt` |
+| API | `ConvertRoutes.kt` (`/api/me/convert/…`) |
+| Wire types | `protocol/.../Convert.kt` |
 
-New readers and writers are a class each; the jobs, the matcher and the screens stay.
+When a later reader's source is the target's (YTM to YTMP playlists), the IDs can go straight
+through without matching. A new reader is a function from the upload to `ConvertRead`; a new
+writer a branch in `PlaylistConverter.write`.
 
 ## The shared format
 
-```kotlin
-ConvertList(
-    name: String, description: String?,
-    kind: ConvertListKind,              // PLAYLIST, LIKED_SONGS, SAVED_EPISODES, FOLLOWED_SHOWS
-    items: List<ConvertItem>,
-)
-
-ConvertItem(
-    type: ConvertItemType,              // SONG, EPISODE, LOCAL_FILE, SHOW
-    title: String, artists: List<String>, album: String?,
-    durationMs: Long?, isrc: String?,   // each only when the source has it
-    sourceId: String?,                  // "spotify:track:…", a YTM video ID, …
-    show: String?,                      // an episode's podcast
-    addedAt: Instant?,
-)
-```
-
-The order of `items` is the playlist's order.
+A reader gives `ConvertList(name, kind, items)` and `ConvertItem(type, title, artists,
+album, durationMs, isrc, sourceId, show)`, each field only when the source has it
+(`protocol/.../Convert.kt`). `kind`: playlist, liked songs, saved episodes, followed shows;
+`type`: song, episode, local file, show. The order of `items` is the list's order.
 
 ## Readers
 
 ### Spotify data export
 
-The zip from *Download your data → Account data*, sent as it is (like
-`POST /api/cache/takeout`) and read streaming. In its folder `Spotify Account Data/` only
-these are read; the rest (user data, streaming history, inferences) is skipped and nothing of
-the zip is kept:
+The zip from *Download your data → Account data* (or one JSON from it, picked alone), sent
+as it is and read with `ZipInputStream`. Only `Playlist1.json`, `Playlist2.json`, … and
+`YourLibrary.json` are read (in that order); the rest (user data, streaming history) is
+skipped and nothing of the upload is kept.
 
-- `Playlist1.json`, `Playlist2.json`, …: `{ playlists: [{ name, lastModifiedDate, description,
-  items: [{ track, episode, localTrack, addedDate }] }] }`. One of the three is set per row:
-  - `track: { trackName, artistName, albumName, trackUri }`: a song. Only the first artist.
-  - `episode`: a podcast episode (its fields still to check with a real export, probably
-    `episodeName`, `showName`, `episodeUri`).
-  - `localTrack: { uri }`: a file added from the user's own disk,
-    `spotify:local:<artist>:<album>:<title>:<seconds>`, form-encoded; still a song, often one
-    YTM has.
-- `YourLibrary.json`: `{ tracks: [{ artist, album, track, uri }], albums, artists, shows,
-  episodes, bannedTracks }`. `tracks` is *Liked songs*; `shows` and `episodes` the podcasts.
-  Saved albums, followed artists and hidden songs aren't imported (bulk saving and following
-  is what YouTube's spam filters look for).
+- `Playlist*.json`: `{ playlists: [{ name, items: [{ track, episode, localTrack, … }] }] }`.
+  - `track: { trackName, artistName, albumName, trackUri }`: a song (only the first artist).
+  - `episode`: a podcast episode, read as `episodeName`/`name`, `showName`/`show`,
+    `episodeUri`/`uri` (still to check with a real export).
+  - `localTrack: { uri }`: a file from the user's own disk,
+    `spotify:local:<artist>:<album>:<title>:<seconds>`, form-encoded.
+  - Anything else (an audiobook, a blank row) is counted as skipped.
+- `YourLibrary.json`: `tracks: [{ artist, album, track, uri }]` is *Liked songs*, `episodes`
+  *Saved episodes* and `shows` the followed podcasts. Saved albums, followed artists and hidden
+  songs aren't imported (bulk saving and following is what YouTube's spam filters look for).
 
-There's no length and no ISRC, so matching is on title, artist and album. A zip without any of
-these files is refused with one message (the wrong export, or not unpacked by Spotify yet).
+There's no length and no ISRC, so matching is on title, artist and album. An upload with none
+of these files is refused with one message. Tests: `SpotifyExportTest` (a zip built in the
+test).
 
-To check with a real export: the episode fields, whether followed (not own) playlists are in
-it, and whether `YourLibrary.json` has more fields than the above. A test zip with these fields
-is in the host's tests.
+To check with a real export: the episode and show fields, whether followed (not own)
+playlists are in it.
 
 ## Matching
 
-`SongMatcher` (host), for each item, in order:
+`ConvertMatcher.match`:
 
-1. **Match memory** (`song_matches`): matched before, by anyone on this host? By `sourceId`
-   when there is one, else by the [match key](storage.md#song-matching) (title and main
-   artist, normalised as `SongMatch` does) plus the album. A pick made by hand always wins.
-2. **ISRC**, when the item has one and the target module has `isrc_lookup`.
-3. **Search** `artist + title` (episodes: `type=episodes` with the show; shows:
-   `type=podcasts`) and score each result:
-   - title and artist, after normalising
-   - album, when known
-   - length, when both are known (within ±3 s scores high)
-   - a song (the album version) before a music video; a video only when the setting allows it
-4. Above the threshold: **matched**. Just below: **unsure**, with the best ~5 candidates kept.
-   Otherwise **not found**, still with what the search gave. The thresholds are set against a
-   real export.
+- Songs and local files: a search (`type=songs`) for "artist title", with Spotify's
+  " - Remastered 2011"-style notes left out of the title. When no song scores as sure and
+  *music videos* is on, a second search (`type=videos`).
+- Episodes: `type=episodes` for "show title"; shows: `type=podcasts` for the name (a podcast
+  is kept as a `Song` with its ID and `podcast` set, so all rows look alike).
+- Each result is scored 0..1 (`score`): title 55%, artist 35%, album 10% (after
+  `SongMatch.normalize`: no accents, brackets or "feat."); within 3 s of a known length adds
+  a little, over 20 s off takes a lot; a different version (live, remix, acoustic, sped up, …)
+  takes 0.3; a video a little.
+- **Matched** from 0.85, **unsure** from 0.5 (with the best guess and up to 4 others), else
+  **not found** (still with what the search gave).
 
-Every match (also by hand) goes into `song_matches` and into `song_sources`, so the
-[song graph](storage.md#song-graph) knows the Spotify song and the YTM song are one.
-
-The same item in several lists (or twice in one) is matched once per job.
+Before any search, the **match memory** (`matches.json`): matched before on this host (by
+anyone, on a server), by the item's source ID, else by its type, title, artist and album. A
+pick made by hand is kept there too (also *leave it out*) and always wins over an automatic
+match. The same song in several lists of a job is one entry, so it's looked up once; a song
+waiting in another import is matched with it.
 
 ## Jobs
 
-A conversion is a stored **job**, so it survives the app closing and the server restarting:
+A job is kept as `job-<id>.json` in the converter's folder: owner, title, reader, settings,
+its lists (name, kind, target, the entry key of each row, the target playlist's ID once made,
+which rows are written, the song IDs in the target, rows still to put in their place, the last
+error) and its entries (each song once: the item, state, chosen song, candidates, score, picked
+by hand). Picks and writes are kept at once, looked-up songs at most every 30 s (a crash looks
+those few up again). The uploaded file isn't kept; a read is kept in memory for an hour, until
+the job starts.
 
-- **Job**: owner (the account, or the phone's owner), reader and target kind, settings, status:
-  `MATCHING`, `PAUSED` (by hand, or by the bot check until a time), `NEEDS_YOU` (only unsure or
-  not-found songs left), `DONE`, `CANCELLED`, `FAILED` (with why).
-- **List**: its place in the job, name, kind, the target (`new` with a title, or an existing
-  playlist's ID), the target playlist's ID once made, and its state (`WAITING`, `WRITTEN`).
-- **Item**: its place, the `ConvertItem`, its state (`PENDING`, `MATCHED`, `UNSURE`,
-  `NOT_FOUND`, `LEFT_OUT`), the chosen song, the candidates and score, whether it was picked by
-  hand, and whether it's written.
+| | Folder |
+|---|---|
+| Server | `imports/` next to the SQLite database (`imports` in the working folder with PostgreSQL) |
+| Phone | `files/imports` in the app's storage |
 
-`ConvertStore` is the interface. The server: tables `conversions`, `conversion_lists`,
-`conversion_items` and `song_matches` (new steps in `Database.kt`'s migration list). The phone:
-the same tables in its own SQLite next to `PhoneRoomStore`. The parsed lists are stored with
-the job; the uploaded file is not.
+**Owner**: on a server the account (`HostSources.personalId`, the same account `personalFor`
+finds); on a phone `"device"`, its own sign-in. A job uses its owner's YouTube Music
+(`personalOf`) when it writes, also with nobody looking.
 
-A job runs on the host where it's started, with that host's YouTube Music sign-in: started in
-the app, the phone's own sign-in; on a server, the account's. On the phone there's one store
-and one match memory per phone.
+**Status** (worked out each time, not stored): cancelled, paused, *matching* while songs are
+pending or a list has something to write, *needs you* while unsure songs wait, else *done*.
+Not-found songs don't hold it up.
+
+Lists longer than 5,000 songs (a YouTube Music playlist's limit) are split into parts
+"Name (2)", ….
 
 ## Background work
 
-`ConvertWorker` (host): one item at a time across all jobs, oldest job first, with a pause
-between searches (a constant to tune, starting cautious). It shares one YouTube budget with
-[learning radios](../features/history-and-recommendations.md#learning-from-youtube-music),
-so the two never search at the same time.
+One worker (`PlaylistConverter.run`) for all jobs, oldest first:
 
-- On the bot check (the module's existing error) every job goes to `PAUSED` for the same wait
-  the rooms use, then on by itself.
-- The server: always. The phone: while the app is open or playing, and with *Also overnight*
-  like learning radios (the same background window, charging on Wi-Fi).
-- Restarting picks up the first `PENDING` item; an item being looked up when it stopped is
-  looked up again.
+- A list that's looked up whole and has something to write goes first, but never twice in a
+  row while songs wait, so a long list of likes doesn't hold the rest up.
+- Otherwise the next pending song, then a pause of 4 s (`GAP_MS`, LocalMatcher's pace).
+  Radio learning keeps its own pace next to it.
+- YouTube's bot check (`SourceBlocked`, or "bot"/"confirm"/429 in the message): every job
+  waits 30 minutes (*"YouTube asked to confirm this isn't a bot: again at 14:20"*), another
+  error 5 minutes. A write that fails (also *not signed in*) is tried again after 10 minutes,
+  with its error shown.
+- The server: always. The phone: while its host runs, and woken with the radio crawl's
+  background runs (`crawlAwake`).
 
 ## Writing
 
-As soon as every item of a list is past `PENDING`, the writer writes it:
-
-- **New YTM playlist**: `POST /me/playlists` with the title and the first part of the songs,
-  then `POST /me/playlists/{id}/songs` in parts of 50 with a pause between, in the list's order.
-- **Existing playlist**: read it (`/me/playlists/{id}`) and add only what isn't in it.
-- Items picked later (unsure, not found) are added and put in their place with
-  `POST /me/playlists/{id}/move` (`itemId` from `PlaylistPage.itemIds`).
-- *Liked songs* into a playlist, or as likes (`PUT /me/likes/{songId}`, a few a minute);
-  followed shows with `PUT /me/podcasts/{id}/saved`, also slowly.
-- Each item is marked written, so running it again or going on after a crash never adds a song
-  twice. A target playlist that was deleted meanwhile makes the list `FAILED`, with *Make it
-  again*.
+- **New playlist**: `createPlaylist` with the first 50 songs, then `addToPlaylist` 50 at a
+  time with 2 s between, in the list's order.
+- **Existing playlist**: read whole first; only what isn't in it is added.
+- Each song goes in **once** per playlist (YouTube refuses a whole part when one of its songs
+  is in the playlist already; then they're added one by one).
+- Songs picked later are added, then put in their place with `movePlaylistItem` (before the
+  next song of the list that's in place), reading the playlist for the `itemId`s.
+- **Likes** (`setRating`) and **follows** (`setPodcastSaved`): 4 per step, 15 s apart.
+- Each row is marked written, so going on after a restart never adds a song twice.
 
 ## API (host)
 
-In `ConvertRoutes` (with `PersonalRoutes`: your own imports only):
+Under `/api/me/` like the rest of your YouTube Music, so a page of a room on another host
+reaches the host with your sign-in (`youtubeFrom` in the web app; the server's YouTube token
+allows these paths, `AccountService.verifyYoutubeToken`).
 
 | Method | Path | What |
 |---|---|---|
-| POST | `/api/convert/read?reader=spotify-export` | The file as the body → `ConvertPreview` (`readId`, lists with name, kind, item count). The parsed lists are kept in memory for an hour |
-| POST | `/api/convert/jobs` | `{ readId, lists: [{ index, target }], settings }` → the job |
-| GET | `/api/convert/jobs` | Your jobs with their counts |
-| GET | `/api/convert/jobs/{id}` | One job, its lists and counts, the time left |
-| GET | `/api/convert/jobs/{id}/items?state=&cursor=` | Its items, in parts, by state (for *Checking songs*) |
-| PUT | `/api/convert/jobs/{id}/items/{itemId}` | Pick: `{ song }` (a candidate or from your own search) or `{ leftOut: true }` |
-| POST | `/api/convert/jobs/{id}/accept-unsure` | Accept every unsure item as it is |
-| POST | `/api/convert/jobs/{id}/pause`, `/resume` | |
-| DELETE | `/api/convert/jobs/{id}` | Cancel; the playlists made stay |
+| POST | `/api/me/convert/read?reader=spotify-export` | The file as the body → `ConvertPreview` (`readId`, the lists with name, kind, count; skipped rows) |
+| POST | `/api/me/convert/jobs` | `ConvertStartRequest { readId, lists: [{ index, target }], settings }` → `ConvertJob` |
+| GET | `/api/me/convert/jobs` | `ConvertJobList`, newest first |
+| GET | `/api/me/convert/jobs/{id}` | `ConvertJob`: status, waiting and until when, time left, counts, lists |
+| GET | `/api/me/convert/jobs/{id}/items?state=&cursor=` | `ConvertItemPage`: its songs, each once, 50 at a time, by state |
+| PUT | `/api/me/convert/jobs/{id}/items/{key}` | `ConvertPick { song }` or `{ leftOut: true }` |
+| POST | `/api/me/convert/jobs/{id}/accept-unsure`, `/pause`, `/resume`, `/cancel` | → `ConvertJob` |
+| DELETE | `/api/me/convert/jobs/{id}` | Off the list; its playlists stay |
 
-Searching by hand uses the normal search. While an import screen is open it asks for the job
-every few seconds; a push over the WebSocket can come later. The types are in `protocol/`
-(`ConvertPreview`, `ConvertJob`, `ConvertJobList`, `ConvertItemRow`, `ConvertSettings`, …) and
-generated for the web app.
+Targets: `new_playlist` (with `title`), `existing_playlist` (with `playlistId`), `likes`,
+`follow` (only for followed shows, and they only that). Refusals are 400 with a message (404 for
+someone else's import).
 
 ## Web app
 
-`frontend/src/routes/import/`: the source and file, *What to import*, the settings, *Your
-imports* and *Checking songs*, the same on the phone and in a browser. Reached from *Library*
-and *Settings*. The phone's notification comes from the app (`android/`), when a job becomes
-`NEEDS_YOU` or `DONE`.
+`ImportView.svelte`, a page of the room (`{ kind: 'import', jobId? }`), reached from
+*Library → Import* when signed in to YouTube Music: *Your imports*, a new import (the how-to,
+the file, *What to import* with a target per list, the settings) and an import's page (its
+lists with *Open*, *Pause / Go on / Cancel*, *Accept all*, and *Checking songs* by filter: the
+candidates, a search of your own, *Leave it out*). While an import goes, its page asks every
+3 s.
 
 ## Tests
 
-- The Spotify reader on a test zip (songs, episodes, local files, a blank row, a zip without
-  the files).
-- The matcher's scoring on a set of real-looking cases (remasters, "feat.", live versions,
-  videos only), with a fake search.
-- Jobs: going on after a stop, the bot check pause, writing in order and never twice, a pick by
-  hand put in its place, the match memory used across jobs.
+- `SpotifyExportTest`: playlists, library, episodes, local files, skipped rows, wrong files.
+- `ConvertMatcherTest`: scoring (remasters, accents, feat., covers, live and remix versions,
+  lengths, videos, episodes, shows) and the songs-then-videos searches.
+- `PlaylistConverterTest`: each song looked up once, the playlist in order, an unsure song
+  picked later put in its place, the memory across imports and restarts, the bot check pause,
+  an existing playlist, likes, per-person imports.
+- `ApplicationTest`: the routes on a phone host, refused for a friend on the Wi-Fi.

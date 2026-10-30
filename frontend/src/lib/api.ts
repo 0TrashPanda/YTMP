@@ -51,7 +51,15 @@ import type {
 	MovePlaylistItemRequest,
 	RenamePlaylistRequest,
 	RadioCrawlStatus,
-	RadioFrom
+	RadioFrom,
+	ConvertItemPage,
+	ConvertItemRow,
+	ConvertItemState,
+	ConvertJob,
+	ConvertJobList,
+	ConvertPick,
+	ConvertPreview,
+	ConvertStartRequest
 } from './protocol.gen';
 
 import { identity } from './account';
@@ -553,6 +561,51 @@ export async function createPlaylist(title: string, songIds: string[]): Promise<
 	});
 	forgetLibrary();
 	return response.id;
+}
+
+// --- importing playlists (docs/features/importing-playlists.md), on the host with your YouTube Music ---
+
+/** What's in an export (a Spotify data export: the zip, or a JSON from it). */
+export function readImport(file: File, reader = 'spotify-export'): Promise<ConvertPreview> {
+	return request(`/api/me/convert/read?reader=${encodeURIComponent(reader)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+}
+
+export function startImport(start: ConvertStartRequest): Promise<ConvertJob> {
+	return request('/api/me/convert/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(start) });
+}
+
+export async function getImports(): Promise<ConvertJob[]> {
+	return (await request<ConvertJobList>('/api/me/convert/jobs')).jobs;
+}
+
+export function getImport(id: string): Promise<ConvertJob> {
+	return request(`/api/me/convert/jobs/${encodeURIComponent(id)}`);
+}
+
+/** An import's songs, each once; [state]: only those. */
+export function getImportItems(id: string, state: ConvertItemState | null, cursor: string | null = null): Promise<ConvertItemPage> {
+	const query = new URLSearchParams();
+	if (state) query.set('state', state);
+	if (cursor) query.set('cursor', cursor);
+	return request(`/api/me/convert/jobs/${encodeURIComponent(id)}/items?${query}`);
+}
+
+/** This song for one of an import's songs, or leave it out. */
+export function pickImportSong(id: string, key: string, pick: ConvertPick): Promise<ConvertItemRow> {
+	return request(`/api/me/convert/jobs/${encodeURIComponent(id)}/items/${encodeURIComponent(key)}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(pick)
+	});
+}
+
+export function importAction(id: string, action: 'accept-unsure' | 'pause' | 'resume' | 'cancel'): Promise<ConvertJob> {
+	return request(`/api/me/convert/jobs/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+}
+
+/** Takes an import off the list; its playlists stay. */
+export async function removeImport(id: string): Promise<void> {
+	await request<null>(`/api/me/convert/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 let refreshHome = false;

@@ -1,8 +1,10 @@
 # Importing playlists
 
-> Status: **planned**. First: a **Spotify data export** into **YouTube Music playlists**.
-> Later: other exports (Google Takeout's playlists), playlists from a linked account (YouTube
-> Music, Spotify) and **YTMP playlists** as a place to put them.
+> Status: **built** for a **Spotify data export** into **YouTube Music** (playlists, likes,
+> followed podcasts), on a server and on the phone; not yet tried with a real export. Not yet:
+> listening to a song while checking, a notification on the phone. Later: other exports
+> (Google Takeout's playlists), playlists from a linked account (YouTube Music, Spotify) and
+> **YTMP playlists** as a place to put them.
 > Implementation: [playlist converter](../implementation/playlist-converter.md).
 
 Bring your playlists from somewhere else into YTMP: from a file you download (an export) or
@@ -28,29 +30,31 @@ and you can check the songs it wasn't sure about.
 
 ## How it goes
 
-1. **Import** (in *Library*, and in *Settings*): pick where from, for now *Spotify data
-   export*, and pick the zip. A short how-to says how to get it from Spotify.
+1. **Library → Import → From Spotify** (signed in to YouTube Music), and pick the zip (or
+   `Playlist1.json` from it). A short how-to says how to get it from Spotify.
 2. **What to import**: the playlists in it with their number of songs, plus *Liked songs*
-   and *Podcasts*, each with a checkbox. For each one: a new playlist (the name can be
-   changed) or one of your playlists to add to.
+   and the podcasts, each with a checkbox. For each one: a new playlist (the name can be
+   changed) or one of your playlists to add to; liked songs can also become likes.
 3. The [settings](#settings) for this import, then **Start**.
-4. YTMP looks up the songs in the background, a calm pace at a time so YouTube doesn't block
-   your network. Songs that are in several playlists are looked up once, and songs it found
-   before (also for other people on your server) aren't looked up again.
+4. YTMP looks up the songs in the background, one every few seconds so YouTube doesn't block
+   your network (a thousand songs take about an hour). Songs that are in several playlists are
+   looked up once, and songs it found before (also for other people on your server) aren't
+   looked up again.
 5. Each playlist is made **as soon as its songs are looked up**, with the songs YTMP is sure
    about, in their order. The others wait for you and are put in their place once you pick
-   them.
-6. A notification on the phone when it's done, or when it needs you.
+   them. Each song is in a playlist once.
 
-If YouTube asks whether you're a bot, the import pauses (*"Paused by YouTube's bot check,
-again at 14:20"*) and goes on by itself. Closing the app or restarting the server doesn't
+If YouTube asks whether you're a bot, the import waits half an hour (*"YouTube asked to
+confirm this isn't a bot: again at 14:20"*) and goes on by itself. On the phone it goes on
+while the app runs. Closing the app or restarting the server doesn't
 lose anything: it goes on where it was. Importing the same thing again doesn't add songs twice.
 
 ## Your imports
 
 A list of your imports, each with a bar, *312 of 1,040 songs · about 40 min left*, and how
-many were **found**, **not sure** and **not found**. *Pause*, *Go on* and *Cancel* (the
-playlists made so far stay). When it's done: *Open in YouTube Music*.
+many were **found**, **not sure** and **not found**. An import's page has its lists (how many
+songs are in, and *Open* for the playlist), *Pause*, *Go on* and *Cancel* (the playlists made
+so far stay). A finished one can be taken off the list.
 
 ## Checking songs
 
@@ -58,24 +62,26 @@ The songs YTMP wasn't sure about or didn't find, in a list like YouTube Music's:
 
 - Filters: *Not sure*, *Not found*, *All*.
 - Each song shows what it was (title, artist, album) and what YTMP picked, with its cover.
-  Tap to **listen**, to see the **other options** it found, to **search yourself**, or to
-  **leave it out**.
+  Tap it for *This one is right*, the **other options** it found, a **search of your own**,
+  or **leave it out**.
 - *Accept all* for when the ones it wasn't sure about look right.
 
 A song you pick is remembered, so it's right in the next import too.
 
 ## Settings
 
-The defaults are in *Settings*, and each import can change them before it starts.
+Set for each import before it starts.
 
 - **Add songs I'm not sure about without asking**: off.
 - **Music videos when there's no song version**: on. YTMP prefers the song itself (the
   album version) over its video.
-- **Liked songs**: into a playlist *Liked on Spotify* (default), or as likes on YouTube Music
-  (slowly; thousands of likes at once look like spam to YouTube).
+- **Liked songs** (where it goes, with the lists): into a playlist *Liked on Spotify*
+  (default), or as likes on YouTube Music (slowly; thousands of likes at once look like spam
+  to YouTube).
 - **Podcasts**: the shows you follow are followed on YouTube Music, saved episodes go into a
   playlist.
-- **The same song twice in a playlist**: keep it (default) or once.
+- A list of more than 5,000 songs (YouTube Music's most for a playlist) becomes several
+  playlists.
 
 ## Not included
 

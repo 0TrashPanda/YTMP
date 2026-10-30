@@ -79,6 +79,9 @@ Music, without Premium, and not tied to a single music service.
 - Hold Start radio (or right-click it) to choose for one radio: where from, songs you know
   or new ones, with or without your YouTube Music account. *Settings → Radio* has the
   defaults, songs per artist, leave out songs you skip or just played, never-in-radios.
+- Import playlists from Spotify: pick Spotify's data export, and YTMP finds each song on
+  YouTube Music and makes the playlists there (liked songs and followed podcasts too), in the
+  background; the songs it wasn't sure about wait for you to check.
 - The song graph: import your YouTube Music history from Google Takeout, see the graph
   (around a song, or your most played) and move sliders for how much each part counts.
   *All your music* shows the whole graph at once (thousands of songs, drawn with WebGL),
@@ -188,8 +191,7 @@ Music, without Premium, and not tied to a single music service.
 
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
-- Importing playlists: a Spotify data export into YouTube Music playlists first, later other
-  exports and YTMP playlists
+- Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists
 - YTMP playlists, explore page
 
 ## Platforms

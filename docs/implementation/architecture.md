@@ -89,6 +89,12 @@ sync, the admin page in `AdminApi.kt`) through `extraApi`. A server setting the 
 change goes in `ServerSettings.kt` (`ServerSettingValues` in `protocol/`) and is put to work
 in `settings.apply` in the server's `Main.kt`.
 
+**Importing playlists** (`host/`): a reader per kind of import (`SpotifyExport.kt`) gives
+lists of items; `PlaylistConverter` keeps them as jobs, looks them up with `ConvertMatcher`
+and writes them to YouTube Music; the routes are `ConvertRoutes` (`/api/me/convert`). A new
+import source is a reader; a new place to put playlists a branch in `PlaylistConverter.write`
+(see [playlist converter](playlist-converter.md)).
+
 **Songs' audio** (`host/`): sources are wrapped, in front of YouTube Music: `LocalMusic`
 (`local:` songs) and the song cache `SongCache` (cached and downloaded songs), each with a
 `streams` (what rooms play), an `audio` (the `/api/audio` route) and for local music a

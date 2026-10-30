@@ -1,7 +1,8 @@
 <script lang="ts">
 	// Your library, like YTM's: your playlists (Liked music first) and podcasts, through your
 	// YouTube Music sign-in. Signed out, it asks you to sign in. The search field filters it by
-	// name (and author), as you type. With a YTMP account, History opens your listening history.
+	// name (and author), as you type. With a YTMP account, History opens your listening history;
+	// Import brings playlists from Spotify.
 	import { getLibrary, lastSeen } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
 	import { fuzzyFind } from '../format';
@@ -12,7 +13,7 @@
 	import CardGrid from './CardGrid.svelte';
 	import Icon from './Icon.svelte';
 
-	let { onToast, onHistory, ...open }: { onToast: (text: string) => void; onHistory: () => void } & PageHandlers = $props();
+	let { onToast, onHistory, onImport, ...open }: { onToast: (text: string) => void; onHistory: () => void; onImport: () => void } & PageHandlers = $props();
 
 	let library = $state<HomePage | null>(null);
 	let error = $state<string | null>(null);
@@ -48,12 +49,20 @@
 </script>
 
 <div class="flex flex-col gap-8 pb-4">
-	{#if listening.available}
+	{#if listening.available || youtube.account}
 		<div class="flex gap-2 px-2">
-			<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={onHistory}>
-				<Icon name="history" size={20} />
-				History
-			</button>
+			{#if listening.available}
+				<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={onHistory}>
+					<Icon name="history" size={20} />
+					History
+				</button>
+			{/if}
+			{#if youtube.account}
+				<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={onImport}>
+					<Icon name="playlistAdd" size={20} />
+					Import
+				</button>
+			{/if}
 		</div>
 	{/if}
 	{#if !youtube.account && !youtube.available}

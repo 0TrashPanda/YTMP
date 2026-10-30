@@ -9,6 +9,7 @@
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
 	import HistoryView from '../../../lib/components/HistoryView.svelte';
+	import ImportView from '../../../lib/components/ImportView.svelte';
 	import { listening } from '../../../lib/listening.svelte';
 	import LocalView from '../../../lib/components/LocalView.svelte';
 	import LocalGroupView from '../../../lib/components/LocalGroupView.svelte';
@@ -754,6 +755,10 @@
 								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={openMenu} />
 							{:else if view.kind === 'history'}
 								<HistoryView {room} onToast={toast} onMenu={openMenu} />
+							{:else if view.kind === 'import'}
+								{#key view.jobId}
+									<ImportView jobId={view.jobId} onToast={toast} onJob={(jobId) => show({ kind: 'import', jobId })} onPlaylist={(p) => openPlaylist(p, true)} />
+								{/key}
 							{:else if view.kind === 'genre' || view.kind === 'folder'}
 								{@const library = view.library}
 								<LocalGroupView
@@ -783,6 +788,7 @@
 							<LibraryView
 								onToast={toast}
 								onHistory={() => show({ kind: 'history' })}
+								onImport={() => show({ kind: 'import' })}
 								onArtist={openArtist}
 								onAlbum={(a) => openAlbum(a)}
 								onPlaylist={(p) => openPlaylist(p, true)}
