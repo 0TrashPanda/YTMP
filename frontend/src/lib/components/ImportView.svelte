@@ -30,17 +30,23 @@
 		Song
 	} from '../protocol.gen';
 	import { youtube } from '../youtube.svelte';
+	import { hold } from '../hold';
+	import { menuAt } from '../songActions';
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
+	import type { MenuTarget } from './SongMenu.svelte';
 
 	let {
 		jobId,
 		onToast,
 		onJob,
-		onPlaylist
+		onPlaylist,
+		onMenu
 	}: {
 		jobId?: string;
 		onToast: (text: string) => void;
+		/** The song menu (holding an option's cover). */
+		onMenu: (target: MenuTarget) => void;
 		/** Opens an import's own page. */
 		onJob: (id: string) => void;
 		/** Opens a YouTube Music playlist (one of yours). */
@@ -267,6 +273,18 @@
 		listening = song.id;
 	}
 
+	/** A followed podcast (kept as a song with its own ID): not something to play or queue. */
+	const isShow = (song: Song) => song.podcast?.id === song.id;
+
+	/** Holding an option's cover: the song menu, to queue it and listen with seeking. */
+	function menuFor(song: Song) {
+		stopListening();
+		onMenu({ song, place: 'search', ...(pressed ? menuAt(pressed) : { x: 16, y: 120 }) });
+	}
+
+	/** The cover pressed last, to show the menu next to. */
+	let pressed: HTMLElement | null = null;
+
 	function stopListening() {
 		sample?.pause();
 		sample = null;
@@ -319,7 +337,13 @@
 
 {#snippet option(row: ConvertItemRow, song: Song, chosen: boolean)}
 	<div class="flex items-center gap-1 rounded {chosen ? 'bg-line/60' : 'hover:bg-line'}">
-		<button class="relative shrink-0 rounded p-1" aria-label={listening === song.id ? 'Stop' : `Listen to ${song.title}`} onclick={() => listen(song)}>
+		<button
+			class="relative shrink-0 rounded p-1"
+			aria-label={listening === song.id ? 'Stop' : `Listen to ${song.title}`}
+			onclick={() => listen(song)}
+			onpointerdown={(e) => (pressed = e.currentTarget)}
+			use:hold={isShow(song) ? null : () => menuFor(song)}
+		>
 			<Art {song} size={40} class="h-10 w-10" />
 			<span class="absolute inset-1 grid place-items-center rounded bg-black/50"><Icon name={listening === song.id ? 'pause' : 'play'} size={22} /></span>
 		</button>

@@ -168,7 +168,8 @@ the file, *What to import* with a target per list, the settings) and an import's
 lists with *Open*, *Pause / Go on / Cancel*, *Accept all*, and *Checking songs* by filter: the
 the song on Spotify, its match now, the candidates, a search of your own, *Leave it out*).
 Listening to an option plays `/api/audio/{id}` in an `Audio` element of the page (this device
-only, from 30 s in for songs over 1½ minutes), not in the room. While an import goes, its page
+only, from 30 s in for songs over 1½ minutes), not in the room; holding the cover opens the
+song menu (`hold`, place `search`), but not for a followed podcast. While an import goes, its page
 asks every 3 s.
 
 ## Tests

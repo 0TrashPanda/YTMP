@@ -65,7 +65,8 @@ The songs YTMP wasn't sure about or didn't find, in a list like YouTube Music's:
   Tap it to see, one under the other: the song **on Spotify**, what it's **matched to** now
   (or YTMP's guess, with *This one is right*), the **other options** it found, a **search of
   your own** and **leave it out**. Tap an option's cover to **listen** to it (on this device
-  only, from 30 s in; not in the room); tap the option to pick it.
+  only, from 30 s in; not in the room), or **hold** it for the song menu (to add it to the
+  queue and listen with seeking); tap the option to pick it.
 - *Accept all* for when the ones it wasn't sure about look right.
 
 A song you pick is remembered, so it's right in the next import too.

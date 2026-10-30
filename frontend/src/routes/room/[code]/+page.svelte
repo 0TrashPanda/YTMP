@@ -757,7 +757,7 @@
 								<HistoryView {room} onToast={toast} onMenu={openMenu} />
 							{:else if view.kind === 'import'}
 								{#key view.jobId}
-									<ImportView jobId={view.jobId} onToast={toast} onJob={(jobId) => show({ kind: 'import', jobId })} onPlaylist={(p) => openPlaylist(p, true)} />
+									<ImportView jobId={view.jobId} onToast={toast} onJob={(jobId) => show({ kind: 'import', jobId })} onPlaylist={(p) => openPlaylist(p, true)} onMenu={openMenu} />
 								{/key}
 							{:else if view.kind === 'genre' || view.kind === 'folder'}
 								{@const library = view.library}
