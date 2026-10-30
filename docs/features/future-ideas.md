@@ -56,6 +56,12 @@ Emoji reactions on the current song, and/or a small text chat in the room.
 Liking songs without a linked YouTube account. These likes would be saved to the YTMP
 account and could also feed the [song graph](history-and-recommendations.md#song-graph).
 
+## History and Import out of Library
+
+*History* and *Import* are buttons at the top of *Library* for now. They'll probably move
+somewhere else later (for example the account menu or *Settings*), so Library is only your
+playlists and podcasts, like in YouTube Music.
+
 ## More languages
 
 The UI is English only for now. Translations (for example Dutch) could be added later.
