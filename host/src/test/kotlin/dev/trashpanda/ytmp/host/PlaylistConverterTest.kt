@@ -98,6 +98,12 @@ class PlaylistConverterTest {
             val at = beforeItemId?.let { b -> rows.indexOfFirst { it.second == b } } ?: rows.size
             rows.add(at, row)
         }
+        override suspend fun removeFromPlaylist(playlistId: String, items: List<dev.trashpanda.ytmp.protocol.PlaylistItemRef>) {
+            playlists.getValue(playlistId).removeAll { row -> items.any { it.itemId == row.second } }
+        }
+        override suspend fun setRating(songId: String, rating: LikeStatus) {
+            if (rating.liked) liked += songId else liked -= songId
+        }
         override suspend fun signOut() {}
     }
 
@@ -165,6 +171,21 @@ class PlaylistConverterTest {
         assertEquals(listOf("ytm:halo", "ytm:mystery", "ytm:stay"), account.playlists.getValue("PL0").map { it.first })
         assertEquals(1, account.moves.size)
         assertEquals(4, done.lists.single().written)
+
+        // Left out after it was put there: out of the playlist again; put back: in again, in its place.
+        val stay = converter.items("me", started.id, ConvertItemState.MATCHED, null).items.single { it.song?.id == "ytm:stay" }
+        converter.pick("me", started.id, stay.key, ConvertPick(leftOut = true))
+        converter.waitFor(started.id) { it.status == ConvertJobStatus.DONE && account.playlists.getValue("PL0").none { r -> r.first == "ytm:stay" } }
+        assertEquals(listOf("ytm:halo", "ytm:mystery"), account.playlists.getValue("PL0").map { it.first })
+        converter.pick("me", started.id, stay.key, ConvertPick(back = true))
+        converter.waitFor(started.id) { it.status == ConvertJobStatus.DONE && account.playlists.getValue("PL0").size == 3 }
+        assertEquals(listOf("ytm:halo", "ytm:mystery", "ytm:stay"), account.playlists.getValue("PL0").map { it.first })
+
+        // Another song picked for one already there: swapped, in the same place.
+        val halo = converter.items("me", started.id, ConvertItemState.MATCHED, null).items.single { it.song?.id == "ytm:halo" }
+        converter.pick("me", started.id, halo.key, ConvertPick(song("halo2", "Halo", "Beyoncé")))
+        converter.waitFor(started.id) { it.status == ConvertJobStatus.DONE && account.playlists.getValue("PL0").none { r -> r.first == "ytm:halo" } }
+        assertEquals(listOf("ytm:halo2", "ytm:mystery", "ytm:stay"), account.playlists.getValue("PL0").map { it.first })
     }
 
     @Test
@@ -233,6 +254,16 @@ class PlaylistConverterTest {
         val liking = converter.start("me", ConvertStartRequest(likes.readId, listOf(ConvertListChoice(0, ConvertTarget(ConvertTargetKind.LIKES)))))
         converter.waitFor(liking.id) { it.status == ConvertJobStatus.DONE }
         assertEquals(listOf("ytm:halo"), account.liked)
+
+        // A song left out of an existing playlist that was in it before stays there.
+        val stay = converter.items("me", job.id, ConvertItemState.MATCHED, null).items.single { it.song?.id == "ytm:stay" }
+        converter.pick("me", job.id, stay.key, ConvertPick(leftOut = true))
+        delay(300)
+        assertEquals(listOf("ytm:stay", "ytm:halo"), account.playlists.getValue("PLmine").map { it.first })
+        // A like left out: unliked.
+        val liked = converter.items("me", liking.id, ConvertItemState.MATCHED, null).items.single()
+        converter.pick("me", liking.id, liked.key, ConvertPick(leftOut = true))
+        withTimeout(5_000) { while (account.liked.isNotEmpty()) delay(20) }
     }
 
     @Test

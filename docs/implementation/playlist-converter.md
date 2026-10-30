@@ -138,6 +138,11 @@ One worker (`PlaylistConverter.run`) for all jobs, oldest first:
   next song of the list that's in place), reading the playlist for the `itemId`s.
 - **Likes** (`setRating`) and **follows** (`setPodcastSaved`): 4 per step, 15 s apart.
 - Each row is marked written, so going on after a restart never adds a song twice.
+- A song left out, or replaced by another pick, after it was written: its rows aren't written
+  any more, and it goes into the list's `toRemove` when no other row of the list is that song
+  and the import put it there (`added`; every song of a new playlist). The next write step
+  takes those out first (`removeFromPlaylist` with their `itemId`s; likes and follows undone a
+  few at a time). Wanted again before that (put back, picked again): it just stays.
 
 ## API (host)
 

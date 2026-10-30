@@ -61,7 +61,11 @@ so far stay). A finished one can be taken off the list.
 The songs YTMP wasn't sure about or didn't find, in a list like YouTube Music's:
 
 - Filters: *Not sure*, *Found*, *Not found*, *Left out*, *All*.
-- A song you left out can be **put back** as it was (not sure, not found or found).
+- Leaving out a song that's already in the playlist takes it out again (an unlike, an
+  unfollow); a song that was in your playlist before the import stays. Picking another song for
+  one that's in swaps them, in the same place.
+- A song you left out can be **put back** as it was (not sure, not found or found); found, it
+  goes into the playlist again.
 - Each song shows what it was (title, artist, album) and what YTMP picked, with its cover.
   Tap it to see, one under the other: the song **on Spotify**, what it's **matched to** now
   (or YTMP's guess, with *This one is right*), the **other options** it found, a **search of

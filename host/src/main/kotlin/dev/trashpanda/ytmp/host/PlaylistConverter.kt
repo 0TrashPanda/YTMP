@@ -21,6 +21,7 @@ import dev.trashpanda.ytmp.protocol.ConvertStartRequest
 import dev.trashpanda.ytmp.protocol.ConvertTarget
 import dev.trashpanda.ytmp.protocol.ConvertTargetKind
 import dev.trashpanda.ytmp.protocol.LikeStatus
+import dev.trashpanda.ytmp.protocol.PlaylistItemRef
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -185,6 +186,7 @@ class PlaylistConverter(
             pick.back -> {
                 if (entry.state != ConvertItemState.LEFT_OUT) throw ConvertException("That song isn't left out")
                 putBack(entry)
+                if (entry.writable()) rewant(job, entry.song!!.id)
                 forget(key, entry.item)
                 save(job)
                 wake.trySend(Unit)
@@ -192,6 +194,7 @@ class PlaylistConverter(
             }
             pick.leftOut -> {
                 if (entry.state != ConvertItemState.LEFT_OUT) entry.leftFrom = entry.state
+                entry.song?.let { unwrite(job, key, it.id) }
                 // What it was matched to stays one of the options, to pick after all.
                 entry.candidates = (listOfNotNull(entry.song) + entry.candidates).distinctBy { it.id }.take(CANDIDATES)
                 entry.song = null
@@ -199,6 +202,9 @@ class PlaylistConverter(
             }
             song != null -> {
                 if (!song.id.startsWith("ytm:")) throw ConvertException("Only YouTube Music songs can go there")
+                // Another song instead of one already put there: that one comes out again.
+                entry.song?.takeIf { it.id != song.id && entry.state == ConvertItemState.MATCHED }?.let { unwrite(job, key, it.id) }
+                rewant(job, song.id)
                 entry.candidates = (listOfNotNull(entry.song) + entry.candidates).filter { it.id != song.id }.take(CANDIDATES)
                 entry.song = song
                 entry.state = ConvertItemState.MATCHED
@@ -234,6 +240,36 @@ class PlaylistConverter(
         entry.manual = false
     }
 
+    /**
+     * The rows of [key] are no longer [songId] (left out, or another song picked): not written
+     * any more, and the song comes out of the target again when nothing else in the list is it
+     * and this import put it there (a song that was in your playlist before stays).
+     */
+    private fun unwrite(job: StoredJob, key: String, songId: String) {
+        for (list in job.lists) {
+            val rows = list.keys.indices.filter { list.keys[it] == key }.toSet()
+            if (rows.none { it in list.written }) continue
+            list.written -= rows
+            list.late -= rows
+            val stillThere = list.written.any { i -> job.entries[list.keys[i]]?.song?.id == songId }
+            if (stillThere) continue
+            list.songIds -= songId
+            val ours = list.target.kind == ConvertTargetKind.NEW_PLAYLIST || songId in list.added
+            if (ours) list.toRemove += songId
+            list.added -= songId
+        }
+    }
+
+    /** [songId] is wanted again: if it was still to come out of a target, it stays there instead. */
+    private fun rewant(job: StoredJob, songId: String) {
+        for (list in job.lists) {
+            if (list.toRemove.remove(songId)) {
+                list.songIds += songId
+                list.added += songId
+            }
+        }
+    }
+
     /** Forgets that [item] was left out by hand, so the next import looks it up again. */
     private fun forget(key: String, item: ConvertItem) {
         for (k in setOf(key, textKey(item))) if (memory[k]?.let { it.manual && it.song == null } == true) memory.remove(k)
@@ -246,6 +282,7 @@ class PlaylistConverter(
         for ((key, e) in job.entries) {
             if (e.state == ConvertItemState.UNSURE && e.song != null) {
                 e.state = ConvertItemState.MATCHED
+                rewant(job, e.song!!.id)
                 remember(key, e.item, Remembered(e.song, manual = true))
             }
         }
@@ -400,6 +437,7 @@ class PlaylistConverter(
 
     /** Whether [list] is looked up whole and has something to put in its target (or its new playlist isn't made yet). */
     private fun needsWrite(job: StoredJob, list: StoredList): Boolean {
+        if (list.toRemove.isNotEmpty()) return true
         if (list.keys.any { job.entries[it]?.state == ConvertItemState.PENDING }) return false
         if (list.target.kind == ConvertTargetKind.NEW_PLAYLIST && list.playlistId == null) return true
         if (list.late.isNotEmpty()) return true
@@ -418,7 +456,9 @@ class PlaylistConverter(
             return
         }
         try {
-            when (list.target.kind) {
+            if (lock.withLock { list.toRemove.isNotEmpty() }) {
+                takeOut(job, list, catalog)
+            } else when (list.target.kind) {
                 ConvertTargetKind.NEW_PLAYLIST, ConvertTargetKind.EXISTING_PLAYLIST -> writePlaylist(job, list, catalog)
                 ConvertTargetKind.LIKES -> writeEach(job, list, PER_STEP_LIKES) { catalog.setRating(it.id, LikeStatus(liked = true)) }
                 ConvertTargetKind.FOLLOW -> writeEach(job, list, PER_STEP_LIKES) { catalog.setPodcastSaved(it.id, true) }
@@ -436,6 +476,33 @@ class PlaylistConverter(
                 list.error = e.message ?: "Couldn't put the songs there"
                 list.retryAt = clock() + RETRY_WRITE_MS
                 save(job)
+            }
+        }
+    }
+
+    /** Takes the songs left out (or replaced) out of [list]'s target again: from the playlist at once, likes and follows a few at a time. */
+    private suspend fun takeOut(job: StoredJob, list: StoredList, catalog: PersonalCatalog) {
+        val gone = lock.withLock { list.toRemove.toList() }
+        when (list.target.kind) {
+            ConvertTargetKind.NEW_PLAYLIST, ConvertTargetKind.EXISTING_PLAYLIST -> {
+                val id = list.playlistId
+                if (id != null) {
+                    val refs = allSongs(catalog, id).filter { it.first in gone && it.second.isNotEmpty() }.distinctBy { it.first }
+                    if (refs.isNotEmpty()) catalog.removeFromPlaylist(id, refs.map { PlaylistItemRef(it.first, it.second) })
+                }
+                lock.withLock {
+                    list.toRemove -= gone.toSet()
+                    save(job)
+                }
+                delay(writeGapMs)
+            }
+            ConvertTargetKind.LIKES, ConvertTargetKind.FOLLOW -> for (songId in gone.take(PER_STEP_LIKES)) {
+                if (list.target.kind == ConvertTargetKind.LIKES) catalog.setRating(songId, LikeStatus(liked = false)) else catalog.setPodcastSaved(songId, false)
+                lock.withLock {
+                    list.toRemove -= songId
+                    save(job)
+                }
+                delay(likeGapMs)
             }
         }
     }
@@ -510,6 +577,7 @@ class PlaylistConverter(
             list.written += i
             list.songIds += song.id
             list.addedUpTo = maxOf(list.addedUpTo, i)
+            list.added += song.id
         }
     }
 
@@ -666,6 +734,10 @@ class PlaylistConverter(
         val songIds: MutableSet<String> = mutableSetOf(),
         /** The last row added by the import (songs that were there already don't count). */
         var addedUpTo: Int = -1,
+        /** The songs this import put in the target (not the ones that were there already). */
+        val added: MutableSet<String> = mutableSetOf(),
+        /** Songs to take out of the target again (left out, or replaced by another pick). */
+        val toRemove: MutableSet<String> = mutableSetOf(),
         /** Rows added after later ones, still to put in their place. */
         val late: MutableSet<Int> = mutableSetOf(),
         var error: String? = null,
