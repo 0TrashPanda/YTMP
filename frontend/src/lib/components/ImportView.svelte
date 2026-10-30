@@ -183,7 +183,7 @@
 
 	// --- one import's songs ---
 
-	type Filter = 'unsure' | 'not_found' | 'left_out' | 'all';
+	type Filter = 'unsure' | 'matched' | 'not_found' | 'left_out' | 'all';
 	let filter = $state<Filter>('unsure');
 	let rows = $state<ConvertItemRow[]>([]);
 	let next = $state<string | null>(null);
@@ -426,7 +426,7 @@
 			<section class="flex flex-col gap-3">
 				<h2 class="text-lg font-bold">Checking songs</h2>
 				<div class="flex flex-wrap gap-2">
-					{#each [['unsure', 'Not sure'], ['not_found', 'Not found'], ['left_out', 'Left out'], ['all', 'All']] as [value, label] (value)}
+					{#each [['unsure', 'Not sure'], ['matched', 'Found'], ['not_found', 'Not found'], ['left_out', 'Left out'], ['all', 'All']] as [value, label] (value)}
 						<button
 							class="rounded-lg px-3 py-1.5 text-sm font-medium {filter === value ? 'bg-white text-black' : 'bg-raised hover:bg-line'}"
 							onclick={() => (filter = value as Filter)}>{label}</button
@@ -498,7 +498,7 @@
 						{/if}
 					</div>
 				{:else}
-					<p class="text-muted">{loadingRows ? 'Loading…' : filter === 'unsure' ? 'No songs to check.' : filter === 'not_found' ? 'Every song was found.' : filter === 'left_out' ? 'No songs left out.' : 'No songs.'}</p>
+					<p class="text-muted">{loadingRows ? 'Loading…' : filter === 'unsure' ? 'No songs to check.' : filter === 'not_found' ? 'Every song was found.' : filter === 'left_out' ? 'No songs left out.' : filter === 'matched' ? 'No songs found yet.' : 'No songs.'}</p>
 				{/each}
 				{#if next}
 					<button class="self-center rounded-full bg-raised px-4 py-2 text-sm hover:bg-line disabled:opacity-50" disabled={loadingRows} onclick={() => loadRows(false)}>More</button>

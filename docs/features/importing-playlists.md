@@ -60,7 +60,7 @@ so far stay). A finished one can be taken off the list.
 
 The songs YTMP wasn't sure about or didn't find, in a list like YouTube Music's:
 
-- Filters: *Not sure*, *Not found*, *Left out*, *All*.
+- Filters: *Not sure*, *Found*, *Not found*, *Left out*, *All*.
 - A song you left out can be **put back** as it was (not sure, not found or found).
 - Each song shows what it was (title, artist, album) and what YTMP picked, with its cover.
   Tap it to see, one under the other: the song **on Spotify**, what it's **matched to** now
