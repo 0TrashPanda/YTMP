@@ -6,6 +6,7 @@ import dev.trashpanda.ytmp.core.RoomRadio
 import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.core.RoomTimeouts
 import dev.trashpanda.ytmp.host.CastOutputs
+import dev.trashpanda.ytmp.host.YoutubeTvOutputs
 import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.LyricsLookup
 import dev.trashpanda.ytmp.host.SongFiles
@@ -100,7 +101,10 @@ fun main(args: Array<String>) {
         val zones = ZoneOutputs(this, audioBase, mpd, local)
         for (url in config.zones.files) zones.addSource(url, url)
         if (config.zones.discovery) zones.discover()
-        val outputs = OutputDrivers(this, listOf(casts, sonos, mpd, zones))
+        val tvs = YoutubeTvOutputs(this)
+        config.youtubeTv.devices.forEach(tvs::addHost)
+        if (config.youtubeTv.discovery) tvs.discover()
+        val outputs = OutputDrivers(this, listOf(casts, sonos, mpd, zones, tvs))
 
         val db = Database.open(config.database)
         val accounts = Accounts(db)

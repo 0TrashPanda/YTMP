@@ -102,7 +102,8 @@ Music, without Premium, and not tied to a single music service.
 - Buttons and queue changes respond right away, without waiting for the room; if the room
   says no, it goes back with a message saying why.
 - Play on this device, on Chromecasts (including speakers with Chromecast built in), on
-  Sonos speakers and on MPD (a Raspberry Pi on a speaker or amplifier), with their volume.
+  Sonos speakers, on MPD (a Raspberry Pi on a speaker or amplifier), and on TVs and
+  projectors that only have the YouTube app, with their volume.
   The rooms of a multi-room amplifier show up as speakers of their own, from a file the house
   keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
   speakers near your phone (the phone looks the songs up and serves them).

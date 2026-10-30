@@ -118,6 +118,9 @@ class LocalHost(private val context: Context) {
     }
     val zones = ZoneOutputs(scope, { localAddress -> "http://${localAddress.hostAddress}:$PORT" }, mpd, local)
     val zoneFinder = ZoneFinder(context, zones)
+    /** TVs with only the YouTube app; they play the songs from YouTube themselves. */
+    val tvs = YoutubeTvOutputs(scope)
+    val tvFinder = TvFinder(context, tvs, scope)
     /** On another Wi-Fi network, the devices found on the old one go from the list. */
     private val wifi = WifiWatch(context) {
         Log.i(TAG, "On another network: looking for speakers and TVs again")
@@ -125,10 +128,11 @@ class LocalHost(private val context: Context) {
         sonosFinder.forgetAll()
         mpdFinder.forgetAll()
         zoneFinder.forgetAll()
+        tvFinder.forgetAll()
     }
     /** Speakers here that play a room on another host (a server), which can't reach them. */
     /** Every kind of speaker and TV on the network. */
-    val outputs = OutputDrivers(scope, listOf(casts, sonos, mpd, zones))
+    val outputs = OutputDrivers(scope, listOf(casts, sonos, mpd, zones, tvs))
     val nearby = NearbySpeakers(scope, outputs.all)
     val authLink = AuthLink(context, PORT)
     /** The phone owner's YouTube Music account. */

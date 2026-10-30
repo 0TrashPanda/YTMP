@@ -78,7 +78,7 @@ class YtmpApp : Application() {
                 }
             }
         }
-        // Look for Chromecasts, Sonos and MPDs only while they can be picked, to save battery: while
+        // Look for Chromecasts, Sonos, MPDs and YouTube TVs only while they can be picked, to save battery: while
         // the app is on screen, or while a public room plays (friends may pick one). Devices found
         // earlier stay in the list until a new search misses them or the phone changes networks.
         scope.launch {
@@ -90,11 +90,13 @@ class YtmpApp : Application() {
                         host.sonosFinder.start()
                         host.mpdFinder.start()
                         host.zoneFinder.start()
+                        host.tvFinder.start()
                     } else {
                         host.castFinder.stop()
                         host.sonosFinder.stop()
                         host.mpdFinder.stop()
                         host.zoneFinder.stop()
+                        host.tvFinder.stop()
                     }
                 }
         }

@@ -52,6 +52,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [implementation/song-cache.md](implementation/song-cache.md) | The song cache on server and phone: storing, serving, removing |
 | [implementation/chromecast.md](implementation/chromecast.md) | Chromecast output module |
 | [implementation/sonos.md](implementation/sonos.md) | Sonos output module |
+| [implementation/youtube-tv.md](implementation/youtube-tv.md) | TVs with only the YouTube app (DIAL + Lounge API) |
 | [implementation/mpd.md](implementation/mpd.md) | MPD output module (e.g. a Raspberry Pi on a speaker) |
 | [implementation/local-music.md](implementation/local-music.md) | Local music: a Raspberry Pi's music folder (MPD), the music on the phone, the Local tab's API |
 | [implementation/zones.md](implementation/zones.md) | Amplifier zones: the zones file and its building blocks, setting up the Pi |

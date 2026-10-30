@@ -50,6 +50,13 @@ discovery = true
 # e.g. ["Woonkamer=192.168.0.50"].
 devices = []
 
+[youtube_tv]
+# Find TVs and projectors that only have the YouTube app (DIAL, over SSDP). Needs UDP
+# multicast replies to reach the server.
+discovery = true
+# TVs to always offer, by IP address, or with their DIAL port: "192.168.68.100:56790".
+devices = []
+
 [zones]
 # The rooms of a multi-room amplifier, from a zones file on the network (docs/implementation/zones.md).
 # Find zones files with mDNS. Inside Docker this needs network_mode: host.

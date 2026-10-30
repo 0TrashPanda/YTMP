@@ -114,11 +114,12 @@ The host can also send audio to **output modules**. Outputs are **modular**.
 | Chromecast ✅ | Casts to Chromecast / Google Cast devices: TVs, Nest speakers, speaker groups (see [implementation](../implementation/chromecast.md)). A TV or display can show the [party screen](ui.md#party-screen) while it plays |
 | MPD ✅ | Plays on MPD (Music Player Daemon), e.g. a Raspberry Pi on a speaker or an amplifier, wired or over Bluetooth (see [implementation](../implementation/mpd.md)) |
 | Amplifier zones ✅ | The rooms of a multi-room amplifier, each a speaker of its own, with a player (an MPD) on one of its inputs (see [below](#amplifier-zones) and [implementation](../implementation/zones.md)) |
+| TV with the YouTube app ✅ | TVs and projectors without Chromecast that phones cast to from the YouTube app: the room plays there in the TV's own YouTube app, with the video (YouTube songs only; see [implementation](../implementation/youtube-tv.md)) |
 | Snapcast | Future idea: precise multi-room sync through a Snapcast server (see [future ideas](future-ideas.md#snapcast-output)) |
 | Discord bot | Future idea: plays into a Discord voice channel (see [future ideas](future-ideas.md#discord-bot-output)) |
 | … | Future output modules |
 
-Outputs like Sonos, Chromecast, MPD and amplifier zones must be on the **same network as the host**. A phone
+Outputs like Sonos, Chromecast, MPD, amplifier zones and YouTube TVs must be on the **same network as the host**. A phone
 host or a home server can use them, a server in a datacenter can't.
 
 *Play on* lists the speakers and TVs that are there now: one that's switched off, or that's
@@ -126,7 +127,7 @@ on the network your phone just left (another Wi-Fi), goes from the list. If the 
 playing there, it's switched off with a notice.
 
 **Speakers near your phone** ✅: in a room on another host (a server), the app's *Play on*
-also lists the Sonos speakers, Chromecasts, MPDs and amplifier zones on your phone's network that the host doesn't
+also lists the Sonos speakers, Chromecasts, MPDs, amplifier zones and YouTube TVs on your phone's network that the host doesn't
 offer itself, under *Near this phone*. Switched on, the phone plays the room there: it
 follows the room, looks the songs up itself and serves them to the speaker, so it works
 wherever the server is. They have their own volume slider, and a Chromecast TV can show the

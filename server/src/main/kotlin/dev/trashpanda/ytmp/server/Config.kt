@@ -18,6 +18,8 @@ data class Config(
     val sonos: SonosConfig = SonosConfig(),
     val mpd: MpdConfig = MpdConfig(),
     val zones: ZonesConfig = ZonesConfig(),
+    @SerialName("youtube_tv")
+    val youtubeTv: YoutubeTvConfig = YoutubeTvConfig(),
     val database: DatabaseConfig = DatabaseConfig(),
     val accounts: AccountsConfig = AccountsConfig(),
     val audio: AudioConfig = AudioConfig(),
@@ -171,6 +173,15 @@ data class MpdConfig(
     /** Find MPD players with mDNS (MPD's zeroconf, `_mpd._tcp`). Inside Docker this needs `network_mode: host`. */
     val discovery: Boolean = true,
     /** MPD players to always offer, as "host", "host:port" or "Name=host[:port]", e.g. "Woonkamer=192.168.0.50". */
+    val devices: List<String> = emptyList(),
+)
+
+/** TVs with only the YouTube app (docs/implementation/youtube-tv.md). */
+@Serializable
+data class YoutubeTvConfig(
+    /** Find TVs with DIAL (SSDP). Needs UDP multicast replies to reach the server (firewall, Docker host networking). */
+    val discovery: Boolean = true,
+    /** TVs to always offer, by IP address, or with their DIAL port: "192.168.68.100:56790". */
     val devices: List<String> = emptyList(),
 )
 

@@ -8,7 +8,7 @@ what's planned is marked there.
 ## Layout
 
 - `protocol/` message types (Kotlin is the source of truth) · `core/` rooms, queue, roles ·
-  `host/` HTTP/WebSocket API, shared by server and phone · `cast/` Chromecast client ·
+  `host/` HTTP/WebSocket API, shared by server and phone · `cast/` Chromecast, DIAL and YouTube Lounge clients ·
   `server/` Linux server, accounts, room sync · `android/` the app (WebView, Media3, Chaquopy,
   its own host) · `frontend/` Svelte 5 + Tailwind · `ytm-module/` Python · `deploy/` Docker
   Compose, Caddy, Proxmox guide · `tools/smoke-test.py`.

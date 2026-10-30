@@ -207,6 +207,8 @@ enum class OutputKind {
     @SerialName("mpd") MPD,
     /** A room of a multi-room amplifier, fed by a player (an MPD) that other zones may share. */
     @SerialName("zone") ZONE,
+    /** A TV with only the YouTube app (no Chromecast): the host remote-controls that app. */
+    @SerialName("youtube_tv") YOUTUBE_TV,
 }
 
 /** A speaker or TV the host can play the room on. */
