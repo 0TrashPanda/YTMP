@@ -183,6 +183,9 @@ class PlaylistConverter(
         val song = pick.song
         when {
             pick.leftOut -> {
+                // What it was matched to stays one of the options, to pick after all.
+                entry.candidates = (listOfNotNull(entry.song) + entry.candidates).distinctBy { it.id }.take(CANDIDATES)
+                entry.song = null
                 entry.state = ConvertItemState.LEFT_OUT
             }
             song != null -> {
@@ -194,7 +197,7 @@ class PlaylistConverter(
             else -> throw ConvertException("Pick a song, or leave it out")
         }
         entry.manual = true
-        remember(key, entry.item, Remembered(entry.song.takeIf { !pick.leftOut }, manual = true))
+        remember(key, entry.item, Remembered(entry.song, manual = true))
         save(job)
         wake.trySend(Unit)
         row(key, entry, job.lists.filter { key in it.keys }.map { it.name })

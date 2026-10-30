@@ -30,6 +30,7 @@
 		Song
 	} from '../protocol.gen';
 	import { youtube } from '../youtube.svelte';
+	import { tick } from 'svelte';
 	import { hold } from '../hold';
 	import { menuAt } from '../songActions';
 	import Art from './Art.svelte';
@@ -222,12 +223,18 @@
 
 	async function choose(row: ConvertItemRow, song: Song | null) {
 		if (!jobId) return;
+		const index = rows.findIndex((r) => r.key === row.key);
 		try {
 			const picked = await pickImportSong(jobId, row.key, song ? { song, leftOut: false } : { song: null, leftOut: true });
 			// Out of this filter now (unless it's All).
 			stopListening();
 			rows = filter === 'all' ? rows.map((r) => (r.key === row.key ? picked : r)) : rows.filter((r) => r.key !== row.key);
 			open = null;
+			// Back to the list where you were: the row closed (or the next one, when it left this filter).
+			await tick();
+			const at = rows.findIndex((r) => r.key === row.key);
+			const keep = rows[at >= 0 ? at : Math.min(index, rows.length - 1)];
+			if (keep) document.querySelector(`[data-row="${CSS.escape(keep.key)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 			refresh();
 		} catch (e) {
 			onToast(message(e, "Couldn't save that"));
@@ -426,9 +433,9 @@
 					{/each}
 				</div>
 				{#each rows as row (row.key)}
-					<div class="flex flex-col gap-2 rounded-lg bg-raised/50 p-2">
+					<div class="flex scroll-mt-16 flex-col gap-2 rounded-lg bg-raised/50 p-2" data-row={row.key}>
 						<button class="flex items-center gap-3 text-left" onclick={() => toggle(row)}>
-							<Art song={row.song} size={48} class="h-12 w-12" />
+							<Art song={row.state === 'matched' || row.state === 'unsure' ? row.song : null} size={48} class="h-12 w-12" />
 							<div class="min-w-0 flex-1">
 								<p class="truncate font-medium">{row.item.title}</p>
 								<p class="truncate text-sm text-muted">{original(row)}</p>
@@ -444,14 +451,14 @@
 						</button>
 						{#if open === row.key}
 							{@const current = row.song && row.state !== 'not_found' && row.state !== 'left_out' ? row.song : null}
-							{@const others = [...row.candidates, ...found].filter((s, i, all) => s.id !== current?.id && all.findIndex((o) => o.id === s.id) === i)}
+							{@const others = [...(current || !row.song ? [] : [row.song]), ...row.candidates, ...found].filter((s, i, all) => s.id !== current?.id && all.findIndex((o) => o.id === s.id) === i)}
 							<div class="flex flex-col gap-1 pl-2">
 								<p class="pt-1 text-xs font-medium uppercase tracking-wide text-muted">On Spotify</p>
 								<p class="px-1">
 									<span class="font-medium">{row.item.title}</span>
 									<span class="block text-sm text-muted">{[original(row), row.item.durationMs ? formatTime(row.item.durationMs) : null].filter(Boolean).join(' · ') || 'No artist or album'}</span>
 								</p>
-								<p class="pt-2 text-xs font-medium uppercase tracking-wide text-muted">{row.state === 'unsure' ? "YTMP's guess" : 'Matched to'}</p>
+								<p class="pt-2 text-xs font-medium uppercase tracking-wide text-muted">{row.state === 'unsure' ? "YTMP's guess" : row.state === 'left_out' ? 'Left out' : 'Matched to'}</p>
 								{#if current}
 									{@render option(row, current, true)}
 									{#if row.state === 'unsure'}
@@ -460,7 +467,7 @@
 										</button>
 									{/if}
 								{:else}
-									<p class="px-1 text-sm text-muted">{row.state === 'left_out' ? 'Left out' : 'Nothing yet: pick one below, or search'}</p>
+									<p class="px-1 text-sm text-muted">{row.state === 'left_out' ? "Not added. Pick one below to add it after all." : 'Nothing yet: pick one below, or search'}</p>
 								{/if}
 								{#if others.length}
 									<p class="pt-2 text-xs font-medium uppercase tracking-wide text-muted">{current ? 'Or one of these' : 'Maybe one of these'}</p>

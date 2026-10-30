@@ -177,7 +177,10 @@ class PlaylistConverterTest {
         val first = converter.startRoadTrip()
         converter.waitFor(first.id) { it.status == ConvertJobStatus.NEEDS_YOU }
         val unsure = converter.items("me", first.id, ConvertItemState.UNSURE, null).items.single()
-        converter.pick("me", first.id, unsure.key, ConvertPick(leftOut = true))
+        val left = converter.pick("me", first.id, unsure.key, ConvertPick(leftOut = true))
+        // Not matched to anything now; what it was stays an option.
+        assertNull(left.song)
+        assertEquals("ytm:cover", left.candidates.first().id)
         converter.waitFor(first.id) { it.status == ConvertJobStatus.DONE }
         val asked = search.asked.size
 
