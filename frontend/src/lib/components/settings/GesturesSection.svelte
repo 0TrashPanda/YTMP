@@ -4,6 +4,7 @@
 	import { ACTION_NAMES, ACTIONS, DEFAULTS, GESTURES, gestures, resetGestures, setGesture, type QueueAction, type Where } from '../../gestures.svelte';
 	import { settings } from '../../settings.svelte';
 	import DeviceNote from './DeviceNote.svelte';
+	import Toggle from './Toggle.svelte';
 	import DeviceToggle from './DeviceToggle.svelte';
 
 	const groups: [Where, string, string][] = [
@@ -44,6 +45,7 @@
 			<DeviceNote setting={where === 'list' ? settings.gesturesList : settings.gesturesQueue} />
 		</section>
 	{/each}
+	<Toggle label="Holding doesn't select text" hint="On a touch screen, so holding a song or button never selects its words. Text fields can still be selected." setting={settings.holdNoSelect} />
 	<p class="text-xs text-muted">
 		Swipes are for touch screens. A right-click (or ⋮) always opens the song menu, also when Hold does something else.
 	</p>

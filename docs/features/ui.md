@@ -238,6 +238,10 @@ in *Up next* also *Remove*. The defaults:
 | **Hold** | Open the [song menu](#song-menu) | Open the song menu |
 | **Drag** (the handle) | Move it in your own playlists | Move it |
 
+✅ **Holding doesn't select text** on a touch screen (on by default, *Settings → Taps and
+swipes*), so holding a song or button never selects its words; text fields still can be
+selected. Switched off, a hold selects text as usual.
+
 A swiped song shows what letting go does underneath, in green once it's far enough (red to
 remove); a short swipe does nothing. An action someone may not do (no permission) doesn't
 swipe. A **right-click** or **⋮** always opens the song menu, also when *Hold* does something

@@ -221,6 +221,8 @@ export const settings = {
 	dislikeButton: new Setting('dislikeButton', 'normal' as DislikeButton, dislikeButton, word('ytmp.dislikeButton', dislikeButton)),
 	swipeOpens: new Setting('swipeOpens', 'tab' as SwipeOpens, swipeOpens, word('ytmp.swipeOpens', swipeOpens)),
 	tabOrder: new Setting('tabOrder', 'upnext' as TabOrder, tabOrder, word('ytmp.tabOrder', tabOrder)),
+	/** On a touch screen, holding doesn't select text (text fields still can); app.css's `hold-no-select`. */
+	holdNoSelect: new Setting('holdNoSelect', true, bool),
 
 	// The rest keep their own shape (and check it where they're used).
 	/** Taps and swipes on songs in lists, and in Up next (gestures.svelte.ts). */

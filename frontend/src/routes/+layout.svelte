@@ -8,6 +8,7 @@
 	import { nativeBridge } from '../lib/native';
 	import { checkOwnModule } from '../lib/ownModule.svelte';
 	import { appLink, webLink } from '../lib/openInApp';
+	import { settings } from '../lib/settings.svelte';
 
 	// Coming back from logging in on an auth server (/connect), or (the app) logged in on your server's pages?
 	identity.takeFromUrl();
@@ -54,6 +55,11 @@
 		const control = (event.target as Element | null)?.closest?.(CONTROLS);
 		if (control instanceof HTMLElement && control === document.activeElement && !control.matches(':focus-visible')) control.blur();
 	}
+
+	// Holding on a touch screen doesn't select text (Settings → Taps and swipes).
+	$effect(() => {
+		document.documentElement.classList.toggle('hold-no-select', settings.holdNoSelect.value);
+	});
 </script>
 
 <svelte:window onclick={dropMouseFocus} />
