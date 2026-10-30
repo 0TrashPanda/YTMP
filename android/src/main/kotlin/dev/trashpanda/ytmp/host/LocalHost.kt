@@ -244,7 +244,10 @@ class LocalHost(private val context: Context) {
     )
 
     /** The app woke up to learn radios in the background ([CrawlJob]): the crawl looks at once. */
-    fun crawlAwake() = crawl.nudge()
+    fun crawlAwake() {
+        crawl.nudge()
+        converter.nudge()
+    }
 
     /** Which of the phone's music is a YouTube Music song (Settings → Playback → Song cache). */
     private val matcher: LocalMatcher = LocalMatcher(
@@ -286,6 +289,9 @@ class LocalHost(private val context: Context) {
         if (localSongsOn()) matcher.start() else matcher.stop()
     }
     private val cacheLibrary = cache.library { lanUrl() ?: LOCAL_URL }
+
+    /** Importing playlists into the owner's YouTube Music (docs/features/importing-playlists.md), while the app runs. */
+    private val converter by lazy { PlaylistConverter(File(context.filesDir, "imports"), cached, personalOf = { youtube }, scope = scope) }
 
     /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
     private val cached = CachedSource(
@@ -462,6 +468,7 @@ class LocalHost(private val context: Context) {
         rooms.startCleanup()
         sync.start()
         crawl.start()
+        converter.start()
         crawl.current.let { CrawlJob.schedule(context, it.enabled && it.overnight) }
         graphCopy.start()
         outputs.attach(rooms)
@@ -496,6 +503,7 @@ class LocalHost(private val context: Context) {
                     graphCopy = graphCopy,
                     zones = zones,
                     personal = youtube,
+                    converter = converter,
                     // Find similar and Related: the song graph of the asker's server, with their login.
                     songGraph = { call, seed ->
                         call.bearerToken()?.let { authLink.auth.similar(it, seed) }.orEmpty().filter { local.playable(it.id) }

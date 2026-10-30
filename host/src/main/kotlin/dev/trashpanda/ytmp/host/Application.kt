@@ -102,6 +102,10 @@ data class HostSources(
      * the request proves. Null: none (the general pages).
      */
     val personalFor: ((ApplicationCall) -> PersonalCatalog?)? = null,
+    /** Whose that YouTube Music is (the account's ID), for what's kept per person (imports); null: the device's own ([personal]). */
+    val personalId: ((ApplicationCall) -> String?)? = null,
+    /** Importing playlists into your YouTube Music (docs/features/importing-playlists.md). */
+    val converter: PlaylistConverter? = null,
     /**
      * Songs that go with a song in the song graph, for whoever asks (their account's listening,
      * where their auth server allows it), mixed into Find similar and Related. Null: none.

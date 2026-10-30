@@ -3,6 +3,12 @@ package dev.trashpanda.ytmp.protocol.tsgen
 import dev.trashpanda.ytmp.protocol.ApiError
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.SongCacheStatus
+import dev.trashpanda.ytmp.protocol.ConvertItemPage
+import dev.trashpanda.ytmp.protocol.ConvertJob
+import dev.trashpanda.ytmp.protocol.ConvertJobList
+import dev.trashpanda.ytmp.protocol.ConvertPick
+import dev.trashpanda.ytmp.protocol.ConvertPreview
+import dev.trashpanda.ytmp.protocol.ConvertStartRequest
 import dev.trashpanda.ytmp.protocol.TakeoutPreview
 import dev.trashpanda.ytmp.protocol.TakeoutPreviewRequest
 import dev.trashpanda.ytmp.protocol.TakeoutRule
@@ -259,6 +265,12 @@ fun main(args: Array<String>) {
     generator.addRoot(TakeoutRule.serializer().descriptor)
     generator.addRoot(TakeoutPreview.serializer().descriptor)
     generator.addRoot(UnmatchedSongs.serializer().descriptor)
+    generator.addRoot(ConvertPreview.serializer().descriptor)
+    generator.addRoot(ConvertStartRequest.serializer().descriptor)
+    generator.addRoot(ConvertJob.serializer().descriptor)
+    generator.addRoot(ConvertJobList.serializer().descriptor)
+    generator.addRoot(ConvertItemPage.serializer().descriptor)
+    generator.addRoot(ConvertPick.serializer().descriptor)
     generator.addRoot(BackupInfo.serializer().descriptor)
     generator.addRoot(AuditLogResponse.serializer().descriptor)
     generator.addRoot(DisableAccountRequest.serializer().descriptor)

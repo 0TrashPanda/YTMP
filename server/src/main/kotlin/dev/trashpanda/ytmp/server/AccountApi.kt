@@ -644,8 +644,10 @@ class AccountService(
         if (claims.scope != YOUTUBE_SCOPE) return null
         val allowed = when (method) {
             HttpMethod.Get -> path.startsWith("/api/me/")
-            HttpMethod.Put -> path.startsWith("/api/me/likes/") || (path.startsWith("/api/me/podcasts/") && path.endsWith("/saved"))
-            HttpMethod.Post -> path == "/api/me/playlists" || (path.startsWith("/api/me/playlists/") && path.endsWith("/songs"))
+            HttpMethod.Put -> path.startsWith("/api/me/likes/") || (path.startsWith("/api/me/podcasts/") && path.endsWith("/saved")) || path.startsWith("/api/me/convert/")
+            HttpMethod.Post -> path == "/api/me/playlists" || (path.startsWith("/api/me/playlists/") && path.endsWith("/songs")) || path.startsWith("/api/me/convert/")
+            // Imports: taking one off the list.
+            HttpMethod.Delete -> path.startsWith("/api/me/convert/")
             else -> false
         }
         return claims.accountId.takeIf { allowed }

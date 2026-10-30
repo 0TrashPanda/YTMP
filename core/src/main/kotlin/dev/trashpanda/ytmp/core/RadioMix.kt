@@ -25,7 +25,7 @@ object SongMatch {
     private val marks = Regex("""\p{M}+""")
     private val other = Regex("""[^\p{L}\p{N}]+""")
 
-    internal fun normalize(text: String): String {
+    fun normalize(text: String): String {
         val plain = Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD).replace(marks, "")
         return plain.replace(brackets, " ").replace(featuring, "").replace(other, " ").trim()
     }

@@ -28,6 +28,7 @@ import dev.trashpanda.ytmp.host.normalizeOrigin
 import dev.trashpanda.ytmp.host.AccountTokens
 import dev.trashpanda.ytmp.protocol.RadioHintsRequest
 import dev.trashpanda.ytmp.protocol.RadioWay
+import dev.trashpanda.ytmp.host.PlaylistConverter
 import dev.trashpanda.ytmp.host.RadioCrawl
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import io.ktor.server.request.httpMethod
@@ -158,6 +159,15 @@ fun main(args: Array<String>) {
         fun localUsername(accountId: String): String? = accountId.takeIf { it.endsWith("@$issuer") }?.substringBeforeLast('@')
         /** One of this server's own accounts, by account ID (`user@issuer`). */
         fun localAccount(accountId: String): String? = localUsername(accountId)?.let(accounts::find)?.id
+        /** The account (one of this server's) a request proves for its YouTube Music, as personalFor does. */
+        fun youtubeAccount(call: io.ktor.server.application.ApplicationCall): String? {
+            val token = call.bearerToken()
+            val id = token?.let(auth::verify)?.id ?: token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
+            return id?.let(::localAccount)
+        }
+        // Importing playlists into accounts' YouTube Music, kept next to the database (docs/features/importing-playlists.md).
+        val importsDir = if (config.database.type == "sqlite") File(File(config.database.path).absoluteFile.parentFile, "imports") else File("imports")
+        val converter = PlaylistConverter(importsDir, cached, personalOf = youtube::of, scope = this).also { it.start() }
         val rooms = RoomManager(
             local.streams(songCache.streams), this, live.codeStyle(), live.roomCodeLength, outputs = outputs.devices, store = JdbcRoomStore(db),
             // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
@@ -229,11 +239,9 @@ fun main(args: Array<String>) {
                 zones = zones,
                 // Your account's YouTube Music, when you're logged in with an account of this server.
                 // Also from the pages of rooms on other hosts, with a token just for that (see AccountApi.youtubeToken).
-                personalFor = { call ->
-                    val token = call.bearerToken()
-                    val id = token?.let(auth::verify)?.id ?: token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
-                    id?.let(::localAccount)?.let(youtube::of)
-                },
+                personalFor = { call -> youtubeAccount(call)?.let(youtube::of) },
+                personalId = ::youtubeAccount,
+                converter = converter,
                 // Find similar and Related: the song graph of whoever asks (one of our accounts, or one
                 // of a server we trust, which decides itself), else of everyone here.
                 songGraph = { call, seed ->

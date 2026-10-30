@@ -1492,6 +1492,121 @@ export interface UnmatchedSongs {
   songs: UnmatchedSong[];
 }
 
+export type ConvertListKind = "playlist" | "liked_songs" | "saved_episodes" | "followed_shows";
+
+export interface ConvertListPreview {
+  index: number;
+  name: string;
+  kind: ConvertListKind;
+  count: number;
+}
+
+export interface ConvertPreview {
+  readId: string;
+  reader: string;
+  lists: ConvertListPreview[];
+  skipped: number;
+}
+
+export type ConvertTargetKind = "new_playlist" | "existing_playlist" | "likes" | "follow";
+
+export interface ConvertTarget {
+  kind: ConvertTargetKind;
+  title: string | null;
+  playlistId: string | null;
+}
+
+export interface ConvertListChoice {
+  index: number;
+  target: ConvertTarget;
+}
+
+export interface ConvertSettings {
+  addUnsure: boolean;
+  videos: boolean;
+}
+
+export interface ConvertStartRequest {
+  readId: string;
+  lists: ConvertListChoice[];
+  settings: ConvertSettings;
+}
+
+export type ConvertJobStatus = "matching" | "paused" | "needs_you" | "done" | "cancelled";
+
+export interface ConvertCounts {
+  total: number;
+  pending: number;
+  matched: number;
+  unsure: number;
+  notFound: number;
+  leftOut: number;
+}
+
+export interface ConvertListStatus {
+  name: string;
+  kind: ConvertListKind;
+  target: ConvertTarget;
+  playlistId: string | null;
+  count: number;
+  written: number;
+  error: string | null;
+}
+
+export interface ConvertJob {
+  id: string;
+  title: string;
+  reader: string;
+  createdAt: number;
+  status: ConvertJobStatus;
+  waiting: string | null;
+  waitingUntil: number | null;
+  leftMs: number | null;
+  counts: ConvertCounts;
+  lists: ConvertListStatus[];
+  settings: ConvertSettings;
+}
+
+export interface ConvertJobList {
+  jobs: ConvertJob[];
+}
+
+export type ConvertItemType = "song" | "episode" | "local_file" | "show";
+
+export interface ConvertItem {
+  type: ConvertItemType;
+  title: string;
+  artists: string[];
+  album: string | null;
+  durationMs: number | null;
+  isrc: string | null;
+  sourceId: string | null;
+  show: string | null;
+}
+
+export type ConvertItemState = "pending" | "matched" | "unsure" | "not_found" | "left_out";
+
+export interface ConvertItemRow {
+  key: string;
+  item: ConvertItem;
+  state: ConvertItemState;
+  song: Song | null;
+  candidates: Song[];
+  score: number | null;
+  manual: boolean;
+  lists: string[];
+}
+
+export interface ConvertItemPage {
+  items: ConvertItemRow[];
+  next: string | null;
+}
+
+export interface ConvertPick {
+  song: Song | null;
+  leftOut: boolean;
+}
+
 export interface BackupInfo {
   accounts: number;
   rooms: number;

@@ -52,6 +52,16 @@ internal class HostContext(val rooms: RoomManager, val sources: HostSources, val
     }
 
     /**
+     * Whose YouTube Music [personal] is, for what's kept per person (imports): the account on a
+     * server, [DEVICE_OWNER] for a phone's own sign-in. Null when there's none.
+     */
+    fun ApplicationCall.personalOwner(): String? {
+        sources.personalId?.invoke(this)?.let { return it }
+        if (sources.personalFor != null) return null
+        return DEVICE_OWNER.takeIf { personal() != null }
+    }
+
+    /**
      * Find similar from where the request's `from` says (Find similar's hold): YouTube Music's
      * radio and the song graph mixed (the usual), only one of them, or only what plays here
      * without internet.
@@ -92,7 +102,10 @@ internal class HostContext(val rooms: RoomManager, val sources: HostSources, val
     fun ApplicationCall.owns(room: Room) =
         request.header(OWNER_TOKEN_HEADER) == room.ownerToken || (room.ownerAccount != null && account()?.id == room.ownerAccount)
 
-    private companion object {
-        val log = LoggerFactory.getLogger("ytmp")
+    companion object {
+        /** A phone's own YouTube Music sign-in, as the owner of its imports. */
+        const val DEVICE_OWNER = "device"
+
+        private val log = LoggerFactory.getLogger("ytmp")
     }
 }

@@ -150,6 +150,7 @@ internal fun Route.personalRoutes(host: HostContext) = with(host) {
             call.respond(HttpStatusCode.NoContent)
         }
         get("/likes/{songId}") { call.respond(call.owner().rating(call.parameters["songId"]!!)) }
+        convertRoutes(host)
         put("/likes/{songId}") {
             val owner = call.owner()
             val rating = call.receive<LikeStatus>()

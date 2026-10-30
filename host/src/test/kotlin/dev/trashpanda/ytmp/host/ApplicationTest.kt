@@ -5,6 +5,13 @@ import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.core.AccountIdentity
 import dev.trashpanda.ytmp.core.SearchSuggestions
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.protocol.ConvertJob
+import dev.trashpanda.ytmp.protocol.ConvertJobList
+import dev.trashpanda.ytmp.protocol.ConvertListChoice
+import dev.trashpanda.ytmp.protocol.ConvertPreview
+import dev.trashpanda.ytmp.protocol.ConvertStartRequest
+import dev.trashpanda.ytmp.protocol.ConvertTarget
+import dev.trashpanda.ytmp.protocol.ConvertTargetKind
 import dev.trashpanda.ytmp.protocol.HomePage
 import dev.trashpanda.ytmp.protocol.HomeSection
 import dev.trashpanda.ytmp.protocol.PlaylistPage
@@ -440,6 +447,30 @@ class ApplicationTest {
     }
 
     @Test
+    fun `importing playlists, the phone's owner reads an export and starts an import, nobody else`() = testApplication {
+        val converter = PlaylistConverter(kotlin.io.path.createTempDirectory().toFile(), search, { null }, CoroutineScope(SupervisorJob()))
+        setupPhone(personal = Owner(YoutubeAccount("Me", null, null)), converter = converter)
+        val client = jsonClient()
+        val export = """{"playlists":[{"name":"Road trip","items":[{"track":{"trackName":"Halo","artistName":"Beyoncé","albumName":"A","trackUri":"spotify:track:1"}}]}]}"""
+        val preview = client.post("/api/me/convert/read") {
+            contentType(ContentType.Application.OctetStream)
+            setBody(export.toByteArray())
+        }.body<ConvertPreview>()
+        assertEquals(listOf("Road trip"), preview.lists.map { it.name })
+        val job = client.post("/api/me/convert/jobs") {
+            contentType(ContentType.Application.Json)
+            setBody(ConvertStartRequest(preview.readId, listOf(ConvertListChoice(0, ConvertTarget(ConvertTargetKind.NEW_PLAYLIST)))))
+        }.body<ConvertJob>()
+        assertEquals("Road trip", job.lists.single().target.title)
+        assertEquals(listOf(job.id), client.get("/api/me/convert/jobs").body<ConvertJobList>().jobs.map { it.id })
+        // Not a Spotify export: a message to show.
+        val wrong = client.post("/api/me/convert/read") { setBody("hello".toByteArray()) }
+        assertEquals(HttpStatusCode.BadRequest, wrong.status)
+        // A friend on the Wi-Fi: not the owner's imports.
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/me/convert/jobs") { header("X-Remote", "1") }.status)
+    }
+
+    @Test
     fun `search goes to the sources`() = testApplication {
         setup()
         val all = jsonClient().get("/api/search?q=daft").body<SearchPage>()
@@ -480,12 +511,13 @@ class ApplicationTest {
         suggestions: SearchSuggestions? = null,
         deviceOwner: () -> String? = { null },
         onLocalAccount: (AccountIdentity) -> Unit = {},
+        converter: PlaylistConverter? = null,
     ) {
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
             ytmpModule(
                 rooms,
-                HostSources(search, catalog = catalog, personal = personal, suggestions = suggestions),
+                HostSources(search, catalog = catalog, personal = personal, suggestions = suggestions, converter = converter),
                 HostOptions(
                     kind = HostKind.PHONE,
                     shareUrl = { "http://192.168.1.23:8765" },
