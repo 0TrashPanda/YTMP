@@ -1499,6 +1499,7 @@ export interface ConvertListPreview {
   name: string;
   kind: ConvertListKind;
   count: number;
+  truncated: boolean;
 }
 
 export interface ConvertPreview {

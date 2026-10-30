@@ -17,7 +17,13 @@ import java.util.zip.ZipInputStream
 
 /** A list read from an import (a playlist, the liked songs, …), in a reader's own words. */
 @Serializable
-data class ConvertList(val name: String, val kind: ConvertListKind, val items: List<ConvertItem>)
+data class ConvertList(
+    val name: String,
+    val kind: ConvertListKind,
+    val items: List<ConvertItem>,
+    /** Only the first songs: the source shows no more (a Spotify link's page). */
+    val truncated: Boolean = false,
+)
 
 /** What a reader found: the lists, and how many rows weren't anything to import. */
 data class ConvertRead(val reader: String, val lists: List<ConvertList>, val skipped: Int)

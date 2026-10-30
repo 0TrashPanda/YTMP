@@ -12,6 +12,7 @@
 		pickImportSong,
 		proxiedAudioUrl,
 		readImport,
+		readImportLink,
 		removeImport,
 		search,
 		startImport
@@ -138,21 +139,32 @@
 		return { kind: 'new_playlist', title: kind === 'liked_songs' ? 'Liked on Spotify' : name, playlistId: null };
 	}
 
+	let link = $state('');
+
 	async function pickFile(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
 		input.value = '';
-		if (!file) return;
+		if (file) await readWith(() => readImport(file), "Couldn't read that file");
+	}
+
+	/** A public Spotify playlist or album by its link. */
+	async function readLink() {
+		const url = link.trim();
+		if (url) await readWith(() => readImportLink(url), "Couldn't read that playlist");
+	}
+
+	async function readWith(reader: () => Promise<ConvertPreview>, failed: string) {
 		reading = true;
 		try {
-			const read = await readImport(file);
+			const read = await reader();
 			preview = read;
 			picks = read.lists.map((l) => ({ on: true, target: defaultTarget(l.kind, l.name) }));
 			getMyPlaylists()
 				.then((p) => (playlists = p))
 				.catch(() => {});
 		} catch (e) {
-			onToast(message(e, "Couldn't read that file"));
+			onToast(message(e, failed));
 		} finally {
 			reading = false;
 		}
@@ -509,6 +521,21 @@
 		<!-- A new import -->
 		<h1 class="text-2xl font-bold">Import from Spotify</h1>
 		{#if !preview}
+			<section class="flex flex-col gap-3">
+				<h2 class="text-lg font-bold">A public playlist or album</h2>
+				<p class="text-muted">In Spotify: <strong class="text-white">Share → Copy link</strong>, and paste it here.</p>
+				<form
+					class="flex items-center gap-2"
+					onsubmit={(e) => {
+						e.preventDefault();
+						readLink();
+					}}
+				>
+					<input class="min-w-0 flex-1 rounded-lg bg-raised px-3 py-2.5 outline-none" bind:value={link} placeholder="https://open.spotify.com/playlist/…" aria-label="Spotify link" inputmode="url" autocapitalize="none" spellcheck="false" enterkeyhint="go" />
+					<button class="rounded-full bg-white px-5 py-2.5 font-medium text-black disabled:opacity-50" disabled={reading || !link.trim()}>{reading ? 'Reading…' : 'Read'}</button>
+				</form>
+			</section>
+			<h2 class="pt-2 text-lg font-bold">Everything: your Spotify data</h2>
 			<div class="flex flex-col gap-3 text-muted">
 				<p>
 					On <a class="underline" href="https://www.spotify.com/account/privacy/" target="_blank" rel="noopener">spotify.com → Account → Privacy settings</a>, request
@@ -518,7 +545,7 @@
 			</div>
 			<label class="flex cursor-pointer items-center justify-center gap-2 self-start rounded-full bg-white px-6 py-2.5 font-medium text-black {reading ? 'opacity-50' : ''}">
 				<Icon name="playlistAdd" size={20} />
-				{reading ? 'Reading…' : 'Pick the export'}
+				Pick the export
 				<input class="hidden" type="file" accept=".zip,.json,application/zip,application/json" disabled={reading} onchange={pickFile} />
 			</label>
 			<button class="self-start text-sm text-muted hover:text-white" onclick={() => (choosing = false)}>Back</button>
@@ -532,7 +559,7 @@
 							<input type="checkbox" class="h-5 w-5 accent-accent" bind:checked={pick.on} />
 							<span class="min-w-0 flex-1">
 								<span class="block truncate font-medium">{list.name}</span>
-								<span class="block text-sm text-muted">{kindLabel[list.kind]} · {list.count.toLocaleString()}</span>
+								<span class="block text-sm text-muted">{kindLabel[list.kind]} · {list.count.toLocaleString()}{list.truncated ? ' (Spotify only shows the first ones: for the rest, use your Spotify data)' : ''}</span>
 							</span>
 						</label>
 						{#if pick.on && list.kind !== 'followed_shows'}

@@ -20,7 +20,7 @@ reader  →  lists (one shared format)  →  matcher  →  writer
 
 | Part | Where |
 |---|---|
-| Readers | `SpotifyExport.kt` (later Google Takeout's playlists, YTM and Spotify accounts) |
+| Readers | `SpotifyExport.kt`, `SpotifyLink.kt` (later Google Takeout's playlists, YTM and Spotify accounts) |
 | Matcher | `ConvertMatcher.kt`: searches the target source with its normal module `search` (modules don't match; see [song matching](storage.md#song-matching)) |
 | Jobs, the match memory, the worker, the YTM writer | `PlaylistConverter.kt` |
 | API | `ConvertRoutes.kt` (`/api/me/convert/…`) |
@@ -63,6 +63,18 @@ test).
 
 To check with a real export: the episode and show fields, whether followed (not own)
 playlists are in it.
+
+### A Spotify link
+
+`SpotifyLink.kt` (reader `spotify-link`, the body is the link): a playlist or album link
+(`open.spotify.com/[intl-xx/]playlist/<id>`, also `spotify:playlist:<id>`) is read from
+Spotify's embed page, `https://open.spotify.com/embed/<kind>/<id>`, which needs no account.
+Its `<script id="__NEXT_DATA__">` has `props.pageProps.state.data.entity`: `name` and
+`trackList: [{ uri, title, subtitle (artists, ", " between), duration (ms), entityType
+(track, episode) }]`. No album (an album's own name is used for its songs), but the length,
+which helps matching. The page shows at most 100 songs: a list of 100 is marked `truncated`, and
+the screen says the data export has the rest. A private or deleted list (400/404) gets a
+message of its own.
 
 ## Matching
 
@@ -152,7 +164,7 @@ allows these paths, `AccountService.verifyYoutubeToken`).
 
 | Method | Path | What |
 |---|---|---|
-| POST | `/api/me/convert/read?reader=spotify-export` | The file as the body → `ConvertPreview` (`readId`, the lists with name, kind, count; skipped rows) |
+| POST | `/api/me/convert/read?reader=spotify-export` (or `spotify-link`, with the link as the body) | The file as the body → `ConvertPreview` (`readId`, the lists with name, kind, count; skipped rows) |
 | POST | `/api/me/convert/jobs` | `ConvertStartRequest { readId, lists: [{ index, target }], settings }` → `ConvertJob` |
 | GET | `/api/me/convert/jobs` | `ConvertJobList`, newest first |
 | GET | `/api/me/convert/jobs/{id}` | `ConvertJob`: status, waiting and until when, time left, counts, lists |

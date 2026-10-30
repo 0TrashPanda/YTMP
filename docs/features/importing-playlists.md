@@ -14,7 +14,10 @@ and you can check the songs it wasn't sure about.
 
 ## Where from
 
-- **Spotify data export** (first): on spotify.com, *Account → Privacy settings → Download
+- **A link to a public Spotify playlist or album**: in Spotify *Share → Copy link*, paste it
+  in *Import → From Spotify*. No sign-in, nothing to wait for. Spotify only shows the first
+  100 songs of a list this way; for longer ones, use the data export.
+- **Spotify data export**: on spotify.com, *Account → Privacy settings → Download
   your data*, tick *Account data*. Spotify emails a zip within a few days. It has the playlists
   you made, your liked songs, saved albums, and the podcasts you follow and saved. No Spotify
   developer app or Premium needed.

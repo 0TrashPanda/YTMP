@@ -63,6 +63,8 @@ class PlaylistConverter(
     private val likeGapMs: Long = LIKE_GAP_MS,
     private val blockedPauseMs: Long = BLOCKED_PAUSE_MS,
     private val failedPauseMs: Long = FAILED_PAUSE_MS,
+    /** Fetches a web page (a Spotify link's), for tests. */
+    private val download: (String) -> String = SpotifyLink::download,
 ) {
     private val log = LoggerFactory.getLogger(PlaylistConverter::class.java)
     private val matcher = ConvertMatcher(search)
@@ -110,6 +112,8 @@ class PlaylistConverter(
         val read = withContext(Dispatchers.IO) {
             when (reader) {
                 SpotifyExport.READER -> SpotifyExport.read(input)
+                // The body is the link.
+                SpotifyLink.READER -> SpotifyLink.read(input.readNBytes(MAX_LINK).decodeToString(), download)
                 else -> throw ConvertException("Can't import from $reader")
             }
         }
@@ -120,7 +124,7 @@ class PlaylistConverter(
             while (reads.size >= MAX_READS) reads.remove(reads.keys.first())
             reads[id] = Pending(owner, read, now)
         }
-        return ConvertPreview(id, read.reader, read.lists.mapIndexed { i, l -> ConvertListPreview(i, l.name, l.kind, l.items.size) }, read.skipped)
+        return ConvertPreview(id, read.reader, read.lists.mapIndexed { i, l -> ConvertListPreview(i, l.name, l.kind, l.items.size, l.truncated) }, read.skipped)
     }
 
     /** Starts an import of the lists [request] picks from a read; songs found before are matched at once. */
@@ -773,6 +777,7 @@ class PlaylistConverter(
         private const val SAVE_EVERY_MS = 30_000L
         private const val READ_KEPT_MS = 3_600_000L
         private const val MAX_READS = 20
+        private const val MAX_LINK = 2_000
         /** Songs added to a playlist at once. */
         const val PART = 50
         private const val PER_STEP_LIKES = 4

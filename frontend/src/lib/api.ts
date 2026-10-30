@@ -570,6 +570,11 @@ export function readImport(file: File, reader = 'spotify-export'): Promise<Conve
 	return request(`/api/me/convert/read?reader=${encodeURIComponent(reader)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
 }
 
+/** What's in a public Spotify playlist or album, by its link. */
+export function readImportLink(url: string): Promise<ConvertPreview> {
+	return request('/api/me/convert/read?reader=spotify-link', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: url });
+}
+
 export function startImport(start: ConvertStartRequest): Promise<ConvertJob> {
 	return request('/api/me/convert/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(start) });
 }

@@ -47,14 +47,21 @@ data class ConvertItem(
 /** One list found in what was read, for *What to import*. */
 @Serializable
 @SerialName("ConvertListPreview")
-data class ConvertListPreview(val index: Int, val name: String, val kind: ConvertListKind, val count: Int)
+data class ConvertListPreview(
+    val index: Int,
+    val name: String,
+    val kind: ConvertListKind,
+    val count: Int,
+    /** Only its first [count] songs could be read (a link to a long Spotify playlist). */
+    val truncated: Boolean = false,
+)
 
 /** `POST /api/me/convert/read`: what's in the file, kept for an hour as [readId]. */
 @Serializable
 @SerialName("ConvertPreview")
 data class ConvertPreview(
     val readId: String,
-    /** e.g. "spotify-export". */
+    /** e.g. "spotify-export", "spotify-link". */
     val reader: String,
     val lists: List<ConvertListPreview>,
     /** Rows that weren't anything to import (an audiobook, a blank row). */
