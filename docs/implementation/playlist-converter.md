@@ -3,8 +3,8 @@
 > Status: **built**: the Spotify export reader, the matcher with its match memory, stored
 > jobs, the YouTube Music writer (new or existing playlists, likes, follows), the API and the
 > screens. Tried in a browser against a local server with a fake module (an import of two
-> playlists, a song picked by hand put in its place); not yet with a real Spotify export or real
-> YouTube Music. Not built yet: listening to a candidate while checking, a phone notification,
+> playlists, a song picked by hand put in its place), and on a Pixel with a test export and
+> real YouTube Music; not yet with a real Spotify export. Not built yet: a phone notification,
 > matches in the song graph's `song_sources`, other readers and writers.
 
 Feature: [importing playlists](../features/importing-playlists.md).
@@ -166,8 +166,10 @@ someone else's import).
 *Library → Import* when signed in to YouTube Music: *Your imports*, a new import (the how-to,
 the file, *What to import* with a target per list, the settings) and an import's page (its
 lists with *Open*, *Pause / Go on / Cancel*, *Accept all*, and *Checking songs* by filter: the
-candidates, a search of your own, *Leave it out*). While an import goes, its page asks every
-3 s.
+the song on Spotify, its match now, the candidates, a search of your own, *Leave it out*).
+Listening to an option plays `/api/audio/{id}` in an `Audio` element of the page (this device
+only, from 30 s in for songs over 1½ minutes), not in the room. While an import goes, its page
+asks every 3 s.
 
 ## Tests
 

@@ -1,8 +1,8 @@
 # Importing playlists
 
 > Status: **built** for a **Spotify data export** into **YouTube Music** (playlists, likes,
-> followed podcasts), on a server and on the phone; not yet tried with a real export. Not yet:
-> listening to a song while checking, a notification on the phone. Later: other exports
+> followed podcasts), on a server and on the phone; tried on a Pixel with a test export. Not
+> yet: a notification on the phone. Later: other exports
 > (Google Takeout's playlists), playlists from a linked account (YouTube Music, Spotify) and
 > **YTMP playlists** as a place to put them.
 > Implementation: [playlist converter](../implementation/playlist-converter.md).
@@ -62,8 +62,10 @@ The songs YTMP wasn't sure about or didn't find, in a list like YouTube Music's:
 
 - Filters: *Not sure*, *Not found*, *All*.
 - Each song shows what it was (title, artist, album) and what YTMP picked, with its cover.
-  Tap it for *This one is right*, the **other options** it found, a **search of your own**,
-  or **leave it out**.
+  Tap it to see, one under the other: the song **on Spotify**, what it's **matched to** now
+  (or YTMP's guess, with *This one is right*), the **other options** it found, a **search of
+  your own** and **leave it out**. Tap an option's cover to **listen** to it (on this device
+  only, from 30 s in; not in the room); tap the option to pick it.
 - *Accept all* for when the ones it wasn't sure about look right.
 
 A song you pick is remembered, so it's right in the next import too.

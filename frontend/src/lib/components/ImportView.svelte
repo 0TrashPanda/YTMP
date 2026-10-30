@@ -10,6 +10,7 @@
 		getMyPlaylists,
 		importAction,
 		pickImportSong,
+		proxiedAudioUrl,
 		readImport,
 		removeImport,
 		search,
@@ -207,6 +208,7 @@
 	});
 
 	function toggle(row: ConvertItemRow) {
+		stopListening();
 		open = open === row.key ? null : row.key;
 		query = [row.item.artists[0], row.item.title].filter(Boolean).join(' ');
 		found = [];
@@ -217,6 +219,7 @@
 		try {
 			const picked = await pickImportSong(jobId, row.key, song ? { song, leftOut: false } : { song: null, leftOut: true });
 			// Out of this filter now (unless it's All).
+			stopListening();
 			rows = filter === 'all' ? rows.map((r) => (r.key === row.key ? picked : r)) : rows.filter((r) => r.key !== row.key);
 			open = null;
 			refresh();
@@ -239,6 +242,38 @@
 			searching = false;
 		}
 	}
+
+	// Listening to an option: its audio through the host, here on this device only (not in the room).
+	let listening = $state<string | null>(null);
+	let sample: HTMLAudioElement | null = null;
+
+	function listen(song: Song) {
+		sample?.pause();
+		if (listening === song.id) {
+			listening = null;
+			return;
+		}
+		const audio = new Audio(proxiedAudioUrl(song.id));
+		// Past the intro, where a song is most itself.
+		if (song.durationMs > 90_000) audio.addEventListener('loadedmetadata', () => (audio.currentTime = 30), { once: true });
+		audio.addEventListener('ended', () => {
+			if (sample === audio) listening = null;
+		});
+		audio.play().catch(() => {
+			if (sample === audio) listening = null;
+			onToast("Couldn't play it here");
+		});
+		sample = audio;
+		listening = song.id;
+	}
+
+	function stopListening() {
+		sample?.pause();
+		sample = null;
+		listening = null;
+	}
+
+	$effect(() => () => sample?.pause());
 
 	async function act(action: 'accept-unsure' | 'pause' | 'resume' | 'cancel') {
 		if (!jobId) return;
@@ -279,6 +314,22 @@
 		<div class="bg-good" style="width: {(c.matched / Math.max(1, c.total)) * 100}%"></div>
 		<div class="bg-yellow-500" style="width: {(c.unsure / Math.max(1, c.total)) * 100}%"></div>
 		<div class="bg-muted/40" style="width: {((c.notFound + c.leftOut) / Math.max(1, c.total)) * 100}%"></div>
+	</div>
+{/snippet}
+
+{#snippet option(row: ConvertItemRow, song: Song, chosen: boolean)}
+	<div class="flex items-center gap-1 rounded {chosen ? 'bg-line/60' : 'hover:bg-line'}">
+		<button class="relative shrink-0 rounded p-1" aria-label={listening === song.id ? 'Stop' : `Listen to ${song.title}`} onclick={() => listen(song)}>
+			<Art {song} size={40} class="h-10 w-10" />
+			<span class="absolute inset-1 grid place-items-center rounded bg-black/50"><Icon name={listening === song.id ? 'pause' : 'play'} size={22} /></span>
+		</button>
+		<button class="flex min-w-0 flex-1 items-center gap-2 p-1 text-left" disabled={chosen} onclick={() => choose(row, song)}>
+			<span class="min-w-0 flex-1">
+				<span class="block truncate">{song.title}</span>
+				<span class="block truncate text-sm text-muted">{artistNames(song)}{song.album ? ` · ${song.album.name}` : ''}{song.durationMs ? ` · ${formatTime(song.durationMs)}` : ''}</span>
+			</span>
+			{#if chosen}<Icon name="check" size={20} class="shrink-0 text-good" />{/if}
+		</button>
 	</div>
 {/snippet}
 
@@ -368,23 +419,33 @@
 							<Icon name={open === row.key ? 'expand' : 'collapse'} size={22} class="shrink-0 text-muted" />
 						</button>
 						{#if open === row.key}
+							{@const current = row.song && row.state !== 'not_found' && row.state !== 'left_out' ? row.song : null}
+							{@const others = [...row.candidates, ...found].filter((s, i, all) => s.id !== current?.id && all.findIndex((o) => o.id === s.id) === i)}
 							<div class="flex flex-col gap-1 pl-2">
-								{#if row.song && row.state !== 'matched'}
-									<button class="flex items-center gap-3 rounded p-1 text-left hover:bg-line" onclick={() => choose(row, row.song)}>
-										<Icon name="check" size={20} class="text-good" /><span class="font-medium">This one is right</span>
-									</button>
+								<p class="pt-1 text-xs font-medium uppercase tracking-wide text-muted">On Spotify</p>
+								<p class="px-1">
+									<span class="font-medium">{row.item.title}</span>
+									<span class="block text-sm text-muted">{[original(row), row.item.durationMs ? formatTime(row.item.durationMs) : null].filter(Boolean).join(' · ') || 'No artist or album'}</span>
+								</p>
+								<p class="pt-2 text-xs font-medium uppercase tracking-wide text-muted">{row.state === 'unsure' ? "YTMP's guess" : 'Matched to'}</p>
+								{#if current}
+									{@render option(row, current, true)}
+									{#if row.state === 'unsure'}
+										<button class="flex items-center gap-2 self-start rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black" onclick={() => choose(row, current)}>
+											<Icon name="check" size={18} />This one is right
+										</button>
+									{/if}
+								{:else}
+									<p class="px-1 text-sm text-muted">{row.state === 'left_out' ? 'Left out' : 'Nothing yet: pick one below, or search'}</p>
 								{/if}
-								{#each [...row.candidates, ...found] as song (song.id)}
-									<button class="flex items-center gap-3 rounded p-1 text-left hover:bg-line" onclick={() => choose(row, song)}>
-										<Art {song} size={40} class="h-10 w-10" />
-										<span class="min-w-0 flex-1">
-											<span class="block truncate">{song.title}</span>
-											<span class="block truncate text-sm text-muted">{artistNames(song)}{song.album ? ` · ${song.album.name}` : ''}{song.durationMs ? ` · ${formatTime(song.durationMs)}` : ''}</span>
-										</span>
-									</button>
-								{/each}
+								{#if others.length}
+									<p class="pt-2 text-xs font-medium uppercase tracking-wide text-muted">{current ? 'Or one of these' : 'Maybe one of these'}</p>
+									{#each others as song (song.id)}
+										{@render option(row, song, false)}
+									{/each}
+								{/if}
 								<form
-									class="flex items-center gap-2 pt-1"
+									class="flex items-center gap-2 pt-2"
 									onsubmit={(e) => {
 										e.preventDefault();
 										searchYourself();
