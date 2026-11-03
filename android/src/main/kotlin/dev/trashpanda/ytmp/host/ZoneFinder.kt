@@ -19,6 +19,8 @@ class ZoneFinder(context: Context, private val zones: ZoneOutputs) : NsdFinder(c
 
     override fun remove(id: String) = zones.removeSource(id)
 
+    override fun lose(id: String) = zones.loseSource(id)
+
     companion object {
         private const val TAG = "YtmpZones"
     }

@@ -57,6 +57,8 @@ class ZoneOutputs(
     /** Zone files by source (an mDNS service, or a URL from the config). */
     private val loaded = MutableStateFlow<Map<String, List<Zone>>>(emptyMap())
     private val sources = HashMap<String, Pair<String, Job>>()
+    /** Sources the network search lost (under [sources]): followed until their file can't be fetched. */
+    private val lostSources = HashSet<String>()
     /** The local music each source shares, by source. */
     private val libraries = HashMap<String, String>()
 
@@ -78,6 +80,7 @@ class ZoneOutputs(
     /** Follows the zones file at [url] (fetched again every minute, so changes to it show up). */
     fun addSource(id: String, url: String) {
         synchronized(sources) {
+            lostSources -= id
             if (sources[id]?.first == url) return
             sources.remove(id)?.second?.cancel()
             sources[id] = url to scope.launch { follow(id, url) }
@@ -85,9 +88,25 @@ class ZoneOutputs(
     }
 
     fun removeSource(id: String) {
-        synchronized(sources) { sources.remove(id)?.second?.cancel() }
+        synchronized(sources) {
+            lostSources -= id
+            sources.remove(id)?.second?.cancel()
+        }
         loaded.update { it - id }
         shareMusic(id, null)
+    }
+
+    /**
+     * The network search lost source [id]. A phone's search sometimes misses a device for a
+     * while (just after the screen comes on), so its zones stay as long as the file can be
+     * fetched, and a room playing on them plays on; the source goes once it can't be.
+     */
+    fun loseSource(id: String) {
+        synchronized(sources) {
+            if (id !in sources) return
+            lostSources += id
+        }
+        log.info("The network search lost zones {}; they stay while the file can be fetched", id)
     }
 
     /** Offers (or with null, takes back) the music [id]'s file shares, as a library in [local]. */
@@ -133,6 +152,11 @@ class ZoneOutputs(
                     currentCoroutineContext().ensureActive()
                     loaded.update { it - id }
                     shareMusic(id, null)
+                    // Lost by the network search too: gone.
+                    if (synchronized(sources) { id in lostSources }) {
+                        removeSource(id)
+                        return
+                    }
                 }
             }
             delay(REFRESH_MS)

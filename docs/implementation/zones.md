@@ -100,7 +100,9 @@ to the internet. The worst it can do is offer zones that don't work.
 
 - mDNS service `_ytmp-zones._tcp`, TXT `path` (default `/ytmp-zones.json`).
 - **Phone:** `ZoneFinder` (NsdManager), like the other finders; the zones go when the phone
-  is on another network.
+  is on another network. When the search loses the file (the phone's search often misses
+  devices just after the screen comes on), its zones stay while the file can still be fetched,
+  so a room playing on them plays on; once it can't be (three tries), the file is forgotten.
 - **Server:** JmDNS, plus fixed files in `ytmp.toml` (mDNS doesn't work inside Docker without
   `network_mode: host`):
 

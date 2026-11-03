@@ -124,6 +124,29 @@ class ZoneOutputsTest {
     }
 
     @Test
+    fun `zones the network search loses while their file can still be fetched stay, and play on`() = withSetup {
+        eventually { zones.devices.value.size == 2 }
+        val room = rooms.create("Party")
+        val run = join(room)
+        run(Command.AddSongs(listOf(song), QueuePosition.END))
+        eventually { room.view().current != null }
+        run(Command.SetOutput(keuken, active = true))
+        eventually { mpd.state == "play" }
+
+        // The phone's search misses the Pi just after the screen comes on.
+        zones.loseSource("test")
+        delay(2_500)
+        assertEquals(listOf("Zithoek", "Keuken"), zones.devices.value.map { it.name })
+        assertTrue(mpds.devices.value.isEmpty())
+        assertTrue(keuken in room.view().activeOutputs)
+        assertEquals("play", mpd.state)
+
+        // Gone for real (here: by another network): removed.
+        zones.removeSource("test")
+        eventually { zones.devices.value.isEmpty() }
+    }
+
+    @Test
     fun `paused for a while, the zones get back what they had until the room plays again`() = withSetup {
         eventually { zones.devices.value.size == 2 }
         val room = rooms.create("Party")
