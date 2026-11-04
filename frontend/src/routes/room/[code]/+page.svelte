@@ -45,7 +45,7 @@
 	import { sleepTimer } from '../../../lib/sleepTimer.svelte';
 	import SleepTimerSheet from '../../../lib/components/SleepTimerSheet.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
-	import { shows } from '../../../lib/soloLook.svelte';
+	import { searchFills, shows } from '../../../lib/soloLook.svelte';
 	import { load as loadSettings, settings } from '../../../lib/settings.svelte';
 	import { saved } from '../../../lib/storage';
 	import { moduleStatus, switchOffOwnModule } from '../../../lib/ownModule.svelte';
@@ -631,7 +631,7 @@
 						<button class="text-xl font-black tracking-tight sm:hidden" title="Home" onclick={goHome}>
 							YT<span class="text-accent">MP</span>
 						</button>
-						<SearchBox {query} onopen={() => (headerHidden = false)} onsearch={searchFor} onlink={openLink} />
+						<SearchBox {query} fills={searchFills(room)} onopen={() => (headerHidden = false)} onsearch={searchFor} onlink={openLink} />
 						<div class="ml-auto flex items-center gap-2">
 							<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
 							<!-- Phones: centered in the header. -->

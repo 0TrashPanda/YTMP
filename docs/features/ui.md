@@ -366,7 +366,8 @@ Open it with the **⋮** button or by **right-clicking** the song.
   under the controls, Karaoke, and Party screen, Show on a TV and Clone room in the avatar
   menu. Everything shows by default, and parties always show everything. The room code
   can also be hidden from the room itself: tap it in a solo room, then *Hide the room code in
-  solo rooms*.
+  solo rooms*. Without the room code, search fills the top bar as a search box, also on
+  phones where it's otherwise an icon (*Wide search box*, on by default).
 - **Numbers you can type** ✅: every setting that is a number has a box to type it in, next to
   its slider or its choices: the volumes and the sync adjustment in *Play on*, the room's
   waiting and limits and the votes needed to skip (*This room*), songs per page, the song
