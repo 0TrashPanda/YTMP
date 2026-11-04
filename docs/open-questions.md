@@ -28,6 +28,23 @@ _None open right now._
   - Settings the Android app needs are fields of what the page sends with playback
     (`player.svelte.ts` → `PlaybackTarget`): each new one is a field in TypeScript and in
     Kotlin. Send them as one settings object instead, if more of them come?
+- **Code that could be shared** (found looking for repeated patterns):
+  - **Sheets and dialogs**: about 12 web app components (CloneSheet, SaveSheet, ShareSheet,
+    SleepTimerSheet, OutputsSheet, LeaveRoomDialog, TvLinkDialog, InterruptDialog,
+    HoldChoices, PlayAllButtons, AvatarMenu, the home page's room chooser) copy the same
+    backdrop and bottom-sheet panel, each with its own z-index (40 to 90). One `Sheet.svelte`
+    would give one place for the layering, Escape, the Android back button and the animation.
+  - **Room commands as text in the Android player**: about 18 like `"""{"kind":"Pause"}"""`
+    in `PlaybackService.kt` and `SpeakerPlayer.kt`, next to 3 that use the typed `Command`.
+    A helper that encodes `Command` would let the compiler catch protocol changes.
+  - **The app's events to the page**: `MainActivity.kt` writes
+    `js("window.__ytmpNative && window.__ytmpNative.onX && …")` out 21 times; one `emit()`
+    would do. Further: generate `native.ts` from the `@JavascriptInterface` methods, as
+    `protocol/` does for its types.
+  - **Speaker discovery on the server**: `CastDiscovery`, `MpdDiscovery` and `ZoneDiscovery`
+    each set up the same JmmDNS listener; one helper, like the phone's `NsdFinder`.
+  - Already shared well: the output drivers (`OutputDriver`, `DeviceDriver`), the phone's
+    finders (`NsdFinder`), the web app's `request()` in `api.ts`, and `Setting`.
 
 ## Settled
 
