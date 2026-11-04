@@ -190,6 +190,8 @@ export const settings = {
 	remotePlay: new Setting('remotePlay', true, bool, flag('ytmp.remotePlay')),
 	/** The app skips silent parts of podcast episodes, when you listen alone. */
 	skipSilence: new Setting('skipSilence', false, bool, flag('ytmp.skipSilence')),
+	/** In the app, the volume buttons change the speakers' and TVs' volume while the room plays there and not on the phone. */
+	volumeKeys: new Setting('volumeKeys', true, bool),
 	/** In a party room, pausing, skipping, seeking or playing something else asks first while others listen along. */
 	askInParty: new Setting('askInParty', true, bool),
 	/** In a party room where others listen along, Pause stops playing on this device instead (not playing here: it pauses, asked first). */

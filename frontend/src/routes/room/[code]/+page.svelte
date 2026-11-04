@@ -277,7 +277,9 @@
 		void room?.listeningAlone;
 		void room?.participantId;
 		// The lock screen's buttons follow what you may do.
-		void [room?.can('skip'), room?.can('seek')];
+		void [room?.can('skip'), room?.can('seek'), room?.can('output_volume')];
+		// The notification while it plays on speakers or TVs.
+		void s?.outputs.some((o) => o.active);
 		untrack(() => player?.sync());
 	});
 

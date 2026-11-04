@@ -52,6 +52,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -66,6 +67,7 @@ class MainActivity : ComponentActivity() {
     private var controller: ListenableFuture<MediaController>? = null
     private var askedForNotifications = false
     private var nearbyUpdates: Job? = null
+    private var speakerVolume: Job? = null
     private var castUpdates: Job? = null
     private val app get() = application as YtmpApp
 
@@ -272,6 +274,12 @@ class MainActivity : ComponentActivity() {
         // On screen: a media button that would interrupt a party can be asked about.
         PlaybackHub.askSink = askSink
         app.nearby.startDiscovery()
+        // The room plays on speakers or TVs, not here: the volume buttons change their volume (Settings → Sound).
+        speakerVolume = lifecycleScope.launch {
+            combine(PlaybackHub.speakerSession, PlaybackHub.target) { token, target -> token?.takeIf { target?.volumeKeys != false } }
+                .distinctUntilChanged()
+                .collect { token -> mediaController = token?.let { android.media.session.MediaController(this@MainActivity, it) } }
+        }
         nearbyUpdates = lifecycleScope.launch {
             app.nearby.rooms.collect { rooms ->
                 val list = json.encodeToString(ListSerializer(NearbyRoom.serializer()), rooms)
@@ -306,6 +314,8 @@ class MainActivity : ComponentActivity() {
         app.visible.value = false
         if (PlaybackHub.askSink === askSink) PlaybackHub.askSink = null
         nearbyUpdates?.cancel()
+        speakerVolume?.cancel()
+        mediaController = null
         castUpdates?.cancel()
         app.nearby.stopDiscovery()
         controller?.let(MediaController::releaseFuture)
@@ -773,7 +783,7 @@ class MainActivity : ComponentActivity() {
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
             PlaybackHub.target.value = target
-            if (target.enabled) runOnUiThread { askForNotifications() }
+            if (target.enabled || target.elsewhere) runOnUiThread { askForNotifications() }
         }
     }
 

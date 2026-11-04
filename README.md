@@ -107,7 +107,9 @@ Music, without Premium, and not tied to a single music service.
   The rooms of a multi-room amplifier show up as speakers of their own, from a file the house
   keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
   speakers near your phone (the phone looks the songs up and serves them).
-- Android: lock screen and notification controls, keeps playing with the screen off.
+- Android: lock screen and notification controls, keeps playing with the screen off. Also
+  while the room plays on speakers or TVs and not on the phone, and then the volume buttons
+  change the speakers' volume (all together, keeping their balance).
 - In a party room, taking your earbuds out or pausing on the lock screen only stops the music
   on your phone, and putting them back in (or Play) plays it there again; the lock screen's
   Next is only there for whoever may skip. The others see who paused, skipped or switched a

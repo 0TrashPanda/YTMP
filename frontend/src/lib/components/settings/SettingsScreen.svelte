@@ -417,6 +417,11 @@
 							window.dispatchEvent(new Event('ytmp:settings'));
 						}}
 					/>
+					<Toggle
+						label="Volume buttons control speakers"
+						hint="When the room plays on speakers or TVs and not on this phone, the volume buttons change their volume while the app is open. Several speakers go up and down together and keep their balance."
+						setting={settings.volumeKeys}
+					/>
 				{/if}
 				<p class="text-xs text-muted">The sync adjustment for Bluetooth is under <em>Play on</em> in a room. Sound settings are only for this {here}.</p>
 			{:else if section === 'look'}

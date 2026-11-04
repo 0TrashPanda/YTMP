@@ -184,6 +184,18 @@ inside the WebView.
   host's own `/api/audio/…` → `host`, otherwise `youtube`. The page shows it only while that
   item is the room's current one: the next song's link can take seconds, and the app loads it
   only then.
+- **Media controls while it plays on speakers** ✅
+  ([feature](../features/playback-and-outputs.md#media-controls-while-casting)): when the room
+  has a song, *Play here* is off and it plays on the host's active outputs or on speakers this
+  phone plays itself (`NearbySpeakers.playing`), `PlaybackService` swaps the session's player
+  for `SpeakerPlayer` (a `SimpleBasePlayer` with nothing to play): the room's song, position
+  and buttons as room commands, and a remote `DeviceInfo` whose volume is the speakers'
+  (`SpeakerGroup`: the loudest one's level, changes scale all of them, the balance kept also
+  through 0). The page says the room plays on outputs (`elsewhere`, so the player's own room
+  connection follows it with the page frozen), may set their volume (`canSetOutputVolume`) and
+  the setting (`volumeKeys`). While that player is in use, `MainActivity` sets the session as
+  its `mediaController` (`PlaybackHub.speakerSession`), so the volume buttons go to it while
+  the app is on screen and Android shows its volume panel for the speakers.
 - The **sync logic** (clock offset, drift correction, see
   [playback-sync](playback-sync.md)) is implemented twice: in TypeScript for browsers, and in
   Kotlin for the native player.

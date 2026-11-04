@@ -33,6 +33,7 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.TeeDataSource
 import dev.trashpanda.ytmp.host.LocalHost
+import dev.trashpanda.ytmp.host.NearbyPlaying
 import dev.trashpanda.ytmp.host.SongCache
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ProtocolJson
@@ -148,6 +149,10 @@ class PlaybackService : MediaSessionService() {
     private var resumedHere = false
     private lateinit var roomPlayer: RoomPlayer
 
+    /** The session's player while the room plays on speakers or TVs and not here ([speakersShown]). */
+    private lateinit var speakerPlayer: SpeakerPlayer
+    private var speakersShown = false
+
     /** Headphones were unplugged and the room was asked to pause: stay quiet until it has. */
     private var pausingRoom = false
 
@@ -233,6 +238,8 @@ class PlaybackService : MediaSessionService() {
         )
         session = MediaSession.Builder(this, RoomPlayer(exo).also { roomPlayer = it }).setSessionActivity(openApp).setCallback(Earbuds()).build()
 
+        speakerPlayer = SpeakerPlayer(SpeakerControls())
+
         PlaybackHub.followerCommands = follower::command
         audioManager = getSystemService(AudioManager::class.java)
         contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, volumeObserver)
@@ -251,18 +258,24 @@ class PlaybackService : MediaSessionService() {
                 }
             }
         }
+        val nearby = (application as YtmpApp).host.nearby.playing
         scope.launch {
-            PlaybackHub.target.collect { target ->
+            combine(PlaybackHub.target, nearby, ::Pair).collect { (target, near) ->
                 if (target?.enabled != true) stoppedHere = false
                 if (target?.enabled == true) {
                     stoppedBy = null
                     resumedHere = false
                 }
-                follower.follow(target?.room?.takeIf { target.enabled || resumedHere })
+                // Also while it plays on speakers, for the notification (the page freezes with the screen off).
+                val onSpeakers = target != null && (target.elsewhere || near?.roomCode == target.room?.code)
+                follower.follow(target?.room?.takeIf { target.enabled || resumedHere || onSpeakers })
             }
         }
         scope.launch {
             combine(PlaybackHub.target, follower.room) { target, room -> merge(target, room) }.collect { apply(it) }
+        }
+        scope.launch {
+            combine(PlaybackHub.target, follower.room, nearby, ::Triple).collect { (target, room, near) -> showSpeakers(target, room, near) }
         }
         // The sleep timer: runs here, so it works with the page frozen (screen off).
         scope.launch {
@@ -335,11 +348,13 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         if (PlaybackHub.followerCommands == follower::command) PlaybackHub.followerCommands = null
+        PlaybackHub.speakerSession.value = null
         contentResolver.unregisterContentObserver(volumeObserver)
         holdLocks(false)
         follower.close()
         scope.cancel()
         session.release()
+        speakerPlayer.release()
         exo.release()
         super.onDestroy()
     }
@@ -420,7 +435,7 @@ class PlaybackService : MediaSessionService() {
         lastTarget = target
         measuring.value = target != null && target.enabled && target.playing && target.item != null
         holdLocks(measuring.value)
-        setKeepForeground(target != null && target.enabled && target.item != null)
+        setKeepForeground(target != null && target.enabled && target.item != null || speakersShown)
         if (target?.room != null && target.room.hostUrl != sourceRoom?.hostUrl) {
             sourceRoom = target.room
             preferred = Source.DIRECT
@@ -892,6 +907,51 @@ class PlaybackService : MediaSessionService() {
         PlaybackHub.sleep.value = null
     }
 
+    /**
+     * The room plays on speakers or TVs (the host's, or ones this phone plays on itself) and not
+     * here: the media session shows it with [speakerPlayer], so the notification and lock screen
+     * have its song and controls, and the volume is the speakers'.
+     */
+    private fun showSpeakers(target: PlaybackTarget?, live: FollowedRoom?, near: NearbyPlaying?) {
+        val shown = merge(target, live)
+        val room = target?.room
+        val own = live?.takeIf { it.link == room }
+        val outputs = own?.state?.outputs?.filter { it.active }.orEmpty()
+        val nearby = near?.takeIf { room != null && it.roomCode == room.code }?.speakers.orEmpty()
+        val speakers = outputs.map { Speaker(it.id, it.volume, nearby = false) } + nearby.map { Speaker(it.id, it.volume, nearby = true) }
+        // Until the player's own connection has the room, what the page saw.
+        val onSpeakers = if (own != null) speakers.isNotEmpty() else target?.elsewhere == true || nearby.isNotEmpty()
+        val show = shown != null && !shown.enabled && shown.item != null && room != null && stoppedBy == null && onSpeakers
+        // Speakers this phone plays on itself need no permission.
+        if (show) speakerPlayer.show(shown!!, speakers, outputs.isEmpty() || target!!.canSetOutputVolume)
+        if (show == speakersShown) return
+        speakersShown = show
+        Log.i(TAG, if (show) "the room plays on speakers: media controls for them" else "media controls for playing here")
+        session.player = if (show) speakerPlayer else roomPlayer
+        PlaybackHub.speakerSession.value = if (show) session.platformToken else null
+        setKeepForeground(show || current?.let { it.enabled && it.item != null } == true)
+    }
+
+    private inner class SpeakerControls : SpeakerPlayer.Controls {
+        override fun command(json: String, onlyAlone: Boolean) {
+            if (PlaybackHub.askCommand(json)) return
+            if (onlyAlone && follower.room.value?.othersListen ?: (current?.solo != true)) {
+                Log.d(TAG, "media session: $json, but others listen along and the app isn't on screen to ask")
+                return
+            }
+            PlaybackHub.command(json)
+        }
+
+        override fun setVolumes(volumes: Map<String, Double>) {
+            val near = (application as YtmpApp).host.nearby
+            val ownSpeakers = near.playing.value?.speakers.orEmpty().map { it.id }.toSet()
+            for ((id, volume) in volumes) {
+                if (id in ownSpeakers) near.setVolume(id, volume)
+                else PlaybackHub.command(ProtocolJson.encodeToString(Command.serializer(), Command.SetOutputVolume(id, volume)))
+            }
+        }
+    }
+
     /** Stops playing on this device (not in the room). */
     private fun stopHere(by: StoppedBy? = null) {
         stoppedBy = by
@@ -907,7 +967,7 @@ class PlaybackService : MediaSessionService() {
         current = current?.copy(enabled = false)
         measuring.value = false
         holdLocks(false)
-        setKeepForeground(false)
+        setKeepForeground(speakersShown)
         exo.playWhenReady = false
         follower.command("""{"kind":"SetListening","on":false}""")
         PlaybackHub.status("stopped")

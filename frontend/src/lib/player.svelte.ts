@@ -731,7 +731,11 @@ class NativePlayer implements RoomPlayer {
 				solo: state?.room.visibility === 'private',
 				// The lock screen's Next, Previous and seeking only for whoever may do them right away.
 				canSkip: this.room.can('skip'),
-				canSeek: this.room.can('seek')
+				canSeek: this.room.can('seek'),
+				// The notification shows the room playing on speakers or TVs, with their volume.
+				elsewhere: state?.outputs.some((o) => o.active) ?? false,
+				canSetOutputVolume: this.room.can('output_volume'),
+				volumeKeys: settings.volumeKeys.value
 			})
 		);
 	}

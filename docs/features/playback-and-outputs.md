@@ -44,6 +44,18 @@ permissions say otherwise (permission: *Play audio locally*).
   With the app open (the notification pulled down over it) they ask first like YTMP's own
   buttons; from the lock screen they just happen. A browser's media keys likewise: asked with
   the tab on screen.
+- <a id="media-controls-while-casting"></a>**Media controls while it plays on speakers** ✅ (app):
+  when the room plays on speakers or TVs (the host's, or ones near your phone) and not on your
+  phone, the notification and lock screen still show the song with Play/pause, Next, Previous
+  and seeking, like YouTube Music while casting. Their volume slider is the speakers' volume.
+  Pause asks first in a party like above (from the lock screen it doesn't pause the others).
+- **Volume buttons control speakers** ✅ (*Settings → Sound*, app, on by default): in that
+  case the phone's volume buttons change the speakers' volume while the app is open, with
+  Android's volume panel. Several speakers go up and down together, like a speaker group: the
+  panel shows the loudest one, and each press changes all of them by the same share, so the
+  balance you set per speaker under *Play on* stays (also for speakers that are louder at the
+  same percentage). They act on the room the app has open. Changing speakers' volume needs the
+  *Speaker Volume* permission; speakers your phone plays on itself don't.
 - **Pause only stops it here** ✅ (*Settings → Playback*, on by default): in a party room
   while others listen along, YTMP's own Pause button stops the music on your device and it
   goes on for everyone else. When it isn't playing on your device, Pause pauses the room

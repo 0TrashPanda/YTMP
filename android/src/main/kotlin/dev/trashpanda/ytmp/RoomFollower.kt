@@ -46,6 +46,10 @@ data class FollowedRoom(
     /** Nobody else plays along (like the web app's `listeningAlone`). */
     val alone: Boolean
         get() = state.participants.none { (it.id != participantId && it.online && it.listening) || it.speakers.isNotEmpty() } && state.outputs.none { it.active }
+
+    /** Someone else listens on their own device (speakers and TVs don't count). */
+    val othersListen: Boolean
+        get() = state.participants.any { it.id != participantId && it.online && it.listening }
 }
 
 /**

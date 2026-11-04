@@ -45,6 +45,12 @@ data class PlaybackTarget(
     val canSkip: Boolean = true,
     /** May seek (permission `seek`): the lock screen and notification can seek. */
     val canSeek: Boolean = true,
+    /** The room plays on a speaker or TV of its host (an active output), as the page last saw. */
+    val elsewhere: Boolean = false,
+    /** May change the volume of the room's speakers and TVs (permission `output_volume`). */
+    val canSetOutputVolume: Boolean = false,
+    /** The volume buttons change the speakers' volume while the app is open and the room plays there, not here (Settings → Sound). */
+    val volumeKeys: Boolean = true,
 )
 
 /**
@@ -96,6 +102,12 @@ data class TargetItem(
  */
 object PlaybackHub {
     val target = MutableStateFlow<PlaybackTarget?>(null)
+
+    /**
+     * The media session while it shows the room playing on speakers or TVs, not here: the app's
+     * screen sends the volume buttons to it ([PlaybackTarget.volumeKeys]). Null otherwise.
+     */
+    val speakerSession = MutableStateFlow<android.media.session.MediaSession.Token?>(null)
 
     /** The sleep timer, set from the page; [PlaybackService] runs it (also with the page frozen) and clears it when it goes off. */
     val sleep = MutableStateFlow<SleepSetting?>(null)
