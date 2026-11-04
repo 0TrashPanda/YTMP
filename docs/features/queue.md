@@ -69,6 +69,13 @@ queue runs out.
 - **Clear queue** and **Clear** (autoplay) empty the queue or the autoplay queue. A cleared
   autoplay queue stays empty until something new is played or started (otherwise it would
   refill right away).
+- **Clear room** ✅ stops the song and empties the queue and autoplay at once (the song goes
+  into the history as skipped). **Undo** puts it all back for 2 minutes: the song where it
+  was, playing or paused, the queue and autoplay, as long as nothing else was played or
+  queued in between. Under *Settings → Playback → Clear room* you choose how: a **Clear room**
+  button above Up next, **swiping the mini player down** on a phone (like YTM), or both. It
+  needs the permissions to remove those songs (and *Autoplay from here* when autoplay has
+  songs); in a party room it asks first while others listen, and the others see who did it.
 - The autoplay queue is visible below the queue. Tapping a song there plays it; the
   autoplay songs before it are dropped.
 

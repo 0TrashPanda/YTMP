@@ -146,6 +146,25 @@ sealed interface Command {
     @SerialName("ClearQueue")
     data object ClearQueue : Command
 
+    /**
+     * Clears the room: the current song stops (into the history, as skipped), and the queue and
+     * the autoplay queue are emptied (autoplay stays empty until something new plays). Needs
+     * the permissions to remove those songs, and *Autoplay from here* when autoplay has songs.
+     * [UndoClearRoom] puts it all back for a while.
+     */
+    @Serializable
+    @SerialName("ClearRoom")
+    data object ClearRoom : Command
+
+    /**
+     * Puts back what the last [ClearRoom] took away (the song where it was, playing or paused,
+     * the queue and autoplay), while nothing else has been played or queued since, and for
+     * [CLEAR_ROOM_UNDO_MS] after.
+     */
+    @Serializable
+    @SerialName("UndoClearRoom")
+    data object UndoClearRoom : Command
+
     /** Empties the autoplay queue; it stays empty until something new is played or started. */
     @Serializable
     @SerialName("ClearAutoplay")

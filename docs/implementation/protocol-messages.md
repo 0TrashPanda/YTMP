@@ -86,6 +86,8 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `MoveItem` ✅ | `itemId`, `list: "history" \| "queue" \| "autoplay"`, `toIndex` | Reorder (autoplay → queue next/last: Add songs) |
 | `ClearQueue` ✅ | – | Remove own / others' songs |
 | `ClearAutoplay` ✅ | – | Autoplay from here |
+| `ClearRoom` ✅ | – | Remove own / others' songs (the current one too); Autoplay from here when autoplay has songs |
+| `UndoClearRoom` ✅ | – | The same, for what it puts back; within `CLEAR_ROOM_UNDO_MS` (2 min), while nothing new plays or is queued |
 | `ShuffleQueue` ✅ | – (with fair order it keeps the rounds) | Reorder |
 | `StartRadio` ✅ (song only so far) | `song`, `songs?` (a radio the sender brings: their own account's, from their server; null: the room's), `follows` (the sender's radio isn't there yet: the song starts now and it follows in another `StartRadio` for the same song), `clearHistory` (the history goes too, if the sender may remove those songs like *Clear queue*: their own, or others'; otherwise it stays; an older host ignores it); later `seedId`. The song starts right away, the radio follows | Start radio |
 | `AutoplayFromHere` ✅ (song only so far) | `song`; later `seedId` (song, artist, album or playlist) | Autoplay from here |

@@ -40,6 +40,8 @@ export type SwipeOpens = 'tab' | 'upnext';
 export type TabOrder = 'upnext' | 'related';
 /** The full player on a screen taller than wide (a monitor turned upright): the art above Up next, or next to it. */
 export type TallPlayer = 'stacked' | 'side';
+/** How the room is cleared (song, queue and autoplay): a button above Up next, swiping the mini player down, or both. */
+export type ClearRoomBy = 'button' | 'swipe' | 'both';
 export type ImageQuality = 'high' | 'low';
 export type VideoArt = 'crop' | 'fit';
 /** The songs a long list shows at a time: 100, 300 or 1000, or a number typed in between these. */

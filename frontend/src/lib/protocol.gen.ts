@@ -106,6 +106,10 @@ export interface CommandClearQueue {
   kind: "ClearQueue";
 }
 
+export interface CommandClearRoom {
+  kind: "ClearRoom";
+}
+
 export type Permission = "add_songs" | "play_now" | "remove_own" | "remove_others" | "reorder" | "start_radio" | "autoplay_from_here" | "play_pause" | "skip" | "seek" | "repeat" | "vote_skip" | "listen_locally" | "change_outputs" | "output_volume" | "kick" | "ban" | "assign_roles" | "edit_roles" | "change_settings" | "clone_room" | "send_migration";
 
 export interface CommandCreateRole {
@@ -334,6 +338,10 @@ export interface CommandUnban {
   banId: string;
 }
 
+export interface CommandUndoClearRoom {
+  kind: "UndoClearRoom";
+}
+
 export interface Role {
   id: string;
   name: string;
@@ -379,6 +387,7 @@ export type Command =
   | CommandChangeOwner
   | CommandClearAutoplay
   | CommandClearQueue
+  | CommandClearRoom
   | CommandCreateRole
   | CommandDeleteRole
   | CommandJumpTo
@@ -417,6 +426,7 @@ export type Command =
   | CommandSkip
   | CommandStartRadio
   | CommandUnban
+  | CommandUndoClearRoom
   | CommandUpdateRole
   | CommandUpdateSettings
   | CommandVoteSkip;

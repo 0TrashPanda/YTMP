@@ -9,7 +9,7 @@
 // account when it has none yet, else it stays this device's own if it's different (see [load]).
 import { listening } from './listening.svelte';
 import { preferences } from './preferences.svelte';
-import type { DislikeButton, ImageQuality, SwipeOpens, TabOrder, TallPlayer, VideoArt } from './storage';
+import type { ClearRoomBy, DislikeButton, ImageQuality, SwipeOpens, TabOrder, TallPlayer, VideoArt } from './storage';
 import { PAGE_SIZES, read, write } from './storage';
 
 export type PlaylistPick = 'first' | 'random';
@@ -176,6 +176,7 @@ const dislikeButton = oneOf<DislikeButton>('normal', 'dim', 'hidden');
 const swipeOpens = oneOf<SwipeOpens>('tab', 'upnext');
 const tabOrder = oneOf<TabOrder>('upnext', 'related');
 const tallPlayer = oneOf<TallPlayer>('stacked', 'side');
+const clearRoomBy = oneOf<ClearRoomBy>('button', 'swipe', 'both');
 
 export const settings = {
 	// Playback
@@ -193,6 +194,8 @@ export const settings = {
 	skipSilence: new Setting('skipSilence', false, bool, flag('ytmp.skipSilence')),
 	/** In the app, the volume buttons change the speakers' and TVs' volume while the room plays there and not on the phone. */
 	volumeKeys: new Setting('volumeKeys', true, bool),
+	/** Clearing the room (song, queue and autoplay, with Undo): a button above Up next, swiping the mini player down, or both. */
+	clearRoomBy: new Setting('clearRoomBy', 'button' as ClearRoomBy, clearRoomBy),
 	/** In a party room, pausing, skipping, seeking or playing something else asks first while others listen along. */
 	askInParty: new Setting('askInParty', true, bool),
 	/** In a party room where others listen along, Pause stops playing on this device instead (not playing here: it pauses, asked first). */

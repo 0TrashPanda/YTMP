@@ -31,6 +31,10 @@
 	const canClear = $derived(
 		!!roomState?.queue.length && room.can(roomState.queue.every((i) => i.addedBy === room.participantId) ? 'remove_own' : 'remove_others')
 	);
+	// Clear room (Settings → Playback): the song, the queue and autoplay at once; Undo puts them back.
+	const canClearRoom = $derived(
+		settings.clearRoomBy.value !== 'swipe' && !!(roomState?.nowPlaying || roomState?.queue.length || roomState?.autoplay.length) && room.can('remove_own')
+	);
 	let list = $state<HTMLElement>();
 
 	const slots = $derived.by((): Slot[] => {
@@ -337,12 +341,17 @@
 </script>
 
 <aside class="flex h-full min-h-0 flex-col">
-	{#if title || canClear}
+	{#if title || canClear || canClearRoom}
 		<div class="flex items-center gap-2 px-4 {title ? 'pt-4' : 'pt-2'} pb-2">
 			<h2 class="flex-1 text-sm font-medium tracking-wide text-muted uppercase">{title ? 'Up next' : ''}</h2>
 			{#if canClear}
 				<button class="rounded-full px-2 py-0.5 text-xs text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearQueue' })}>
 					Clear queue
+				</button>
+			{/if}
+			{#if canClearRoom}
+				<button class="rounded-full px-2 py-0.5 text-xs text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearRoom' })}>
+					Clear room
 				</button>
 			{/if}
 		</div>

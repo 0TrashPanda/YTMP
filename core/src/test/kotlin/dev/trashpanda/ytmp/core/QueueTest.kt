@@ -403,4 +403,50 @@ class QueueTest {
         assertTrue(Permission.REPEAT in dj.permissions)
         assertNotEquals(Permission.SKIP in listener.permissions, true)
     }
+
+    // --- clear room ---
+
+    @Test
+    fun `clear room stops the song and empties the queue, and undo puts it back`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        room.run(owner, Command.AddSongs((1..3).map { song(it) }, QueuePosition.END))
+        val before = room.state(owner)
+
+        assertNull(room.run(owner, Command.ClearRoom))
+        val cleared = room.state(owner)
+        assertNull(cleared.nowPlaying)
+        assertEquals(emptyList(), cleared.queue)
+        assertEquals(emptyList(), cleared.autoplay)
+        assertEquals(listOf("ytm:1"), cleared.history.map { it.song.id })
+
+        assertNull(room.run(owner, Command.UndoClearRoom))
+        val back = room.state(owner)
+        assertEquals(before.nowPlaying?.item?.itemId, back.nowPlaying?.item?.itemId)
+        assertEquals(before.queue.map { it.itemId }, back.queue.map { it.itemId })
+        assertEquals(emptyList(), back.history)
+    }
+
+    @Test
+    fun `clearing the room can't be undone once something else plays`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        room.run(owner, Command.AddSongs((1..2).map { song(it) }, QueuePosition.END))
+        room.run(owner, Command.ClearRoom)
+        room.run(owner, Command.PlayNow(song(9)))
+
+        assertEquals(ErrorCode.INVALID, room.run(owner, Command.UndoClearRoom)?.code)
+        assertEquals("ytm:9", room.state(owner).nowPlaying?.item?.song?.id)
+    }
+
+    @Test
+    fun `clearing the room needs the permission to remove the others' songs`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        val guest = room.connect("Guest")
+        room.run(owner, Command.AddSongs((1..2).map { song(it) }, QueuePosition.END))
+
+        assertEquals(ErrorCode.PERMISSION_DENIED, room.run(guest, Command.ClearRoom)?.code)
+        assertEquals("ytm:1", room.state(owner).nowPlaying?.item?.song?.id)
+    }
 }

@@ -37,7 +37,7 @@
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
 	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type PlaylistPick, type Setting } from '../../settings.svelte';
-	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type TallPlayer, type VideoArt } from '../../storage';
+	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type TallPlayer, type VideoArt, type ClearRoomBy } from '../../storage';
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
 	import LeaveRoomDialog from '../LeaveRoomDialog.svelte';
@@ -293,6 +293,16 @@
 						[true, 'Plays the next song'],
 						[false, 'Stays paused']
 					]}
+				/>
+				<Choice
+					label="Clear room"
+					hint="Stops the song and empties Up next and autoplay at once. Undo puts it all back. Swiping down works on the mini player of a phone."
+					setting={settings.clearRoomBy}
+					options={[
+						['button', 'Button in Up next'],
+						['swipe', 'Swipe the player down'],
+						['both', 'Both']
+					] as [ClearRoomBy, string][]}
 				/>
 				<Toggle
 					label="Start radio clears played songs"

@@ -6,6 +6,7 @@ import dev.trashpanda.ytmp.protocol.BanInfo
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.ErrorCode
+import dev.trashpanda.ytmp.protocol.CLEAR_ROOM_UNDO_MS
 import dev.trashpanda.ytmp.protocol.ErrorInfo
 import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import dev.trashpanda.ytmp.protocol.Event
@@ -750,6 +751,8 @@ class Room(
             // A vote that's not enough yet changes nothing; one that is, isn't theirs alone.
             is Command.Skip -> if (current?.itemId != before.itemId && can(member, Permission.SKIP)) "$who skipped “${before.title}”" else null
             Command.Previous -> "$who went back"
+            Command.ClearRoom -> if (before.itemId != null && current == null) "$who cleared the room" else null
+            Command.UndoClearRoom -> if (current != null && before.itemId == null) "$who put the room back" else null
             is Command.Seek -> "$who jumped to ${minutes(command.positionMs)}"
             is Command.JumpTo, is Command.PlayNow -> current?.takeIf { it.itemId != before.itemId }?.let { "$who is playing “${it.song.title}” now" }
             is Command.StartRadio -> "$who started a radio"
@@ -885,6 +888,8 @@ class Room(
                 emit(Event.QueueReplaced(emptyList()))
                 refillAutoplay()
             }
+            Command.ClearRoom -> return clearRoom(member)
+            Command.UndoClearRoom -> return undoClearRoom(member)
             Command.ClearAutoplay -> {
                 need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
                 clearAutoplay()
@@ -1846,6 +1851,75 @@ class Room(
     // --- radio and autoplay -----------------------------------------------------------
 
     private fun autoplayActive() = autoplay.active(hasRadio = radio != null, setting = settings.autoplay)
+
+    /** What the last Clear room took away, for its Undo. */
+    private class ClearedRoom(
+        val current: QueueItem?,
+        val positionMs: Long,
+        val playing: Boolean,
+        val queue: List<QueueItem>,
+        val autoplay: List<QueueItem>,
+        val seed: Song?,
+        val dismissed: Boolean,
+        val at: Long,
+    )
+
+    private var clearedRoom: ClearedRoom? = null
+
+    /** The permissions to take [songs] and [autoplay] out of the room. */
+    private fun needToClear(member: Member, songs: List<QueueItem>, autoplay: List<QueueItem>): ErrorInfo? {
+        if (songs.isNotEmpty()) need(member, if (songs.all { it.addedBy == member.id }) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS)?.let { return it }
+        if (autoplay.isNotEmpty()) need(member, Permission.AUTOPLAY_FROM_HERE)?.let { return it }
+        return null
+    }
+
+    private fun clearRoom(member: Member): ErrorInfo? {
+        val songs = listOfNotNull(current) + queue
+        if (songs.isEmpty() && autoplay.items.isEmpty()) return null
+        needToClear(member, songs, autoplay.items)?.let { return it }
+        clearedRoom = ClearedRoom(
+            current, position(), wantPlaying, queue.toList(), autoplay.items.toList(), autoplay.seed, autoplay.dismissed, clock(),
+        )
+        log.info("Room {}: {} cleared the room ({} songs, {} in autoplay)", code, member.name, songs.size, autoplay.items.size)
+        if (queue.isNotEmpty()) {
+            queue.clear()
+            emit(Event.QueueReplaced(emptyList()))
+        }
+        clearAutoplay()
+        autoplay.dismissed = true
+        autoplay.startWhenLoaded = false
+        retireCurrent(QueueItemResult.SKIPPED)
+        setCurrent(null)
+        return null
+    }
+
+    private fun undoClearRoom(member: Member): ErrorInfo? {
+        val cleared = clearedRoom?.takeIf { clock() - it.at <= CLEAR_ROOM_UNDO_MS }
+            ?: return invalid("Clearing the room can only be undone for ${CLEAR_ROOM_UNDO_MS / 60_000} minutes")
+        if (current != null || queue.isNotEmpty()) return invalid("Something else is playing now")
+        needToClear(member, listOfNotNull(cleared.current) + cleared.queue, cleared.autoplay)?.let { return it }
+        clearedRoom = null
+        log.info("Room {}: {} undid clearing the room", code, member.name)
+        if (cleared.queue.isNotEmpty()) {
+            queue.addAll(cleared.queue)
+            emit(Event.QueueItemsAdded(cleared.queue, 0))
+        }
+        autoplay.items.clear()
+        autoplay.items.addAll(cleared.autoplay)
+        autoplay.seed = cleared.seed
+        autoplay.dismissed = cleared.dismissed
+        emit(autoplay.changed())
+        val item = cleared.current ?: return null
+        // Out of the history again, where it went as skipped.
+        history.indexOfLast { it.itemId == item.itemId }.takeIf { it >= 0 }?.let { at ->
+            history.removeAt(at)
+            emit(Event.HistoryItemRemoved(item.itemId))
+        }
+        wantPlaying = cleared.playing
+        setCurrent(item.copy(result = null))
+        seek(cleared.positionMs)
+        return null
+    }
 
     private fun clearAutoplay() {
         if (autoplay.clear()) emit(autoplay.changed())

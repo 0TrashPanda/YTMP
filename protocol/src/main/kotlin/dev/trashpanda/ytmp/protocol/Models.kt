@@ -8,6 +8,9 @@ import kotlinx.serialization.Serializable
 /** Bumped on every incompatible protocol change. Client and host must match. */
 const val PROTOCOL_VERSION = 1
 
+/** How long (ms) a Clear room can be undone ([Command.UndoClearRoom]). */
+const val CLEAR_ROOM_UNDO_MS = 120_000L
+
 @Serializable
 @SerialName("ArtistRef")
 data class ArtistRef(

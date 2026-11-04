@@ -38,7 +38,7 @@ Music, without Premium, and not tied to a single music service.
   QR code or a room link opens in the app on an Android phone that has it. Pick your own
   room code if you like (e.g. `PARTY`).
 - One shared queue: add, play next, drag to reorder, swipe to remove, jump to any song,
-  clear. Played songs stay above the current one; autoplay songs below.
+  clear, or clear the whole room (song, queue and autoplay) with Undo. Played songs stay above the current one; autoplay songs below.
 - Shuffle and repeat (queue or one song), fair order (one song per person per round),
   vote to skip, and limits (songs per person, song length, no recent repeats).
 - A party screen for a TV, laptop or tablet: big album art in its colour, what's next and

@@ -4,6 +4,7 @@
 	import { holds } from '../songMenu.svelte';
 	import { wheelAdjust } from '../wheel';
 	import { nativeBridge } from '../native';
+	import { settings } from '../settings.svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { getAlbum, prefetch } from '../api';
 	import { artistNames, formatTime } from '../format';
@@ -69,8 +70,12 @@
 	const loading = $derived(current !== null && (current.streamUrl === null || !!playback?.starting) && playing);
 	const status = $derived(loading ? ' • loading…' : player.buffering ? ' • buffering…' : '');
 
-	// Phones: swipe the mini player up to open the full player (a tap opens it too).
+	// Phones: swipe the mini player up to open the full player (a tap opens it too). Down
+	// clears the room when Settings → Playback says so (Undo puts it back), like YTM's mini player.
 	let swipeStart: number | null = null;
+	let drop = $state(0);
+	const swipeClears = $derived(settings.clearRoomBy.value !== 'button' && room.can('remove_own'));
+	const DROP_CLEARS_PX = 60;
 
 	// Desktop, like YTM: "Artist • Album • Year". Songs don't carry their year, so it comes
 	// from the album's page (remembered, so once per album).
@@ -151,6 +156,12 @@
 		const t = tap;
 		tap = null;
 		swipeStart = null;
+		if (drop) {
+			const clears = drop >= DROP_CLEARS_PX;
+			drop = 0;
+			if (clears) void room.run({ kind: 'ClearRoom' });
+			return;
+		}
 		if (!t || event.timeStamp - t.at > 500 || !current || !(event.target as Element).closest('[data-opens-player]')) return;
 		// Instead of the click (if it comes), so it doesn't open twice.
 		event.preventDefault();
@@ -179,12 +190,23 @@
 			if (tap && Math.hypot(e.touches[0].clientX - tap.x, e.touches[0].clientY - tap.y) > 10) tap = null;
 			if (swipeStart !== null && swipeStart - e.touches[0].clientY > 30) {
 				swipeStart = null;
+				drop = 0;
 				if (current) onExpand(true);
+			} else if (swipeStart !== null && swipeClears && current) {
+				drop = Math.max(0, e.touches[0].clientY - swipeStart);
 			}
+		}}
+		ontouchcancel={() => {
+			drop = 0;
+			swipeStart = null;
 		}}
 		ontouchend={tapEnd}
 	>
-		<div class="flex h-16 items-center gap-1 pr-1 pl-2">
+		<div
+			class="flex h-16 items-center gap-1 pr-1 pl-2 {drop ? '' : 'transition-[translate,opacity]'}"
+			style:translate="0 {Math.min(drop, 64)}px"
+			style:opacity={drop ? Math.max(0.3, 1 - drop / 100) : undefined}
+		>
 			<button class="flex min-w-0 flex-1 items-center gap-2.5 text-left" data-opens-player disabled={!current} onclick={() => onExpand(true)} oncontextmenu={onSongMenu}>
 				<Art song={current?.item.song ?? null} size={96} class="h-10 w-10 shrink-0" />
 				<div class="min-w-0 flex-1">

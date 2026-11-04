@@ -20,7 +20,7 @@ import { applyEvent } from './roomEvents';
 import { predict, type Sender } from './optimistic';
 
 /** What interrupts the music for everyone: in a party room it's asked first (see [RoomConnection.run]). */
-const INTERRUPTS = new Set<Command['kind']>(['Pause', 'Seek', 'Skip', 'Previous', 'JumpTo', 'PlayNow', 'StartRadio', 'SetSpeed', 'SetOutput']);
+const INTERRUPTS = new Set<Command['kind']>(['Pause', 'Seek', 'Skip', 'Previous', 'JumpTo', 'PlayNow', 'StartRadio', 'SetSpeed', 'SetOutput', 'ClearRoom']);
 
 /** How long a host notice (e.g. "Couldn't play …") stays on screen. */
 const NOTICE_MS = 8000;
@@ -224,19 +224,24 @@ export class RoomConnection {
 		this.socket = null;
 	}
 
-	/** Something that was just removed from the queue and can be put back (shown for a few seconds). */
-	undo = $state<{ text: string; songs: Song[]; index: number } | null>(null);
+	/** Something that was just removed and can be put back (shown for a few seconds): what it says, and the command that puts it back. */
+	undo = $state<{ text: string; command: Command } | null>(null);
 	private undoTimer: ReturnType<typeof setTimeout> | undefined;
 
-	/** What [command] takes out of the queue, to put back: a song, or all of them. */
-	private undoFor(command: Command): { text: string; songs: Song[]; index: number } | null {
-		const queue = this.state?.queue ?? [];
+	/** What [command] takes out, to put back: a song, the whole queue, or the whole room. */
+	private undoFor(command: Command): { text: string; command: Command } | null {
+		const state = this.state;
+		const queue = state?.queue ?? [];
+		const restore = (songs: Song[], index: number): Command => ({ kind: 'RestoreSongs', songs, index });
 		if (command.kind === 'RemoveQueueItem') {
 			const index = queue.findIndex((item) => item.itemId === command.itemId);
-			return index < 0 ? null : { text: `Removed "${queue[index].song.title}"`, songs: [queue[index].song], index };
+			return index < 0 ? null : { text: `Removed "${queue[index].song.title}"`, command: restore([queue[index].song], index) };
 		}
 		if (command.kind === 'ClearQueue' && queue.length) {
-			return { text: `Cleared the queue (${queue.length} ${queue.length === 1 ? 'song' : 'songs'})`, songs: queue.map((item) => item.song), index: 0 };
+			return { text: `Cleared the queue (${queue.length} ${queue.length === 1 ? 'song' : 'songs'})`, command: restore(queue.map((item) => item.song), 0) };
+		}
+		if (command.kind === 'ClearRoom' && (state?.nowPlaying || queue.length || state?.autoplay.length)) {
+			return { text: 'Cleared the room', command: { kind: 'UndoClearRoom' } };
 		}
 		return null;
 	}
@@ -246,7 +251,7 @@ export class RoomConnection {
 		const undo = this.undo;
 		this.undo = null;
 		clearTimeout(this.undoTimer);
-		if (undo) void this.run({ kind: 'RestoreSongs', songs: undo.songs, index: undo.index });
+		if (undo) void this.run(undo.command, false);
 	}
 
 	/**
@@ -333,7 +338,7 @@ export class RoomConnection {
 	/** The command whose removal [undo] puts back. */
 	private undoCommand: string | null = null;
 
-	private showUndo(undo: { text: string; songs: Song[]; index: number }, commandId: string): void {
+	private showUndo(undo: { text: string; command: Command }, commandId: string): void {
 		this.undo = undo;
 		this.undoCommand = commandId;
 		clearTimeout(this.undoTimer);
