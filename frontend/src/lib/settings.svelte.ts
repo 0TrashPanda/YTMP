@@ -235,9 +235,10 @@ export const settings = {
 	holdNoSelect: new Setting('holdNoSelect', true, bool),
 
 	// The rest keep their own shape (and check it where they're used).
-	/** Taps and swipes on songs in lists, and in Up next (gestures.svelte.ts). */
+	/** Taps and swipes on songs in lists, in the queue and in Autoplay (gestures.svelte.ts). */
 	gesturesList: new Setting<Record<string, unknown>>('gesturesList', {}, object, json('ytmp.gestures.list', object)),
 	gesturesQueue: new Setting<Record<string, unknown>>('gesturesQueue', {}, object, json('ytmp.gestures.queue', object)),
+	gesturesAutoplay: new Setting<Record<string, unknown>>('gesturesAutoplay', {}, object),
 	/** Home and your library load new ones after this many minutes (0: only when you pull down). */
 	homeRefresh: new Setting('homeRefresh', 6 * 60, count(0, 7 * 24 * 60)),
 	/** How Home looks (home.svelte.ts). */

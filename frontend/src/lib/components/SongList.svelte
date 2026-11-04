@@ -119,7 +119,7 @@
 		onMenu({ song, place: 'search', playlist: inPlaylist, listened: inHistory, ...at });
 	}
 
-	const rows = new RowGestures<Row>('list', allowed, run, menu);
+	const rows = new RowGestures<Row>(() => 'list', allowed, run, menu);
 	const swipe = rows.swipe;
 </script>
 
@@ -135,7 +135,7 @@
 	>
 		<!-- Under the song while it's swiped: what letting go does. -->
 		{#if offset !== 0}
-			{@const action = rows.actionFor(offset)}
+			{@const action = rows.actionFor({ song, index: i }, offset)}
 			<div
 				class="absolute inset-0 flex items-center gap-2 px-5 text-sm font-medium text-white transition-colors
 					{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(key) ? (action === 'remove' ? 'bg-accent' : 'bg-good') : 'bg-line'}"

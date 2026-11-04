@@ -8,7 +8,7 @@ Because it is one web frontend, it is the same in the browser and in the Android
 The most common use of YTMP:
 
 1. **Search** for a song or artist (mostly through the YTM module).
-2. **Play** it (tap = play next, swipe left = play now, swipe right = add to queue; all
+2. **Play** it (tap = add to queue, swipe left = play now, swipe right = add to queue; all
    [settable](#gestures)), or
 3. **Start a radio** from it ([radio / mix](history-and-recommendations.md#radio--mix)), or
    open **find similar** to pick similar songs by hand
@@ -44,7 +44,7 @@ pages have *Play*, *Play next*, *Add to queue*; playlist pages have *Play*, *Pla
 Like YTM:
 
 - **Home** ✅: the room opens on it. Rows of suggestions from the sources: quick picks
-  (songs in a grid of four rows that scrolls sideways; tap = play next), new releases,
+  (songs in a grid of four rows that scrolls sideways; tap = add to queue), new releases,
   mixes and playlists (cards that scroll sideways and open their page). Without a linked
   YouTube account these are YTM's general suggestions for the host's country; with one,
   your own (see [accounts](accounts.md#linked-youtube-account)).
@@ -169,7 +169,7 @@ app's). Other phones don't show the icon.
 
 It also accepts **links** ✅: pasting a YouTube Music or YouTube link opens what it points
 at right away, without Enter: an album, playlist, artist or podcast opens its page; a song
-(or video, or episode) shows as the result (*From the link*, tap = play next), with *Open
+(or video, or episode) shows as the result (*From the link*, tap = add to queue), with *Open
 the playlist it's in* when the link plays it in one (not YouTube's endless mixes). A YTMP
 room link opens that room. A link that's typed rather than pasted shows one row instead of
 suggestions (*Open this album*, …) that Enter or a tap opens. Links don't go into the recent
@@ -179,7 +179,7 @@ Like YouTube Music, **chips** above the results pick what to search for ✅: **A
 **Songs**, **Videos**, **Albums**, **Artists**, **Community playlists** and **Featured
 playlists** (YouTube Music's own). *All* shows the **top result** as a big card, then a few
 of each kind, each with **More** (which picks that chip). The chip stays as picked for
-the next search. Songs and videos play like songs (tap = play next); albums, artists and
+the next search. Songs and videos play like songs (tap = add to queue); albums, artists and
 playlists open their page. **Podcasts** and **Episodes** have chips too (see below);
 profiles are left out.
 
@@ -189,7 +189,7 @@ YTMP plays YouTube Music's podcasts like YTM does:
 
 - **Search**: the *Podcasts* and *Episodes* chips, and both in *All*.
 - **Podcast page**: cover, author, description, *Latest episode*, and the episodes
-  (newest first, with length and description). Tap = play next, ⋮ = the song menu.
+  (newest first, with length and description). Tap = add to queue, ⋮ = the song menu.
 - **Episodes are songs** with a podcast: they go in the queue like songs, and show their
   podcast where a song shows its artists (click it to open the podcast). The song menu
   has *Go to (podcast)* instead of radio and find similar.
@@ -229,17 +229,27 @@ YTMP plays YouTube Music's podcasts like YTM does:
 ## Gestures
 
 ✅ **Tap, swipe right, swipe left and hold** a song do what *Settings → Taps and swipes* says,
-separately for songs in lists (search, albums, artists, playlists, Local) and in *Up next*.
-Each can be *Play now*, *Play next*, *Add to queue*, *Start radio*, *Song menu* or *Nothing*;
-in *Up next* also *Remove*. The defaults:
+separately for songs in lists (search, albums, artists, playlists, Local), songs in the
+queue (in *Up next*: the queue, the song playing and what played) and songs in *Autoplay*
+(so, say, a swipe removes a song from the queue but adds an autoplay song to it). Each can be
+*Play now*, *Play next*, *Add to queue*, *Start radio*, *Song menu* or *Nothing*; in the
+queue and *Autoplay* also *Remove*. The defaults:
 
-| Gesture | Songs in lists | Songs in *Up next* |
-|---------|----------------|--------------------|
-| **Tap** | **Play next** (the start of the queue) | **Play now**: jump to it, like YTM (the songs before it go to the history as skipped; a played song plays again; an autoplay song plays next, so the queue stays) |
-| **Swipe right** | **Add to queue** (the end) | **Play next** (moved to the start of the queue) |
-| **Swipe left** | **Play now** | **Remove**, like YTM (the current song too: the next one plays) |
-| **Hold** | Open the [song menu](#song-menu) | Open the song menu |
-| **Drag** (the handle) | Move it in your own playlists | Move it |
+| Gesture | Songs in lists | Songs in the queue | Songs in *Autoplay* |
+|---------|----------------|--------------------|---------------------|
+| **Tap** | **Add to queue** (the end) | **Play now**: jump to it, like YTM (the songs before it go to the history as skipped; a played song plays again) | **Play now**: it plays next, so the queue stays |
+| **Swipe right** | **Add to queue** (the end) | **Play next** (moved to the start of the queue) | **Play next** |
+| **Swipe left** | **Play now** | **Remove**, like YTM (the current song too: the next one plays) | **Remove** |
+| **Hold** | Open the [song menu](#song-menu) | Open the song menu | Open the song menu |
+| **Drag** (the handle) | Move it in your own playlists | Move it | Move it |
+
+A tap on a song that isn't in a list (Home's quick picks, the top search result, a podcast's
+episodes, speed dial tiles) does what *Tap* does in lists (*Song menu* there opens the menu
+where it has one, else adds to the queue).
+
+Taps in lists used to *play next*: a setting saved back then that still had that (the old
+default) moved to the new one; any other choice stays. *Autoplay* does what the queue's
+songs did until it's set itself (changing the queue's no longer changes it).
 
 ✅ **Holding doesn't select text** on a touch screen (on by default, *Settings → Taps and
 swipes*), so holding a song or button never selects its words; text fields still can be

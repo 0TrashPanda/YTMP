@@ -1,11 +1,11 @@
 <script lang="ts">
 	// Search results with YTM's chips (all, songs, videos, albums, …), or "Find similar" for a
-	// song. Songs: tap = play next, ⋮ or right-click = song menu. Albums, artists and
+	// song. Songs: tap = what Tap does in song lists, ⋮ or right-click = song menu. Albums, artists and
 	// playlists open their page.
 	import { thumbUrl } from '../images.svelte';
 	import { getSong, search, similar } from '../api';
 	import { parseLink } from '../links';
-	import { playNext, quoted } from '../songActions';
+	import { tapSong } from '../songActions';
 	import { itemCard } from '../cards';
 	import { artistNames } from '../format';
 	import type { RadioFrom, AlbumRef, ArtistRef, PodcastRef, SearchItem, SearchPage, SearchType, Song } from '../protocol.gen';
@@ -111,9 +111,7 @@
 
 	const cards = (items: SearchItem[]) => items.flatMap((i) => card(i) ?? []);
 
-	const playSongNext = (song: Song) => playNext(room, [song], quoted(song), onToast);
-
-	/** The top result, as one big card: a song plays next, anything else opens. */
+	/** The top result, as one big card: a song does what Tap does in song lists, anything else opens. */
 	function top(item: SearchItem): { title: string; subtitle: string; art: string | undefined; round: boolean; open: () => void; prefetch?: () => void } {
 		if (item.kind === 'song') {
 			const song = item.song;
@@ -122,7 +120,7 @@
 				subtitle: `${song.podcast ? 'Episode' : item.video ? 'Video' : 'Song'} • ${artistNames(song)}`,
 				art: thumbUrl(song.thumbnails, 400),
 				round: false,
-				open: () => playSongNext(song)
+				open: () => tapSong(room, song, onToast)
 			};
 		}
 		const c = card(item)!;
