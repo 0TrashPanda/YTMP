@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Settings → Taps and swipes: what tapping, swiping and holding a song does, in song lists
 	// and in Up next (see gestures.svelte.ts).
-	import { ACTION_NAMES, ACTIONS, DEFAULTS, GESTURES, gestures, resetGestures, setGesture, type QueueAction, type Where } from '../../gestures.svelte';
+	import { ACTION_NAMES, ACTIONS, DEFAULT_PAGE_TAP, DEFAULTS, GESTURES, gestures, PAGE_TAP_ACTIONS, resetGestures, setGesture, setPageTap, type QueueAction, type Where } from '../../gestures.svelte';
 	import { settings } from '../../settings.svelte';
 	import DeviceNote from './DeviceNote.svelte';
 	import Toggle from './Toggle.svelte';
@@ -12,7 +12,7 @@
 		['queue', 'Songs in Up next', 'The queue, what played and autoplay.']
 	];
 
-	const isDefault = (where: Where) => GESTURES.every(([g]) => gestures[where][g] === DEFAULTS[where][g]);
+	const isDefault = (where: Where) => GESTURES.every(([g]) => gestures[where][g] === DEFAULTS[where][g]) && (where !== 'list' || gestures.pageTap === DEFAULT_PAGE_TAP);
 </script>
 
 <div class="flex flex-col gap-8">
@@ -42,6 +42,17 @@
 					</select>
 				</label>
 			{/each}
+			{#if where === 'list'}
+				<!-- Like YouTube Music: a song on an album or playlist page plays it from there. -->
+				<label class="flex items-center gap-4">
+					<span class="min-w-0 flex-1 text-sm">Tap, on album and playlist pages</span>
+					<select class="rounded-lg bg-raised px-3 py-2 text-sm outline-none" value={gestures.pageTap} onchange={(e) => setPageTap(e.currentTarget.value as QueueAction)}>
+						{#each PAGE_TAP_ACTIONS as action (action)}
+							<option value={action}>{ACTION_NAMES[action]}{action === DEFAULT_PAGE_TAP ? ' (default)' : ''}</option>
+						{/each}
+					</select>
+				</label>
+			{/if}
 			<DeviceNote setting={where === 'list' ? settings.gesturesList : settings.gesturesQueue} />
 		</section>
 	{/each}

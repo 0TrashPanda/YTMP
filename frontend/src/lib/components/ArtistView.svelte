@@ -99,7 +99,7 @@
 		{/if}
 		<section class="flex flex-col gap-1">
 			<h2 class="px-2 pb-1 text-xl font-bold">Songs</h2>
-			<SongList {room} songs={showAllSongs ? artist.songs : artist.songs.slice(0, 5)} {onToast} {onMenu} />
+			<SongList {room} songs={showAllSongs ? artist.songs : artist.songs.slice(0, 5)} page={{ artist: id }} {onToast} {onMenu} />
 			{#if artist.songsPlaylistId}
 				{@const all = { id: artist.songsPlaylistId, title: `Songs by ${artist.name}` }}
 				<!-- Like YTM: all their songs on a page of their own. -->

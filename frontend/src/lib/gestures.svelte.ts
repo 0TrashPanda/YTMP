@@ -3,7 +3,7 @@
 import { settings } from './settings.svelte';
 
 export type Gesture = 'tap' | 'right' | 'left' | 'hold';
-export type SongAction = 'playNow' | 'playNext' | 'addToQueue' | 'radio' | 'menu' | 'none';
+export type SongAction = 'playNow' | 'playFromHere' | 'playNext' | 'addToQueue' | 'radio' | 'menu' | 'none';
 export type QueueAction = SongAction | 'remove';
 export type Where = 'list' | 'queue';
 
@@ -16,6 +16,7 @@ export const GESTURES: [Gesture, string][] = [
 
 export const ACTION_NAMES: Record<QueueAction, string> = {
 	playNow: 'Play now',
+	playFromHere: 'Play from here',
 	playNext: 'Play next',
 	addToQueue: 'Add to queue',
 	radio: 'Start radio',
@@ -33,6 +34,13 @@ export const DEFAULTS: Record<Where, Record<Gesture, QueueAction>> = {
 	list: { tap: 'playNext', right: 'addToQueue', left: 'playNow', hold: 'menu' },
 	queue: { tap: 'playNow', right: 'playNext', left: 'remove', hold: 'menu' }
 };
+
+/**
+ * Tapping a song on an album or playlist page: like YouTube Music, it plays the album or playlist
+ * from that song by default. Kept with the other list gestures (as `pageTap`).
+ */
+export const PAGE_TAP_ACTIONS: QueueAction[] = ['playFromHere', ...ACTIONS.list];
+export const DEFAULT_PAGE_TAP: QueueAction = 'playFromHere';
 
 function parse(where: Where, stored: Record<string, unknown>): Record<Gesture, QueueAction> {
 	const out = { ...DEFAULTS[where] };
@@ -52,11 +60,20 @@ export const gestures = {
 	},
 	get queue() {
 		return parse('queue', settings.gesturesQueue.value);
+	},
+	/** Tap on album and playlist pages. */
+	get pageTap(): QueueAction {
+		const action = settings.gesturesList.value.pageTap;
+		return typeof action === 'string' && PAGE_TAP_ACTIONS.includes(action as QueueAction) ? (action as QueueAction) : DEFAULT_PAGE_TAP;
 	}
 };
 
 export function setGesture(where: Where, gesture: Gesture, action: QueueAction): void {
-	setting(where).set({ ...gestures[where], [gesture]: action });
+	setting(where).set({ ...setting(where).value, ...gestures[where], [gesture]: action });
+}
+
+export function setPageTap(action: QueueAction): void {
+	settings.gesturesList.set({ ...settings.gesturesList.value, pageTap: action });
 }
 
 export function resetGestures(where: Where): void {
@@ -127,6 +144,7 @@ export class RowSwipe {
 /** The icon for an action, under a song while it's swiped. */
 export const ACTION_ICONS = {
 	playNow: 'play',
+	playFromHere: 'play',
 	playNext: 'playNext',
 	addToQueue: 'playlistAdd',
 	radio: 'radio',
@@ -150,8 +168,15 @@ export class RowGestures<Row> {
 		private readonly where: Where,
 		private readonly allowed: (action: QueueAction, row: Row) => boolean,
 		private readonly run: (action: QueueAction, row: Row, event: MouseEvent | null, element: HTMLElement | null) => void,
-		private readonly menu: (row: Row, event: MouseEvent, atPointer: boolean) => void
+		private readonly menu: (row: Row, event: MouseEvent, atPointer: boolean) => void,
+		/** What a tap does here, when it isn't the list's tap (album and playlist pages). */
+		private readonly tap?: () => QueueAction
 	) {}
+
+	/** What [gesture] does here. */
+	actionOf(gesture: Gesture): QueueAction {
+		return gesture === 'tap' && this.tap ? this.tap() : gestures[this.where][gesture];
+	}
 
 	/** For the row's `onpointerdown`. */
 	pressed(event: PointerEvent): void {
@@ -160,7 +185,7 @@ export class RowGestures<Row> {
 
 	/** Does what [gesture] is set to for [row]; [event] and [element] place the menu. */
 	act(gesture: Gesture, row: Row, event: MouseEvent | null, element: HTMLElement | null): void {
-		const action = gestures[this.where][gesture];
+		const action = this.actionOf(gesture);
 		if (action !== 'menu' && !this.allowed(action, row)) return;
 		this.run(action, row, event, element);
 	}

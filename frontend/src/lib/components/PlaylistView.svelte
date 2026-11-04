@@ -135,6 +135,7 @@
 	// From your server in a room on another host, playlists can't be changed (only there).
 	const editable = $derived(!!playlist?.owned && !youtube.from);
 	let menuOpen = $state(false);
+	let buttons = $state<PlayAllButtons>();
 	let renaming = $state<string | null>(null);
 
 	async function move(from: number, to: number) {
@@ -239,7 +240,7 @@
 					</button>
 				{/if}
 			{/if}
-			<PlayAllButtons {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay whole={playlist?.more ? whole : undefined} total={playlist?.songCount ?? null} {onToast}>
+			<PlayAllButtons bind:this={buttons} {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay whole={playlist?.more ? whole : undefined} total={playlist?.songCount ?? null} {onToast}>
 				<PinButton pin={playlist ? { kind: 'playlist', id, title: playlist.title, art: thumbUrl(playlist.thumbnails, 120), personal: personal || undefined } : null} {onToast} />
 			</PlayAllButtons>
 		</div>
@@ -258,6 +259,7 @@
 				songs={playlist.songs.slice(0, shown)}
 				playlist={editable || likedMusic ? { id: playlist.id, itemIds: playlist.itemIds, likedMusic, onRemoved: removed } : undefined}
 				onMove={editable ? move : undefined}
+				playFrom={(i) => buttons?.playFrom(i)}
 				{onToast}
 				{onMenu}
 			/>

@@ -14,6 +14,10 @@
 		listened?: { id: string; onRemoved: () => void };
 		/** A podcast episode with a played mark (your account): it can be marked played or unplayed. */
 		episode?: { played: boolean; onMarked: (played: boolean) => void };
+		/** On an album or playlist page: play it from this song (when tapping does something else). */
+		playFrom?: () => void;
+		/** The album's or artist's page the song is on: no "Go to" that page. */
+		page?: { album?: string; artist?: string };
 		/** Where to show the menu (the click or the ⋮ button). */
 		x: number;
 		y: number;
@@ -42,6 +46,7 @@
 	import { canDownload, downloadSong } from '../downloads';
 	import { youtube } from '../youtube.svelte';
 	import { sleepTimer } from '../sleepTimer.svelte';
+	import { gestures } from '../gestures.svelte';
 	import { arrange, holds, shownChoices, songMenuLayout, type MenuAction } from '../songMenu.svelte';
 	import { artistNames } from '../format';
 	import Art from './Art.svelte';
@@ -182,6 +187,10 @@
 				label: 'Play now',
 				run: () => (item ? command({ kind: 'JumpTo', itemId: item.itemId }) : command({ kind: 'PlayNow', song }))
 			});
+		}
+		if (target.playFrom && room.can('play_now') && gestures.pageTap !== 'playFromHere') {
+			const playFrom = target.playFrom;
+			add('playFromHere', { icon: 'play', label: 'Play from here', run: () => (onClose(), playFrom()) });
 		}
 		if (place === 'current' && room.can('seek')) {
 			add('playNow', { icon: 'previous', label: 'Play from the start', run: () => command({ kind: 'Seek', positionMs: 0 }) });
@@ -364,18 +373,20 @@
 			const podcast = song.podcast;
 			add('goPodcast', { icon: 'podcast', label: `Go to ${podcast.name}`, run: () => (onPodcast(podcast), onClose()) });
 		}
+		// Not the page it's on, like YouTube Music.
+		const artists = song.artists.filter((a) => !a.id || a.id !== target.page?.artist);
 		const pickArtist =
-			song.artists.length > 1
-				? choicesFor('goArtist', 'Go to artist', () => song.artists.map((a) => ({ id: 'pick', icon: 'person' as IconName, label: a.name, run: () => (onArtist(a), onClose()) })))
+			artists.length > 1
+				? choicesFor('goArtist', 'Go to artist', () => artists.map((a) => ({ id: 'pick', icon: 'person' as IconName, label: a.name, run: () => (onArtist(a), onClose()) })))
 				: undefined;
 		// One entry for the first artist, the others by holding it; with holding off, one each (up to 3).
 		if (pickArtist) {
-			const first = song.artists[0];
+			const first = artists[0];
 			add('goArtist', { icon: 'person', label: `Go to ${first.name}`, run: () => (onArtist(first), onClose()), held: pickArtist });
 		} else {
-			for (const artist of song.artists.slice(0, 3)) add('goArtist', { icon: 'person', label: `Go to ${artist.name}`, run: () => (onArtist(artist), onClose()) });
+			for (const artist of artists.slice(0, 3)) add('goArtist', { icon: 'person', label: `Go to ${artist.name}`, run: () => (onArtist(artist), onClose()) });
 		}
-		if (song.album) {
+		if (song.album && !(song.album.id && song.album.id === target.page?.album)) {
 			const album = song.album;
 			const artist = song.artists[0]?.name ?? '';
 			add('goAlbum', { icon: 'album', label: `Go to album ${album.name}`, run: () => (onAlbum(album, artist), onClose()) });
