@@ -30,6 +30,7 @@
 	} = $props();
 
 	let album = $state<AlbumPage | null>(null);
+	let buttons = $state<PlayAllButtons>();
 	let error = $state<string | null>(null);
 
 	$effect(() => {
@@ -65,7 +66,7 @@
 					{#if album.year} • {album.year}{/if} • {album.songs.length} songs • {formatTime(total)}
 				</p>
 			{/if}
-			<PlayAllButtons {room} songs={album?.songs ?? null} name={album?.title ?? title} {onToast}>
+			<PlayAllButtons bind:this={buttons} {room} songs={album?.songs ?? null} name={album?.title ?? title} {onToast}>
 				<PinButton pin={album ? { kind: 'album', id, title: album.title, art: thumbUrl(album.thumbnails, 120) } : null} {onToast} />
 			</PlayAllButtons>
 		</div>
@@ -77,7 +78,7 @@
 		<Skeleton art={false} />
 	{:else}
 		<section class="flex flex-col gap-1">
-			<SongList {room} songs={album.songs} numbered showAlbum={false} {onToast} {onMenu} />
+			<SongList {room} songs={album.songs} numbered showAlbum={false} playFrom={(i) => buttons?.playFrom(i)} page={{ album: id }} {onToast} {onMenu} />
 		</section>
 	{/if}
 </div>

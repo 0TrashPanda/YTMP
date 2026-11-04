@@ -1,9 +1,11 @@
 <script lang="ts">
 	// A list of songs (search, find similar, artist, album, playlist, history and Local pages). Tap,
 	// swipe right, swipe left and hold do what Settings → Taps and swipes says (play next, add
-	// to queue, play now, the song menu by default); ⋮ or right-click = song menu.
+	// to queue, play now, the song menu by default; in an empty room a tap on album and playlist
+	// pages plays it from that song, Settings → Playback); ⋮ or right-click = song menu.
 	import { artistNames, formatTime } from '../format';
-	import { ACTION_ICONS, ACTION_NAMES, gestures, RowGestures, type QueueAction } from '../gestures.svelte';
+	import { ACTION_ICONS, ACTION_NAMES, gestures, pageTap, RowGestures, type QueueAction } from '../gestures.svelte';
+	import { settings } from '../settings.svelte';
 	import { addToQueue, menuAt, playNext, playNow, quoted, startRadio } from '../songActions';
 	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -20,6 +22,8 @@
 		details,
 		listened,
 		onMove,
+		playFrom,
+		page,
 		onToast,
 		onMenu
 	}: {
@@ -36,6 +40,10 @@
 		listened?: { ids: string[]; onRemoved: (index: number) => void };
 		/** Songs can be dragged to another place (your own playlists). */
 		onMove?: (from: number, to: number) => void;
+		/** Album and playlist pages: play it from the song at [index] (the menu, and a tap in an empty room). */
+		playFrom?: (index: number) => void;
+		/** The album's or artist's page this list is on (its songs' menus don't go there). */
+		page?: { album?: string; artist?: string };
 		onToast: (text: string) => void;
 		onMenu: (target: MenuTarget) => void;
 	} = $props();
@@ -75,6 +83,8 @@
 		switch (action) {
 			case 'playNow':
 				return room.can('play_now');
+			case 'playFromHere':
+				return room.can('play_now') && !!playFrom;
 			case 'playNext':
 			case 'addToQueue':
 				return room.can('add_songs');
@@ -92,6 +102,8 @@
 				return openMenu(row, menuAt(element ?? (event!.currentTarget as HTMLElement)));
 			case 'playNow':
 				return playNow(room, song, onToast);
+			case 'playFromHere':
+				return playFrom?.(row.index);
 			case 'playNext':
 				return playNext(room, [song], quoted(song), onToast);
 			case 'addToQueue':
@@ -116,10 +128,10 @@
 			onRemoved: () => playlist.onRemoved(index)
 		};
 		const inHistory = listened && { id: listened.ids[index], onRemoved: () => listened.onRemoved(index) };
-		onMenu({ song, place: 'search', playlist: inPlaylist, listened: inHistory, ...at });
+		onMenu({ song, place: 'search', playlist: inPlaylist, listened: inHistory, playFrom: playFrom && (() => playFrom(index)), page, ...at });
 	}
 
-	const rows = new RowGestures<Row>(() => 'list', allowed, run, menu);
+	const rows = new RowGestures<Row>(() => 'list', allowed, run, menu, () => (playFrom ? pageTap(room.state, settings.tapPlaysFromHere.value, gestures.list.tap) : gestures.list.tap));
 	const swipe = rows.swipe;
 </script>
 
@@ -155,7 +167,7 @@
 		ontouchend={(e) => rows.swiped({ song, index: i }, e.currentTarget as HTMLElement)}
 		ontouchcancel={() => swipe.cancel()}
 	>
-		<button class="flex min-w-0 flex-1 items-center gap-3 text-left" onclick={(e) => rows.act('tap', { song, index: i }, e, e.currentTarget.parentElement)} title={ACTION_NAMES[gestures.list.tap]}>
+		<button class="flex min-w-0 flex-1 items-center gap-3 text-left" onclick={(e) => rows.act('tap', { song, index: i }, e, e.currentTarget.parentElement)} title={ACTION_NAMES[rows.of({ song, index: i }).tap]}>
 			{#if numbered}
 				<span class="w-8 shrink-0 text-center text-muted tabular-nums">{i + 1}</span>
 			{:else}

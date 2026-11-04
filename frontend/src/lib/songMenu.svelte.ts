@@ -8,6 +8,7 @@ export type MenuAction =
 	| 'playNext'
 	| 'addToQueue'
 	| 'playNow'
+	| 'playFromHere'
 	| 'radio'
 	| 'autoplay'
 	| 'similar'
@@ -32,6 +33,7 @@ export const MENU_ACTIONS: Record<MenuAction, { name: string; icon: IconName; hi
 	playNext: { name: 'Play next', icon: 'playNext' },
 	addToQueue: { name: 'Add to queue', icon: 'playlistAdd' },
 	playNow: { name: 'Play now', icon: 'play', hint: 'The song that plays: play from the start' },
+	playFromHere: { name: 'Play from here', icon: 'play', hint: 'Album and playlist pages' },
 	radio: { name: 'Start radio', icon: 'radio' },
 	autoplay: { name: 'Autoplay this', icon: 'autoplay' },
 	similar: { name: 'Find similar', icon: 'similar' },
@@ -55,6 +57,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
 	'playNext',
 	'addToQueue',
 	'playNow',
+	'playFromHere',
 	'divider',
 	'radio',
 	'autoplay',

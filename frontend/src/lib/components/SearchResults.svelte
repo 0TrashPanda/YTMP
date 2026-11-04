@@ -5,7 +5,7 @@
 	import { thumbUrl } from '../images.svelte';
 	import { getSong, search, similar } from '../api';
 	import { parseLink } from '../links';
-	import { tapSong } from '../songActions';
+	import { menuAt, tapSong } from '../songActions';
 	import { itemCard } from '../cards';
 	import { artistNames } from '../format';
 	import type { RadioFrom, AlbumRef, ArtistRef, PodcastRef, SearchItem, SearchPage, SearchType, Song } from '../protocol.gen';
@@ -162,25 +162,37 @@
 				</div>
 				{#if section.type === null && !similarTo}
 					{@const t = top(section.items[0])}
-					<button
-						class="group mx-2 flex items-center gap-4 rounded-lg bg-raised p-4 text-left hover:bg-line"
-						onclick={t.open}
-						onpointerenter={t.prefetch}
-						oncontextmenu={(e) => {
-							const item = section.items[0];
-							if (item.kind !== 'song') return;
-							e.preventDefault();
-							onMenu({ song: item.song, place: 'search', x: e.clientX, y: e.clientY });
-						}}
-					>
-						<div class="h-20 w-20 shrink-0 overflow-hidden bg-line sm:h-24 sm:w-24 {t.round ? 'rounded-full' : 'rounded-md'}">
-							{#if t.art}<img src={t.art} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />{/if}
-						</div>
-						<div class="min-w-0">
-							<p class="truncate text-xl font-bold sm:text-2xl">{t.title}</p>
-							<p class="truncate text-sm text-muted">{t.subtitle}</p>
-						</div>
-					</button>
+					{@const first = section.items[0]}
+					<!-- A song on top has the song menu too: ⋮, a right-click or holding it. -->
+					<div class="relative mx-2">
+						<button
+							class="group flex w-full items-center gap-4 rounded-lg bg-raised p-4 text-left hover:bg-line {first.kind === 'song' ? 'pr-12' : ''}"
+							onclick={t.open}
+							onpointerenter={t.prefetch}
+							oncontextmenu={(e) => {
+								if (first.kind !== 'song') return;
+								e.preventDefault();
+								onMenu({ song: first.song, place: 'search', x: e.clientX, y: e.clientY });
+							}}
+						>
+							<div class="h-20 w-20 shrink-0 overflow-hidden bg-line sm:h-24 sm:w-24 {t.round ? 'rounded-full' : 'rounded-md'}">
+								{#if t.art}<img src={t.art} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />{/if}
+							</div>
+							<div class="min-w-0">
+								<p class="truncate text-xl font-bold sm:text-2xl">{t.title}</p>
+								<p class="truncate text-sm text-muted">{t.subtitle}</p>
+							</div>
+						</button>
+						{#if first.kind === 'song'}
+							<button
+								class="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-2 text-muted hover:bg-surface hover:text-white"
+								aria-label="More for {first.song.title}"
+								onclick={(e) => onMenu({ song: first.song, place: 'search', ...menuAt(e.currentTarget) })}
+							>
+								<Icon name="more" />
+							</button>
+						{/if}
+					</div>
 				{:else}
 					<SongList {room} songs={songs(section.items)} {onToast} {onMenu} />
 					{#if cards(section.items).length}

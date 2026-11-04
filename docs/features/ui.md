@@ -251,6 +251,19 @@ Taps in lists used to *play next*: a setting saved back then that still had that
 default) moved to the new one; any other choice stays. *Autoplay* does what the queue's
 songs did until it's set itself (changing the queue's no longer changes it).
 
+✅ **Play from here**: in an empty room (nothing queued, and nothing playing: no song, or
+it's paused or finished), **tapping a song on an album or playlist page plays it from that
+song**, like YouTube Music: that song plays now and the ones after it come next; the songs
+before it are left out. When something is queued or playing, a tap there does what *Tap* in
+lists says (*Play next* by default), so it doesn't throw away what's lined up. *Settings →
+Playback → Tap a song to play an album or playlist from there* (on by default) switches the
+empty-room tap off. The song menu on those pages always has **Play from here**. It's the
+page's *Play* from that song, so the same limits apply (at most *Settings → Adding songs →
+most songs at once*, or asked first above the set number, counting from that song on), and in
+a party you're asked before it interrupts the music. Long playlists load the songs after it as
+needed. It works on every playlist page (also Liked music and YouTube Music's own playlists
+like *New episodes*).
+
 ✅ **Holding doesn't select text** on a touch screen (on by default, *Settings → Taps and
 swipes*), so holding a song or button never selects its words; text fields still can be
 selected. Switched off, a hold selects text as usual.
@@ -266,9 +279,13 @@ says "Added … in your next turn"), unless you have the *Reorder* permission.
 
 ## Song menu
 
-**Every song** has the same menu, wherever it appears: search results, the queue
-(upcoming), the queue history (played or skipped), playlists, albums, find similar, …
-Open it with the **⋮** button or by **right-clicking** the song.
+**Every song** has the same menu, wherever it appears ✅: search results (also the top
+result), the queue (upcoming), the queue history (played or skipped), artist pages (top
+songs and *Show all*), album pages, playlist pages (also Liked music and YouTube Music's own
+playlists), podcast pages (episodes), Home (lists, quick picks, speed dial, pinned things),
+find similar, your history, Local and imports. Open it with the **⋮** button, by
+**right-clicking** the song, or by **holding** it on a touch screen. Like YouTube Music, a
+song's menu on an album's or artist's page has no *Go to* that same page.
 
 > Implemented so far: Play next, Add to queue, Play now (for the current song: play from
 > the start), Start radio, Autoplay from here, Find similar, Go to artist / album / podcast
@@ -286,6 +303,7 @@ Open it with the **⋮** button or by **right-clicking** the song.
 | Action | Notes |
 |--------|-------|
 | Play next | Plays next |
+| Play from here | On album and playlist pages: plays it from this song (see [gestures](#gestures)) |
 | Add to queue | |
 | Remove | From the queue, the queue history or the autoplay queue. Needs *Remove own/others' songs*. |
 | Start radio | Replace the queue with a [radio](history-and-recommendations.md#radio--mix) from this song |

@@ -1,9 +1,10 @@
 // What tapping, swiping and holding a song does, in song lists (search, albums, artists,
 // playlists, Local), in the queue and in Autoplay, as set in Settings → Taps and swipes: one of your settings (settings.svelte.ts).
 import { settings } from './settings.svelte';
+import type { RoomState } from './protocol.gen';
 
 export type Gesture = 'tap' | 'right' | 'left' | 'hold';
-export type SongAction = 'playNow' | 'playNext' | 'addToQueue' | 'radio' | 'menu' | 'none';
+export type SongAction = 'playNow' | 'playFromHere' | 'playNext' | 'addToQueue' | 'radio' | 'menu' | 'none';
 export type QueueAction = SongAction | 'remove';
 export type Where = 'list' | 'queue' | 'autoplay';
 
@@ -16,6 +17,7 @@ export const GESTURES: [Gesture, string][] = [
 
 export const ACTION_NAMES: Record<QueueAction, string> = {
 	playNow: 'Play now',
+	playFromHere: 'Play from here',
 	playNext: 'Play next',
 	addToQueue: 'Add to queue',
 	radio: 'Start radio',
@@ -86,6 +88,16 @@ function pinAutoplay(): void {
 export function setGesture(where: Where, gesture: Gesture, action: QueueAction): void {
 	if (where === 'queue') pinAutoplay();
 	gestureSetting(where).set({ v: VERSION, ...gestures[where], [gesture]: action });
+}
+
+/**
+ * What tapping a song on an album or playlist page does: with [fromHere] on (Settings →
+ * Playback) and the room empty (nothing queued and nothing playing), it plays the album or
+ * playlist from that song, like YouTube Music; else what a tap in lists does.
+ */
+export function pageTap(state: Pick<RoomState, 'queue' | 'nowPlaying' | 'playback'> | null, fromHere: boolean, listTap: QueueAction): QueueAction {
+	const empty = !!state && state.queue.length === 0 && !(state.nowPlaying && state.playback.playing);
+	return fromHere && empty ? 'playFromHere' : listTap;
 }
 
 export function resetGestures(where: Where): void {
@@ -159,6 +171,7 @@ export class RowSwipe {
 /** The icon for an action, under a song while it's swiped. */
 export const ACTION_ICONS = {
 	playNow: 'play',
+	playFromHere: 'play',
 	playNext: 'playNext',
 	addToQueue: 'playlistAdd',
 	radio: 'radio',
@@ -183,7 +196,9 @@ export class RowGestures<Row> {
 		private readonly where: (row: Row) => Where,
 		private readonly allowed: (action: QueueAction, row: Row) => boolean,
 		private readonly run: (action: QueueAction, row: Row, event: MouseEvent | null, element: HTMLElement | null) => void,
-		private readonly menu: (row: Row, event: MouseEvent, atPointer: boolean) => void
+		private readonly menu: (row: Row, event: MouseEvent, atPointer: boolean) => void,
+		/** What a tap does here, when it isn't the list's tap (album and playlist pages). */
+		private readonly tap?: () => QueueAction
 	) {}
 
 	/** For the row's `onpointerdown`. */
@@ -228,8 +243,9 @@ export class RowGestures<Row> {
 		return this.of(row)[offset > 0 ? 'right' : 'left'];
 	}
 
-	/** What each gesture does for [row]. */
+	/** What each gesture does for [row] (a page's own tap, when it has one). */
 	of(row: Row): Record<Gesture, QueueAction> {
-		return gestures[this.where(row)];
+		const set = gestures[this.where(row)];
+		return this.tap ? { ...set, tap: this.tap() } : set;
 	}
 }

@@ -134,7 +134,11 @@ Music, without Premium, and not tied to a single music service.
   Music's, with three big buttons at the top that you pick. Hold an action for more:
   where Add to queue puts it, Save to playlist straight into the last one, Dislike's
   never-in-radios, remove all by an artist, keep a song offline; Shuffle, Next and Play on
-  can be held too. Each hold can be switched off or trimmed.
+  can be held too. Each hold can be switched off or trimmed. Every list of songs has it:
+  search, artist, album, playlist and podcast pages, Home, your history, Local.
+- Play an album or playlist from a song, like YouTube Music: *Play from here* in its menu,
+  or just tap it when nothing is queued or playing (the songs before it are left out; a
+  setting in *Settings → Playback*).
 - Download a song or episode from its menu: a music file with its title, artist, album and
   cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app
