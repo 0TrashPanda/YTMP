@@ -196,6 +196,8 @@ export const settings = {
 	askInParty: new Setting('askInParty', true, bool),
 	/** In a party room where others listen along, Pause stops playing on this device instead (not playing here: it pauses, asked first). */
 	pauseStopsHere: new Setting('pauseStopsHere', true, bool),
+	/** Leave room asks first (not for a party room's owner with others in it: they pick who runs it). */
+	askLeave: new Setting('askLeave', true, bool),
 
 	// Adding songs
 	/** At most this many songs of one playlist (or album) go into the queue without asking. */
