@@ -37,7 +37,7 @@
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
 	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type PlaylistPick, type Setting } from '../../settings.svelte';
-	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type VideoArt } from '../../storage';
+	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type TallPlayer, type VideoArt } from '../../storage';
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
 	import LeaveRoomDialog from '../LeaveRoomDialog.svelte';
@@ -433,6 +433,15 @@
 						['high', 'High'],
 						['low', 'Low']
 					] as [ImageQuality, string][]}
+				/>
+				<Choice
+					label="Upright screen"
+					hint="On a big screen that is taller than wide, like a monitor turned on its side: the full player shows the album art above Up next, or next to it."
+					setting={settings.tallPlayer}
+					options={[
+						['stacked', 'Art above'],
+						['side', 'Side by side']
+					] as [TallPlayer, string][]}
 				/>
 				<Choice
 					label="Video pictures"

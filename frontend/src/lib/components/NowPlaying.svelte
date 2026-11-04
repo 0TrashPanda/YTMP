@@ -9,6 +9,7 @@
 	import { fly } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { MediaQuery } from 'svelte/reactivity';
+	import { settings } from '../settings.svelte';
 	import { getLyrics, prefetch } from '../api';
 	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
@@ -85,6 +86,9 @@
 
 	/** Desktop shows the tabs next to the art, always open. */
 	const wide = new MediaQuery('min-width: 1024px');
+	// A big screen taller than wide (a monitor turned upright): the art above Up next (Settings → Look).
+	const upright = new MediaQuery('orientation: portrait');
+	const stacked = $derived(wide.current && upright.current && settings.tallPlayer.value === 'stacked');
 	type Tab = 'queue' | 'lyrics' | 'related';
 	let tab = $state<Tab>('queue');
 	// Up next first like YTM, or swapped with Related (a setting).
@@ -352,7 +356,11 @@
 		</div>
 	</div>
 
-	<div class="flex min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,32rem)] lg:gap-8 lg:px-8 lg:pb-6">
+	<div
+		class="flex min-h-0 flex-1 lg:grid lg:gap-8 lg:px-8 lg:pb-6 {stacked
+			? 'lg:grid-cols-1 lg:grid-rows-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-6'
+			: 'lg:grid-cols-[minmax(0,1fr)_minmax(360px,32rem)]'}"
+	>
 		<!-- The song: everything on phones, only the art on desktop (the player bar has the rest, like YTM). -->
 		<div
 			class="flex min-h-0 min-w-0 flex-1 touch-pan-x flex-col items-center justify-center gap-5 px-6 pb-2"
@@ -489,7 +497,7 @@
 			{/if}
 		</div>
 
-		<!-- Desktop: Up next and Related next to the art. -->
+		<!-- Desktop: Up next and Related next to the art (an upright screen: below it). -->
 		{#if wide.current}
 			<div class="flex min-h-0 flex-col overflow-hidden rounded-xl bg-surface/60">
 				{@render tabs()}

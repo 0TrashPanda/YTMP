@@ -112,6 +112,9 @@ Like YTM:
   stay, and **clicking the
   art plays or pauses**, like YTM (a play or pause icon pops up on the art for a moment). The art is always square and never cut off at the top or
   bottom, as big as the space allows.
+  **Upright screen** ✅ (*Settings → Look*, on by default): on a big screen that is taller
+  than wide (a monitor turned on its side), the art is on top and Up next / Lyrics / Related
+  below it, instead of side by side.
 - **Image quality** ✅ (Settings → Look): **High** (default) loads sharp pictures, on
   big screens bigger than YTM lists them (like YTM, Google's pictures are asked for at the
   size shown, e.g. 1200 px album art in the desktop player); **Low** loads at most 300 px

@@ -38,6 +38,8 @@ export type DislikeButton = 'normal' | 'dim' | 'hidden';
 export type SwipeOpens = 'tab' | 'upnext';
 /** Which comes first in the full player's tabs: Up next (like YTM) or Related. */
 export type TabOrder = 'upnext' | 'related';
+/** The full player on a screen taller than wide (a monitor turned upright): the art above Up next, or next to it. */
+export type TallPlayer = 'stacked' | 'side';
 export type ImageQuality = 'high' | 'low';
 export type VideoArt = 'crop' | 'fit';
 /** The songs a long list shows at a time: 100, 300 or 1000, or a number typed in between these. */

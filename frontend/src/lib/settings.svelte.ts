@@ -9,7 +9,7 @@
 // account when it has none yet, else it stays this device's own if it's different (see [load]).
 import { listening } from './listening.svelte';
 import { preferences } from './preferences.svelte';
-import type { DislikeButton, ImageQuality, SwipeOpens, TabOrder, VideoArt } from './storage';
+import type { DislikeButton, ImageQuality, SwipeOpens, TabOrder, TallPlayer, VideoArt } from './storage';
 import { PAGE_SIZES, read, write } from './storage';
 
 export type PlaylistPick = 'first' | 'random';
@@ -175,6 +175,7 @@ const videoArt = oneOf<VideoArt>('crop', 'fit');
 const dislikeButton = oneOf<DislikeButton>('normal', 'dim', 'hidden');
 const swipeOpens = oneOf<SwipeOpens>('tab', 'upnext');
 const tabOrder = oneOf<TabOrder>('upnext', 'related');
+const tallPlayer = oneOf<TallPlayer>('stacked', 'side');
 
 export const settings = {
 	// Playback
@@ -223,6 +224,8 @@ export const settings = {
 	dislikeButton: new Setting('dislikeButton', 'normal' as DislikeButton, dislikeButton, word('ytmp.dislikeButton', dislikeButton)),
 	swipeOpens: new Setting('swipeOpens', 'tab' as SwipeOpens, swipeOpens, word('ytmp.swipeOpens', swipeOpens)),
 	tabOrder: new Setting('tabOrder', 'upnext' as TabOrder, tabOrder, word('ytmp.tabOrder', tabOrder)),
+	/** The full player on a big screen taller than wide: the art above Up next, or next to it. */
+	tallPlayer: new Setting('tallPlayer', 'stacked' as TallPlayer, tallPlayer),
 	/** On a touch screen, holding doesn't select text (text fields still can); app.css's `hold-no-select`. */
 	holdNoSelect: new Setting('holdNoSelect', true, bool),
 
