@@ -3,6 +3,7 @@
 	import type { HostInfo } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
+	import { setSoloHidden } from '../soloLook.svelte';
 	import { getHost } from '../api';
 
 	let {
@@ -88,6 +89,16 @@
 					Make public, so friends on this Wi-Fi can join
 				</button>
 			{/if}
+			<button
+				class="w-full rounded-full bg-raised py-3 font-medium hover:bg-line"
+				onclick={() => {
+					setSoloHidden('code', true);
+					onToast('Room code hidden in solo rooms. Settings → Solo rooms brings it back.');
+					onClose();
+				}}
+			>
+				Hide the room code in solo rooms
+			</button>
 		{:else}
 			{#if addresses.length > 1}
 				<div class="flex w-full flex-wrap justify-center gap-2" role="radiogroup" aria-label="Address">
