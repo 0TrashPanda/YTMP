@@ -1,11 +1,11 @@
 // What tapping, swiping and holding a song does, in song lists (search, albums, artists,
-// playlists, Local) and in Up next, as set in Settings → Taps and swipes: one of your settings (settings.svelte.ts).
+// playlists, Local), in the queue and in Autoplay, as set in Settings → Taps and swipes: one of your settings (settings.svelte.ts).
 import { settings } from './settings.svelte';
 
 export type Gesture = 'tap' | 'right' | 'left' | 'hold';
 export type SongAction = 'playNow' | 'playNext' | 'addToQueue' | 'radio' | 'menu' | 'none';
 export type QueueAction = SongAction | 'remove';
-export type Where = 'list' | 'queue';
+export type Where = 'list' | 'queue' | 'autoplay';
 
 export const GESTURES: [Gesture, string][] = [
 	['tap', 'Tap'],
@@ -26,41 +26,73 @@ export const ACTION_NAMES: Record<QueueAction, string> = {
 
 export const ACTIONS: Record<Where, QueueAction[]> = {
 	list: ['playNow', 'playNext', 'addToQueue', 'radio', 'menu', 'none'],
-	queue: ['playNow', 'playNext', 'addToQueue', 'remove', 'radio', 'menu', 'none']
+	queue: ['playNow', 'playNext', 'addToQueue', 'remove', 'radio', 'menu', 'none'],
+	autoplay: ['playNow', 'playNext', 'addToQueue', 'remove', 'radio', 'menu', 'none']
 };
 
 export const DEFAULTS: Record<Where, Record<Gesture, QueueAction>> = {
-	list: { tap: 'playNext', right: 'addToQueue', left: 'playNow', hold: 'menu' },
-	queue: { tap: 'playNow', right: 'playNext', left: 'remove', hold: 'menu' }
+	list: { tap: 'addToQueue', right: 'addToQueue', left: 'playNow', hold: 'menu' },
+	queue: { tap: 'playNow', right: 'playNext', left: 'remove', hold: 'menu' },
+	autoplay: { tap: 'playNow', right: 'playNext', left: 'remove', hold: 'menu' }
 };
 
-function parse(where: Where, stored: Record<string, unknown>): Record<Gesture, QueueAction> {
+/**
+ * Saved with each change. Without it, a saved value is from before: it had all four gestures,
+ * also the ones never changed, so a list's Tap of Play next (the default then) is taken as not
+ * chosen and follows today's default.
+ */
+const VERSION = 2;
+
+export function parse(where: Where, stored: Record<string, unknown>): Record<Gesture, QueueAction> {
 	const out = { ...DEFAULTS[where] };
+	const old = stored.v !== VERSION;
 	for (const [gesture] of GESTURES) {
 		const action = stored[gesture];
+		if (old && where === 'list' && gesture === 'tap' && action === 'playNext') continue;
 		if (typeof action === 'string' && (ACTIONS[where] as string[]).includes(action)) out[gesture] = action as QueueAction;
 	}
 	return out;
 }
 
-const setting = (where: Where) => (where === 'list' ? settings.gesturesList : settings.gesturesQueue);
+const SETTINGS = { list: settings.gesturesList, queue: settings.gesturesQueue, autoplay: settings.gesturesAutoplay };
 
-/** What each gesture does, in lists and in Up next. Reactive. */
+/** The setting for [where]. */
+export const gestureSetting = (where: Where) => SETTINGS[where];
+
+/**
+ * Autoplay's songs used to do what Up next's do: until Autoplay is set, it keeps what the queue
+ * had (so the queue's own changes are pinned on Autoplay first, see [setGesture]).
+ */
+const autoplaySet = () => Object.keys(settings.gesturesAutoplay.value).length > 0;
+
+/** What each gesture does, in lists, in the queue and in Autoplay. Reactive. */
 export const gestures = {
 	get list() {
 		return parse('list', settings.gesturesList.value);
 	},
 	get queue() {
 		return parse('queue', settings.gesturesQueue.value);
+	},
+	get autoplay() {
+		return autoplaySet() ? parse('autoplay', settings.gesturesAutoplay.value) : parse('autoplay', settings.gesturesQueue.value);
 	}
 };
 
+/** Before the queue changes: Autoplay keeps what it has. */
+function pinAutoplay(): void {
+	if (!autoplaySet()) settings.gesturesAutoplay.set({ v: VERSION, ...gestures.autoplay });
+}
+
 export function setGesture(where: Where, gesture: Gesture, action: QueueAction): void {
-	setting(where).set({ ...gestures[where], [gesture]: action });
+	if (where === 'queue') pinAutoplay();
+	gestureSetting(where).set({ v: VERSION, ...gestures[where], [gesture]: action });
 }
 
 export function resetGestures(where: Where): void {
-	setting(where).reset();
+	if (where === 'queue') pinAutoplay();
+	// Autoplay's own defaults, not the queue's (what unset means).
+	if (where === 'autoplay') settings.gesturesAutoplay.set({ v: VERSION, ...DEFAULTS.autoplay });
+	else gestureSetting(where).reset();
 }
 
 /** How far (part of the row's width) a song must be swiped before letting go does it. */
@@ -136,7 +168,7 @@ export const ACTION_ICONS = {
 } as const;
 
 /**
- * Taps, swipes and holds on the rows of a list ([where]: a song list or Up next), each row
+ * Taps, swipes and holds on the rows of a list ([where]: a song list, the queue or Autoplay), each row
  * being a [Row]. What a gesture does is in [gestures]; [allowed] says whether the room lets you
  * (the song menu always opens), [run] does it, [menu] opens the song menu. A right-click always
  * opens the menu; holding a finger does the Hold action.
@@ -147,7 +179,8 @@ export class RowGestures<Row> {
 	private pointer = 'mouse';
 
 	constructor(
-		private readonly where: Where,
+		/** Where [row] is: a song list, the queue (with what played) or Autoplay. */
+		private readonly where: (row: Row) => Where,
 		private readonly allowed: (action: QueueAction, row: Row) => boolean,
 		private readonly run: (action: QueueAction, row: Row, event: MouseEvent | null, element: HTMLElement | null) => void,
 		private readonly menu: (row: Row, event: MouseEvent, atPointer: boolean) => void
@@ -160,7 +193,7 @@ export class RowGestures<Row> {
 
 	/** Does what [gesture] is set to for [row]; [event] and [element] place the menu. */
 	act(gesture: Gesture, row: Row, event: MouseEvent | null, element: HTMLElement | null): void {
-		const action = gestures[this.where][gesture];
+		const action = this.of(row)[gesture];
 		if (action !== 'menu' && !this.allowed(action, row)) return;
 		this.run(action, row, event, element);
 	}
@@ -168,7 +201,7 @@ export class RowGestures<Row> {
 	/** For the row's `ontouchmove`: may it be swiped that way. */
 	canSwipe(row: Row): (way: 'left' | 'right') => boolean {
 		return (way) => {
-			const action = gestures[this.where][way];
+			const action = this.of(row)[way];
 			return action !== 'none' && this.allowed(action, row);
 		};
 	}
@@ -181,7 +214,7 @@ export class RowGestures<Row> {
 
 	/** For the row's `oncontextmenu`: a right-click, or a finger held down. */
 	held(event: MouseEvent, row: Row): void {
-		if (this.pointer === 'touch' && gestures[this.where].hold !== 'menu') {
+		if (this.pointer === 'touch' && this.of(row).hold !== 'menu') {
 			event.preventDefault();
 			this.swipe.cancel();
 			this.act('hold', row, null, event.currentTarget as HTMLElement);
@@ -190,8 +223,13 @@ export class RowGestures<Row> {
 		}
 	}
 
-	/** What letting go of a swipe of [offset] px would do. */
-	actionFor(offset: number): QueueAction {
-		return gestures[this.where][offset > 0 ? 'right' : 'left'];
+	/** What letting go of a swipe of [offset] px on [row] would do. */
+	actionFor(row: Row, offset: number): QueueAction {
+		return this.of(row)[offset > 0 ? 'right' : 'left'];
+	}
+
+	/** What each gesture does for [row]. */
+	of(row: Row): Record<Gesture, QueueAction> {
+		return gestures[this.where(row)];
 	}
 }

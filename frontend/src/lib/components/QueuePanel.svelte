@@ -6,7 +6,7 @@
 	// the song menu by default); right-click or ⋮ on hover with a mouse: the song menu.
 	import { tick } from 'svelte';
 	import { artistNames, formatTime } from '../format';
-	import { ACTION_ICONS, ACTION_NAMES, gestures, RowGestures, type QueueAction } from '../gestures.svelte';
+	import { ACTION_ICONS, ACTION_NAMES, RowGestures, type QueueAction } from '../gestures.svelte';
 	import { menuAt, startRadio } from '../songActions';
 	import { RADIO_FROM, withFrom } from '../radio.svelte';
 	import { settings } from '../settings.svelte';
@@ -294,7 +294,7 @@
 		}
 	}
 
-	const rows = new RowGestures<Slot>('queue', allowed, run, menu);
+	const rows = new RowGestures<Slot>((slot) => (slot.kind === 'item' && slot.place === 'autoplay' ? 'autoplay' : 'queue'), allowed, run, menu);
 	const swipe = rows.swipe;
 
 	/** How far a song is swiped, or swiped away. */
@@ -402,7 +402,7 @@
 							<Icon name="remove" size={22} />
 						</div>
 					{:else if swiping}
-						{@const action = rows.actionFor(offset)}
+						{@const action = rows.actionFor(slot, offset)}
 						<div
 							class="absolute inset-0 flex items-center gap-2 px-5 text-sm font-medium text-white transition-colors
 								{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(slot.key) ? (action === 'remove' ? 'bg-accent' : 'bg-good') : 'bg-line'}"
@@ -431,7 +431,7 @@
 							class="flex min-w-0 flex-1 items-center gap-3 text-left {canOpen(slot) ? '' : 'cursor-default'}"
 							aria-disabled={!canOpen(slot)}
 							onclick={(e) => rows.act('tap', slot, e, e.currentTarget.parentElement)}
-							title={ACTION_NAMES[gestures.queue.tap]}
+							title={ACTION_NAMES[rows.of(slot).tap]}
 						>
 							<Art song={slot.item.song} size={40} class="h-10 w-10" />
 							<div class="min-w-0 flex-1">
@@ -442,7 +442,7 @@
 						</button>
 						<!-- With a mouse, on hover; touch screens hold the song for the menu, or (when Hold does something else) have it here. -->
 						<button
-							class="rounded-full p-1.5 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus:opacity-100 {gestures.queue.hold === 'menu' ? 'pointer-coarse:hidden' : 'pointer-coarse:opacity-100'}"
+							class="rounded-full p-1.5 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus:opacity-100 {rows.of(slot).hold === 'menu' ? 'pointer-coarse:hidden' : 'pointer-coarse:opacity-100'}"
 							aria-label="More for {slot.item.song.title}"
 							onclick={(e) => menu(slot, e, false)}
 						>

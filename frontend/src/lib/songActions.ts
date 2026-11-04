@@ -2,6 +2,7 @@
 // page's Play buttons, and what it says afterwards: the same everywhere.
 import { bringsOwnRadio, yourRadio } from './api';
 import { whileBusy } from './busy.svelte';
+import { gestures } from './gestures.svelte';
 import { settings } from './settings.svelte';
 import { radioOptions } from './radio.svelte';
 import type { Command, RadioOptions, Song } from './protocol.gen';
@@ -40,6 +41,27 @@ export const addToQueue = (room: RoomConnection, songs: Song[], name: string, on
 	runCommand(room, { kind: 'AddSongs', songs, position: 'end' }, onToast, `Added ${name} to the queue`);
 
 export const playNow = (room: RoomConnection, song: Song, onToast: Toast) => runCommand(room, { kind: 'PlayNow', song }, onToast);
+
+/**
+ * A tap on a song that isn't in a song list (Home's quick picks, the top search result, an
+ * episode, a dial tile): what Tap does in song lists (Settings → Taps and swipes). [menu] opens
+ * its song menu; without one, Song menu adds it to the queue.
+ */
+export function tapSong(room: RoomConnection, song: Song, onToast: Toast, menu?: () => void) {
+	switch (gestures.list.tap) {
+		case 'playNow':
+			return playNow(room, song, onToast);
+		case 'playNext':
+			return playNext(room, [song], quoted(song), onToast);
+		case 'radio':
+			return startRadio(room, song, onToast);
+		case 'none':
+			return;
+		case 'menu':
+			if (menu) return menu();
+	}
+	return addToQueue(room, [song], quoted(song), onToast);
+}
 
 /**
  * Start radio: the queue becomes a radio from [song] (your own account's, when you bring one).

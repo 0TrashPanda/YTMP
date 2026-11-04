@@ -1,4 +1,4 @@
-// Tiles for a speed dial (SpeedDial.svelte): songs (tap = play next, right-click = song menu),
+// Tiles for a speed dial (SpeedDial.svelte): songs (tap = what Tap does in song lists, right-click = song menu),
 // and albums, playlists, artists and podcasts (cards) that open their page.
 import type { Card } from './components/CardGrid.svelte';
 import type { DialTile } from './components/SpeedDial.svelte';
@@ -6,7 +6,7 @@ import type { MenuTarget } from './components/SongMenu.svelte';
 import { thumbUrl } from './images.svelte';
 import type { Song } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
-import { menuAt, playNext, quoted } from './songActions';
+import { menuAt, tapSong } from './songActions';
 
 /** A third of the widest page (30rem), sharp on high-density screens. */
 const TILE = 320;
@@ -17,7 +17,7 @@ export function songTiles(songs: Song[], room: RoomConnection, onToast: (text: s
 		title: song.title,
 		art: thumbUrl(song.thumbnails, TILE),
 		icon: 'note',
-		open: () => playNext(room, [song], quoted(song), onToast),
+		open: () => tapSong(room, song, onToast),
 		menu: (event: MouseEvent) => {
 			event.preventDefault();
 			onMenu({ song, place: 'search', ...menuAt(event.currentTarget as HTMLElement, event, true) });

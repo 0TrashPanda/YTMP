@@ -1,7 +1,7 @@
 <script lang="ts">
-	// Settings → Taps and swipes: what tapping, swiping and holding a song does, in song lists
-	// and in Up next (see gestures.svelte.ts).
-	import { ACTION_NAMES, ACTIONS, DEFAULTS, GESTURES, gestures, resetGestures, setGesture, type QueueAction, type Where } from '../../gestures.svelte';
+	// Settings → Taps and swipes: what tapping, swiping and holding a song does, in song lists,
+	// in the queue and in Autoplay (see gestures.svelte.ts).
+	import { ACTION_NAMES, ACTIONS, DEFAULTS, GESTURES, gestureSetting, gestures, resetGestures, setGesture, type QueueAction, type Where } from '../../gestures.svelte';
 	import { settings } from '../../settings.svelte';
 	import DeviceNote from './DeviceNote.svelte';
 	import Toggle from './Toggle.svelte';
@@ -9,7 +9,8 @@
 
 	const groups: [Where, string, string][] = [
 		['list', 'Songs in lists', 'Search, albums, artists, playlists and Local.'],
-		['queue', 'Songs in Up next', 'The queue, what played and autoplay.']
+		['queue', 'Songs in the queue', 'In Up next: the queue, the song playing and what played.'],
+		['autoplay', 'Songs in Autoplay', 'In Up next: what plays after the queue.']
 	];
 
 	const isDefault = (where: Where) => GESTURES.every(([g]) => gestures[where][g] === DEFAULTS[where][g]);
@@ -23,7 +24,7 @@
 					<p class="text-sm font-medium">{title}</p>
 					<p class="text-xs text-muted">{hint}</p>
 				</div>
-				<DeviceToggle setting={where === 'list' ? settings.gesturesList : settings.gesturesQueue} label={title} />
+				<DeviceToggle setting={gestureSetting(where)} label={title} />
 				{#if !isDefault(where)}
 					<button class="shrink-0 rounded-full px-3 py-1 text-xs text-muted hover:bg-raised hover:text-white" onclick={() => resetGestures(where)}>Defaults</button>
 				{/if}
@@ -42,7 +43,7 @@
 					</select>
 				</label>
 			{/each}
-			<DeviceNote setting={where === 'list' ? settings.gesturesList : settings.gesturesQueue} />
+			<DeviceNote setting={gestureSetting(where)} />
 		</section>
 	{/each}
 	<Toggle label="Holding doesn't select text" hint="On a touch screen, so holding a song or button never selects its words. Text fields can still be selected." setting={settings.holdNoSelect} />

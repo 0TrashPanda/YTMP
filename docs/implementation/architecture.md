@@ -108,7 +108,7 @@ in `OutputDrivers` (server `Main.kt`, phone `LocalHost.kt`).
 **The web app** (`frontend/src/`): the room page (`routes/room/[code]/+page.svelte`) shows one
 page of the stack (`lib/pageStack.svelte.ts`: a new kind of page is a `View`) and at most one
 sheet, menu or dialog (`sheet`). Song lists use `SongList.svelte`; what tap, swipe and hold do
-is `RowGestures` (`lib/gestures.svelte.ts`), and the actions themselves with their messages are
+is `RowGestures` (`lib/gestures.svelte.ts`; a tap on a song outside a list is `tapSong`), and the actions themselves with their messages are
 `lib/songActions.ts`. The song menu is `SongMenu.svelte`: each action it can show for a song
 goes under its id, and `arrange` in `lib/songMenu.svelte.ts` lays them out as set in
 *Settings → Song menu* (a new action: an id in `MENU_ACTIONS` and `DEFAULT_ITEMS`). A new setting
