@@ -41,10 +41,22 @@ describe('gestures', () => {
 		expect(gestures.list.tap).toBe('addToQueue');
 	});
 
-	it('a list saved before keeps its choices, but Tap = Play next (the default then) follows the new default', async () => {
+	it('a list saved before keeps its choices, but the defaults of then (Tap = Play next, Right = Add to queue) follow the new ones', async () => {
 		account = { gesturesList: { tap: 'playNext', right: 'addToQueue', left: 'radio', hold: 'menu' } };
 		const { gestures } = await start();
-		expect(gestures.list).toEqual({ tap: 'addToQueue', right: 'addToQueue', left: 'radio', hold: 'menu' });
+		expect(gestures.list).toEqual({ tap: 'addToQueue', right: 'playNext', left: 'radio', hold: 'menu' });
+	});
+
+	it('a list saved with the version before keeps a Tap of Add to queue, and its Right follows the new default', async () => {
+		account = { gesturesList: { v: 2, tap: 'addToQueue', right: 'addToQueue', left: 'playNow', hold: 'menu' } };
+		const { gestures } = await start();
+		expect(gestures.list).toEqual({ tap: 'addToQueue', right: 'playNext', left: 'playNow', hold: 'menu' });
+	});
+
+	it('swiping right in lists plays next, and Autoplay adds on tap, plays now right and removes left', async () => {
+		const { gestures } = await start();
+		expect(gestures.list.right).toBe('playNext');
+		expect(gestures.autoplay).toEqual({ tap: 'addToQueue', right: 'playNow', left: 'remove', hold: 'menu' });
 	});
 
 	it('a list saved before with another Tap keeps it', async () => {
@@ -58,13 +70,14 @@ describe('gestures', () => {
 		setGesture('list', 'tap', 'playNext');
 		expect(gestures.list.tap).toBe('playNext');
 		await vi.advanceTimersByTimeAsync(1000);
-		expect(account.gesturesList).toMatchObject({ v: 2, tap: 'playNext' });
+		expect(account.gesturesList).toMatchObject({ v: 3, tap: 'playNext' });
 	});
 
 	it('Autoplay keeps what Up next had, until it is set', async () => {
 		account = { gesturesQueue: { tap: 'playNow', right: 'addToQueue', left: 'remove', hold: 'radio' } };
 		const { gestures } = await start();
-		expect(gestures.autoplay).toEqual({ tap: 'playNow', right: 'addToQueue', left: 'remove', hold: 'radio' });
+		// What were the defaults then follow Autoplay's own; the rest is kept.
+		expect(gestures.autoplay).toEqual({ tap: 'addToQueue', right: 'addToQueue', left: 'remove', hold: 'radio' });
 	});
 
 	it('the queue and Autoplay change apart', async () => {
@@ -73,7 +86,7 @@ describe('gestures', () => {
 		setGesture('autoplay', 'left', 'addToQueue');
 		expect(gestures.queue.left).toBe('playNext');
 		expect(gestures.autoplay.left).toBe('addToQueue');
-		expect(gestures.autoplay.right).toBe('playNext');
+		expect(gestures.autoplay.right).toBe('playNow');
 	});
 
 	it("changing the queue doesn't change Autoplay, also when it followed the queue", async () => {

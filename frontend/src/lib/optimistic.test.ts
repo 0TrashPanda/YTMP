@@ -116,7 +116,7 @@ describe('predict', () => {
 
 	it('jumps ahead in the queue, skipping the songs before it', () => {
 		const s = room();
-		predict(s, { kind: 'JumpTo', itemId: 'q2' }, sender());
+		predict(s, { kind: 'JumpTo', itemId: 'q2', keepBefore: false }, sender());
 		expect(s.nowPlaying?.item.itemId).toBe('q2');
 		expect(ids(s.history)).toEqual(['h1', 'now', 'q1']);
 		expect(s.queue).toEqual([]);

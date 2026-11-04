@@ -80,7 +80,7 @@ Each command lists the permission it needs (see [room management](../features/ro
 |---------|--------|------------|
 | `AddSongs` ✅ | `songs` (full song objects from search), `position: "next" \| "end"` | Add songs |
 | `PlayNow` ✅ | `song` | Play now |
-| `JumpTo` ✅ | `itemId` (a queue or history item) | Play now |
+| `JumpTo` ✅ | `itemId` (a queue, autoplay or history item), `keepBefore` (an autoplay song: the ones before it stay instead of being dropped) | Play now |
 | `RemoveQueueItem` ✅ | `itemId` (queue, history or autoplay) | Remove own / others' songs |
 | `MoveQueueItem` ✅ | `itemId`, `toIndex` | Reorder |
 | `MoveItem` ✅ | `itemId`, `list: "history" \| "queue" \| "autoplay"`, `toIndex` | Reorder (autoplay → queue next/last: Add songs) |

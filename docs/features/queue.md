@@ -76,8 +76,10 @@ queue runs out.
   button above Up next, **swiping the mini player down** on a phone (like YTM), or both. It
   needs the permissions to remove those songs (and *Autoplay from here* when autoplay has
   songs); in a party room it asks first while others listen, and the others see who did it.
-- The autoplay queue is visible below the queue. Tapping a song there plays it; the
-  autoplay songs before it are dropped.
+- The autoplay queue is visible below the queue. By default a tap adds an autoplay song to the
+  queue, and swiping it right plays it now: the queue and the autoplay songs above it stay
+  ([gestures](ui.md#gestures)). *Next*'s "Skip to" and the song menu's *Play now* still drop
+  the autoplay songs before it, like YTM.
 
 ## Queue history
 

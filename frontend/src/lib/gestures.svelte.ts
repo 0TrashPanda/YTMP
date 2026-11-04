@@ -33,24 +33,32 @@ export const ACTIONS: Record<Where, QueueAction[]> = {
 };
 
 export const DEFAULTS: Record<Where, Record<Gesture, QueueAction>> = {
-	list: { tap: 'addToQueue', right: 'addToQueue', left: 'playNow', hold: 'menu' },
+	list: { tap: 'addToQueue', right: 'playNext', left: 'playNow', hold: 'menu' },
 	queue: { tap: 'playNow', right: 'playNext', left: 'remove', hold: 'menu' },
-	autoplay: { tap: 'playNow', right: 'playNext', left: 'remove', hold: 'menu' }
+	// Play now keeps the autoplay songs before it (see QueuePanel).
+	autoplay: { tap: 'addToQueue', right: 'playNow', left: 'remove', hold: 'menu' }
 };
 
 /**
- * Saved with each change. Without it, a saved value is from before: it had all four gestures,
- * also the ones never changed, so a list's Tap of Play next (the default then) is taken as not
- * chosen and follows today's default.
+ * Saved with each change. A saved value from an older version had all four gestures, also the
+ * ones never changed: one that is a default of then ([OLD_DEFAULTS]) is taken as not chosen and
+ * follows today's default.
  */
-const VERSION = 2;
+const VERSION = 3;
+
+/** Earlier defaults that changed since. */
+const OLD_DEFAULTS: Record<Where, Partial<Record<Gesture, QueueAction[]>>> = {
+	list: { tap: ['playNext'], right: ['addToQueue'] },
+	queue: {},
+	autoplay: { tap: ['playNow'], right: ['playNext'] }
+};
 
 export function parse(where: Where, stored: Record<string, unknown>): Record<Gesture, QueueAction> {
 	const out = { ...DEFAULTS[where] };
 	const old = stored.v !== VERSION;
 	for (const [gesture] of GESTURES) {
 		const action = stored[gesture];
-		if (old && where === 'list' && gesture === 'tap' && action === 'playNext') continue;
+		if (old && (OLD_DEFAULTS[where][gesture] as unknown[] | undefined)?.includes(action)) continue;
 		if (typeof action === 'string' && (ACTIONS[where] as string[]).includes(action)) out[gesture] = action as QueueAction;
 	}
 	return out;

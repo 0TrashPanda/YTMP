@@ -127,6 +127,7 @@ export interface CommandDeleteRole {
 export interface CommandJumpTo {
   kind: "JumpTo";
   itemId: string;
+  keepBefore: boolean;
 }
 
 export interface CommandKick {

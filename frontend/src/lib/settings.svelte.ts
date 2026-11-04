@@ -9,7 +9,7 @@
 // account when it has none yet, else it stays this device's own if it's different (see [load]).
 import { listening } from './listening.svelte';
 import { preferences } from './preferences.svelte';
-import type { ClearRoomBy, DislikeButton, ImageQuality, SwipeOpens, TabOrder, TallPlayer, VideoArt } from './storage';
+import type { SwipeSkips, ClearRoomBy, DislikeButton, ImageQuality, SwipeOpens, TabOrder, TallPlayer, VideoArt } from './storage';
 import { PAGE_SIZES, read, write } from './storage';
 
 export type PlaylistPick = 'first' | 'random';
@@ -177,6 +177,7 @@ const swipeOpens = oneOf<SwipeOpens>('tab', 'upnext');
 const tabOrder = oneOf<TabOrder>('upnext', 'related');
 const tallPlayer = oneOf<TallPlayer>('stacked', 'side');
 const clearRoomBy = oneOf<ClearRoomBy>('button', 'swipe', 'both');
+const swipeSkips = oneOf<SwipeSkips>('both', 'mini', 'art', 'off');
 
 export const settings = {
 	// Playback
@@ -233,6 +234,8 @@ export const settings = {
 	tabOrder: new Setting('tabOrder', 'upnext' as TabOrder, tabOrder, word('ytmp.tabOrder', tabOrder)),
 	/** The full player on a big screen taller than wide: the art above Up next, or next to it. */
 	tallPlayer: new Setting('tallPlayer', 'stacked' as TallPlayer, tallPlayer),
+	/** Swiping the mini player or the full player's art sideways: left is Next, right is Previous, like YTM. */
+	swipeSkips: new Setting('swipeSkips', 'both' as SwipeSkips, swipeSkips),
 	/** On a touch screen, holding doesn't select text (text fields still can); app.css's `hold-no-select`. */
 	holdNoSelect: new Setting('holdNoSelect', true, bool),
 

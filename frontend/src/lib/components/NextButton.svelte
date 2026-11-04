@@ -22,10 +22,10 @@
 		const list = [];
 		const party = (room.state?.participants.filter((p) => p.online && !p.screen).length ?? 0) > 1;
 		const other = firstOther((by) => by !== now?.addedBy);
-		if (party && other) list.push({ id: 'other', icon: 'people' as const, label: `Next song from someone else (${other.addedByName})`, run: () => void room.run({ kind: 'JumpTo', itemId: other.itemId }) });
+		if (party && other) list.push({ id: 'other', icon: 'people' as const, label: `Next song from someone else (${other.addedByName})`, run: () => void room.run({ kind: 'JumpTo', itemId: other.itemId, keepBefore: false }) });
 		const album = now?.song.album?.name;
 		const after = album ? firstOther((_, a) => a !== album) : null;
-		if (after) list.push({ id: 'album', icon: 'album' as const, label: `Skip to after ${album}`, run: () => void room.run({ kind: 'JumpTo', itemId: after.itemId }) });
+		if (after) list.push({ id: 'album', icon: 'album' as const, label: `Skip to after ${album}`, run: () => void room.run({ kind: 'JumpTo', itemId: after.itemId, keepBefore: false }) });
 		return list.filter((c) => shownChoices('next').includes(c.id));
 	});
 

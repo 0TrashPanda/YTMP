@@ -200,7 +200,11 @@ sealed interface Command {
     /** Jump to an item in the queue, the autoplay queue or the history. */
     @Serializable
     @SerialName("JumpTo")
-    data class JumpTo(val itemId: String) : Command
+    data class JumpTo(
+        val itemId: String,
+        /** An autoplay song: the autoplay songs before it stay (otherwise they're dropped, like YTM). */
+        val keepBefore: Boolean = false,
+    ) : Command
 
     @Serializable
     @SerialName("Play")

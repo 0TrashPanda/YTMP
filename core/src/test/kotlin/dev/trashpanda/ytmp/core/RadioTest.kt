@@ -378,6 +378,20 @@ class RadioTest {
     }
 
     @Test
+    fun `playing an autoplay song now can keep the ones before it`() = runTest {
+        val room = room()
+        room.run(Command.AddSongs(listOf(song("a")), QueuePosition.END))
+        runCurrent()
+        val before = room.state().autoplay
+        val target = before[3]
+        room.run(Command.JumpTo(target.itemId, keepBefore = true))
+        runCurrent()
+        val state = room.state()
+        assertEquals(target.song.id, state.nowPlaying?.item?.song?.id)
+        assertEquals(before.take(3).map { it.itemId }, state.autoplay.take(3).map { it.itemId })
+    }
+
+    @Test
     fun `items move between history, queue and autoplay`() = runTest {
         val room = room()
         room.run(Command.AddSongs(listOf(song("a"), song("b"), song("c")), QueuePosition.END))

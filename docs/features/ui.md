@@ -8,7 +8,7 @@ Because it is one web frontend, it is the same in the browser and in the Android
 The most common use of YTMP:
 
 1. **Search** for a song or artist (mostly through the YTM module).
-2. **Play** it (tap = add to queue, swipe left = play now, swipe right = add to queue; all
+2. **Play** it (tap = add to queue, swipe left = play now, swipe right = play next; all
    [settable](#gestures)), or
 3. **Start a radio** from it ([radio / mix](history-and-recommendations.md#radio--mix)), or
    open **find similar** to pick similar songs by hand
@@ -237,8 +237,8 @@ queue and *Autoplay* also *Remove*. The defaults:
 
 | Gesture | Songs in lists | Songs in the queue | Songs in *Autoplay* |
 |---------|----------------|--------------------|---------------------|
-| **Tap** | **Add to queue** (the end) | **Play now**: jump to it, like YTM (the songs before it go to the history as skipped; a played song plays again) | **Play now**: it plays next, so the queue stays |
-| **Swipe right** | **Add to queue** (the end) | **Play next** (moved to the start of the queue) | **Play next** |
+| **Tap** | **Add to queue** (the end) | **Play now**: jump to it, like YTM (the songs before it go to the history as skipped; a played song plays again) | **Add to queue** (the end) |
+| **Swipe right** | **Play next** | **Play next** (moved to the start of the queue) | **Play now**: it plays right away; the queue and the autoplay songs above it stay |
 | **Swipe left** | **Play now** | **Remove**, like YTM (the current song too: the next one plays) | **Remove** |
 | **Hold** | Open the [song menu](#song-menu) | Open the song menu | Open the song menu |
 | **Drag** (the handle) | Move it in your own playlists | Move it | Move it |
@@ -247,9 +247,18 @@ A tap on a song that isn't in a list (Home's quick picks, the top search result,
 episodes, speed dial tiles) does what *Tap* does in lists (*Song menu* there opens the menu
 where it has one, else adds to the queue).
 
-Taps in lists used to *play next*: a setting saved back then that still had that (the old
-default) moved to the new one; any other choice stays. *Autoplay* does what the queue's
-songs did until it's set itself (changing the queue's no longer changes it).
+Defaults that changed (a list's *Tap* was *Play next*, its *Swipe right* *Add to queue*;
+*Autoplay*'s *Tap* was *Play now*, which played it next, and its *Swipe right* *Play next*): a
+setting saved back then that still had the old default moves to the new one; any other choice
+stays. *Autoplay* does what the queue's songs did until it's set itself (changing the queue's
+no longer changes it), with the same move to its new defaults.
+
+✅ **Swipe to skip** (*Settings → Taps and swipes*, default *Mini player and art*): swiping the
+mini player or the art in the full player **left plays the next song, right goes back**
+(within the first seconds of a song to the one before, later to its start, like Previous), like
+YouTube Music. It can be only the mini player, only the art, or off. The mini player follows
+the finger, and up (open) and down (clear the room) still work: the first clear direction
+decides.
 
 ✅ **Play from here**: in an empty room (nothing queued, and nothing playing: no song, or
 it's paused or finished), **tapping a song on an album or playlist page plays it from that

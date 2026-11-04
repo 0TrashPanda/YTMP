@@ -42,6 +42,8 @@ export type TabOrder = 'upnext' | 'related';
 export type TallPlayer = 'stacked' | 'side';
 /** How the room is cleared (song, queue and autoplay): a button above Up next, swiping the mini player down, or both. */
 export type ClearRoomBy = 'button' | 'swipe' | 'both';
+/** Where swiping sideways skips to the next song (left) or back (right), like YTM: the mini player, the art in the full player, both, or neither. */
+export type SwipeSkips = 'both' | 'mini' | 'art' | 'off';
 export type ImageQuality = 'high' | 'low';
 export type VideoArt = 'crop' | 'fit';
 /** The songs a long list shows at a time: 100, 300 or 1000, or a number typed in between these. */

@@ -5,6 +5,7 @@
 	import { wheelAdjust } from '../wheel';
 	import { nativeBridge } from '../native';
 	import { settings } from '../settings.svelte';
+	import { skipBySwipe, SKIP_SWIPE_PX } from '../songActions';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { getAlbum, prefetch } from '../api';
 	import { artistNames, formatTime } from '../format';
@@ -73,9 +74,14 @@
 	// Phones: swipe the mini player up to open the full player (a tap opens it too). Down
 	// clears the room when Settings → Playback says so (Undo puts it back), like YTM's mini player.
 	let swipeStart: number | null = null;
+	let startX = 0;
 	let drop = $state(0);
 	const swipeClears = $derived(settings.clearRoomBy.value !== 'button' && room.can('remove_own'));
 	const DROP_CLEARS_PX = 60;
+	// Sideways skips (Settings → Taps and swipes → Swipe to skip): the first clear direction decides.
+	let slide = $state(0);
+	let axis: 'x' | 'y' | null = null;
+	const swipeSkips = $derived(['both', 'mini'].includes(settings.swipeSkips.value));
 
 	// Desktop, like YTM: "Artist • Album • Year". Songs don't carry their year, so it comes
 	// from the album's page (remembered, so once per album).
@@ -156,6 +162,14 @@
 		const t = tap;
 		tap = null;
 		swipeStart = null;
+		axis = null;
+		if (slide) {
+			const skips = Math.abs(slide) >= SKIP_SWIPE_PX;
+			const forward = slide < 0;
+			slide = 0;
+			if (skips) skipBySwipe(room, forward);
+			return;
+		}
 		if (drop) {
 			const clears = drop >= DROP_CLEARS_PX;
 			drop = 0;
@@ -184,10 +198,19 @@
 		role="presentation"
 		ontouchstart={(e) => {
 			swipeStart = e.touches[0].clientY;
+			startX = e.touches[0].clientX;
+			axis = null;
 			tap = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: e.timeStamp };
 		}}
 		ontouchmove={(e) => {
+			const dx = e.touches[0].clientX - startX;
+			const dy = e.touches[0].clientY - (swipeStart ?? e.touches[0].clientY);
 			if (tap && Math.hypot(e.touches[0].clientX - tap.x, e.touches[0].clientY - tap.y) > 10) tap = null;
+			if (axis === null && Math.hypot(dx, dy) > 10) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+			if (axis === 'x') {
+				if (swipeSkips && current) slide = dx;
+				return;
+			}
 			if (swipeStart !== null && swipeStart - e.touches[0].clientY > 30) {
 				swipeStart = null;
 				drop = 0;
@@ -198,14 +221,16 @@
 		}}
 		ontouchcancel={() => {
 			drop = 0;
+			slide = 0;
+			axis = null;
 			swipeStart = null;
 		}}
 		ontouchend={tapEnd}
 	>
 		<div
-			class="flex h-16 items-center gap-1 pr-1 pl-2 {drop ? '' : 'transition-[translate,opacity]'}"
-			style:translate="0 {Math.min(drop, 64)}px"
-			style:opacity={drop ? Math.max(0.3, 1 - drop / 100) : undefined}
+			class="flex h-16 items-center gap-1 pr-1 pl-2 {drop || slide ? '' : 'transition-[translate,opacity]'}"
+			style:translate="{slide}px {Math.min(drop, 64)}px"
+			style:opacity={drop ? Math.max(0.3, 1 - drop / 100) : slide ? Math.max(0.4, 1 - Math.abs(slide) / 200) : undefined}
 		>
 			<button class="flex min-w-0 flex-1 items-center gap-2.5 text-left" data-opens-player disabled={!current} onclick={() => onExpand(true)} oncontextmenu={onSongMenu}>
 				<Art song={current?.item.song ?? null} size={96} class="h-10 w-10 shrink-0" />

@@ -184,7 +184,7 @@
 			add('playNow', {
 				icon: 'play',
 				label: 'Play now',
-				run: () => (item ? command({ kind: 'JumpTo', itemId: item.itemId }) : command({ kind: 'PlayNow', song }))
+				run: () => (item ? command({ kind: 'JumpTo', itemId: item.itemId, keepBefore: false }) : command({ kind: 'PlayNow', song }))
 			});
 		}
 		if (target.playFrom && room.can('play_now')) {

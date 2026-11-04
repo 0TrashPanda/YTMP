@@ -311,13 +311,12 @@
 
 	function open(slot: Slot) {
 		if (slot.kind !== 'item' || !canOpen(slot)) return;
-		// An autoplay song plays next; others play now (jump), like YTM.
-		if (slot.place === 'autoplay') room.run({ kind: 'MoveItem', itemId: slot.item.itemId, list: 'queue', toIndex: 0 });
-		else room.run({ kind: 'JumpTo', itemId: slot.item.itemId });
+		// Play now (jump). An autoplay song: the autoplay songs before it stay.
+		room.run({ kind: 'JumpTo', itemId: slot.item.itemId, keepBefore: slot.place === 'autoplay' });
 	}
 
 	function canOpen(slot: Slot) {
-		return slot.kind === 'item' && room.can(slot.place === 'autoplay' ? 'add_songs' : 'play_now');
+		return slot.kind === 'item' && room.can('play_now');
 	}
 
 	/** The ⋮ button or a right-click. */

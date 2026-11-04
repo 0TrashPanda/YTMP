@@ -906,7 +906,7 @@ class Room(
             }
             is Command.JumpTo -> {
                 need(member, Permission.PLAY_NOW)?.let { return it }
-                return jumpTo(command.itemId)
+                return jumpTo(command.itemId, command.keepBefore)
             }
             is Command.StartRadio -> {
                 need(member, Permission.START_RADIO)?.let { return it }
@@ -1459,13 +1459,13 @@ class Room(
         }
     }
 
-    private fun jumpTo(itemId: String): ErrorInfo? {
+    private fun jumpTo(itemId: String, keepBefore: Boolean = false): ErrorInfo? {
         val autoplayIndex = autoplay.items.indexOfFirst { it.itemId == itemId }
         if (autoplayIndex >= 0) {
             // Like YTM: the autoplay songs before it are dropped (they never played).
             retireCurrent(QueueItemResult.SKIPPED)
             val item = autoplay.items[autoplayIndex]
-            autoplay.items.subList(0, autoplayIndex + 1).clear()
+            if (keepBefore) autoplay.items.removeAt(autoplayIndex) else autoplay.items.subList(0, autoplayIndex + 1).clear()
             emit(autoplay.changed())
             wantPlaying = true
             setCurrent(item)

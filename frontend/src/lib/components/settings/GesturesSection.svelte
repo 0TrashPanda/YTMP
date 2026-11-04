@@ -5,6 +5,8 @@
 	import { settings } from '../../settings.svelte';
 	import DeviceNote from './DeviceNote.svelte';
 	import Toggle from './Toggle.svelte';
+	import Choice from './Choice.svelte';
+	import type { SwipeSkips } from '../../storage';
 	import DeviceToggle from './DeviceToggle.svelte';
 
 	const groups: [Where, string, string][] = [
@@ -46,6 +48,17 @@
 			<DeviceNote setting={gestureSetting(where)} />
 		</section>
 	{/each}
+	<Choice
+		label="Swipe to skip"
+		hint="Swipe the player sideways: left plays the next song, right goes back, like YouTube Music."
+		setting={settings.swipeSkips}
+		options={[
+			['both', 'Mini player and art'],
+			['mini', 'Mini player'],
+			['art', 'Art in the player'],
+			['off', 'Off']
+		] as [SwipeSkips, string][]}
+	/>
 	<Toggle label="Holding doesn't select text" hint="On a touch screen, so holding a song or button never selects its words. Text fields can still be selected." setting={settings.holdNoSelect} />
 	<p class="text-xs text-muted">
 		Swipes are for touch screens. A right-click (or ⋮) always opens the song menu, also when Hold does something else.

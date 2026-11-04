@@ -105,3 +105,12 @@ export function menuAt(element: Element, event?: MouseEvent | null, atPointer = 
 	const rect = element.getBoundingClientRect();
 	return { x: rect.right - MENU_WIDTH, y: rect.bottom };
 }
+
+/** How far (px) the player must be swiped sideways to skip (Settings → Taps and swipes → Swipe to skip). */
+export const SKIP_SWIPE_PX = 60;
+
+/** A sideways swipe on the player: left ([forward]) plays the next song, right goes back, like YTM. */
+export function skipBySwipe(room: RoomConnection, forward: boolean): void {
+	if (forward) void room.next();
+	else if (room.canPrevious) void room.run({ kind: 'Previous' });
+}

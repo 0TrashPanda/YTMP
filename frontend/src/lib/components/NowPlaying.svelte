@@ -10,6 +10,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { settings } from '../settings.svelte';
+	import { skipBySwipe, SKIP_SWIPE_PX } from '../songActions';
 	import { getLyrics, prefetch } from '../api';
 	import { images } from '../images.svelte';
 	import { likes } from '../likes.svelte';
@@ -173,14 +174,18 @@
 	// Swipe down to close (phones): the player follows the finger, springs back when let go
 	// early, and slides on down from where it is when far enough or flicked. Sideways (the
 	// seek bar, the art) doesn't move it.
-	let swipe: { x: number; y: number; t: number; down: boolean | null } | null = null;
+	let swipe: { x: number; y: number; t: number; down: boolean | null; art: boolean } | null = null;
 	let dragY = $state(0);
+	// Sideways on the art: next (left) or back (right), like YTM (Settings → Taps and swipes → Swipe to skip).
+	let artX = $state(0);
+	const artSkips = $derived(['both', 'art'].includes(settings.swipeSkips.value));
 	let dragging = $state(false);
 	let closing = false;
 
 	function onTouchStart(e: TouchEvent) {
 		if (closing) return;
-		swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: e.timeStamp, down: null };
+		const art = artSkips && !!current && !(karaoke && song && !song.podcast) && !!(e.target as Element).closest('[data-art]');
+		swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: e.timeStamp, down: null, art };
 	}
 
 	function onTouchMove(e: TouchEvent) {
@@ -195,7 +200,10 @@
 			swipe.y = e.touches[0].clientY;
 			swipe.t = e.timeStamp;
 		}
-		if (!swipe.down) return;
+		if (!swipe.down) {
+			if (swipe.art) artX = dx;
+			return;
+		}
 		dragging = true;
 		dragY = Math.max(0, e.touches[0].clientY - swipe.y);
 	}
@@ -204,6 +212,13 @@
 		const flick = swipe && dragY > 40 && dragY / Math.max(1, e.timeStamp - swipe.t) > 0.6;
 		swipe = null;
 		dragging = false;
+		if (artX) {
+			const skips = Math.abs(artX) >= SKIP_SWIPE_PX;
+			const forward = artX < 0;
+			artX = 0;
+			if (skips) skipBySwipe(room, forward);
+			return;
+		}
 		if (dragY > 120 || flick) {
 			// Keep dragY: the slide out starts from where the finger left it.
 			closing = true;
@@ -371,7 +386,14 @@
 			ontouchcancel={onTouchEnd}
 		>
 			<!-- Always square: as big as both the width and the height allow (desktop: no other limit, the song is in the player bar). -->
-			<div class="flex min-h-0 w-full flex-1 items-center justify-center [container-type:size]" role="presentation" oncontextmenu={onSongMenu}>
+			<div
+				class="flex min-h-0 w-full flex-1 items-center justify-center [container-type:size] {artX ? '' : 'transition-[translate,opacity]'}"
+				style:translate={artX ? `${artX}px 0` : undefined}
+				style:opacity={artX ? Math.max(0.4, 1 - Math.abs(artX) / 300) : undefined}
+				data-art
+				role="presentation"
+				oncontextmenu={onSongMenu}
+			>
 				{#if karaoke && song && !song.podcast}
 					<Lyrics {room} {song} {positionMs} large />
 				{:else if wide.current}

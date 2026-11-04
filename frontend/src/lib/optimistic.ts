@@ -85,7 +85,7 @@ export function predict(s: RoomState, command: Command, by: Sender): boolean {
 			return true;
 		}
 		case 'JumpTo':
-			return by.can('play_now') && jumpTo(s, command.itemId, by);
+			return by.can('play_now') && jumpTo(s, command.itemId, by, command.keepBefore);
 		case 'PlayNow':
 			if (!by.can('play_now')) return false;
 			retire(s);
@@ -243,12 +243,12 @@ function find(s: RoomState, itemId: string): { list: 'history' | 'queue' | 'auto
 }
 
 /** Like jumpTo in Room.kt: plays [itemId] now, from autoplay, the queue or the history. */
-function jumpTo(s: RoomState, itemId: string, by: Sender): boolean {
+function jumpTo(s: RoomState, itemId: string, by: Sender, keepBefore = false): boolean {
 	const autoplayIndex = s.autoplay.findIndex((i) => i.itemId === itemId);
 	if (autoplayIndex >= 0) {
-		// The autoplay songs before it are dropped (they never played).
+		// The autoplay songs before it are dropped (they never played), unless asked to keep them.
 		retire(s);
-		const [item] = s.autoplay.splice(0, autoplayIndex + 1).slice(-1);
+		const [item] = keepBefore ? s.autoplay.splice(autoplayIndex, 1) : s.autoplay.splice(0, autoplayIndex + 1).slice(-1);
 		setCurrent(s, item, true, by.at);
 		return true;
 	}
