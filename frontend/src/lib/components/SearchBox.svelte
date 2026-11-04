@@ -18,7 +18,8 @@
 		query,
 		onsearch,
 		onopen,
-		onlink
+		onlink,
+		fills = false
 	}: {
 		/** The current search (shown in the box). */
 		query: string;
@@ -28,6 +29,8 @@
 		onopen: () => void;
 		/** A link was pasted (or entered): open what it points at. [text]: the link as given. */
 		onlink: (link: Link, text: string) => void;
+		/** Fill the bar: no width limit, and a field instead of an icon on phones too. */
+		fills?: boolean;
 	} = $props();
 
 	const wide = new MediaQuery('min-width: 640px');
@@ -279,7 +282,7 @@
 {/snippet}
 
 {#if wide.current}
-	<div class="relative flex min-w-0 flex-1 sm:max-w-xl">
+	<div class="relative flex min-w-0 flex-1 {fills ? '' : 'sm:max-w-xl'}">
 		<label class="flex min-w-0 flex-1 items-center gap-3 bg-raised px-4 py-2 {showList ? 'rounded-t-lg' : 'rounded-lg'}">
 			<Icon name="search" size={22} class="shrink-0 text-muted" />
 			{@render field(false)}
@@ -289,10 +292,17 @@
 		{/if}
 	</div>
 {:else}
-	<!-- Phones: a search icon; searching happens on its own page. -->
-	<button class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label="Search" onclick={open}>
-		<Icon name="search" size={24} />
-	</button>
+	<!-- Phones: a search icon (or a field that fills the bar); searching happens on its own page. -->
+	{#if fills}
+		<button class="flex min-w-0 flex-1 items-center gap-3 rounded-lg bg-raised px-3 py-2 text-left" aria-label="Search" onclick={open}>
+			<Icon name="search" size={22} class="shrink-0 text-muted" />
+			<span class="min-w-0 flex-1 truncate {text ? '' : 'text-muted'}">{text || 'Search'}</span>
+		</button>
+	{:else}
+		<button class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label="Search" onclick={open}>
+			<Icon name="search" size={24} />
+		</button>
+	{/if}
 	{#if active}
 		<div class="fixed inset-0 z-50 flex flex-col bg-bg" use:portal>
 			<div class="flex items-center gap-2 border-b border-line px-2 py-2">

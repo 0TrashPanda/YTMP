@@ -249,6 +249,8 @@ export const settings = {
 	}),
 	/** What solo rooms leave out (soloLook.svelte.ts). */
 	soloHidden: new Setting<unknown>('soloHidden', undefined, (raw) => raw),
+	/** Without the room code at the top, search fills the top bar as a field (also on phones). */
+	soloSearchField: new Setting('soloSearchField', true, bool),
 	/** The Local tab shows the music on the network. */
 	localNetwork: new Setting('localNetwork', true, bool, flag('ytmp.localNetwork'))
 };

@@ -123,7 +123,7 @@ Music, without Premium, and not tied to a single music service.
 - A sleep timer (in the playing song's ⋮ menu): after some minutes or at the end of the
   song the sound fades out, then a solo room pauses; in a party room only your device stops.
 - Solo rooms can leave out the party bits you don't need alone (room code, Play on, Karaoke,
-  Party screen…), in *Settings → Solo rooms*.
+  Party screen…), in *Settings → Solo rooms*. Without the room code, search fills the top bar.
 - One Settings screen in YouTube Music's style, with the room's own settings at the top when
   you're in a room. Your settings are kept on your YTMP account, so all your devices have them;
   the phone icon next to one keeps it different on that device.

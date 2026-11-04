@@ -29,3 +29,8 @@ export function setSoloHidden(part: SoloPart, hidden: boolean): void {
 export function shows(room: RoomConnection | null | undefined, part: SoloPart): boolean {
 	return room?.state?.room.visibility !== 'private' || !soloHidden(part);
 }
+
+/** Search fills the top bar as a field in [room]: a solo room without its code at the top, if set so. */
+export function searchFills(room: RoomConnection | null | undefined): boolean {
+	return !shows(room, 'code') && settings.soloSearchField.value;
+}
