@@ -1,10 +1,11 @@
 <script lang="ts">
 	// A list of songs (search, find similar, artist, album, playlist, history and Local pages). Tap,
 	// swipe right, swipe left and hold do what Settings → Taps and swipes says (play next, add
-	// to queue, play now, the song menu by default; a tap on album and playlist pages plays it
-	// from that song); ⋮ or right-click = song menu.
+	// to queue, play now, the song menu by default; in an empty room a tap on album and playlist
+	// pages plays it from that song, Settings → Playback); ⋮ or right-click = song menu.
 	import { artistNames, formatTime } from '../format';
-	import { ACTION_ICONS, ACTION_NAMES, gestures, RowGestures, type QueueAction } from '../gestures.svelte';
+	import { ACTION_ICONS, ACTION_NAMES, gestures, pageTap, RowGestures, type QueueAction } from '../gestures.svelte';
+	import { settings } from '../settings.svelte';
 	import { addToQueue, menuAt, playNext, playNow, quoted, startRadio } from '../songActions';
 	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -39,7 +40,7 @@
 		listened?: { ids: string[]; onRemoved: (index: number) => void };
 		/** Songs can be dragged to another place (your own playlists). */
 		onMove?: (from: number, to: number) => void;
-		/** Album and playlist pages: play it from the song at [index] (a tap there, as set). */
+		/** Album and playlist pages: play it from the song at [index] (the menu, and a tap in an empty room). */
 		playFrom?: (index: number) => void;
 		/** The album's or artist's page this list is on (its songs' menus don't go there). */
 		page?: { album?: string; artist?: string };
@@ -130,7 +131,7 @@
 		onMenu({ song, place: 'search', playlist: inPlaylist, listened: inHistory, playFrom: playFrom && (() => playFrom(index)), page, ...at });
 	}
 
-	const rows = new RowGestures<Row>('list', allowed, run, menu, () => (playFrom ? gestures.pageTap : gestures.list.tap));
+	const rows = new RowGestures<Row>('list', allowed, run, menu, () => (playFrom ? pageTap(room.state, settings.tapPlaysFromHere.value, gestures.list.tap) : gestures.list.tap));
 	const swipe = rows.swipe;
 </script>
 

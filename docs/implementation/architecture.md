@@ -109,8 +109,9 @@ in `OutputDrivers` (server `Main.kt`, phone `LocalHost.kt`).
 page of the stack (`lib/pageStack.svelte.ts`: a new kind of page is a `View`) and at most one
 sheet, menu or dialog (`sheet`). Song lists use `SongList.svelte`; what tap, swipe and hold do
 is `RowGestures` (`lib/gestures.svelte.ts`), and the actions themselves with their messages are
-`lib/songActions.ts`. On album and playlist pages `SongList` gets `playFrom`: a tap (as set,
-`gestures.pageTap`) or the menu's *Play from here* calls `PlayAllButtons.playFrom(index)`,
+`lib/songActions.ts`. On album and playlist pages `SongList` gets `playFrom`: the menu's *Play
+from here*, or a tap in an empty room (`pageTap` in `lib/gestures.svelte.ts`, with the
+`tapPlaysFromHere` setting), calls `PlayAllButtons.playFrom(index)`,
 the page's *Play* from that song on (the same limit and ask-first, then `PlayNow` for the song
 and `AddSongs` `next` for the rest; no command of its own). The song menu is `SongMenu.svelte`: each action it can show for a song
 goes under its id, and `arrange` in `lib/songMenu.svelte.ts` lays them out as set in

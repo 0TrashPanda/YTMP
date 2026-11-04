@@ -14,7 +14,7 @@
 		listened?: { id: string; onRemoved: () => void };
 		/** A podcast episode with a played mark (your account): it can be marked played or unplayed. */
 		episode?: { played: boolean; onMarked: (played: boolean) => void };
-		/** On an album or playlist page: play it from this song (when tapping does something else). */
+		/** On an album or playlist page: play it from this song. */
 		playFrom?: () => void;
 		/** The album's or artist's page the song is on: no "Go to" that page. */
 		page?: { album?: string; artist?: string };
@@ -46,7 +46,6 @@
 	import { canDownload, downloadSong } from '../downloads';
 	import { youtube } from '../youtube.svelte';
 	import { sleepTimer } from '../sleepTimer.svelte';
-	import { gestures } from '../gestures.svelte';
 	import { arrange, holds, shownChoices, songMenuLayout, type MenuAction } from '../songMenu.svelte';
 	import { artistNames } from '../format';
 	import Art from './Art.svelte';
@@ -188,7 +187,7 @@
 				run: () => (item ? command({ kind: 'JumpTo', itemId: item.itemId }) : command({ kind: 'PlayNow', song }))
 			});
 		}
-		if (target.playFrom && room.can('play_now') && gestures.pageTap !== 'playFromHere') {
+		if (target.playFrom && room.can('play_now')) {
 			const playFrom = target.playFrom;
 			add('playFromHere', { icon: 'play', label: 'Play from here', run: () => (onClose(), playFrom()) });
 		}

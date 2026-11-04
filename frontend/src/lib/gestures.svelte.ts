@@ -1,6 +1,7 @@
 // What tapping, swiping and holding a song does, in song lists (search, albums, artists,
 // playlists, Local) and in Up next, as set in Settings → Taps and swipes: one of your settings (settings.svelte.ts).
 import { settings } from './settings.svelte';
+import type { RoomState } from './protocol.gen';
 
 export type Gesture = 'tap' | 'right' | 'left' | 'hold';
 export type SongAction = 'playNow' | 'playFromHere' | 'playNext' | 'addToQueue' | 'radio' | 'menu' | 'none';
@@ -35,13 +36,6 @@ export const DEFAULTS: Record<Where, Record<Gesture, QueueAction>> = {
 	queue: { tap: 'playNow', right: 'playNext', left: 'remove', hold: 'menu' }
 };
 
-/**
- * Tapping a song on an album or playlist page: like YouTube Music, it plays the album or playlist
- * from that song by default. Kept with the other list gestures (as `pageTap`).
- */
-export const PAGE_TAP_ACTIONS: QueueAction[] = ['playFromHere', ...ACTIONS.list];
-export const DEFAULT_PAGE_TAP: QueueAction = 'playFromHere';
-
 function parse(where: Where, stored: Record<string, unknown>): Record<Gesture, QueueAction> {
 	const out = { ...DEFAULTS[where] };
 	for (const [gesture] of GESTURES) {
@@ -60,20 +54,21 @@ export const gestures = {
 	},
 	get queue() {
 		return parse('queue', settings.gesturesQueue.value);
-	},
-	/** Tap on album and playlist pages. */
-	get pageTap(): QueueAction {
-		const action = settings.gesturesList.value.pageTap;
-		return typeof action === 'string' && PAGE_TAP_ACTIONS.includes(action as QueueAction) ? (action as QueueAction) : DEFAULT_PAGE_TAP;
 	}
 };
 
 export function setGesture(where: Where, gesture: Gesture, action: QueueAction): void {
-	setting(where).set({ ...setting(where).value, ...gestures[where], [gesture]: action });
+	setting(where).set({ ...gestures[where], [gesture]: action });
 }
 
-export function setPageTap(action: QueueAction): void {
-	settings.gesturesList.set({ ...settings.gesturesList.value, pageTap: action });
+/**
+ * What tapping a song on an album or playlist page does: with [fromHere] on (Settings →
+ * Playback) and the room empty (nothing queued and nothing playing), it plays the album or
+ * playlist from that song, like YouTube Music; else what a tap in lists does.
+ */
+export function pageTap(state: Pick<RoomState, 'queue' | 'nowPlaying' | 'playback'> | null, fromHere: boolean, listTap: QueueAction): QueueAction {
+	const empty = !!state && state.queue.length === 0 && !(state.nowPlaying && state.playback.playing);
+	return fromHere && empty ? 'playFromHere' : listTap;
 }
 
 export function resetGestures(where: Where): void {

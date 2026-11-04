@@ -136,9 +136,9 @@ Music, without Premium, and not tied to a single music service.
   never-in-radios, remove all by an artist, keep a song offline; Shuffle, Next and Play on
   can be held too. Each hold can be switched off or trimmed. Every list of songs has it:
   search, artist, album, playlist and podcast pages, Home, your history, Local.
-- Tap a song on an album or playlist page to play it from there, like YouTube Music (the
-  songs before it are left out); *Settings → Taps and swipes* can change it, and then the
-  song menu there has *Play from here*.
+- Play an album or playlist from a song, like YouTube Music: *Play from here* in its menu,
+  or just tap it when nothing is queued or playing (the songs before it are left out; a
+  setting in *Settings → Playback*).
 - Download a song or episode from its menu: a music file with its title, artist, album and
   cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
 - Music comes straight from YouTube, also when you listen to a server elsewhere: the app

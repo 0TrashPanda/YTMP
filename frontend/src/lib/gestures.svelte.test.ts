@@ -1,43 +1,31 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-// The two settings, as plain values.
-const values: Record<string, Record<string, unknown>> = { list: {}, queue: {} };
-const setting = (key: string) => ({
-	get value() {
-		return values[key];
-	},
-	set: (v: Record<string, unknown>) => void (values[key] = v),
-	reset: () => void (values[key] = {})
-});
-vi.mock('./settings.svelte', () => ({ settings: { gesturesList: setting('list'), gesturesQueue: setting('queue') } }));
+vi.mock('./settings.svelte', () => ({ settings: {} }));
 
-const { gestures, setGesture, setPageTap, resetGestures } = await import('./gestures.svelte');
+const { pageTap } = await import('./gestures.svelte');
 
-beforeEach(() => {
-	values.list = {};
-	values.queue = {};
-});
+type State = Parameters<typeof pageTap>[0];
+const room = (queued: number, current: 'none' | 'playing' | 'paused'): State =>
+	({
+		queue: Array.from({ length: queued }, () => ({})),
+		nowPlaying: current === 'none' ? null : {},
+		playback: { playing: current === 'playing' }
+	}) as unknown as State;
 
-describe('tap on album and playlist pages', () => {
-	it('plays from that song by default', () => {
-		expect(gestures.pageTap).toBe('playFromHere');
-		expect(gestures.list.tap).toBe('playNext');
+describe('tapping a song on an album or playlist page', () => {
+	it('plays it from there in an empty room', () => {
+		expect(pageTap(room(0, 'none'), true, 'playNext')).toBe('playFromHere');
+		// A paused or finished song with nothing after it: empty too.
+		expect(pageTap(room(0, 'paused'), true, 'playNext')).toBe('playFromHere');
 	});
 
-	it('is kept when a list gesture changes, and reset with them', () => {
-		setPageTap('menu');
-		setGesture('list', 'tap', 'playNow');
-		expect(gestures.pageTap).toBe('menu');
-		expect(gestures.list.tap).toBe('playNow');
-		resetGestures('list');
-		expect(gestures.pageTap).toBe('playFromHere');
+	it('does what a tap in lists does when something is queued or playing', () => {
+		expect(pageTap(room(0, 'playing'), true, 'playNext')).toBe('playNext');
+		expect(pageTap(room(2, 'paused'), true, 'addToQueue')).toBe('addToQueue');
+		expect(pageTap(null, true, 'playNext')).toBe('playNext');
 	});
 
-	it('ignores what it can’t be', () => {
-		values.list = { pageTap: 'remove' };
-		expect(gestures.pageTap).toBe('playFromHere');
-		// Play from here is only for those pages.
-		values.list = { tap: 'playFromHere' };
-		expect(gestures.list.tap).toBe('playNext');
+	it('does what a tap in lists does with the setting off', () => {
+		expect(pageTap(room(0, 'none'), false, 'playNext')).toBe('playNext');
 	});
 });

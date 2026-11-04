@@ -194,6 +194,8 @@ export const settings = {
 	volumeKeys: new Setting('volumeKeys', true, bool),
 	/** In a party room, pausing, skipping, seeking or playing something else asks first while others listen along. */
 	askInParty: new Setting('askInParty', true, bool),
+	/** In an empty room, tapping a song on an album or playlist page plays it from there (gestures.svelte.ts). */
+	tapPlaysFromHere: new Setting('tapPlaysFromHere', true, bool),
 	/** In a party room where others listen along, Pause stops playing on this device instead (not playing here: it pauses, asked first). */
 	pauseStopsHere: new Setting('pauseStopsHere', true, bool),
 

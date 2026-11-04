@@ -238,15 +238,18 @@ in *Up next* also *Remove*. The defaults:
 | **Hold** | Open the [song menu](#song-menu) | Open the song menu |
 | **Drag** (the handle) | Move it in your own playlists | Move it |
 
-✅ **Tapping a song on an album or playlist page plays it from that song**, like YouTube
-Music: that song plays now and the ones after it come next; the songs before it are left out.
-It's the page's *Play* from there, so the same limits apply (at most *Settings → Adding
-songs → most songs at once*, or asked first above the set number, counting from that song on),
-and in a party you're asked before it interrupts the music. Long playlists load the songs after
-it as needed. A playlist plays from the song as it's shown (also Liked music and YouTube
-Music's own playlists like *New episodes*). *Settings → Taps and swipes → Tap, on album and
-playlist pages* can make it do something else (any of the list actions); then the song menu
-there has **Play from here**. Swipes and hold on those pages are the list's.
+✅ **Play from here**: in an empty room (nothing queued, and nothing playing: no song, or
+it's paused or finished), **tapping a song on an album or playlist page plays it from that
+song**, like YouTube Music: that song plays now and the ones after it come next; the songs
+before it are left out. When something is queued or playing, a tap there does what *Tap* in
+lists says (*Play next* by default), so it doesn't throw away what's lined up. *Settings →
+Playback → Tap a song to play an album or playlist from there* (on by default) switches the
+empty-room tap off. The song menu on those pages always has **Play from here**. It's the
+page's *Play* from that song, so the same limits apply (at most *Settings → Adding songs →
+most songs at once*, or asked first above the set number, counting from that song on), and in
+a party you're asked before it interrupts the music. Long playlists load the songs after it as
+needed. It works on every playlist page (also Liked music and YouTube Music's own playlists
+like *New episodes*).
 
 ✅ **Holding doesn't select text** on a touch screen (on by default, *Settings → Taps and
 swipes*), so holding a song or button never selects its words; text fields still can be
@@ -287,7 +290,7 @@ song's menu on an album's or artist's page has no *Go to* that same page.
 | Action | Notes |
 |--------|-------|
 | Play next | Plays next |
-| Play from here | On album and playlist pages, when tapping is set to something else: plays it from this song (see [gestures](#gestures)) |
+| Play from here | On album and playlist pages: plays it from this song (see [gestures](#gestures)) |
 | Add to queue | |
 | Remove | From the queue, the queue history or the autoplay queue. Needs *Remove own/others' songs*. |
 | Start radio | Replace the queue with a [radio](history-and-recommendations.md#radio--mix) from this song |

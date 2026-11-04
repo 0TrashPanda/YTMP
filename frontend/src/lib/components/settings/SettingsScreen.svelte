@@ -300,6 +300,11 @@
 					setting={settings.radioClearsHistory}
 				/>
 				<Toggle
+					label="Tap a song to play an album or playlist from there"
+					hint="Like YouTube Music: when nothing is queued or playing, tapping a song on an album or playlist page plays it from that song (the songs after it come next). Otherwise a tap does what Taps and swipes says. Play from here in the song menu always does it."
+					setting={settings.tapPlaysFromHere}
+				/>
+				<Toggle
 					label="Ask before interrupting a party"
 					hint="In a party room, while others listen along: asks before you pause, skip, seek, play something else, change an episode's speed or switch off a speaker for everyone (not when the others are only your own devices). Headphone and lock screen buttons don't ask: their pause stops the music only on your phone."
 					setting={settings.askInParty}
