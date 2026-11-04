@@ -1,9 +1,12 @@
 <script lang="ts">
 	// Leave Room. The owner of a party room picks who runs it after them (the person with the
 	// top role who's been here longest is suggested), or nobody (they stay the owner).
-	// Everyone else, and a solo room's owner, just leave.
+	// Everyone else, and a solo room's owner, just leave: asked first, unless that's switched
+	// off (Don't ask again here, or Settings → Playback), then it leaves right away.
 	import { goto } from '$app/navigation';
+	import { untrack } from 'svelte';
 	import type { RoomConnection } from '../room.svelte';
+	import { settings } from '../settings.svelte';
 
 	let { room, onClose }: { room: RoomConnection; onClose: () => void } = $props();
 
@@ -16,10 +19,15 @@
 	// svelte-ignore state_referenced_locally
 	let nextOwner = $state(suggested?.id ?? '');
 	let busy = $state(false);
+	let dontAsk = $state(false);
+	/** Not asking: leaves as soon as it opens, without showing anything. */
+	const direct = untrack(() => !asks && !settings.askLeave.value);
+	if (direct) leave(null);
 
 	/** [newOwnerId]: who takes over; null: nobody, I stay the owner and can come back. */
 	async function leave(newOwnerId: string | null) {
 		busy = true;
+		if (dontAsk) settings.askLeave.set(false);
 		await room.run({ kind: 'LeaveRoom', newOwnerId, stayOwner: !newOwnerId });
 		goto('/');
 	}
@@ -27,34 +35,42 @@
 	const input = 'w-full rounded-lg bg-raised px-3 py-2.5 outline-none';
 </script>
 
-<div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={onClose}>
-	<div
-		class="flex w-full max-w-sm flex-col gap-4 rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
-		role="dialog"
-		aria-label="Leave room"
-		tabindex="-1"
-		onclick={(e) => e.stopPropagation()}
-		onkeydown={(e) => e.key === 'Escape' && onClose()}
-	>
-		<h2 class="text-lg font-bold">Leave '{rs.room.name}'?</h2>
-		{#if asks}
-			<p class="text-sm text-muted">You're the owner. Who runs the room after you? They can change the settings, roles and who's in it.</p>
-			<select class={input} bind:value={nextOwner}>
-				{#each others as person (person.id)}
-					<option value={person.id}>{person.name}{person.online ? '' : ' (away)'}{person.roleId === rs.roles[0]?.id ? ` · ${rs.roles[0].name}` : ''}</option>
-				{/each}
-				<option value="">Nobody: I stay the owner and can come back</option>
-			</select>
-		{:else if me?.isOwner}
-			<p class="text-sm text-muted">It stays yours: you can open it again from the room list.</p>
-		{:else}
-			<p class="text-sm text-muted">Your songs stay in the queue. You can join again with the code, as someone new.</p>
-		{/if}
-		<div class="flex justify-end gap-2">
-			<button class="rounded-full px-4 py-2 text-sm font-medium hover:bg-raised" onclick={onClose}>Cancel</button>
-			<button class="rounded-full bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50" disabled={busy} onclick={() => leave(asks ? nextOwner || null : null)}>
-				Leave room
-			</button>
+{#if !direct}
+	<div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={onClose}>
+		<div
+			class="flex w-full max-w-sm flex-col gap-4 rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
+			role="dialog"
+			aria-label="Leave room"
+			tabindex="-1"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && onClose()}
+		>
+			<h2 class="text-lg font-bold">Leave '{rs.room.name}'?</h2>
+			{#if asks}
+				<p class="text-sm text-muted">You're the owner. Who runs the room after you? They can change the settings, roles and who's in it.</p>
+				<select class={input} bind:value={nextOwner}>
+					{#each others as person (person.id)}
+						<option value={person.id}>{person.name}{person.online ? '' : ' (away)'}{person.roleId === rs.roles[0]?.id ? ` · ${rs.roles[0].name}` : ''}</option>
+					{/each}
+					<option value="">Nobody: I stay the owner and can come back</option>
+				</select>
+			{:else if me?.isOwner}
+				<p class="text-sm text-muted">It stays yours: you can open it again from the room list.</p>
+			{:else}
+				<p class="text-sm text-muted">Your songs stay in the queue. You can join again with the code, as someone new.</p>
+			{/if}
+			{#if !asks}
+				<label class="flex items-center gap-3 text-sm">
+					<input type="checkbox" class="h-5 w-5 accent-accent" bind:checked={dontAsk} />
+					<span>Don't ask again <span class="text-muted">(you can switch asking back on in Settings → Playback)</span></span>
+				</label>
+			{/if}
+			<div class="flex justify-end gap-2">
+				<button class="rounded-full px-4 py-2 text-sm font-medium hover:bg-raised" onclick={onClose}>Cancel</button>
+				<button class="rounded-full bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50" disabled={busy} onclick={() => leave(asks ? nextOwner || null : null)}>
+					Leave room
+				</button>
+			</div>
 		</div>
 	</div>
-</div>
+{/if}

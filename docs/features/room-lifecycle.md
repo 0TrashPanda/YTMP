@@ -24,6 +24,11 @@ longest), or **Nobody**: they stay the owner and can come back. Only Leave Room 
 over: an owner whose phone sleeps or loses Wi-Fi keeps the room. In a solo room, leaving
 never hands it over.
 
+Leave Room asks first (*Leave 'Room'?*). **Ask before leaving a room** ✅ (*Settings →
+Playback*, on by default), or **Don't ask again** in that question, switches that off: Leave
+Room then leaves right away. The owner of a party room with others in it is still asked, since
+they pick who takes over.
+
 A room with an owner account that gets an owner with another account (or a guest) stops
 being the old owner's on their other devices ([room sync](room-sync.md)), and starts being the
 new owner's. Its radio then uses the new owner's YouTube Music sign-in where there is one.

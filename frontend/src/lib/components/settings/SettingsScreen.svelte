@@ -320,6 +320,11 @@
 					setting={settings.pauseStopsHere}
 				/>
 				<Toggle
+					label="Ask before leaving a room"
+					hint="Off: Leave room leaves right away. As the owner of a party room with others in it, it still asks who runs the room after you."
+					setting={settings.askLeave}
+				/>
+				<Toggle
 					label="Your other devices can switch Play here on"
 					hint="Logged in with the same account and in the same room, your other devices can switch Play here on and off on this one, from Play on. A browser plays only after a click on its page."
 					setting={settings.remotePlay}
