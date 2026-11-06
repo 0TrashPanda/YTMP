@@ -30,3 +30,14 @@ if (typeof AbortSignal !== 'undefined') {
 		return controller.signal;
 	});
 }
+
+// Chrome 98: the room's state and events are plain data from the host (JSON), so a deep copy
+// of objects and arrays is all it needs.
+function copy(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(copy);
+	if (value === null || typeof value !== 'object') return value;
+	const out: Record<string, unknown> = {};
+	for (const key of Object.keys(value)) out[key] = copy((value as Record<string, unknown>)[key]);
+	return out;
+}
+define(globalThis, 'structuredClone', copy);
