@@ -89,7 +89,10 @@ URL in a frame, as Home Assistant's pychromecast does (`CastWebPage` in cast/).
 - Older Chromecasts run Chrome 90: the web app is built for it (`build.target` chrome90, the
   few newer built-ins in `src/lib/polyfills.ts`), and Tailwind's `@layer` styles, which
   Chrome before 99 ignores, are repeated without layers for browsers older than Chrome 111
-  (`frontend/legacy-css.ts`).
+  (`frontend/legacy-css.ts`). Two checks keep it that way: `pnpm build` fails when the built
+  app uses a built-in newer than Chrome 90 that isn't polyfilled
+  (`frontend/scripts/check-chrome90.mjs`), and `node tools/chrome90-test.mjs` opens a room and a
+  cast party screen in a real Chromium 90 and checks they join, are styled and throw no errors.
 - What the page tells the host's log (nobody can open a console on a TV): whether it may
   start sound by itself, whole page or framed, the browser; joining the room; the first
   sound of each song; 15 s of silence while the room plays (with the player's state); a tap;

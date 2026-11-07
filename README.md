@@ -258,6 +258,9 @@ YouTube Music module on your own computer and enter it under *Settings → Where
 - Smoke test of a running phone or server (search, pages, radio, streaming; read-only):
   `python3 tools/smoke-test.py URL`. For the app on a phone: `adb forward tcp:8765 tcp:8765`,
   keep the app open, and use `http://127.0.0.1:8765`.
+- The web app in Chrome 90, the browser of older Chromecasts (party screen):
+  `node tools/chrome90-test.mjs` (after `pnpm build` and `./gradlew :server:installDist`; it
+  downloads Chromium 90 once).
 - After changing anything in `protocol/`, run `./gradlew :protocol:generateTs` to update the
   web app's types (`frontend/src/lib/protocol.gen.ts`).
 - Releases: push a tag like `v0.2.0` and GitHub Actions builds the signed APK and publishes

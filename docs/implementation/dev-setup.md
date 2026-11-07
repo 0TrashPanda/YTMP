@@ -43,7 +43,7 @@ frontend/       Svelte 5 + SvelteKit (static) + Tailwind + TypeScript
 ytm-module/     Python: ytmp_ytm package (core.py + http.py + jsc.py)
 docs/           these docs
 deploy/         docker-compose.yml, example ytmp.toml, Caddyfile, Proxmox guide
-tools/          smoke-test.py (checks a running phone or server)
+tools/          smoke-test.py (checks a running phone or server), chrome90-test.mjs (the web app in Chrome 90)
 ```
 
 ### Where modules live
