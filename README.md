@@ -210,6 +210,15 @@ Music, without Premium, and not tied to a single music service.
 - Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists
 - YTMP playlists, explore page
 
+## Known problems
+
+- **Firefox on Windows 10 freezes after a while of playing** (the music keeps going). It isn't
+  YTMP: a Windows service for Bluetooth headphone buttons, the *AVCTP service*, stops
+  answering, and Firefox and Windows itself get stuck waiting for it. Fix: in *Services*, stop
+  the **AVCTP service** and set it to **Disabled** (Bluetooth audio keeps working; only
+  headphone tap controls stop). Details:
+  [playback and outputs](docs/features/playback-and-outputs.md#known-problems).
+
 ## Platforms
 
 | Platform | Status |

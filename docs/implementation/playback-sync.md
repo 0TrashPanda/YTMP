@@ -213,3 +213,32 @@ alone rule (`correct`: drift over `ALONE_ROOM_TOLERANCE_MS` and up to `MAX_ROOM_
 room `Seek` to this device, and `followRoomJump` sees it follow) keeps the room up with it. Not
 verified on a device yet.
 
+
+## Known problem: Windows media controls freeze Firefox
+
+Found on Windows 10 22H2, Firefox 159 (2026-11): the Firefox window freezes after 10–30
+minutes of playing; the sound goes on. Traced with the process logger, a dump and Windows' wait
+chains (`GetThreadWaitChain`):
+
+1. Firefox reports a media element's state to Windows' System Media Transport Controls (SMTC)
+   by itself, for any long, audible element, whatever the page does
+   (`HTMLMediaElement::IsControllableMediaSource`). Play, pause, every seek and every
+   `playbackRate` change sends a timeline update (`NotifyMediaPositionState` →
+   `WindowsSMTCProvider::SetPositionState`); `mediaSession.playbackState` only does when it
+   changes (`MediaSession::SetPlaybackState` ignores the same value).
+2. Each update fires `MediaPlaybackDataChanged` on a thread pool thread
+   (`Windows.Media.MediaControl`), a COM call into **explorer.exe**'s Now Playing manager
+   (`NPSM!CNowPlayingSession` / `CMTCEventProxy::OnMediaPlaybackDataChangedEvent`), which
+   passes it on to the **AVCTP service** (`BthAvctpSvc`, its own svchost).
+3. `BthAvctpSvc` stops answering (seen twice, with no Bluetooth device connected, with both
+   Windows' generic and Realtek's own driver for an RTL8821CE). Every call then waits forever:
+   within a minute ~770 threads wait in Firefox and in Explorer (`LpcReply`), and Firefox's
+   window hangs a few minutes later.
+4. Ending the service (`taskkill` on its svchost; `Stop-Service` hangs) released every waiting
+   call at once and Firefox answered again; it's disabled since.
+
+YTMP can't avoid it: sending fewer updates (fewer sync corrections) only delays it, and keeping
+Firefox off the SMTC would cost media keys and headphone buttons. Fix and workaround for users:
+[features/playback-and-outputs.md](../features/playback-and-outputs.md#known-problems).
+Worth reporting: to Mozilla (a hung SMTC subscriber shouldn't freeze the window) and to
+Microsoft (Feedback Hub; Windows 10 no longer gets fixes).

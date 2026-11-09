@@ -254,3 +254,28 @@ in the ⋮ menu of the song that's playing (*Sleep timer*).
 - In the app it keeps going with the screen off (the app's player runs it). In a browser
   it runs while the room's page is open.
 - It fades this device's sound; speakers a solo room plays on just pause at the end.
+
+## Known problems
+
+### Firefox on Windows freezes while it plays
+
+After 10–30 minutes of playing, the whole Firefox window stops responding (tabs, menus,
+everything), while the music keeps playing. Seen on Windows 10 with Firefox 159; not on Linux.
+
+It isn't YTMP. Windows has a service that passes "now playing" and play/pause to Bluetooth
+headphones, the **AVCTP service**. On some PCs it stops answering after a while, even with no
+Bluetooth device connected (a newer Bluetooth driver didn't help). Every update about what's
+playing then waits for it forever, in Firefox and in Windows itself (the taskbar), until
+Firefox's window freezes. Any site that plays music does this; YTMP can't leave it out without
+losing media keys, and playing less often only makes it happen later.
+
+**Fix:** open *Services* (Win + R, `services.msc`), open **AVCTP service**, set *Startup
+type* to **Disabled** and click *Stop*. If it hangs on *Stopping*, restart the PC. Bluetooth
+audio keeps working; only the headphones' own tap and button controls stop working, and
+Bluetooth devices no longer show the song. To undo it, set it back to *Manual*.
+
+Without changing Windows: in Firefox, `about:config` → `media.hardwaremediakeys.enabled` =
+`false`. Firefox then doesn't freeze, but loses media keys and the Windows media overlay, and
+Windows' own taskbar can still get stuck.
+
+How it was found: [implementation/playback-sync.md](../implementation/playback-sync.md#known-problem-windows-media-controls-freeze-firefox).
