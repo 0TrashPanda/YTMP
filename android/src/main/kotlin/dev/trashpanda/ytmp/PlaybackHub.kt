@@ -109,6 +109,16 @@ object PlaybackHub {
      */
     val speakerSession = MutableStateFlow<android.media.session.MediaSession.Token?>(null)
 
+    /**
+     * What the media session shows (the song, and whether it plays), for the home screen widget
+     * ([Widget]); null while [PlaybackService] isn't running.
+     */
+    val session = MutableStateFlow<WidgetNow?>(null)
+
+    /** Play/pause as on the lock screen, for the widget. Set by [PlaybackService] while it runs. */
+    @Volatile
+    var sessionPlayPause: (() -> Unit)? = null
+
     /** The sleep timer, set from the page; [PlaybackService] runs it (also with the page frozen) and clears it when it goes off. */
     val sleep = MutableStateFlow<SleepSetting?>(null)
 

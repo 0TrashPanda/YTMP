@@ -444,6 +444,14 @@ export function useYoutubeFrom(remote: { server: string; token: string; personal
 	cache.delete('home');
 }
 
+/**
+ * Where your YouTube Music likes are (`/api/me/likes`), for the app's home screen widget: this
+ * host, or your server after [useYoutubeFrom], and the token that works there.
+ */
+export function likesAccess(): { base: string; token: string | null } {
+	return youtubeFrom ? { base: youtubeFrom.server, token: youtubeFrom.token } : { base: location.origin, token: identity.token ?? null };
+}
+
 /** Your YouTube Music sign-in on this host (or, after [useYoutubeFrom], on your server). */
 export function getYoutubeAccount(): Promise<YoutubeAccountStatus> {
 	return request('/api/me/youtube');

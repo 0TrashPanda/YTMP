@@ -1,0 +1,9 @@
+<resources>
+    <!-- The home screen widget (NowPlayingWidget): Material You colours from Android 12 on (values-v31), these before. -->
+    <color name="widget_play_bg">#FFE9DDFF</color>
+    <color name="widget_play_icon">#FF4F378B</color>
+    <color name="widget_like_bg">#FFFFD8E4</color>
+    <color name="widget_like_icon">#FF7D5260</color>
+    <color name="widget_art_empty">#FF4F378B</color>
+    <color name="widget_art_empty_icon">#FFE9DDFF</color>
+</resources>

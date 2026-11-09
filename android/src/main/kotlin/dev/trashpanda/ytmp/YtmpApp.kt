@@ -62,6 +62,7 @@ class YtmpApp : Application() {
         host = LocalHost(this).also { it.start() }
         nearby = Nearby(this)
         scope.launch { host.rooms.list.collect { nearby.announce(it) } }
+        Widget.start(this, scope)
         scope.launch {
             combine(host.rooms.hosting, host.rooms.playing, host.nearby.playing, ::Triple).distinctUntilChanged().collect { (rooms, playing, speakers) ->
                 // Speakers here playing a server's room: the phone serves them the audio, also with the screen off.

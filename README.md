@@ -107,6 +107,8 @@ Music, without Premium, and not tied to a single music service.
   The rooms of a multi-room amplifier show up as speakers of their own, from a file the house
   keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
   speakers near your phone (the phone looks the songs up and serves them).
+- Android: a home screen widget like YouTube Music's (the song's art in a circle, play/pause
+  and like, in your phone's colours).
 - Android: lock screen and notification controls, keeps playing with the screen off. Also
   while the room plays on speakers or TVs and not on the phone, and then the volume buttons
   change the speakers' volume (all together, keeping their balance).
@@ -206,7 +208,7 @@ Music, without Premium, and not tied to a single music service.
 | Platform | Status |
 |----------|--------|
 | Linux server (Docker) | ✅ Hosts rooms, serves the web app, accounts, listening history and YouTube Music sign-ins |
-| Android 11+ | ✅ Join rooms with native playback and lock screen controls; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music; updates itself |
+| Android 11+ | ✅ Join rooms with native playback, lock screen controls and a home screen widget; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music; updates itself |
 | Web browser | ✅ Join rooms, or host through a server |
 | iOS | Not supported (the web app may work, but background playback won't) |
 

@@ -196,6 +196,24 @@ inside the WebView.
   the setting (`volumeKeys`). While that player is in use, `MainActivity` sets the session as
   its `mediaController` (`PlaybackHub.speakerSession`), so the volume buttons go to it while
   the app is on screen and Android shows its volume panel for the speakers.
+- **Home screen widget** ✅ ([feature](../features/platforms.md#android-app)):
+  `NowPlayingWidget` (an `AppWidgetProvider` with `RemoteViews`, `res/layout/widget_now_playing.xml`,
+  `res/xml/widget_now_playing.xml`) and `Widget`, started by `YtmpApp`. What it shows comes from
+  the media session: `PlaybackService` publishes `PlaybackHub.session` (the merged target's item,
+  and the session player's `playWhenReady`, or the room's `playing` with nothing loaded here) on
+  every player event and target change; without the service, from the page's
+  `PlaybackHub.target`. The last song and its art (cut to a circle, 480 px, in `filesDir`) are
+  kept in SharedPreferences `widget`, so it shows after a restart. Play/pause calls
+  `PlaybackHub.sessionPlayPause`: the session player's own `play()`/`pause()` (so `RoomPlayer`'s
+  rules apply, as on the lock screen), or a room `Play`/`Pause` with nothing loaded here; with
+  no room in the app its button opens the app. The thumbs up (`WidgetLikes`) uses
+  `PUT /api/me/likes/{songId}` like the page: the page says where (bridge `setLikes`: its own
+  origin with its host token, or your server and token after `useYoutubeFrom`; only accepted
+  from the app's pages), and both sides tell each other about likes (`likeChanged` and
+  `onLiked`), so the full player and the widget agree. From Android 12 the colours are the
+  system's dynamic ones (`values-v31/colors.xml`: `system_accent1_*` for play/pause,
+  `system_accent3_*` for the like) and `Widget.fit` scales the circle and buttons to the
+  widget's size (`setViewLayoutWidth`); Android 11 gets fixed colours and a 140 dp widget.
 - The **sync logic** (clock offset, drift correction, see
   [playback-sync](playback-sync.md)) is implemented twice: in TypeScript for browsers, and in
   Kotlin for the native player.
