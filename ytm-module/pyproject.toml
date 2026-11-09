@@ -10,6 +10,8 @@ dependencies = [
     "fastapi>=0.142",
     "uvicorn>=0.54",
     "httpx>=0.28",
+    # Recognizing a song from the microphone (recognize.py); not on the phone.
+    "shazamio>=0.9",
 ]
 
 [project.optional-dependencies]

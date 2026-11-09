@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- The music on the phone, for the Local tab (only when switched on in its settings). -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Recognize a song: a few seconds from the microphone, only when you tap it. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <!-- Cleartext is needed for servers and phone hosts on the local network (http://). -->
@@ -76,17 +78,6 @@
             android:name=".host.HostService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
-
-        <!-- Reads the notification a Pixel's Now Playing posts for a recognized song, once you allow notification access for YTMP in Android's settings. -->
-        <service
-            android:name=".NowPlayingListener"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
 
         <!-- The home screen widget: the song that plays, with play/pause and like. -->
         <receiver

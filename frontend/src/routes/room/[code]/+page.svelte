@@ -45,6 +45,8 @@
 	import { createPlayer, pause, play, type RoomPlayer } from '../../../lib/player.svelte';
 	import { sleepTimer } from '../../../lib/sleepTimer.svelte';
 	import SleepTimerSheet from '../../../lib/components/SleepTimerSheet.svelte';
+	import ListenSheet from '../../../lib/components/ListenSheet.svelte';
+	import { canListen } from '../../../lib/listen';
 	import { RoomConnection } from '../../../lib/room.svelte';
 	import { searchFills, shows } from '../../../lib/soloLook.svelte';
 	import { load as loadSettings, settings } from '../../../lib/settings.svelte';
@@ -97,7 +99,7 @@
 		| { kind: 'save'; song: Song }
 		| { kind: 'graph'; song: Song | null }
 		| { kind: 'settings'; start: SettingsSection | null }
-		| { kind: 'avatar' | 'share' | 'clone' | 'leave' | 'playOn' | 'partyScreen' | 'linkTv' | 'sleep' };
+		| { kind: 'avatar' | 'share' | 'clone' | 'leave' | 'playOn' | 'partyScreen' | 'linkTv' | 'sleep' | 'listen' };
 	let sheet = $state<Sheet | null>(null);
 	/** Closes [kind] if it's what's open (it may have opened something else on its way out, like the song menu opening Save). */
 	function close(kind: Sheet['kind']) {
@@ -643,7 +645,7 @@
 						<button class="text-xl font-black tracking-tight sm:hidden" title="Home" onclick={goHome}>
 							YT<span class="text-accent">MP</span>
 						</button>
-						<SearchBox bind:this={searchBox} {query} fills={searchFills(room)} library={libraryBar} onopen={() => (headerHidden = false)} onsearch={searchFor} onlink={openLink} />
+						<SearchBox bind:this={searchBox} {query} fills={searchFills(room)} library={libraryBar} onopen={() => (headerHidden = false)} onsearch={searchFor} onlink={openLink} onlisten={host?.canRecognize && canListen() ? () => (sheet = { kind: 'listen' }) : undefined} />
 						<div class="ml-auto flex items-center gap-2">
 							<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
 							<!-- Phones: centered in the header. -->
@@ -924,6 +926,8 @@
 		<TvLinkDialog {room} {host} onClose={() => close('linkTv')} onToast={toast} />
 	{:else if sheet?.kind === 'partyScreen' && room.state}
 		<PartyScreen {room} {host} onClose={() => close('partyScreen')} />
+	{:else if sheet?.kind === 'listen'}
+		<ListenSheet {room} onClose={() => close('listen')} onToast={toast} onSearch={searchFor} />
 	{:else if sheet?.kind === 'sleep' && room.state}
 		<SleepTimerSheet {room} {player} onClose={() => close('sleep')} onToast={toast} />
 	{:else if sheet?.kind === 'playOn' && player}

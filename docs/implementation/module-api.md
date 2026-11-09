@@ -204,6 +204,29 @@ like) and artist, taking one within 3 s of the length, timed ones first. Then th
 lyrics (`ytm:` songs: the module's `/songs/{id}/lyrics`, on a phone through Chaquopy). Timed
 lyrics win; results (also "none") are kept 6 hours, unless a lookup failed.
 
+### Recognize a song
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/recognize` | ✅ body: a few seconds of sound (WAV, 16 kHz mono) → `{ song, title, artist }` (`RecognizeResponse`): `song` is the YouTube Music song, null when it isn't there; all null when nothing was recognized. 429 when Shazam refuses for a moment, 501 without shazamio (a phone) |
+
+The YTM module (`recognize.py`) asks Shazam with shazamio: shazamio_core makes the audio
+fingerprint, one request without shazamio's retries (Shazam answers 429 when asked too often;
+retrying costs up to a minute). Then it searches YouTube Music's songs for "artist title" and
+takes the first with the same title (accents, "(feat. …)" and "- Remastered" left out) and,
+better still, an artist in common; none fits: `song` is null and the app offers a search. Only
+with `recognize` in `/info`'s capabilities.
+
+Host side: `POST /api/recognize` (`CatalogRoutes.kt`) passes the WAV on to
+`HostSources.recognizer` (the server's `RemoteSourceModule`); `HostInfo.canRecognize` tells the
+web app whether to show the microphone icon. A phone host has no recognizer: shazamio_core is
+compiled Rust without an Android build for Chaquopy. The web app (`lib/listen.ts`) records with
+`getUserMedia` and a `ScriptProcessorNode` (also in Chrome 90), turns it into 16 kHz WAV and
+sends everything it has after 3, 5, 8 and 12 seconds until there's an answer. Measured: 2 s was
+never enough, 3 s mostly is; Shazam takes 0.4–0.8 s and the YouTube Music search ~1 s. The
+Android app grants the page the microphone (`onPermissionRequest`, only its own pages) after
+asking Android for `RECORD_AUDIO`.
+
 ### Library (user-scoped, needs `X-Ytm-Cookie`)
 
 Implemented in the YTM module: the server sends the account's music.youtube.com cookies in

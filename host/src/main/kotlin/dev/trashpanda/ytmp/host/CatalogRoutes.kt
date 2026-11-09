@@ -50,6 +50,13 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
         val source = sources.similar ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No radio source")
         call.respond(SearchResponse(call.similarFrom(songId) { call.asYou({ radio(songId) }) { source.radio(songId) } }.filter { it.id != songId }))
     }
+    // A few seconds from the microphone (WAV, 16 kHz mono): which song is that?
+    post("/recognize") {
+        val recognizer = sources.recognizer ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Recognizing songs isn't possible on this host")
+        val wav = call.receive<ByteArray>()
+        if (wav.isEmpty() || wav.size > 4_000_000) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Send a few seconds of sound as WAV")
+        call.respond(recognizer.recognize(wav))
+    }
     get("/lyrics") {
         // The song as the page knows it: LRCLIB looks lyrics up by title, artist, album and length.
         val query = call.request.queryParameters

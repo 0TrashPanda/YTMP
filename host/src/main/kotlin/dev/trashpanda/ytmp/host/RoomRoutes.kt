@@ -52,6 +52,7 @@ internal fun Route.roomRoutes(host: HostContext) = with(host) {
                 authServers = options.auth.servers(),
                 accountsOnly = options.accountsOnly(),
                 shareAddresses = options.shareAddresses(),
+                canRecognize = sources.recognizer != null,
             ),
         )
     }

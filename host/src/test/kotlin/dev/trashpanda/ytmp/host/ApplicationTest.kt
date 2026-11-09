@@ -57,6 +57,7 @@ import dev.trashpanda.ytmp.protocol.wireName
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.SuggestionsResponse
+import dev.trashpanda.ytmp.protocol.RecognizeResponse
 import io.ktor.client.call.body
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -490,6 +491,28 @@ class ApplicationTest {
         }
         assertEquals(listOf("daft punk", "daft punk one more time"), jsonClient().get("/api/search/suggestions?q=daft").body<SuggestionsResponse>().items)
         assertEquals(emptyList(), jsonClient().get("/api/search/suggestions?q=%20").body<SuggestionsResponse>().items)
+    }
+
+    @Test
+    fun `recognizing a song from the microphone`() = testApplication {
+        val heard = mutableListOf<Int>()
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, HostSources(search, recognizer = { wav -> heard += wav.size; RecognizeResponse(null, "Digital World", "Amaranthe") }), HostOptions(kind = HostKind.SERVER))
+        }
+        val client = jsonClient()
+        assertEquals(true, client.get("/api/host").body<HostInfo>().canRecognize)
+        val answer = client.post("/api/recognize") { contentType(ContentType("audio", "wav")); setBody(ByteArray(1000)) }.body<RecognizeResponse>()
+        assertEquals(RecognizeResponse(null, "Digital World", "Amaranthe"), answer)
+        assertEquals(listOf(1000), heard)
+        assertEquals(HttpStatusCode.BadRequest, client.post("/api/recognize") { contentType(ContentType("audio", "wav")); setBody(ByteArray(0)) }.status)
+    }
+
+    @Test
+    fun `a host without a recognizer says so`() = testApplication {
+        setup()
+        assertEquals(false, jsonClient().get("/api/host").body<HostInfo>().canRecognize)
+        assertEquals(HttpStatusCode.NotFound, jsonClient().post("/api/recognize") { setBody(ByteArray(10)) }.status)
     }
 
     @Test

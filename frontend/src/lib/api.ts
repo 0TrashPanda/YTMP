@@ -26,6 +26,7 @@ import type {
 	SaveSongsRequest,
 	HomePage,
 	HostInfo,
+	RecognizeResponse,
 	PlaylistPage,
 	PodcastPage,
 	PodcastSavedRequest,
@@ -171,6 +172,11 @@ export async function linkAuthServer(url: string | null): Promise<void> {
 }
 
 /** What kind of host served this page (a server, or a phone). */
+/** The song in a few seconds of sound from the microphone (WAV): see listen.ts. */
+export function recognize(wav: Uint8Array<ArrayBuffer>): Promise<RecognizeResponse> {
+	return request('/api/recognize', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav });
+}
+
 export function getHost(): Promise<HostInfo> {
 	return request('/api/host');
 }

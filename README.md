@@ -67,8 +67,8 @@ Music, without Premium, and not tied to a single music service.
   Library tab the search bar searches only your library.
 - Paste a YouTube Music or YouTube link in the search box to open that song, album,
   playlist, artist or podcast (or a YTMP room link to open the room).
-- On a Pixel, a music-note icon in the search box lists the songs Now Playing recognized
-  lately; tap one to search for it (allow notification access for YTMP once).
+- Recognize a song like YouTube Music's song search: the microphone icon in the search box
+  listens and shows that exact song to play or queue (Shazam, through the server).
 - Artist, album, playlist and podcast pages.
 - Lyrics, synced line by line (from LRCLIB or YouTube Music), and a karaoke mode that shows
   them large on the party screen and in everyone's player.

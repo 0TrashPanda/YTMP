@@ -917,6 +917,7 @@ export interface HostInfo {
   authServers: AuthServerRef[];
   accountsOnly: boolean;
   shareAddresses: ShareAddress[];
+  canRecognize: boolean;
 }
 
 export interface RoomListResponse {
@@ -1788,6 +1789,12 @@ export interface CreatePlaylistResponse {
 
 export interface SuggestionsResponse {
   items: string[];
+}
+
+export interface RecognizeResponse {
+  song: Song | null;
+  title: string | null;
+  artist: string | null;
 }
 
 export interface LyricLine {

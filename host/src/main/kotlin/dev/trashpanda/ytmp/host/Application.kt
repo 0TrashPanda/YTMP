@@ -6,6 +6,7 @@ import dev.trashpanda.ytmp.core.PersonalCatalog
 import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.core.SearchSuggestions
+import dev.trashpanda.ytmp.core.SongRecognizer
 import dev.trashpanda.ytmp.core.SongSearch
 import dev.trashpanda.ytmp.core.SourceBlocked
 import dev.trashpanda.ytmp.protocol.ApiError
@@ -79,6 +80,8 @@ data class HostSources(
     val similar: RadioSource? = null,
     /** Artist, album, playlist and podcast pages, and Home. */
     val catalog: CatalogSource? = null,
+    /** Recognizing the song playing near the microphone (the YTM module with Shazam); null: not here (a phone). */
+    val recognizer: SongRecognizer? = null,
     /** Lyrics for the songs (LRCLIB, then the source's own). */
     val lyrics: LyricsLookup? = null,
     /** Songs' audio through the host, for players whose direct link doesn't work (and speakers). */

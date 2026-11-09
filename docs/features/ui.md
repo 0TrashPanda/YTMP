@@ -166,13 +166,18 @@ the browser, ✕ removes one). On **phones** the header has a search button that
 full-screen search page (back arrow, the box, suggestions as rows with ↖ to put one in the
 box and keep typing); the phone's back button closes it.
 
-On a **Pixel** (in the app) the search box has a small music-note icon at its right end for
-**songs Now Playing recognized** ✅: tapping it lists the last 20 songs the phone heard
-(newest first), and tapping one searches for it. Until YTMP may read Now Playing's
-notifications the icon opens Android's notification access settings instead; coming back
-from there, it works. Nothing is listened to or sent anywhere by YTMP: the phone's own Now
-Playing does the recognizing, and YTMP only reads the notification it posts (and no other
-app's). Other phones don't show the icon.
+**Recognize a song** ✅, like YouTube Music's song search: the microphone icon at the right
+end of the search box listens to the music playing nearby and shows that exact song (the
+recording, not a similar one) with **Play**, **Play next** and **Add to queue**. Most songs
+are known in 4–6 seconds: it tries after 3 seconds of sound, and again after 5, 8 and 12
+when that wasn't enough. A song that isn't on YouTube Music shows its name with **Search for
+it**. It only listens after a tap, and stops when the answer is there or you close it; the
+app asks Android for the microphone the first time. Recognizing is done by Shazam (asked by
+the server's YouTube Music module, unofficially, like yt-dlp), so it knows recordings, not
+humming, and sped-up or remixed versions often not. The icon shows on rooms hosted by a
+server, in the app and in browsers (a page on `https://` or the same computer); a phone's
+own host can't recognize songs (its Python can't run Shazam's fingerprinting), so its rooms
+don't show it.
 
 It also accepts **links** ✅: pasting a YouTube Music or YouTube link opens what it points
 at right away, without Enter: an album, playlist, artist or podcast opens its page; a song

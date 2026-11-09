@@ -18,7 +18,7 @@ from fastapi import Depends, FastAPI, Header, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from . import core
+from . import core, recognize
 
 API_VERSION = 1
 VERSION = "0.1.0"
@@ -116,12 +116,34 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
             # For the server's admin page.
             "ytDlp": core.yt_dlp.version.__version__,
             "ytmusicapi": core._version("ytmusicapi"),
-            "capabilities": ["search", "suggestions", "stream", "audio", "radio", "artist", "album", "playlist", "podcast", "home", "personal", "lyrics"],
+            "capabilities": ["search", "suggestions", "stream", "audio", "radio", "artist", "album", "playlist", "podcast", "home", "personal", "lyrics"]
+            + (["recognize"] if recognize.available() else []),
         }
 
     @app.get("/search", dependencies=[Depends(check_key)])
     def search(q: str, type: str = "all", limit: int = 20):
         return ytm.search(q, type=type, limit=min(max(limit, 1), 50))
+
+    @app.post("/recognize", dependencies=[Depends(check_key)])
+    async def recognize_song(request: Request):
+        """A few seconds of sound (WAV) -> the song on YouTube Music (RecognizeResponse in protocol/HttpApi.kt)."""
+        if not recognize.available():
+            raise _ApiError(501, "unsupported", "Recognizing songs isn't possible here")
+        wav = await request.body()
+        if not wav or len(wav) > 4_000_000:
+            raise _ApiError(400, "invalid", "Send a few seconds of sound as WAV")
+        try:
+            found = await recognize.identify(wav)
+        except recognize.RateLimited:
+            raise _ApiError(429, "rate_limited", "Shazam is busy, try again in a moment")
+        if not found:
+            return {"song": None, "title": None, "artist": None}
+        query = f"{found['artist']} {found['title']}".strip()
+        page = await run_in_threadpool(ytm.search, query, "songs", 5)
+        songs = [item["song"] for section in page["sections"] for item in section["items"] if item["kind"] == "song"]
+        song = recognize.best_song(found, songs)
+        log.info("recognized %s - %s (%s)", found["artist"], found["title"], song["id"] if song else "not on YouTube Music")
+        return {"song": song, "title": found["title"], "artist": found["artist"]}
 
     @app.get("/search/suggestions", dependencies=[Depends(check_key)])
     def suggestions(q: str):

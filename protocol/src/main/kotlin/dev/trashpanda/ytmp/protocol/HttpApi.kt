@@ -40,6 +40,15 @@ data class SearchResponse(val items: List<Song>)
 data class SuggestionsResponse(val items: List<String>)
 
 /**
+ * `POST /api/recognize` (a few seconds of sound as WAV): the song that's playing near the
+ * microphone. [song] is that song on YouTube Music; null when it isn't there (then [title] and
+ * [artist] are what was recognized, to search for) or when nothing was recognized (all null).
+ */
+@Serializable
+@SerialName("RecognizeResponse")
+data class RecognizeResponse(val song: Song? = null, val title: String? = null, val artist: String? = null)
+
+/**
  * `POST /api/screens`: a TV asks for a code to show (docs/features/ui.md#party-screen). It
  * then waits with [secret] (`GET /api/screens/{secret}`) until someone in a room links it.
  */
@@ -109,6 +118,8 @@ data class HostInfo(
      * a VPN, …), to pick one when sharing a room. [shareUrl] is the usual one.
      */
     val shareAddresses: List<ShareAddress> = emptyList(),
+    /** Whether a song can be recognized from the microphone here (`POST /api/recognize`). */
+    val canRecognize: Boolean = false,
 )
 
 /** An address of this host for links, with what it is ("Wi-Fi", "Hotspot", "VPN", …). */

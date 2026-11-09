@@ -126,6 +126,11 @@
 - **Local music** (bridge `phoneMusic`, `setPhoneMusic`, version 10): the music on the phone
   in the Local tab (`PhoneLibrary`, Android's media store; asks for `READ_MEDIA_AUDIO` once),
   see [local music](local-music.md).
+- **Microphone** (Recognize a song): the page's `getUserMedia` reaches
+  `WebChromeClient.onPermissionRequest`, which grants it to the app's own pages only, after
+  asking Android for `RECORD_AUDIO` the first time (see
+  [module API](module-api.md#recognize-a-song)). Bridge version 13 (reading a Pixel's Now
+  Playing notifications) is gone: the microphone icon replaced it.
 - **Sleep timer** (bridge `sleepTimer`, `setSleepTimer`, page callback `onSleepTimer`,
   version 12): the page sets it (`PlaybackHub.sleep`: a time, or the end of a queue item), and
   `PlaybackService` runs it, so it keeps going with the page frozen: it fades `exo.volume`

@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.content.pm.ApplicationInfo
 import android.os.Build
@@ -16,6 +17,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.ValueCallback
+import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -24,7 +26,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.media3.session.MediaController
@@ -74,6 +75,13 @@ class MainActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("ytmp", MODE_PRIVATE) }
     private val json = Json { ignoreUnknownKeys = true }
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+    /** The page asked for the microphone (Recognize a song): Android's answer, then the page's. */
+    private var micWanted: PermissionRequest? = null
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        micWanted?.let { if (granted) it.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) else it.deny() }
+        micWanted = null
+    }
 
     /** Reading the music on the phone, for the Local tab: the answer goes to the page as onPhoneMusic. */
     private val musicPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -170,6 +178,18 @@ class MainActivity : ComponentActivity() {
                     if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR || message.messageLevel() == ConsoleMessage.MessageLevel.WARNING) Log.i("YtmpWeb", line)
                     else Log.d("YtmpWeb", line)
                     return true
+                }
+
+                // The microphone, for Recognize a song: only the app's own pages, after Android's question.
+                override fun onPermissionRequest(request: PermissionRequest) = runOnUiThread {
+                    if (PermissionRequest.RESOURCE_AUDIO_CAPTURE !in request.resources || !isAppPage(request.origin)) return@runOnUiThread request.deny()
+                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                    } else {
+                        micWanted?.deny()
+                        micWanted = request
+                        micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                    }
                 }
 
                 override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
@@ -296,11 +316,6 @@ class MainActivity : ComponentActivity() {
             launch {
                 nearbyState().collect { state ->
                     js("window.__ytmpNative && window.__ytmpNative.onNearby && window.__ytmpNative.onNearby(${json.encodeToString(NearbyState.serializer(), state)})")
-                }
-            }
-            launch {
-                app.nowPlaying.recent.collect { songs ->
-                    js("window.__ytmpNative && window.__ytmpNative.onNowPlaying && window.__ytmpNative.onNowPlaying(${json.encodeToString(ListSerializer(DetectedSong.serializer()), songs)})")
                 }
             }
             app.host.nearby.notices.collect { text ->
@@ -501,18 +516,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        /** Whether this phone is a Pixel, which has Now Playing; the search page shows its icon only then (bridge version 13). */
-        @JavascriptInterface
-        fun nowPlayingAvailable(): Boolean = Build.MANUFACTURER.equals("Google", ignoreCase = true)
-
-        /** Whether YTMP may read Now Playing's notifications (allowed in Android's settings; bridge version 13). */
-        @JavascriptInterface
-        fun nowPlayingAccess(): Boolean = NotificationManagerCompat.getEnabledListenerPackages(this@MainActivity).contains(packageName)
-
-        /** Opens Android's notification access settings, where YTMP is allowed to read Now Playing (bridge version 13). */
-        @JavascriptInterface
-        fun openNowPlayingAccess() = runOnUiThread { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
-
         /** Where your YouTube Music likes are, for the home screen widget: JSON { base, token }, or null when signed out. */
         @JavascriptInterface
         fun setLikes(json: String?) {
@@ -523,10 +526,6 @@ class MainActivity : ComponentActivity() {
         /** The page knows or changed a like (also of the song the widget shows). */
         @JavascriptInterface
         fun likeChanged(songId: String, liked: Boolean) = WidgetLikes.heard(songId, liked)
-
-        /** JSON list of DetectedSong, newest first (bridge version 13); changes come as onNowPlaying. */
-        @JavascriptInterface
-        fun nowPlayingRecent(): String = json.encodeToString(ListSerializer(DetectedSong.serializer()), app.nowPlaying.recent.value)
 
         @JavascriptInterface
         fun serverUrl(): String = server.orEmpty()

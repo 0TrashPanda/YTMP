@@ -90,6 +90,7 @@ import dev.trashpanda.ytmp.protocol.RenamePlaylistRequest
 import dev.trashpanda.ytmp.protocol.RoomPasswordRequest
 import dev.trashpanda.ytmp.protocol.CreatePlaylistResponse
 import dev.trashpanda.ytmp.protocol.SuggestionsResponse
+import dev.trashpanda.ytmp.protocol.RecognizeResponse
 import dev.trashpanda.ytmp.protocol.Lyrics
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import kotlinx.serialization.descriptors.PolymorphicKind
@@ -295,6 +296,7 @@ fun main(args: Array<String>) {
     generator.addRoot(RoomPasswordRequest.serializer().descriptor)
     generator.addRoot(CreatePlaylistResponse.serializer().descriptor)
     generator.addRoot(SuggestionsResponse.serializer().descriptor)
+    generator.addRoot(RecognizeResponse.serializer().descriptor)
     generator.addRoot(Lyrics.serializer().descriptor)
     out.parentFile.mkdirs()
     out.writeText(generator.render())

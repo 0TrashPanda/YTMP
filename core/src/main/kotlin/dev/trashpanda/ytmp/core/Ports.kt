@@ -15,6 +15,7 @@ import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.QueueItem
+import dev.trashpanda.ytmp.protocol.RecognizeResponse
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.ServerMessage
@@ -46,6 +47,11 @@ fun interface SongSearch {
 /** Search suggestions while typing, e.g. "daft p" -> "daft punk one more time". */
 fun interface SearchSuggestions {
     suspend fun suggestions(query: String): List<String>
+}
+
+/** The song playing near a microphone: a few seconds of sound (WAV) -> the song (Shazam, then YouTube Music). */
+fun interface SongRecognizer {
+    suspend fun recognize(wav: ByteArray): RecognizeResponse
 }
 
 /** A source's own lyrics for its songs (YTM's), or null when it has none. */
