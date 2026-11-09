@@ -51,6 +51,8 @@ data class PlaybackTarget(
     val canSetOutputVolume: Boolean = false,
     /** The volume buttons change the speakers' volume while the app is open and the room plays there, not here (Settings → Sound). */
     val volumeKeys: Boolean = true,
+    /** Music and other apps' sound (an audiobook, a video) play at the same time, neither stops the other (Settings → Sound). */
+    val mixWithOtherApps: Boolean = false,
 )
 
 /**

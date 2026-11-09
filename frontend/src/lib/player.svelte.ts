@@ -757,7 +757,8 @@ class NativePlayer implements RoomPlayer {
 				// The notification shows the room playing on speakers or TVs, with their volume.
 				elsewhere: state?.outputs.some((o) => o.active) ?? false,
 				canSetOutputVolume: this.room.can('output_volume'),
-				volumeKeys: settings.volumeKeys.value
+				volumeKeys: settings.volumeKeys.value,
+				mixWithOtherApps: settings.mixWithOtherApps.value
 			})
 		);
 	}

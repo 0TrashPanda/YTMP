@@ -196,6 +196,8 @@ export const settings = {
 	skipSilence: new Setting('skipSilence', false, bool, flag('ytmp.skipSilence')),
 	/** In the app, the volume buttons change the speakers' and TVs' volume while the room plays there and not on the phone. */
 	volumeKeys: new Setting('volumeKeys', true, bool),
+	/** In the app, music plays at the same time as another app's sound (an audiobook, a video); neither stops the other. */
+	mixWithOtherApps: new Setting('mixWithOtherApps', false, bool),
 	/** Clearing the room (song, queue and autoplay, with Undo): a button above Up next, swiping the mini player down, or both. */
 	clearRoomBy: new Setting('clearRoomBy', 'button' as ClearRoomBy, clearRoomBy),
 	/** In a party room, pausing, skipping, seeking or playing something else asks first while others listen along. */

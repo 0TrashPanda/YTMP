@@ -12,6 +12,15 @@
   screen, notification, headphones, Bluetooth) are turned into **room commands**
   (`window.__ytmpNative.onCommand`), so they control the room, not just this phone.
 - Losing audio focus or unplugging headphones stops playback **on this phone only**.
+- *Keep playing with other apps* (`PlaybackTarget.mixWithOtherApps`, Settings → Sound):
+  `setMixing` tells ExoPlayer not to handle audio focus (`setAudioAttributes(…, false)`), first
+  thing in `apply`, so it never holds focus and no later song or restart asks for it. No focus
+  means nothing can take it from us and we take it from nobody. Becoming noisy is separate and
+  stays as set. Android doesn't say a call started to an app without focus, so while playing
+  like this a loop reads `AudioManager.getMode()` (no permission needed, every 500 ms):
+  anything but `MODE_NORMAL` (`isCallMode`: ringing, a phone call, an internet call) makes
+  `correct` pause the player here. The room isn't told, so it goes on, and after the call the
+  usual correction applies, as when a call takes the focus.
 - `RoomPlayer` (the session's `ForwardingPlayer`): with others listening along (not
   `alone`), `pause()` (lock screen, notification, earbuds taken out or tapped) stops playback
   here instead of pausing the room. Next, previous and seeking are only offered with

@@ -178,6 +178,9 @@ class PlaybackService : MediaSessionService() {
         override fun onChange(selfChange: Boolean) = reportVolume()
     }
 
+    /** "Keep playing with other apps" is on ([PlaybackTarget.mixWithOtherApps]), see [setMixing]. */
+    private val mixing = MutableStateFlow(false)
+
     /** When the player started waiting for data (elapsedRealtime), to log long buffering. */
     private var bufferingSince: Long? = null
 
@@ -215,10 +218,7 @@ class PlaybackService : MediaSessionService() {
                 ).also { audioClock = it }
         }
         exo = ExoPlayer.Builder(this, renderers)
-            .setAudioAttributes(
-                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
-                /* handleAudioFocus = */ true,
-            )
+            .setAudioAttributes(MUSIC, /* handleAudioFocus = */ true) // Until the page says otherwise: see [setMixing].
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             // YouTube's links in pieces: asked for in one go, YouTube sends them too slowly. What
@@ -307,6 +307,21 @@ class PlaybackService : MediaSessionService() {
             measuring.collectLatest { on ->
                 while (on && isActive) {
                     delay(sampleInterval())
+                    current?.let { correct(it) }
+                }
+            }
+        }
+        // Without audio focus nothing tells the player about a call, so it looks for itself
+        // while it plays next to other apps.
+        scope.launch {
+            measuring.combine(mixing) { playing, mix -> playing && mix }.collectLatest { watch ->
+                var held = false
+                while (watch && isActive) {
+                    delay(CALL_CHECK_MS)
+                    val now = heldForCall()
+                    if (now == held) continue
+                    held = now
+                    Log.i(TAG, if (now) "a call started: quiet here until it's over" else "the call is over: playing here again")
                     current?.let { correct(it) }
                 }
             }
@@ -436,6 +451,8 @@ class PlaybackService : MediaSessionService() {
 
     private fun apply(target: PlaybackTarget?) {
         current = target
+        // Before anything can start playing, so a new song or a restarted service never asks for the focus.
+        if (target != null) setMixing(target.mixWithOtherApps)
         roomPlayer.updateCommands()
         lastTarget?.let { old ->
             if (target != null && (old.clockOffset != target.clockOffset || old.hostTimeMs != target.hostTimeMs)) {
@@ -517,6 +534,21 @@ class PlaybackService : MediaSessionService() {
         correct(target)
         if (exo.playbackState == Player.STATE_READY) reportReady()
     }
+
+    /**
+     * Plays next to other apps, or not. ExoPlayer holds Android's audio focus only while it
+     * handles it. Without the focus, no other app can take it away, so nothing here pauses or
+     * ducks, and starting to play takes it from nobody, so their sound goes on too.
+     */
+    private fun setMixing(on: Boolean) {
+        if (on == mixing.value) return
+        mixing.value = on
+        Log.i(TAG, if (on) "playing next to other apps: no audio focus" else "using the audio focus")
+        exo.setAudioAttributes(MUSIC, /* handleAudioFocus = */ !on)
+    }
+
+    /** Playing next to other apps, and a call is going on: quiet here until it's over. */
+    private fun heldForCall() = mixing.value && isCallMode(audioManager.mode)
 
     private var stallJob: Job? = null
 
@@ -633,6 +665,12 @@ class PlaybackService : MediaSessionService() {
         if (!target.playing || pausingRoom) {
             exo.playWhenReady = false
             if (abs(exo.currentPosition - expected) > PAUSED_TOLERANCE_MS) exo.seekTo(expected)
+            return
+        }
+        if (heldForCall()) {
+            // Only here, like when a call takes the audio focus: the room goes on, for everyone.
+            exo.playWhenReady = false
+            settledAt = maxOf(settledAt, SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS)
             return
         }
         exo.playWhenReady = true
@@ -1159,6 +1197,9 @@ class PlaybackService : MediaSessionService() {
 
     companion object {
         private const val TAG = "YtmpSync"
+        private val MUSIC = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build()
+        /** How often (ms) to look for a call while playing next to other apps. */
+        private const val CALL_CHECK_MS = 500L
         private const val BUTTON_CHANNEL = "media_buttons"
         private const val BUTTON_NOTIFICATION = 7
         private const val PAUSED_TOLERANCE_MS = 250L
@@ -1188,3 +1229,6 @@ class PlaybackService : MediaSessionService() {
         private const val END_MARGIN_MS = 5_000L
     }
 }
+
+/** Android's audio mode ([AudioManager.getMode]) during a call: ringing, a phone call or an internet call (WhatsApp, Meet…). */
+internal fun isCallMode(mode: Int) = mode != AudioManager.MODE_NORMAL
