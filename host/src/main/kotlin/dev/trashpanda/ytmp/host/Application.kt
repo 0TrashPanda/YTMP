@@ -80,8 +80,8 @@ data class HostSources(
     val similar: RadioSource? = null,
     /** Artist, album, playlist and podcast pages, and Home. */
     val catalog: CatalogSource? = null,
-    /** Recognizing the song playing near the microphone (the YTM module with Shazam); null: not here (a phone). */
-    val recognizer: SongRecognizer? = null,
+    /** Recognize a song: Shazam, asked with the signature the page made (any host, a phone too); null: not here. */
+    val recognizer: SongRecognizer? = ShazamLookup(),
     /** Lyrics for the songs (LRCLIB, then the source's own). */
     val lyrics: LyricsLookup? = null,
     /** Songs' audio through the host, for players whose direct link doesn't work (and speakers). */

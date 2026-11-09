@@ -57,6 +57,8 @@ import dev.trashpanda.ytmp.protocol.wireName
 import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.SuggestionsResponse
+import dev.trashpanda.ytmp.protocol.RecognizeRequest
+import dev.trashpanda.ytmp.protocol.SearchResponse
 import dev.trashpanda.ytmp.protocol.RecognizeResponse
 import io.ktor.client.call.body
 import io.ktor.client.statement.bodyAsText
@@ -495,24 +497,42 @@ class ApplicationTest {
 
     @Test
     fun `recognizing a song from the microphone`() = testApplication {
-        val heard = mutableListOf<Int>()
+        val heard = mutableListOf<Long>()
+        val found = RecognizeResponse("One More Time", "Daft Punk", "Discovery", null, null)
         application {
             val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
-            ytmpModule(rooms, HostSources(search, recognizer = { wav -> heard += wav.size; RecognizeResponse(null, "Digital World", "Amaranthe") }), HostOptions(kind = HostKind.SERVER))
+            ytmpModule(rooms, HostSources(search, recognizer = { _, ms -> heard += ms; found }), HostOptions(kind = HostKind.SERVER))
         }
         val client = jsonClient()
         assertEquals(true, client.get("/api/host").body<HostInfo>().canRecognize)
-        val answer = client.post("/api/recognize") { contentType(ContentType("audio", "wav")); setBody(ByteArray(1000)) }.body<RecognizeResponse>()
-        assertEquals(RecognizeResponse(null, "Digital World", "Amaranthe"), answer)
-        assertEquals(listOf(1000), heard)
-        assertEquals(HttpStatusCode.BadRequest, client.post("/api/recognize") { contentType(ContentType("audio", "wav")); setBody(ByteArray(0)) }.status)
+        suspend fun ask(request: RecognizeRequest) = client.post("/api/recognize") { contentType(ContentType.Application.Json); setBody(request) }
+        assertEquals(found, ask(RecognizeRequest("data:audio/vnd.shazam.sig;base64,AAAA", 2500)).body<RecognizeResponse>())
+        assertEquals(listOf(2500L), heard)
+        assertEquals(HttpStatusCode.BadRequest, ask(RecognizeRequest("https://example.com", 2500)).status)
+        assertEquals(HttpStatusCode.BadRequest, ask(RecognizeRequest("data:audio/vnd.shazam.sig;base64,AAAA", 0)).status)
+        // Then the song on YouTube Music, matched like an import.
+        val match = client.get("/api/recognize/song?title=One%20More%20Time&artist=Daft%20Punk&album=Discovery").body<SearchResponse>()
+        assertEquals(listOf(song), match.items)
+        assertEquals(emptyList(), client.get("/api/recognize/song?title=Something%20Else&artist=Nobody").body<SearchResponse>().items)
     }
 
     @Test
     fun `a host without a recognizer says so`() = testApplication {
-        setup()
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, HostSources(search, recognizer = null), HostOptions(kind = HostKind.SERVER))
+        }
         assertEquals(false, jsonClient().get("/api/host").body<HostInfo>().canRecognize)
-        assertEquals(HttpStatusCode.NotFound, jsonClient().post("/api/recognize") { setBody(ByteArray(10)) }.status)
+        assertEquals(HttpStatusCode.NotFound, jsonClient().post("/api/recognize") { contentType(ContentType.Application.Json); setBody(RecognizeRequest("data:audio/vnd.shazam.sig;base64,AAAA", 2500)) }.status)
+    }
+
+    @Test
+    fun `Shazam's answer becomes the song's name, artist, album and cover`() {
+        val answer = """{"matches":[{}],"track":{"title":"Digital World","subtitle":"Amaranthe","isrc":"FIUM71400485",
+            "images":{"coverart":"https://x/400.jpg","coverarthq":"https://x/hq.jpg"},
+            "sections":[{"type":"SONG","metadata":[{"title":"Album","text":"Massive Addictive"},{"title":"Label","text":"Spinefarm"}]}]}}"""
+        assertEquals(RecognizeResponse("Digital World", "Amaranthe", "Massive Addictive", "https://x/hq.jpg", "FIUM71400485"), ShazamLookup.parse(answer))
+        assertEquals(RecognizeResponse(), ShazamLookup.parse("""{"matches":[],"tagid":"x"}"""))
     }
 
     @Test

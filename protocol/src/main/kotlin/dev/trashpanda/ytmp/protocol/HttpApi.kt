@@ -40,13 +40,26 @@ data class SearchResponse(val items: List<Song>)
 data class SuggestionsResponse(val items: List<String>)
 
 /**
- * `POST /api/recognize` (a few seconds of sound as WAV): the song that's playing near the
- * microphone. [song] is that song on YouTube Music; null when it isn't there (then [title] and
- * [artist] are what was recognized, to search for) or when nothing was recognized (all null).
+ * `POST /api/recognize`: Shazam's signature of a few seconds from the microphone (made by the
+ * page, `shazamSignature.ts`, as its data URI) and how long that sound was.
+ */
+@Serializable
+@SerialName("RecognizeRequest")
+data class RecognizeRequest(val signature: String, val sampleMs: Long)
+
+/**
+ * The song Shazam recognized: its name, artist, album, cover (a URL) and ISRC; all null when it
+ * didn't know it. `GET /api/recognize/song` with these finds it on YouTube Music.
  */
 @Serializable
 @SerialName("RecognizeResponse")
-data class RecognizeResponse(val song: Song? = null, val title: String? = null, val artist: String? = null)
+data class RecognizeResponse(
+    val title: String? = null,
+    val artist: String? = null,
+    val album: String? = null,
+    val art: String? = null,
+    val isrc: String? = null,
+)
 
 /**
  * `POST /api/screens`: a TV asks for a code to show (docs/features/ui.md#party-screen). It

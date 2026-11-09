@@ -168,16 +168,17 @@ box and keep typing); the phone's back button closes it.
 
 **Recognize a song** ✅, like YouTube Music's song search: the microphone icon at the right
 end of the search box listens to the music playing nearby and shows that exact song (the
-recording, not a similar one) with **Play**, **Play next** and **Add to queue**. Most songs
-are known in 4–6 seconds: it tries after 3 seconds of sound, and again after 5, 8 and 12
-when that wasn't enough. A song that isn't on YouTube Music shows its name with **Search for
-it**. It only listens after a tap, and stops when the answer is there or you close it; the
-app asks Android for the microphone the first time. Recognizing is done by Shazam (asked by
-the server's YouTube Music module, unofficially, like yt-dlp), so it knows recordings, not
-humming, and sped-up or remixed versions often not. The icon shows on rooms hosted by a
-server, in the app and in browsers (a page on `https://` or the same computer); a phone's
-own host can't recognize songs (its Python can't run Shazam's fingerprinting), so its rooms
-don't show it.
+recording, not a similar one). Its name, artist and cover show as soon as Shazam knows it,
+usually 3.5–4.5 seconds after the tap; a moment later **Play**, **Play next** and **Add to
+queue** come, once it's found on YouTube Music. It tries after 2.5 seconds of sound, and
+again after 4, 6 and 10 when that wasn't enough. A song that isn't on YouTube Music shows
+**Search for it**. It only listens after a tap, and stops when the answer is there or you
+close it; the app asks Android for the microphone the first time. Your device makes Shazam's
+fingerprint of the sound itself (the sound never leaves it), and the room's host asks Shazam
+(unofficially, like yt-dlp for YouTube), so it works in every room, also one hosted by a
+phone. Shazam knows recordings, not humming, and sped-up or remixed versions often not; it
+also refuses for a while when asked very often (many people at once). In the app and in
+browsers on `https://` (or the same computer).
 
 It also accepts **links** ✅: pasting a YouTube Music or YouTube link opens what it points
 at right away, without Enter: an album, playlist, artist or podcast opens its page; a song

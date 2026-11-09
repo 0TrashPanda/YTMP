@@ -206,26 +206,36 @@ lyrics win; results (also "none") are kept 6 hours, unless a lookup failed.
 
 ### Recognize a song
 
+Not a module endpoint: every host does it itself, a phone too. The web app makes Shazam's
+signature of the sound (`frontend/src/lib/shazamSignature.ts`, a port of shazamio-core 2.0.0's
+`algorithm.rs` and `signature_format.rs`, MIT, itself from SongRec: an FFT of 2048 samples every
+128 samples at 16 kHz, the spectrum spread over neighbouring bins and frames, its local maxima
+between 250 Hz and 5.5 kHz packed per band). Checked against shazamio's own Rust code on the same
+samples: the same peaks at the same times and frequencies, a few in a few hundred 1 louder or
+softer (the last bit of the FFT, doubles here, floats there); `shazamSignature.test.ts` keeps its
+output for a test sound. Only that signature (2–6 KB) goes to the host, not the sound.
+
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/recognize` | ✅ body: a few seconds of sound (WAV, 16 kHz mono) → `{ song, title, artist }` (`RecognizeResponse`): `song` is the YouTube Music song, null when it isn't there; all null when nothing was recognized. 429 when Shazam refuses for a moment, 501 without shazamio (a phone) |
+| POST | `/api/recognize` | ✅ `RecognizeRequest { signature, sampleMs }` → `RecognizeResponse { title, artist, album, art, isrc }`, all null when Shazam didn't know it; 429 when Shazam refuses for a moment |
+| GET | `/api/recognize/song?title&artist&album` | ✅ that song on YouTube Music: `SearchResponse` with it, or empty |
 
-The YTM module (`recognize.py`) asks Shazam with shazamio: shazamio_core makes the audio
-fingerprint, one request without shazamio's retries (Shazam answers 429 when asked too often;
-retrying costs up to a minute). Then it searches YouTube Music's songs for "artist title" and
-takes the first with the same title (accents, "(feat. …)" and "- Remastered" left out) and,
-better still, an artist in common; none fits: `song` is null and the app offers a search. Only
-with `recognize` in `/info`'s capabilities.
+`ShazamLookup` (host) posts the signature to `amp.shazam.com/discovery/v5/…/tag/{uuid}/{uuid}`
+the way shazamio does (iPhone headers, one try: shazamio's retries on 429 take up to a minute,
+and the page asks again with more sound anyway), keeping the connection open between tries.
+The song is then matched like a playlist import (`ConvertMatcher`: "artist title", scored on
+title, artist, album and version; a matched or unsure song counts). `HostInfo.canRecognize` is
+whether the host has a recognizer (`HostSources.recognizer`, `ShazamLookup` by default).
 
-Host side: `POST /api/recognize` (`CatalogRoutes.kt`) passes the WAV on to
-`HostSources.recognizer` (the server's `RemoteSourceModule`); `HostInfo.canRecognize` tells the
-web app whether to show the microphone icon. A phone host has no recognizer: shazamio_core is
-compiled Rust without an Android build for Chaquopy. The web app (`lib/listen.ts`) records with
-`getUserMedia` and a `ScriptProcessorNode` (also in Chrome 90), turns it into 16 kHz WAV and
-sends everything it has after 3, 5, 8 and 12 seconds until there's an answer. Measured: 2 s was
-never enough, 3 s mostly is; Shazam takes 0.4–0.8 s and the YouTube Music search ~1 s. The
-Android app grants the page the microphone (`onPermissionRequest`, only its own pages) after
-asking Android for `RECORD_AUDIO`.
+The web app (`lib/listen.ts`) records with `getUserMedia` and a `ScriptProcessorNode` (also in
+Chrome 90) and asks after 2.5, 4, 6 and 10 seconds of sound until Shazam knows it; the sheet
+shows Shazam's answer at once and looks the song up on YouTube Music next. Measured with real
+lookups: 2 s was never enough, 2.5 s was for every song Shazam knows (shazamio itself needed
+3 s: it runs the sound through a resampling filter first); Shazam answers in 0.5–1.5 s,
+the YouTube Music search in ~0.5–1 s. Shazam refuses (429) after a burst of lookups from one
+IP address (about 16 in 30 s); one every 15 s was always fine. The Android app grants the page
+the microphone (`onPermissionRequest`, only its own pages) after asking Android for
+`RECORD_AUDIO`.
 
 ### Library (user-scoped, needs `X-Ytm-Cookie`)
 

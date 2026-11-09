@@ -5,6 +5,10 @@ import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.LocalLibraries
 import dev.trashpanda.ytmp.protocol.SearchResponse
+import dev.trashpanda.ytmp.protocol.RecognizeRequest
+import dev.trashpanda.ytmp.protocol.ConvertItem
+import dev.trashpanda.ytmp.protocol.ConvertItemState
+import dev.trashpanda.ytmp.protocol.ConvertItemType
 import dev.trashpanda.ytmp.protocol.SearchType
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.SuggestionsResponse
@@ -50,12 +54,23 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
         val source = sources.similar ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No radio source")
         call.respond(SearchResponse(call.similarFrom(songId) { call.asYou({ radio(songId) }) { source.radio(songId) } }.filter { it.id != songId }))
     }
-    // A few seconds from the microphone (WAV, 16 kHz mono): which song is that?
+    // Recognize a song: the signature of a few seconds from the microphone -> what Shazam says it is.
     post("/recognize") {
         val recognizer = sources.recognizer ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Recognizing songs isn't possible on this host")
-        val wav = call.receive<ByteArray>()
-        if (wav.isEmpty() || wav.size > 4_000_000) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Send a few seconds of sound as WAV")
-        call.respond(recognizer.recognize(wav))
+        val request = call.receive<RecognizeRequest>()
+        if (!request.signature.startsWith("data:audio/vnd.shazam.sig;base64,") || request.signature.length > 200_000 || request.sampleMs !in 1..30_000) {
+            throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Send a Shazam signature")
+        }
+        call.respond(recognizer.recognize(request.signature, request.sampleMs))
+    }
+    // …then that song on YouTube Music, matched like a playlist import (title, artist, album, version); none: an empty list.
+    get("/recognize/song") {
+        val query = call.request.queryParameters
+        val title = query["title"]?.trim().orEmpty()
+        if (title.isEmpty()) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Missing title")
+        val item = ConvertItem(ConvertItemType.SONG, title, listOfNotNull(query["artist"]?.trim()?.takeIf { it.isNotEmpty() }), album = query["album"]?.trim()?.takeIf { it.isNotEmpty() })
+        val match = ConvertMatcher(sources.search).match(item, videos = true)
+        call.respond(SearchResponse(listOfNotNull(match.song.takeIf { match.state != ConvertItemState.NOT_FOUND })))
     }
     get("/lyrics") {
         // The song as the page knows it: LRCLIB looks lyrics up by title, artist, album and length.

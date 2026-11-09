@@ -1,9 +1,12 @@
 <script lang="ts">
-	// Recognize a song (docs/features/ui.md), like YouTube Music's song search: the
-	// microphone listens (listen.ts), and the song shows with Play, Play next and Add to queue.
-	// Recognized but not on YouTube Music: a search for it. Closing stops the microphone.
+	// Recognize a song (docs/features/ui.md), like YouTube Music's song search: the microphone
+	// listens (listen.ts). Shazam's answer shows at once (its cover, title and artist), and the
+	// buttons come when the song is found on YouTube Music (Play, Play next, Add to queue);
+	// not there: a search for it. Closing stops the microphone.
 	import { onDestroy } from 'svelte';
+	import { recognizedSong } from '../api';
 	import { listen, type Heard } from '../listen';
+	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import { addToQueue, playNext, playNow, quoted } from '../songActions';
 	import { artistNames } from '../format';
@@ -18,20 +21,27 @@
 	}: { room: RoomConnection; onClose: () => void; onToast: (text: string) => void; onSearch: (query: string) => void } = $props();
 
 	let heard = $state<Heard | null>(null);
+	/** The song on YouTube Music: undefined while looking, null when it isn't there. */
+	let song = $state<Song | null | undefined>(undefined);
 	let stopper: AbortController | null = null;
 
 	function start() {
 		stopper?.abort();
 		const mine = (stopper = new AbortController());
 		heard = null;
+		song = undefined;
 		listen(mine.signal).then((h) => {
-			if (!mine.signal.aborted) heard = h;
+			if (mine.signal.aborted) return;
+			heard = h;
+			if (h.kind === 'found')
+				recognizedSong(h.answer).then(
+					(s) => !mine.signal.aborted && (song = s),
+					() => !mine.signal.aborted && (song = null)
+				);
 		});
 	}
 	start();
 	onDestroy(() => stopper?.abort());
-
-	const song = $derived(heard?.kind === 'song' ? heard.answer.song : null);
 
 	function act(what: 'play' | 'next' | 'queue') {
 		if (!song) return;
@@ -64,31 +74,40 @@
 				<p class="mt-1 text-sm text-muted">Hold your device near the music</p>
 			</div>
 			<button class="rounded-full px-5 py-2 font-medium hover:bg-raised" onclick={onClose}>Cancel</button>
-		{:else if song}
-			<Art {song} size={300} class="h-48 w-48 rounded-lg shadow-2xl" />
+		{:else if heard.kind === 'found'}
+			{@const answer = heard.answer}
+			<!-- YouTube Music's cover once the song is found there; Shazam's until then. -->
+			{#if song}
+				<Art {song} size={300} class="h-48 w-48 rounded-lg shadow-2xl" />
+			{:else if answer.art}
+				<img src={answer.art} alt="" referrerpolicy="no-referrer" class="h-48 w-48 rounded-lg object-cover shadow-2xl" />
+			{:else}
+				<div class="grid h-48 w-48 place-items-center rounded-lg bg-raised text-muted"><Icon name="note" size={64} /></div>
+			{/if}
 			<div class="min-w-0 max-w-full">
-				<p class="truncate text-lg font-semibold">{song.title}</p>
-				<p class="truncate text-sm text-muted">{artistNames(song)}</p>
+				<p class="truncate text-lg font-semibold">{song?.title ?? answer.title}</p>
+				<p class="truncate text-sm text-muted">{song ? artistNames(song) : answer.artist}</p>
 			</div>
-			<div class="flex w-full flex-col gap-2">
-				<button class="flex items-center justify-center gap-2 rounded-full bg-white py-3 font-medium text-black" onclick={() => act('play')}>
-					<Icon name="play" size={22} /> Play
-				</button>
-				<div class="flex gap-2">
-					<button class="flex flex-1 items-center justify-center gap-2 rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={() => act('next')}>Play next</button>
-					<button class="flex flex-1 items-center justify-center gap-2 rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={() => act('queue')}>Add to queue</button>
+			<!-- As high as the buttons, so the sheet doesn't jump when they come. -->
+			<div class="flex min-h-[6.75rem] w-full flex-col items-center justify-center gap-2">
+			{#if song === undefined}
+				<p class="text-sm text-muted">Finding it on YouTube Music…</p>
+			{:else if song}
+				<div class="flex w-full flex-col gap-2">
+					<button class="flex items-center justify-center gap-2 rounded-full bg-white py-3 font-medium text-black" onclick={() => act('play')}>
+						<Icon name="play" size={22} /> Play
+					</button>
+					<div class="flex gap-2">
+						<button class="flex flex-1 items-center justify-center gap-2 rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={() => act('next')}>Play next</button>
+						<button class="flex flex-1 items-center justify-center gap-2 rounded-full bg-raised py-2.5 font-medium hover:bg-line" onclick={() => act('queue')}>Add to queue</button>
+					</div>
 				</div>
+			{:else}
+				<p class="text-sm text-muted">Not found on YouTube Music as it is.</p>
+				<button class="rounded-full bg-white px-6 py-3 font-medium text-black" onclick={() => (onSearch(`${answer.title} ${answer.artist ?? ''}`.trim()), onClose())}>Search for it</button>
+			{/if}
 			</div>
 			<button class="text-sm text-muted hover:text-white" onclick={start}>Listen again</button>
-		{:else if heard.kind === 'song'}
-			{@const query = `${heard.answer.title} ${heard.answer.artist ?? ''}`.trim()}
-			<Icon name="note" size={48} class="mt-2 text-muted" />
-			<div>
-				<p class="text-lg font-semibold">{heard.answer.title}</p>
-				<p class="text-sm text-muted">{heard.answer.artist}</p>
-				<p class="mt-2 text-sm text-muted">Not found on YouTube Music as it is.</p>
-			</div>
-			<button class="rounded-full bg-white px-6 py-3 font-medium text-black" onclick={() => (onSearch(query), onClose())}>Search for it</button>
 		{:else}
 			<Icon name={heard.kind === 'error' ? 'mic' : 'note'} size={48} class="mt-2 text-muted" />
 			<div>

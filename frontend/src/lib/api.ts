@@ -26,6 +26,7 @@ import type {
 	SaveSongsRequest,
 	HomePage,
 	HostInfo,
+	RecognizeRequest,
 	RecognizeResponse,
 	PlaylistPage,
 	PodcastPage,
@@ -172,9 +173,16 @@ export async function linkAuthServer(url: string | null): Promise<void> {
 }
 
 /** What kind of host served this page (a server, or a phone). */
-/** The song in a few seconds of sound from the microphone (WAV): see listen.ts. */
-export function recognize(wav: Uint8Array<ArrayBuffer>): Promise<RecognizeResponse> {
-	return request('/api/recognize', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav });
+/** What Shazam says a signature of a few seconds from the microphone is (listen.ts). */
+export function recognize(signature: { uri: string; sampleMs: number }): Promise<RecognizeResponse> {
+	const body: RecognizeRequest = { signature: signature.uri, sampleMs: signature.sampleMs };
+	return request('/api/recognize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+}
+
+/** That song on YouTube Music, or null when it isn't there. */
+export async function recognizedSong(answer: RecognizeResponse): Promise<Song | null> {
+	const query = new URLSearchParams({ title: answer.title ?? '', artist: answer.artist ?? '', album: answer.album ?? '' });
+	return (await request<SearchResponse>(`/api/recognize/song?${query}`)).items[0] ?? null;
 }
 
 export function getHost(): Promise<HostInfo> {

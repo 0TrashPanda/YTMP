@@ -1791,10 +1791,17 @@ export interface SuggestionsResponse {
   items: string[];
 }
 
+export interface RecognizeRequest {
+  signature: string;
+  sampleMs: number;
+}
+
 export interface RecognizeResponse {
-  song: Song | null;
   title: string | null;
   artist: string | null;
+  album: string | null;
+  art: string | null;
+  isrc: string | null;
 }
 
 export interface LyricLine {

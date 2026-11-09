@@ -49,9 +49,9 @@ fun interface SearchSuggestions {
     suspend fun suggestions(query: String): List<String>
 }
 
-/** The song playing near a microphone: a few seconds of sound (WAV) -> the song (Shazam, then YouTube Music). */
+/** Which song a Shazam signature is (of a few seconds from a microphone); all null in the answer when unknown. */
 fun interface SongRecognizer {
-    suspend fun recognize(wav: ByteArray): RecognizeResponse
+    suspend fun recognize(signature: String, sampleMs: Long): RecognizeResponse
 }
 
 /** A source's own lyrics for its songs (YTM's), or null when it has none. */

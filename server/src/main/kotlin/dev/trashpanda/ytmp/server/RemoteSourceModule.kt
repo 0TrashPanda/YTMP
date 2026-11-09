@@ -1,11 +1,7 @@
 package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.core.SearchSuggestions
-import dev.trashpanda.ytmp.core.SongRecognizer
 import dev.trashpanda.ytmp.core.SongSearch
-import dev.trashpanda.ytmp.host.ApiException
-import dev.trashpanda.ytmp.protocol.ErrorCode
-import dev.trashpanda.ytmp.protocol.RecognizeResponse
 import dev.trashpanda.ytmp.core.ResolvedStream
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.host.AudioFiles
@@ -80,7 +76,7 @@ class RemoteSourceModule(
     private val client: HttpClient,
     private val baseUrl: String,
     private val key: String,
-) : SongSearch, StreamResolver, AudioProxy, AudioFiles, RadioSource, CatalogSource, SearchSuggestions, SongRecognizer {
+) : SongSearch, StreamResolver, AudioProxy, AudioFiles, RadioSource, CatalogSource, SearchSuggestions {
 
     @Serializable
     private data class SearchResult(val items: List<Song>)
@@ -135,21 +131,6 @@ class RemoteSourceModule(
     override suspend fun song(id: String): Song = client.get("$baseUrl/songs/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
 
     override suspend fun home(): HomePage = client.get("$baseUrl/home") { auth() }.orThrow().body()
-
-    /** The song in a few seconds of sound (Shazam, then YouTube Music): ytm-module/ytmp_ytm/recognize.py. */
-    override suspend fun recognize(wav: ByteArray): RecognizeResponse {
-        val response = client.post("$baseUrl/recognize") {
-            auth()
-            contentType(ContentType("audio", "wav"))
-            setBody(wav)
-        }
-        when (response.status) {
-            // Shazam refusing for a moment: the app tries again with more sound.
-            HttpStatusCode.TooManyRequests -> throw ApiException(HttpStatusCode.TooManyRequests, ErrorCode.INVALID, "Shazam is busy, try again in a moment")
-            HttpStatusCode.NotImplemented -> throw ApiException(HttpStatusCode.NotImplemented, ErrorCode.NOT_FOUND, "Recognizing songs needs a newer YouTube Music module")
-            else -> return response.orThrow().body()
-        }
-    }
 
     /** YouTube Music's lyrics for the song, or null when it has none. */
     suspend fun lyrics(songId: String): Lyrics? {

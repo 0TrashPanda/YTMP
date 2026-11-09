@@ -236,7 +236,6 @@ fun main(args: Array<String>) {
                 similar = local.radio(cached),
                 catalog = local.catalog(cached),
                 lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
-                recognizer = ytm,
                 audio = local.audio(songCache.audio(ytm)),
                 downloads = SongFiles(songCache.files(ytm)),
                 cache = songCache,
