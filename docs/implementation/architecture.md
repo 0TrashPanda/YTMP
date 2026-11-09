@@ -125,7 +125,10 @@ snippet in `SettingsScreen.svelte`) and `lib/settingsSearch.ts` keeps the rows w
 match. A row is found by its name (`Toggle`, `Choice`, `CountList`, or a custom row's
 `<p class="font-medium">`): the biggest part around it with no other name in it, so a
 custom row needs a wrapper of its own around its name, hint and controls. `data-search-keep`
-(the room's Save bar) shows with any match. Calls to the host are in `lib/api.ts`, to your account's server in
+(the room's Save bar) shows with any match. Pictures: `thumbUrl` (`lib/images.svelte.ts`)
+picks the size to load; a big one goes through `components/Picture.svelte` with `smallUrl`, which
+shows the ~120 px version first (the one lists and the player bar load) and swaps in the sharp
+one once it's loaded and decoded. Calls to the host are in `lib/api.ts`, to your account's server in
 `lib/account.ts` and `lib/listening.svelte.ts`.
 A new version on the host: SvelteKit sees that `_app/version.json` changed (on focus, every
 10 minutes, and when the room's WebSocket reconnects), and `lib/appUpdate.svelte.ts` reloads

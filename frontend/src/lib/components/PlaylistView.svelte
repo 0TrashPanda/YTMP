@@ -1,7 +1,8 @@
 <script lang="ts">
 	// A playlist page (community or YouTube Music's own, or one of yours): its songs, in order.
 	// Long ones load in parts: more songs as you scroll down.
-	import { thumbUrl } from '../images.svelte';
+	import { smallUrl, thumbUrl } from '../images.svelte';
+	import Picture from './Picture.svelte';
 	import { deletePlaylist, getPlaylist, getPlaylistPart, movePlaylistItem, renamePlaylist } from '../api';
 	import { settings } from '../settings.svelte';
 	import Icon from './Icon.svelte';
@@ -190,7 +191,7 @@
 	<header class="flex flex-col gap-5 px-2 sm:flex-row sm:items-end">
 		<div class="aspect-square w-48 shrink-0 overflow-hidden rounded-lg bg-raised shadow-2xl sm:w-56 {playlist ? '' : 'animate-pulse'}">
 			{#if playlist?.thumbnails.at(-1)}
-				<img src={thumbUrl(playlist.thumbnails, 544)} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+				<Picture src={thumbUrl(playlist.thumbnails, 544)!} small={smallUrl(playlist.thumbnails, 544)} lazy={false} class="h-full w-full object-cover" />
 			{/if}
 		</div>
 		<div class="min-w-0">

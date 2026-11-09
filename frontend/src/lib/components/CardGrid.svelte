@@ -5,6 +5,8 @@
 		title: string;
 		subtitle: string;
 		art: string | undefined;
+		/** Shown first while [art] loads (images.svelte.ts: smallUrl). */
+		small?: string;
 		/** Round art, for artists. */
 		round?: boolean;
 		open: () => void;
@@ -16,6 +18,7 @@
 <script lang="ts">
 	import { hideIfBroken } from '../pictures';
 	import Icon from './Icon.svelte';
+	import Picture from './Picture.svelte';
 	import PageDots from './PageDots.svelte';
 
 	/** [row]: one row that scrolls sideways (the home page), instead of a grid; [list]: one card under the other. */
@@ -32,7 +35,8 @@
 				<div class="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden bg-raised text-muted {card.round ? 'rounded-full' : 'rounded'}">
 					<Icon name={card.round ? 'person' : 'note'} size={24} class="absolute" />
 					{#if card.art}
-						<img src={card.art} alt="" use:hideIfBroken loading="lazy" referrerpolicy="no-referrer" class="relative h-full w-full object-cover" />
+						<!-- 48 px: the small picture is sharp enough. -->
+						<img src={card.small ?? card.art} alt="" use:hideIfBroken loading="lazy" referrerpolicy="no-referrer" class="relative h-full w-full object-cover" />
 					{/if}
 				</div>
 				<div class="min-w-0 flex-1">
@@ -55,7 +59,7 @@
 				<!-- Under the picture: shows when there's none, or it doesn't load. -->
 				<Icon name={card.round ? 'person' : 'note'} size={40} class="absolute" />
 				{#if card.art}
-					<img src={card.art} alt="" use:hideIfBroken loading="lazy" referrerpolicy="no-referrer" class="relative h-full w-full object-cover transition-transform group-hover:scale-105" />
+					<Picture src={card.art} small={card.small} class="relative h-full w-full object-cover transition-transform group-hover:scale-105" />
 				{/if}
 			</div>
 			<div class="min-w-0 {card.round ? 'text-center' : ''}">

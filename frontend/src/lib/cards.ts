@@ -1,6 +1,6 @@
 // Albums, artists, podcasts and playlists (search results, the home page) as cards that open their page.
 import { prefetch } from './api';
-import { thumbUrl } from './images.svelte';
+import { smallUrl, thumbUrl } from './images.svelte';
 import type { Card } from './components/CardGrid.svelte';
 import type { AlbumRef, ArtistRef, PodcastRef, SearchItem } from './protocol.gen';
 
@@ -24,6 +24,7 @@ export function itemCard(item: SearchItem, open: PageHandlers): Card | null {
 				title: item.album.title,
 				subtitle: [item.album.kind, item.artists.map((a) => a.name).join(', '), item.album.year].filter(Boolean).join(' • '),
 				art: thumbUrl(item.album.thumbnails, CARD),
+				small: smallUrl(item.album.thumbnails, CARD),
 				open: () => open.onAlbum({ id: item.album.id, name: item.album.title }),
 				prefetch: () => prefetch('album', item.album.id)
 			};
@@ -33,6 +34,7 @@ export function itemCard(item: SearchItem, open: PageHandlers): Card | null {
 				title: item.name,
 				subtitle: 'Artist',
 				art: thumbUrl(item.thumbnails, CARD),
+				small: smallUrl(item.thumbnails, CARD),
 				round: true,
 				open: () => open.onArtist({ id: item.id, name: item.name }),
 				prefetch: () => prefetch('artist', item.id)
@@ -43,6 +45,7 @@ export function itemCard(item: SearchItem, open: PageHandlers): Card | null {
 				title: item.title,
 				subtitle: item.author ?? 'Podcast',
 				art: thumbUrl(item.thumbnails, CARD),
+				small: smallUrl(item.thumbnails, CARD),
 				open: () => open.onPodcast({ id: item.id, name: item.title }),
 				prefetch: () => prefetch('podcast', item.id)
 			};
@@ -52,6 +55,7 @@ export function itemCard(item: SearchItem, open: PageHandlers): Card | null {
 				title: item.title,
 				subtitle: [item.author, item.itemCount != null ? `${item.itemCount} songs` : null].filter(Boolean).join(' • '),
 				art: thumbUrl(item.thumbnails, CARD),
+				small: smallUrl(item.thumbnails, CARD),
 				open: () => open.onPlaylist({ id: item.id, title: item.title }),
 				prefetch: () => prefetch('playlist', item.id)
 			};

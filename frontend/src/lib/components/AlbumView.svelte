@@ -1,8 +1,8 @@
 <script lang="ts">
 	import Skeleton from './Skeleton.svelte';
-	import { hideIfBroken } from '../pictures';
 	// An album page: its songs, in order.
-	import { thumbUrl } from '../images.svelte';
+	import { smallUrl, thumbUrl } from '../images.svelte';
+	import Picture from './Picture.svelte';
 	import { getAlbum } from '../api';
 	import { formatTime } from '../format';
 	import type { AlbumPage, ArtistRef } from '../protocol.gen';
@@ -49,7 +49,7 @@
 	<header class="flex flex-col gap-5 px-2 sm:flex-row sm:items-end">
 		<div class="aspect-square w-48 shrink-0 overflow-hidden rounded-lg bg-raised shadow-2xl sm:w-56">
 			{#if album?.thumbnails.at(-1)}
-				<img src={thumbUrl(album.thumbnails, 544)} alt="" use:hideIfBroken referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+				<Picture src={thumbUrl(album.thumbnails, 544)!} small={smallUrl(album.thumbnails, 544)} lazy={false} class="h-full w-full object-cover" />
 			{/if}
 		</div>
 		<div class="min-w-0">

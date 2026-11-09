@@ -3,7 +3,7 @@
 import type { Card } from './components/CardGrid.svelte';
 import type { DialTile } from './components/SpeedDial.svelte';
 import type { MenuTarget } from './components/SongMenu.svelte';
-import { thumbUrl } from './images.svelte';
+import { smallUrl, thumbUrl } from './images.svelte';
 import type { Song } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 import { menuAt, tapSong } from './songActions';
@@ -16,6 +16,7 @@ export function songTiles(songs: Song[], room: RoomConnection, onToast: (text: s
 		key: `${song.id}:${i}`,
 		title: song.title,
 		art: thumbUrl(song.thumbnails, TILE),
+		small: smallUrl(song.thumbnails, TILE),
 		icon: 'note',
 		open: () => tapSong(room, song, onToast),
 		menu: (event: MouseEvent) => {
@@ -26,4 +27,4 @@ export function songTiles(songs: Song[], room: RoomConnection, onToast: (text: s
 }
 
 export const cardTiles = (cards: Card[]): DialTile[] =>
-	cards.map((card) => ({ key: card.key, title: card.title, art: card.art, icon: card.round ? 'person' : 'note', open: card.open, prefetch: card.prefetch }));
+	cards.map((card) => ({ key: card.key, title: card.title, art: card.art, small: card.small, icon: card.round ? 'person' : 'note', open: card.open, prefetch: card.prefetch }));

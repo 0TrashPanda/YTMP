@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { thumbUrl } from '../images.svelte';
+	import { smallUrl, thumbUrl } from '../images.svelte';
 	import { prefetch } from '../api';
 	import type { AlbumSummary } from '../protocol.gen';
 	import CardGrid from './CardGrid.svelte';
@@ -12,6 +12,7 @@
 			title: album.title,
 			subtitle: [album.kind, album.year].filter(Boolean).join(' • '),
 			art: thumbUrl(album.thumbnails, 400),
+			small: smallUrl(album.thumbnails, 400),
 			open: () => onOpen(album),
 			prefetch: () => prefetch('album', album.id)
 		}))

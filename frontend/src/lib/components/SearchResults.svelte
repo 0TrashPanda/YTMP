@@ -2,7 +2,8 @@
 	// Search results with YTM's chips (all, songs, videos, albums, …), or "Find similar" for a
 	// song. Songs: tap = what Tap does in song lists, ⋮ or right-click = song menu. Albums, artists and
 	// playlists open their page.
-	import { thumbUrl } from '../images.svelte';
+	import { smallUrl, thumbUrl } from '../images.svelte';
+	import Picture from './Picture.svelte';
 	import { getSong, search, similar } from '../api';
 	import { parseLink } from '../links';
 	import { menuAt, tapSong } from '../songActions';
@@ -112,13 +113,14 @@
 	const cards = (items: SearchItem[]) => items.flatMap((i) => card(i) ?? []);
 
 	/** The top result, as one big card: a song does what Tap does in song lists, anything else opens. */
-	function top(item: SearchItem): { title: string; subtitle: string; art: string | undefined; round: boolean; open: () => void; prefetch?: () => void } {
+	function top(item: SearchItem): { title: string; subtitle: string; art: string | undefined; small?: string; round: boolean; open: () => void; prefetch?: () => void } {
 		if (item.kind === 'song') {
 			const song = item.song;
 			return {
 				title: song.title,
 				subtitle: `${song.podcast ? 'Episode' : item.video ? 'Video' : 'Song'} • ${artistNames(song)}`,
 				art: thumbUrl(song.thumbnails, 400),
+				small: smallUrl(song.thumbnails, 400),
 				round: false,
 				open: () => tapSong(room, song, onToast)
 			};
@@ -176,7 +178,7 @@
 							}}
 						>
 							<div class="h-20 w-20 shrink-0 overflow-hidden bg-line sm:h-24 sm:w-24 {t.round ? 'rounded-full' : 'rounded-md'}">
-								{#if t.art}<img src={t.art} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />{/if}
+								{#if t.art}<Picture src={t.art} small={t.small} lazy={false} class="h-full w-full object-cover" />{/if}
 							</div>
 							<div class="min-w-0">
 								<p class="truncate text-xl font-bold sm:text-2xl">{t.title}</p>

@@ -119,6 +119,10 @@ Like YTM:
   big screens bigger than YTM lists them (like YTM, Google's pictures are asked for at the
   size shown, e.g. 1200 px album art in the desktop player); **Low** loads at most 300 px
   pictures, to save data.
+- **Small pictures first** ✅: big pictures (cards on the home page and in search, the
+  player's art, the top of album, playlist, podcast and artist pages) show a small version at
+  once and the sharp one as soon as it's in, so a page fills quickly on a slow connection.
+  Often the small one is there already, from a list or the player bar. Not on Low quality.
 - **Dislike button in the player bar** ✅ (Settings → Player): Normal, Dimmed
   (darker until you point at it) or Hidden.
 - **Swiping up on the player's tabs** ✅ (Settings → Player): opens **that tab**

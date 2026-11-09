@@ -4,6 +4,8 @@
 		key: string;
 		title: string;
 		art: string | undefined;
+		/** Shown first while [art] loads. */
+		small?: string;
 		/** Shown when there's no picture. */
 		icon: IconName;
 		open: () => void;
@@ -17,8 +19,8 @@
 <script lang="ts">
 	// YTM's speed dial: covers in a 3×3 grid with the name over them, nine at a time, the next nine
 	// a swipe to the side (Home: Pinned, and any section set to Speed dial).
-	import { hideIfBroken } from '../pictures';
 	import Icon from './Icon.svelte';
+	import Picture from './Picture.svelte';
 	import PageDots from './PageDots.svelte';
 
 	let { tiles }: { tiles: DialTile[] } = $props();
@@ -41,7 +43,7 @@
 				>
 					<Icon name={tile.icon} size={36} class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-muted" />
 					{#if tile.art}
-						<img src={tile.art} alt="" use:hideIfBroken loading="lazy" referrerpolicy="no-referrer" class="relative h-full w-full object-cover transition-transform group-hover:scale-105" />
+						<Picture src={tile.art} small={tile.small} class="relative h-full w-full object-cover transition-transform group-hover:scale-105" />
 					{/if}
 					<!-- The name over the cover, readable on any picture. -->
 					<span

@@ -3,7 +3,8 @@
 	// what Tap does in song lists (add to queue at first); ⋮ or right-click = the song menu. With YouTube Music: Subscribe (your library).
 	// With a YTMP account: how far you got in each episode, and marking them played.
 	import { whileBusy } from '../busy.svelte';
-	import { thumbUrl } from '../images.svelte';
+	import { smallUrl, thumbUrl } from '../images.svelte';
+	import Picture from './Picture.svelte';
 	import { getMyPodcast, getPodcast, setPodcastSaved } from '../api';
 	import { youtube } from '../youtube.svelte';
 	import { listening } from '../listening.svelte';
@@ -112,7 +113,7 @@
 	<header class="flex flex-col gap-5 px-2 sm:flex-row sm:items-end">
 		<div class="aspect-square w-48 shrink-0 overflow-hidden rounded-lg bg-raised shadow-2xl sm:w-56">
 			{#if podcast?.thumbnails.at(-1)}
-				<img src={thumbUrl(podcast.thumbnails, 544)} alt="" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+				<Picture src={thumbUrl(podcast.thumbnails, 544)!} small={smallUrl(podcast.thumbnails, 544)} lazy={false} class="h-full w-full object-cover" />
 			{/if}
 		</div>
 		<div class="min-w-0">
