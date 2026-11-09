@@ -18,6 +18,8 @@ what's planned is marked there.
 - Tests: `./gradlew test`, `cd ytm-module && .venv/bin/python -m pytest -q` and `cd frontend && pnpm test`.
 - Where a new feature goes: `docs/implementation/architecture.md#where-things-are-in-the-code`.
 - Web app: `cd frontend && pnpm check && pnpm build` (the Android build bundles `frontend/build`).
+- Chrome 90 (older Chromecasts showing the party screen): `pnpm build` checks the built-ins;
+  after web app changes also run `node tools/chrome90-test.mjs` (real Chromium 90, own server).
 - Android: `./gradlew :android:assembleDebug`; release lint: `./gradlew :android:lintRelease`.
 - After changing anything in `protocol/`: `./gradlew :protocol:generateTs` (new request types
   must also be added as roots in `protocol/.../tsgen/TsGenerator.kt`).
@@ -59,3 +61,5 @@ what's planned is marked there.
 - Many real YouTube lookups in a short time get the home network blocked for hours ("confirm
   you're not a bot"): keep real extraction tests sparing.
 - Kotlin: `/*` inside a KDoc comment starts a nested comment.
+- The web app must keep working in Chrome 90: a newer built-in (like `structuredClone`) goes
+  in `frontend/src/lib/polyfills.ts`, or the party screen on older Chromecasts breaks.
