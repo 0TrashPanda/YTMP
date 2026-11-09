@@ -120,6 +120,17 @@ class SyncCorrection {
             return maxOf(0, position + (target.syncOffsetMs * target.speed).toLong())
         }
 
+        /**
+         * [targetPosition], but not past the song's end. A length of 0 is unknown (some listings
+         * leave it out): capped to it, a long DJ set was "expected" at 0 s and sought back there
+         * every couple of seconds.
+         */
+        fun expectedPosition(target: PlaybackTarget, nowMs: Long): Long {
+            val position = targetPosition(target, nowMs)
+            val duration = target.item?.durationMs ?: 0
+            return if (duration > 0) minOf(position, duration) else position
+        }
+
         /** The player's speed apart from the room's ([roomSpeed]): what [onDrift] works with. Rounded (1.455 / 1.5 is 0.97). */
         fun ownSpeed(playerSpeed: Float, roomSpeed: Float): Float = Math.round(playerSpeed / roomSpeed * 1000) / 1000f
     }

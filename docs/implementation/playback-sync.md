@@ -168,6 +168,10 @@ skipped, most on a TV. Now a new song waits for the players, like Sonos or Spoti
   (not a TV showing the party screen: its page is a participant). Older apps don't send the
   flag (the page asks the app for bridge version 9), so they're not waited for. Someone who
   stops listening while the room waits isn't waited for either (checked every 100 ms).
+- A song's length of 0 means unknown, not "ends at 0": seeks (`Room.withinSong`, the web
+  app's prediction) and the position a player aims for (`SyncCorrection.expectedPosition`)
+  are only kept within a known length. Clamped to 0, an hour-long DJ set without a length
+  went back to its first second every couple of seconds.
 - Pausing or seeking while it waits ends the wait. The song ends by its length counted from
   when it started, not from when its stream was ready. Pages show a starting song as playing
   (and loading), and so a song whose stream is still being looked up

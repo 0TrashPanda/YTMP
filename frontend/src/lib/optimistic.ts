@@ -185,7 +185,9 @@ function position(s: RoomState, at: number): number {
 
 function seek(s: RoomState, positionMs: number, at: number): void {
 	const p = s.playback;
-	p.positionMs = Math.min(Math.max(positionMs, 0), Math.max(s.nowPlaying?.item.song.durationMs ?? 0, 0));
+	// A length of 0 is unknown, not "ends at 0".
+	const duration = s.nowPlaying?.item.song.durationMs ?? 0;
+	p.positionMs = duration > 0 ? Math.min(Math.max(positionMs, 0), duration) : Math.max(positionMs, 0);
 	p.hostTimeMs = at;
 	// Seeking while it waits for the players: it plays from there now.
 	if (p.starting) {

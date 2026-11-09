@@ -56,6 +56,20 @@ class SyncCorrectionTest {
     }
 
     @Test
+    fun `the expected position stops at the song's end, unless its length is unknown`() {
+        val target = PlaybackTarget(
+            enabled = true, item = TargetItem("i1", "ytm:1", "DJ set", "Artist", null, durationMs = 180_000),
+            streamUrl = null, proxyUrl = null,
+            playing = true, positionMs = 179_000, hostTimeMs = 1_000, clockOffset = 0.0,
+            syncOffsetMs = 0, volume = 1f,
+        )
+        assertEquals(180_000, SyncCorrection.expectedPosition(target, nowMs = 11_000))
+        // A length of 0 is unknown: capped to it, an hour-long set was sought back to 0 s every 2 s.
+        val unknown = target.copy(item = target.item!!.copy(durationMs = 0), positionMs = 1_400)
+        assertEquals(11_400, SyncCorrection.expectedPosition(unknown, nowMs = 11_000))
+    }
+
+    @Test
     fun `an episode at 1,5 moves on faster, and corrections work on top of that speed`() {
         val target = PlaybackTarget(
             enabled = true, item = null, streamUrl = null, proxyUrl = null,

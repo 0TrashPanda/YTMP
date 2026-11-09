@@ -47,6 +47,18 @@ describe('predict', () => {
 		expect(s.playback).toMatchObject({ playing: true, positionMs: 14_000, hostTimeMs: 9_000 });
 	});
 
+	it('seeks within the song, also when its length is unknown', () => {
+		const s = room();
+		predict(s, { kind: 'Seek', positionMs: 900_000 }, sender());
+		expect(s.playback.positionMs).toBe(200_000);
+		// A length of 0 is unknown: an hour-long DJ set kept going back to 0 s.
+		const long = item('set');
+		long.song = { ...long.song, durationMs: 0 };
+		const t = room({ nowPlaying: { item: long, streamUrl: 'https://stream' } });
+		predict(t, { kind: 'Seek', positionMs: 2_400_000 }, sender());
+		expect(t.playback.positionMs).toBe(2_400_000);
+	});
+
 	it('plays a paused song without its stream as loading', () => {
 		const s = room({ nowPlaying: { item: item('now'), streamUrl: null } });
 		s.playback.playing = false;

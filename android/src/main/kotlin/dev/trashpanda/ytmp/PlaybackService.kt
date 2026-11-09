@@ -700,8 +700,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun expectedPosition(target: PlaybackTarget): Long =
-        SyncCorrection.targetPosition(clockOffset?.let { target.copy(clockOffset = it) } ?: target, System.currentTimeMillis())
-            .coerceAtMost(maxOf(0, target.item?.durationMs ?: 0))
+        SyncCorrection.expectedPosition(clockOffset?.let { target.copy(clockOffset = it) } ?: target, System.currentTimeMillis())
 
     /**
      * A new song here. In a room elsewhere it counts as a play for this phone's song cache (rooms
