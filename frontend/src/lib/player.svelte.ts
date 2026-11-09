@@ -77,6 +77,28 @@ export function pause(room: RoomConnection, player: RoomPlayer | null | undefine
 	else void room.run({ kind: 'Pause' });
 }
 
+/**
+ * Play, from YTMP's own buttons. In a solo room where nothing plays the room (no device with
+ * *Play here* on, no speaker or TV), it also switches *Play here* on, so the press is heard
+ * (*Press play to play here*, on by default). Call it from the click: a browser only starts
+ * sound inside one.
+ */
+export function play(room: RoomConnection, player: RoomPlayer | null | undefined): Promise<unknown> {
+	if (player && startsHere(room, player)) void player.enable();
+	return room.run({ kind: 'Play' });
+}
+
+/** Play also switches *Play here* on (see [play]). */
+export function startsHere(room: RoomConnection, player: RoomPlayer): boolean {
+	return (
+		settings.playStartsHere.value &&
+		!player.enabled &&
+		room.state?.room.visibility === 'private' &&
+		room.listeningAlone &&
+		room.can('listen_locally')
+	);
+}
+
 /** Pause only stops the music on this device: the setting, or you may not pause the party (the default Listener). */
 function stopsHere(room: RoomConnection, player: RoomPlayer | null | undefined): boolean {
 	if (!player?.enabled || room.state?.room.visibility === 'private' || room.listeningAlone) return false;

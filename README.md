@@ -116,6 +116,8 @@ Music, without Premium, and not tied to a single music service.
   speaker off, and guests (*Listener*) can't pause the party by default. Pause, seek, skip
   or play something else while others listen asks first (*No*, *Just once*, *Always*), and
   *Pause only stops it here* makes YTMP's Pause button stop it just on your device.
+- In a room of your own, Play starts the music on the device you pressed it on when it isn't
+  playing anywhere else (*Press play to play here*, on by default).
 - Your other devices in the room (signed in to your account) show in *Play on* with their
   own volume slider: turn the laptop down from your phone. On a phone it's the media volume.
   A checkbox switches *Play here* on or off there (a browser after one click on its page).

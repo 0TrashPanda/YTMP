@@ -20,6 +20,11 @@ permissions say otherwise (permission: *Play audio locally*).
   your first tap or key press, since browsers only allow audio after one). Switching
   *this device* off in a solo room is remembered for that room. Another app taking the
   audio stops it for now but doesn't count as switching off.
+- **Press play to play here** ✅ (*Settings → Playback*, on by default): in a solo room
+  where the music isn't playing anywhere (no device with *Play here* on, no speaker or TV),
+  YTMP's Play button (and the space bar) also switches *this device* on, so pressing Play is
+  always heard. Not in a party room, and not while it plays on another device, speaker or TV:
+  then Play just plays the room there.
 - **Next while paused** ✅ (*Settings → Playback*): **Plays the next song**
   (default, like YouTube Music) or **Stays paused** (the next song loads, the room stays
   paused). Also for the notification's, lock screen's and keyboard's Next. It needs *Play /

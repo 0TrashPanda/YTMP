@@ -41,7 +41,7 @@
 	import CloneSheet from '../../../lib/components/CloneSheet.svelte';
 	import { forgetHome, forgetLibrary, getHost, getRoom } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
-	import { createPlayer, pause, type RoomPlayer } from '../../../lib/player.svelte';
+	import { createPlayer, pause, play, type RoomPlayer } from '../../../lib/player.svelte';
 	import { sleepTimer } from '../../../lib/sleepTimer.svelte';
 	import SleepTimerSheet from '../../../lib/components/SleepTimerSheet.svelte';
 	import { RoomConnection } from '../../../lib/room.svelte';
@@ -426,7 +426,7 @@
 		event.preventDefault();
 		if (!event.repeat) {
 			if (room.state.playback.playing || room.state.playback.starting || room.state.playback.loading) pause(room, player);
-			else room.run({ kind: 'Play' });
+			else play(room, player);
 		}
 	}
 

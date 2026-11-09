@@ -325,6 +325,11 @@
 					setting={settings.pauseStopsHere}
 				/>
 				<Toggle
+					label="Press play to play here"
+					hint="In a room of your own (not a party), when the music isn't playing on any device, speaker or TV, Play starts it on this device."
+					setting={settings.playStartsHere}
+				/>
+				<Toggle
 					label="Ask before leaving a room"
 					hint="Off: Leave room leaves right away. As the owner of a party room with others in it, it still asks who runs the room after you."
 					setting={settings.askLeave}

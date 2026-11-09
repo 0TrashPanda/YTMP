@@ -15,6 +15,13 @@ Feature description: [features/playback-and-outputs.md](../features/playback-and
 3. Clients play the stream themselves and correct drift from the periodic state
    updates.
 
+YTMP's own Play button goes through `play()` in `frontend/src/lib/player.svelte.ts` (Pause
+through `pause()`). With *Press play to play here* on (`settings.playStartsHere`), in a
+private (solo) room where `RoomConnection.listeningAlone` holds (no other participant
+listening, no speakers near a phone, no active output) and this page may `listen_locally`,
+it calls the player's `enable()` inside the click (a browser's audio unlock) before sending
+`Play`; `SetListening` and `Play` go over the same socket, in that order.
+
 ## Clock sync
 
 "Position X at time T" only works if clients know the host's clock. Proposal:

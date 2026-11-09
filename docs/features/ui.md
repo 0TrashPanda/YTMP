@@ -377,7 +377,7 @@ song's menu on an album's or artist's page has no *Go to* that same page.
     **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
     bottom).
   - **Playing**: **Playback** (next while paused, start radio, asking before interrupting a
-    party, pause only stops it here, your other devices, skip silence in podcasts), **Adding
+    party, pause only stops it here, press play to play here, your other devices, skip silence in podcasts), **Adding
     songs** (long playlists, see [queue](queue.md#long-playlists); when to say what's going
     on, below) and **Sound** (equalizer, headphones).
   - **How it looks**: **Look** (image quality, video pictures, songs per page), **Player**

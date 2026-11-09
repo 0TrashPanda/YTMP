@@ -15,7 +15,7 @@
 	import { shows } from '../soloLook.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef } from '../protocol.gen';
-	import { canPause, pause, type RoomPlayer } from '../player.svelte';
+	import { canPause, pause, play, type RoomPlayer } from '../player.svelte';
 	import SourceBadge from './SourceBadge.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -131,7 +131,7 @@
 		const seek = (delta: number) => room.run({ kind: 'Seek', positionMs: Math.max(0, Math.min(duration, Math.round(positionMs + delta))) });
 		let handled = true;
 		if (key === 'k') {
-			if (current && (playing ? canPause(room, player) : room.can('play_pause'))) (playing ? pause(room, player) : room.run({ kind: 'Play' }));
+			if (current && (playing ? canPause(room, player) : room.can('play_pause'))) (playing ? pause(room, player) : play(room, player));
 		} else if (key === 'n') {
 			if (current) room.next();
 		} else if (key === 'p') {
@@ -245,7 +245,7 @@
 				class="shrink-0 rounded-full p-1.5 disabled:opacity-40"
 				disabled={playing ? !canPause(room, player) : !room.can('play_pause')}
 				aria-label={playing ? 'Pause' : 'Play'}
-				onclick={() => (playing ? pause(room, player) : room.run({ kind: 'Play' }))}
+				onclick={() => (playing ? pause(room, player) : play(room, player))}
 			>
 				<Icon name={playing ? 'pause' : 'play'} size={32} />
 			</button>
@@ -270,7 +270,7 @@
 						class="rounded-full p-2 hover:bg-raised disabled:opacity-40"
 						disabled={playing ? !canPause(room, player) : !room.can('play_pause')}
 						aria-label={playing ? 'Pause' : 'Play'}
-						onclick={() => (playing ? pause(room, player) : room.run({ kind: 'Play' }))}
+						onclick={() => (playing ? pause(room, player) : play(room, player))}
 					>
 						<Icon name={playing ? 'pause' : 'play'} size={36} />
 					</button>
