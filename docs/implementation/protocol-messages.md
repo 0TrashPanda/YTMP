@@ -84,6 +84,9 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `RemoveQueueItem` ✅ | `itemId` (queue, history or autoplay) | Remove own / others' songs |
 | `MoveQueueItem` ✅ | `itemId`, `toIndex` | Reorder |
 | `MoveItem` ✅ | `itemId`, `list: "history" \| "queue" \| "autoplay"`, `toIndex` | Reorder (autoplay → queue next/last: Add songs) |
+| `RemoveItems` ✅ | `itemIds` (queue, history or autoplay; not the current song; ones already gone are skipped) | Remove own / others' songs, for each one |
+| `ClearHistory` ✅ | – | Remove own / others' songs, like `ClearQueue` |
+| `UndoRemoveItems` ✅ | – | The same, for what it puts back; the last `RemoveItems` or `ClearHistory`, within `CLEAR_ROOM_UNDO_MS` (2 min) |
 | `ClearQueue` ✅ | – | Remove own / others' songs |
 | `ClearAutoplay` ✅ | – | Autoplay from here |
 | `ClearRoom` ✅ | – | Remove own / others' songs (the current one too); Autoplay from here when autoplay has songs |

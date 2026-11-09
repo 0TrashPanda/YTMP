@@ -102,6 +102,10 @@ export interface CommandClearAutoplay {
   kind: "ClearAutoplay";
 }
 
+export interface CommandClearHistory {
+  kind: "ClearHistory";
+}
+
 export interface CommandClearQueue {
   kind: "ClearQueue";
 }
@@ -189,6 +193,11 @@ export interface CommandPlayerStalled {
 
 export interface CommandPrevious {
   kind: "Previous";
+}
+
+export interface CommandRemoveItems {
+  kind: "RemoveItems";
+  itemIds: string[];
 }
 
 export interface CommandRemoveQueueItem {
@@ -343,6 +352,10 @@ export interface CommandUndoClearRoom {
   kind: "UndoClearRoom";
 }
 
+export interface CommandUndoRemoveItems {
+  kind: "UndoRemoveItems";
+}
+
 export interface Role {
   id: string;
   name: string;
@@ -387,6 +400,7 @@ export type Command =
   | CommandCancelMigration
   | CommandChangeOwner
   | CommandClearAutoplay
+  | CommandClearHistory
   | CommandClearQueue
   | CommandClearRoom
   | CommandCreateRole
@@ -403,6 +417,7 @@ export type Command =
   | CommandPlayerReady
   | CommandPlayerStalled
   | CommandPrevious
+  | CommandRemoveItems
   | CommandRemoveQueueItem
   | CommandRestoreSongs
   | CommandSeek
@@ -428,6 +443,7 @@ export type Command =
   | CommandStartRadio
   | CommandUnban
   | CommandUndoClearRoom
+  | CommandUndoRemoveItems
   | CommandUpdateRole
   | CommandUpdateSettings
   | CommandVoteSkip;

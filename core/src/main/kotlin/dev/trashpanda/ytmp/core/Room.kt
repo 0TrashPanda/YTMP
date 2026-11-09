@@ -880,6 +880,9 @@ class Room(
                     }
                 }
             }
+            is Command.RemoveItems -> return removeItems(member, command.itemIds)
+            Command.ClearHistory -> return clearHistory(member)
+            Command.UndoRemoveItems -> return undoRemoveItems(member)
             is Command.MoveItem -> return moveItem(member, command)
             Command.ClearQueue -> {
                 if (queue.isEmpty()) return null
@@ -1929,6 +1932,63 @@ class Room(
 
     private fun clearAutoplay() {
         if (autoplay.clear()) emit(autoplay.changed())
+    }
+
+    /** What the last RemoveItems or ClearHistory took out and where it was, for [undoRemoveItems]. */
+    private class RemovedItems(val lists: Map<ItemList, List<IndexedValue<QueueItem>>>, val at: Long) {
+        val songs get() = lists.values.flatten().map { it.value }
+    }
+
+    private var removedItems: RemovedItems? = null
+
+    private fun removeItems(member: Member, itemIds: List<String>): ErrorInfo? {
+        val ids = itemIds.toSet()
+        val lists = ItemList.entries.associateWith { list -> listOf(list).withIndex().filter { it.value.itemId in ids } }.filterValues { it.isNotEmpty() }
+        val removed = RemovedItems(lists, clock())
+        if (removed.songs.isEmpty()) return notFound()
+        removed.songs.firstNotNullOfOrNull { need(member, if (it.addedBy == member.id) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS) }?.let { return it }
+        removedItems = removed
+        for (list in lists.keys) {
+            listOf(list).removeAll { it.itemId in ids }
+            emitList(list)
+        }
+        refillAutoplay()
+        return null
+    }
+
+    private fun clearHistory(member: Member): ErrorInfo? {
+        if (history.isEmpty()) return null
+        needToClear(member, history, emptyList())?.let { return it }
+        removedItems = RemovedItems(mapOf(ItemList.HISTORY to history.withIndex().toList()), clock())
+        // Out of sight, but radio and autoplay still don't bring those songs back soon.
+        cleared = (cleared + history.map { it.song.id }).takeLast(RECENT_SONGS)
+        history.clear()
+        emitList(ItemList.HISTORY)
+        return null
+    }
+
+    private fun undoRemoveItems(member: Member): ErrorInfo? {
+        val removed = removedItems?.takeIf { clock() - it.at <= CLEAR_ROOM_UNDO_MS }
+            ?: return invalid("Removing songs can only be undone for ${CLEAR_ROOM_UNDO_MS / 60_000} minutes")
+        needToClear(member, removed.songs, emptyList())?.let { return it }
+        removedItems = null
+        for ((list, items) in removed.lists) {
+            val target = listOf(list)
+            for ((index, item) in items) target.add(index.coerceAtMost(target.size), item)
+            emitList(list)
+        }
+        if (current == null && queue.isNotEmpty()) {
+            wantPlaying = true
+            playNextFromQueue()
+        }
+        return null
+    }
+
+    /** Tells everyone what [list] looks like now. */
+    private fun emitList(list: ItemList) = when (list) {
+        ItemList.HISTORY -> emit(Event.HistoryReplaced(history.takeLast(SNAPSHOT_HISTORY)))
+        ItemList.QUEUE -> emit(Event.QueueReplaced(queue.toList()))
+        ItemList.AUTOPLAY -> emit(autoplay.changed())
     }
 
     /** Songs that shouldn't come up again soon (also from a history Start radio cleared). */

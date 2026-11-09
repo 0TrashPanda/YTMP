@@ -39,6 +39,35 @@ const sender = (allowed: Permission[] | 'all' = 'all'): Sender => ({
 const ids = (items: QueueItem[]) => items.map((i) => i.itemId);
 
 describe('predict', () => {
+	it('removes several songs at once, from every list', () => {
+		const s = room();
+		expect(predict(s, { kind: 'RemoveItems', itemIds: ['q1', 'h1', 'a2', 'gone'] }, sender())).toBe(true);
+		expect(ids(s.queue)).toEqual(['q2']);
+		expect(ids(s.history)).toEqual([]);
+		expect(ids(s.autoplay)).toEqual(['a1']);
+		expect(s.nowPlaying?.item.itemId).toBe('now');
+	});
+
+	it("doesn't remove several songs when one of them may not be removed", () => {
+		const s = room({ queue: [item('q1'), item('q2', 'p2')] });
+		expect(predict(s, { kind: 'RemoveItems', itemIds: ['q1', 'q2'] }, sender(['remove_own']))).toBe(false);
+		expect(ids(s.queue)).toEqual(['q1', 'q2']);
+	});
+
+	it('removes the played songs only', () => {
+		const s = room();
+		expect(predict(s, { kind: 'ClearHistory' }, sender(['remove_own']))).toBe(true);
+		expect(s.history).toEqual([]);
+		expect(ids(s.queue)).toEqual(['q1', 'q2']);
+		expect(s.nowPlaying?.item.itemId).toBe('now');
+	});
+
+	it("keeps the played songs when others' songs may not be removed", () => {
+		const s = room({ history: [item('h1', 'p2')] });
+		expect(predict(s, { kind: 'ClearHistory' }, sender(['remove_own']))).toBe(false);
+		expect(ids(s.history)).toEqual(['h1']);
+	});
+
 	it('pauses where the song is now, and plays on from there', () => {
 		const s = room();
 		expect(predict(s, { kind: 'Pause' }, sender())).toBe(true);

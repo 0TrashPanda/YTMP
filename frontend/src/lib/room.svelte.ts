@@ -237,6 +237,14 @@ export class RoomConnection {
 			const index = queue.findIndex((item) => item.itemId === command.itemId);
 			return index < 0 ? null : { text: `Removed "${queue[index].song.title}"`, command: restore([queue[index].song], index) };
 		}
+		if (command.kind === 'RemoveItems') {
+			const ids = new Set(command.itemIds);
+			const count = [...(state?.history ?? []), ...queue, ...(state?.autoplay ?? [])].filter((item) => ids.has(item.itemId)).length;
+			return count ? { text: `Removed ${count} ${count === 1 ? 'song' : 'songs'}`, command: { kind: 'UndoRemoveItems' } } : null;
+		}
+		if (command.kind === 'ClearHistory' && state?.history.length) {
+			return { text: 'Removed the played songs', command: { kind: 'UndoRemoveItems' } };
+		}
 		if (command.kind === 'ClearQueue' && queue.length) {
 			return { text: `Cleared the queue (${queue.length} ${queue.length === 1 ? 'song' : 'songs'})`, command: restore(queue.map((item) => item.song), 0) };
 		}

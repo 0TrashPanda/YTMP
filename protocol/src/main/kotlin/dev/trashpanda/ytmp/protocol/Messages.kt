@@ -141,6 +141,31 @@ sealed interface Command {
         val options: RadioOptions? = null,
     ) : Command
 
+    /**
+     * Removes several songs at once, from the queue, the history or autoplay (not the current
+     * song); ones that are gone already don't matter. Needs the same permissions as removing each
+     * one ([RemoveQueueItem]). [UndoRemoveItems] puts them back for a while.
+     */
+    @Serializable
+    @SerialName("RemoveItems")
+    data class RemoveItems(val itemIds: List<String>) : Command
+
+    /**
+     * Empties the history: the songs above the current one, played or skipped. Needs the
+     * permissions like [ClearQueue]. [UndoRemoveItems] puts them back for a while.
+     */
+    @Serializable
+    @SerialName("ClearHistory")
+    data object ClearHistory : Command
+
+    /**
+     * Puts back what the last [RemoveItems] or [ClearHistory] took away, where it was, for
+     * [CLEAR_ROOM_UNDO_MS] after.
+     */
+    @Serializable
+    @SerialName("UndoRemoveItems")
+    data object UndoRemoveItems : Command
+
     /** Empties the upcoming queue. */
     @Serializable
     @SerialName("ClearQueue")

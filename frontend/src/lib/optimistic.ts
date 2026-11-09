@@ -133,6 +133,19 @@ export function predict(s: RoomState, command: Command, by: Sender): boolean {
 			}
 			return true;
 		}
+		case 'RemoveItems': {
+			const ids = new Set(command.itemIds);
+			const items = [...s.history, ...s.queue, ...s.autoplay].filter((i) => ids.has(i.itemId));
+			if (!items.length || items.some((i) => !by.can(i.addedBy === by.id ? 'remove_own' : 'remove_others'))) return false;
+			s.history = s.history.filter((i) => !ids.has(i.itemId));
+			s.queue = s.queue.filter((i) => !ids.has(i.itemId));
+			s.autoplay = s.autoplay.filter((i) => !ids.has(i.itemId));
+			return true;
+		}
+		case 'ClearHistory':
+			if (s.history.length && !by.can(s.history.every((i) => i.addedBy === by.id) ? 'remove_own' : 'remove_others')) return false;
+			s.history = [];
+			return true;
 		case 'ClearQueue':
 			if (s.queue.length && !by.can(s.queue.every((i) => i.addedBy === by.id) ? 'remove_own' : 'remove_others')) return false;
 			s.queue = [];

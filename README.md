@@ -38,7 +38,7 @@ Music, without Premium, and not tied to a single music service.
   QR code or a room link opens in the app on an Android phone that has it. Pick your own
   room code if you like (e.g. `PARTY`).
 - One shared queue: add, play next, drag to reorder, swipe to remove, jump to any song,
-  clear, or clear the whole room (song, queue and autoplay) with Undo. Played songs stay above the current one; autoplay songs below.
+  remove everything above or below a song, clear, or clear the whole room (song, queue and autoplay), with Undo. Played songs stay above the current one until you remove them; autoplay songs below.
 - Shuffle and repeat (queue or one song), fair order (one song per person per round),
   vote to skip, and limits (songs per person, song length, no recent repeats).
 - A party screen for a TV, laptop or tablet: big album art in its colour, what's next and
@@ -142,7 +142,7 @@ Music, without Premium, and not tied to a single music service.
   order, hide actions, dividers. On a phone it slides up from the bottom like YouTube
   Music's, with three big buttons at the top that you pick. Hold an action for more:
   where Add to queue puts it, Save to playlist straight into the last one, Dislike's
-  never-in-radios, remove all by an artist, keep a song offline; Shuffle, Next and Play on
+  never-in-radios, remove all by an artist or everything above or below a song, keep a song offline; Shuffle, Next and Play on
   can be held too. Each hold can be switched off or trimmed. Every list of songs has it:
   search, artist, album, playlist and podcast pages, Home, your history, Local.
 - Play an album or playlist from a song, like YouTube Music: *Play from here* in its menu,

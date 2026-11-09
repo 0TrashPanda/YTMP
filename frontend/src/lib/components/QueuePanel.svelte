@@ -35,6 +35,10 @@
 	const canClearRoom = $derived(
 		settings.clearRoomBy.value !== 'swipe' && !!(roomState?.nowPlaying || roomState?.queue.length || roomState?.autoplay.length) && room.can('remove_own')
 	);
+	// The played and skipped songs above the current one; Undo puts them back.
+	const canClearPlayed = $derived(
+		!!roomState?.history.length && room.can(roomState.history.every((i) => i.addedBy === room.participantId) ? 'remove_own' : 'remove_others')
+	);
 	let list = $state<HTMLElement>();
 
 	const slots = $derived.by((): Slot[] => {
@@ -340,16 +344,21 @@
 </script>
 
 <aside class="flex h-full min-h-0 flex-col">
-	{#if title || canClear || canClearRoom}
-		<div class="flex items-center gap-2 px-4 {title ? 'pt-4' : 'pt-2'} pb-2">
-			<h2 class="flex-1 text-sm font-medium tracking-wide text-muted uppercase">{title ? 'Up next' : ''}</h2>
+	{#if title || canClearPlayed || canClear || canClearRoom}
+		<div class="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 px-4 {title ? 'pt-4' : 'pt-2'} pb-2">
+			<h2 class="flex-1 text-sm font-medium tracking-wide whitespace-nowrap text-muted uppercase">{title ? 'Up next' : ''}</h2>
+			{#if canClearPlayed}
+				<button class="rounded-full px-2 py-0.5 text-xs whitespace-nowrap text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearHistory' })}>
+					Remove played songs
+				</button>
+			{/if}
 			{#if canClear}
-				<button class="rounded-full px-2 py-0.5 text-xs text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearQueue' })}>
+				<button class="rounded-full px-2 py-0.5 text-xs whitespace-nowrap text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearQueue' })}>
 					Clear queue
 				</button>
 			{/if}
 			{#if canClearRoom}
-				<button class="rounded-full px-2 py-0.5 text-xs text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearRoom' })}>
+				<button class="rounded-full px-2 py-0.5 text-xs whitespace-nowrap text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearRoom' })}>
 					Clear room
 				</button>
 			{/if}

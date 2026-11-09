@@ -404,6 +404,93 @@ class QueueTest {
         assertNotEquals(Permission.SKIP in listener.permissions, true)
     }
 
+    // --- removing several songs, and the played songs ---
+
+    /** Song 1 played, songs 2 and 3 skipped, song 4 current, songs 5 to 8 queued. */
+    private suspend fun TestScope.roomWithHistory(): Pair<Room, Client> {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        room.run(owner, Command.AddSongs((1..8).map { song(it) }, QueuePosition.END))
+        advanceTimeBy(61_000)
+        runCurrent()
+        assertEquals("ytm:2", room.state(owner).nowPlaying?.item?.song?.id)
+        room.run(owner, Command.Skip())
+        room.run(owner, Command.Skip())
+        return room to owner
+    }
+
+    @Test
+    fun `removing several songs takes them out at once, and undo puts them back where they were`() = runTest {
+        val (room, owner) = roomWithHistory()
+        val before = room.state(owner)
+        val ids = listOf(before.queue[0].itemId, before.queue[2].itemId, before.history[0].itemId, "gone")
+
+        assertNull(room.run(owner, Command.RemoveItems(ids)))
+        val after = room.state(owner)
+        assertEquals(listOf("ytm:6", "ytm:8"), after.queue.map { it.song.id })
+        assertEquals(listOf("ytm:2", "ytm:3"), after.history.map { it.song.id })
+        assertEquals(before.nowPlaying?.item?.itemId, after.nowPlaying?.item?.itemId)
+
+        assertNull(room.run(owner, Command.UndoRemoveItems))
+        val back = room.state(owner)
+        assertEquals(before.queue, back.queue)
+        assertEquals(before.history, back.history)
+        // Once only.
+        assertEquals(ErrorCode.INVALID, room.run(owner, Command.UndoRemoveItems)?.code)
+    }
+
+    @Test
+    fun `removing several songs leaves the current song alone`() = runTest {
+        val (room, owner) = roomWithHistory()
+        val current = room.state(owner).nowPlaying!!.item.itemId
+        assertEquals(ErrorCode.NOT_FOUND, room.run(owner, Command.RemoveItems(listOf(current)))?.code)
+        assertEquals(current, room.state(owner).nowPlaying?.item?.itemId)
+    }
+
+    @Test
+    fun `removing several songs needs the permission for every one of them`() = runTest {
+        val (room, owner) = roomWithHistory()
+        val guest = room.connect("Guest")
+        room.run(guest, Command.AddSongs(listOf(song(20)), QueuePosition.END))
+        val queue = room.state(owner).queue
+        assertEquals(ErrorCode.PERMISSION_DENIED, room.run(guest, Command.RemoveItems(queue.map { it.itemId }))?.code)
+        assertEquals(queue.map { it.itemId }, room.state(owner).queue.map { it.itemId })
+    }
+
+    @Test
+    fun `remove played songs empties the history, played and skipped, and undo puts it back`() = runTest {
+        val (room, owner) = roomWithHistory()
+        val before = room.state(owner)
+        assertEquals(listOf(QueueItemResult.PLAYED, QueueItemResult.SKIPPED, QueueItemResult.SKIPPED), before.history.map { it.result })
+
+        assertNull(room.run(owner, Command.ClearHistory))
+        val after = room.state(owner)
+        assertEquals(emptyList(), after.history)
+        assertEquals(before.queue, after.queue)
+        assertEquals(before.nowPlaying?.item?.itemId, after.nowPlaying?.item?.itemId)
+
+        room.run(owner, Command.Skip())
+        assertNull(room.run(owner, Command.UndoRemoveItems))
+        // Before what ended since.
+        assertEquals(listOf("ytm:1", "ytm:2", "ytm:3", "ytm:4"), room.state(owner).history.map { it.song.id })
+    }
+
+    @Test
+    fun `remove played songs needs the permission to remove the others' songs`() = runTest {
+        val (room, owner) = roomWithHistory()
+        val guest = room.connect("Guest")
+        assertEquals(ErrorCode.PERMISSION_DENIED, room.run(guest, Command.ClearHistory)?.code)
+        assertEquals(3, room.state(owner).history.size)
+    }
+
+    @Test
+    fun `removing songs can't be undone after a while`() = runTest {
+        val (room, owner) = roomWithHistory()
+        room.run(owner, Command.ClearHistory)
+        testScheduler.advanceTimeBy(dev.trashpanda.ytmp.protocol.CLEAR_ROOM_UNDO_MS + 1)
+        assertEquals(ErrorCode.INVALID, room.run(owner, Command.UndoRemoveItems)?.code)
+    }
+
     // --- clear room ---
 
     @Test

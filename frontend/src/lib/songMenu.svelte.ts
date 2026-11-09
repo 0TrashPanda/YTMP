@@ -125,7 +125,9 @@ export const HOLD_CHOICES: Partial<Record<Holdable, { id: string; name: string }
 	],
 	remove: [
 		{ id: 'artist', name: 'Remove the songs by this artist' },
-		{ id: 'person', name: 'Remove the songs this person added' }
+		{ id: 'person', name: 'Remove the songs this person added' },
+		{ id: 'above', name: 'Remove the songs above it' },
+		{ id: 'below', name: 'Remove the songs below it' }
 	],
 	goArtist: [{ id: 'pick', name: 'Pick one of the artists (else each artist has its own line)' }],
 	download: [

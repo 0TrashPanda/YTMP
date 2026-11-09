@@ -23,7 +23,7 @@
 		{#each choices as c, i (i)}
 			<button role="menuitem" class="flex w-full items-center gap-5 px-5 py-3.5 text-left hover:bg-line active:bg-line" onclick={() => (onClose(), c.run())}>
 				<Icon name={c.icon} size={24} class="shrink-0" />
-				<span class="truncate">{c.label}</span>
+				<span class="min-w-0 break-words">{c.label}</span>
 			</button>
 		{/each}
 	</div>

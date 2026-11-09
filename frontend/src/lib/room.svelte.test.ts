@@ -151,6 +151,23 @@ describe('RoomConnection', () => {
 		expect(room.undo?.text).toBe('Removed "q2"');
 	});
 
+	it('offers one Undo for several removed songs', () => {
+		const { room } = connected();
+		room.run({ kind: 'RemoveItems', itemIds: ['q1', 'q2'] });
+		expect(room.state?.queue).toEqual([]);
+		expect(room.undo).toEqual({ text: 'Removed 2 songs', command: { kind: 'UndoRemoveItems' } });
+	});
+
+	it('offers Undo for the played songs, only when there are any', () => {
+		const { room } = connected();
+		room.run({ kind: 'ClearHistory' });
+		expect(room.undo).toBeNull();
+		room.state!.history = [item('h1')];
+		room.run({ kind: 'ClearHistory' });
+		expect(room.state?.history).toEqual([]);
+		expect(room.undo).toEqual({ text: 'Removed the played songs', command: { kind: 'UndoRemoveItems' } });
+	});
+
 	it('drops what was shown when the connection is lost', () => {
 		const { room, socket } = connected();
 		room.run({ kind: 'ClearQueue' });

@@ -36,8 +36,21 @@ limits, and it doesn't look at history or the autoplay queue.
 
 Removing a song from the queue, or clearing the queue, shows *Removed "…" · **Undo*** for 8
 seconds. Undo puts the songs back where they were (they count as added by whoever undoes
-it, and need the same *add songs* permission). It's for the queue; history and autoplay
-removals aren't undoable.
+it, and need the same *add songs* permission). Removing one song from the history or
+autoplay can't be undone.
+
+Removing several songs at once (*Remove above*, *Remove below*, the songs by an artist or
+added by someone: hold *Remove* in the [song menu](ui.md#song-menu)) and *Remove played
+songs* also show **Undo**, for the queue, the history and autoplay alike. Those songs come
+back exactly where they were, still added by whoever added them.
+
+## Remove played songs ✅
+
+*Remove played songs*, next to *Clear queue* and *Clear room* above Up next, empties the
+[history](#queue-history): every song above the current one, played or skipped. The song
+that plays, the queue and autoplay stay. It needs the same permissions as *Clear queue*:
+*Remove own songs* when they're all yours, otherwise *Remove others' songs*. Radio and
+autoplay still won't bring those songs back soon.
 
 ## Autoplay queue
 
@@ -88,6 +101,7 @@ the current song. **Scroll up** to see what has played.
 
 - Each song shows whether it was **played** or **skipped**, and who added it.
 - Songs in the history have the same [song menu](ui.md#song-menu) as any other song.
+- [*Remove played songs*](#remove-played-songs-) above Up next clears it (with Undo).
 - The queue history is part of the room, so it is kept when the room is **cloned**,
   **migrated** or **transferred**.
 

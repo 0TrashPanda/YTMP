@@ -134,12 +134,16 @@
 	const onThisPhone = !!nativeBridge && ['127.0.0.1', 'localhost'].includes(location.hostname);
 	const party = $derived((room.state?.participants.filter((p) => p.online && !p.screen).length ?? 0) > 1);
 
-	/** Removes [items] one by one (the ones you may remove). */
-	async function removeAll(items: QueueItem[], what: string) {
-		onClose();
-		const mine = items.filter((i) => room.can(i.addedBy === room.participantId ? 'remove_own' : 'remove_others'));
-		for (const i of mine) await room.run({ kind: 'RemoveQueueItem', itemId: i.itemId });
-		onToast(mine.length ? `Removed ${mine.length} ${mine.length === 1 ? 'song' : 'songs'} ${what}` : 'You may not remove those songs');
+	const mayRemove = (i: QueueItem) => room.can(i.addedBy === room.participantId ? 'remove_own' : 'remove_others');
+
+	/** Removes the ones of [items] you may remove, all at once (the room's Undo bar says how many). */
+	async function removeAll(items: QueueItem[]) {
+		const mine = items.filter(mayRemove);
+		if (mine.length) await command({ kind: 'RemoveItems', itemIds: mine.map((i) => i.itemId) });
+		else {
+			onClose();
+			onToast('You may not remove those songs');
+		}
 	}
 
 	async function command(c: Command, done?: string) {
@@ -439,17 +443,23 @@
 				held: choicesFor('remove', song.title, () => {
 					const list = place === 'history' ? (room.state?.history ?? []) : place === 'autoplay' ? (room.state?.autoplay ?? []) : (room.state?.queue ?? []);
 					const artist = item.song.artists[0]?.name;
+					const at = list.findIndex((i) => i.itemId === item.itemId);
+					// The song that plays has the played songs above it and the queue below it.
+					const above = (place === 'current' ? (room.state?.history ?? []) : list.slice(0, Math.max(at, 0))).filter(mayRemove);
+					const below = (place === 'current' ? list : at < 0 ? [] : list.slice(at + 1)).filter(mayRemove);
 					return [
 						...(artist
-							? [{ id: 'artist', icon: 'remove' as IconName, label: `Remove the songs by ${artist}`, danger: true, run: () => removeAll(list.filter((i) => i.song.artists[0]?.name === artist), `by ${artist}`) }]
+							? [{ id: 'artist', icon: 'remove' as IconName, label: `Remove the songs by ${artist}`, danger: true, run: () => removeAll(list.filter((i) => i.song.artists[0]?.name === artist)) }]
 							: []),
 						{
 							id: 'person',
 							icon: 'remove' as IconName,
 							label: `Remove the songs ${item.addedBy === room.participantId ? 'you' : item.addedByName} added`,
 							danger: true,
-							run: () => removeAll(list.filter((i) => i.addedBy === item.addedBy), `added by ${item.addedBy === room.participantId ? 'you' : item.addedByName}`)
-						}
+							run: () => removeAll(list.filter((i) => i.addedBy === item.addedBy))
+						},
+						...(above.length ? [{ id: 'above', icon: 'remove' as IconName, label: 'Remove above', danger: true, run: () => removeAll(above) }] : []),
+						...(below.length ? [{ id: 'below', icon: 'remove' as IconName, label: 'Remove below', danger: true, run: () => removeAll(below) }] : [])
 					];
 				})
 			});
@@ -473,6 +483,16 @@
 		const rect = menu.getBoundingClientRect();
 		left = Math.max(8, Math.min(target.x, window.innerWidth - rect.width - 8));
 		top = target.y + rect.height > window.innerHeight - 8 ? Math.max(8, target.y - rect.height) : target.y;
+	});
+	// A held action's choices are wider than the menu: still on screen.
+	$effect(() => {
+		if (!sub) return;
+		tick().then(() => {
+			if (!menu) return;
+			const rect = menu.getBoundingClientRect();
+			left = Math.max(8, Math.min(left, window.innerWidth - rect.width - 8));
+			top = Math.max(8, Math.min(top, window.innerHeight - rect.height - 8));
+		});
 	});
 
 	// The sheet follows the finger down, and closes when let go far enough (from the top of its list).
@@ -503,12 +523,12 @@
 		{#if entry.href}
 			<a role="menuitem" class={style} href={entry.href} target="_blank" rel="noopener" onclick={entry.run}>
 				<Icon name={entry.icon} size={big ? 24 : 20} class="shrink-0" />
-				<span class="truncate">{entry.label}</span>
+				<span class="min-w-0 break-words">{entry.label}</span>
 			</a>
 		{:else}
 			<button role="menuitem" class={style} onclick={entry.run} use:hold={entry.held}>
 				<Icon name={entry.icon} size={big ? 24 : 20} class="shrink-0" />
-				<span class="truncate">{entry.label}</span>
+				<span class="min-w-0 break-words">{entry.label}</span>
 			</button>
 		{/if}
 		<!-- With a mouse there's no holding: the › opens the choices. -->
@@ -537,7 +557,7 @@
 			{#each s.choices as c, i (i)}
 				<button role="menuitem" class="flex w-full items-center {big ? 'gap-5 px-5 py-3.5' : 'gap-3 px-4 py-2'} text-left hover:bg-line active:bg-line {c.danger ? 'text-accent' : ''}" onclick={c.run}>
 					<Icon name={c.icon} size={big ? 24 : 20} class="shrink-0" />
-					<span class="truncate">{c.label}</span>
+					<span class="min-w-0 break-words">{c.label}</span>
 				</button>
 			{/each}
 		</div>
@@ -601,7 +621,7 @@
 	<div class="fixed inset-0 z-[55]" role="presentation" onclick={onClose} oncontextmenu={(e) => (e.preventDefault(), onClose())}></div>
 	<div
 		bind:this={menu}
-		class="fixed z-[56] max-h-[calc(100vh-16px)] {sub && 'radio' in sub ? 'w-80' : 'w-64'} overflow-y-auto rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line"
+		class="fixed z-[56] max-h-[calc(100vh-16px)] {sub ? 'w-80' : 'w-64'} overflow-y-auto rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line"
 		style:left="{left}px"
 		style:top="{top}px"
 		role="menu"
