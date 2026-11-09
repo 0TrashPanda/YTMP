@@ -288,7 +288,7 @@
 				<span class="pl-2 text-xs text-muted tabular-nums">
 					{formatTime(Math.min(positionMs, duration))} / {formatTime(duration)}
 				</span>
-				<SourceBadge source={player.audioSource} />
+				<SourceBadge source={player.audioSource} class="ml-2" />
 			</div>
 
 			<div class="flex max-w-xl min-w-0 items-center gap-3 justify-self-center" role="presentation" oncontextmenu={onSongMenu}>
