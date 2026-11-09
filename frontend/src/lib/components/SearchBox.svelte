@@ -8,6 +8,7 @@
 	import { page } from '$app/state';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { suggestions } from '../api';
+	import { librarySearch } from '../librarySearch.svelte';
 	import { linkLabel, parseLink, type Link } from '../links';
 	import type { DetectedSong } from '../native';
 	import { recognized } from '../recognized.svelte';
@@ -19,7 +20,8 @@
 		onsearch,
 		onopen,
 		onlink,
-		fills = false
+		fills = false,
+		library = false
 	}: {
 		/** The current search (shown in the box). */
 		query: string;
@@ -31,7 +33,11 @@
 		onlink: (link: Link, text: string) => void;
 		/** Fill the bar: no width limit, and a field instead of an icon on phones too. */
 		fills?: boolean;
+		/** It searches only your library: it says so, and suggests from your library instead of asking YouTube Music. */
+		library?: boolean;
 	} = $props();
+
+	const prompt = $derived(library ? 'Search your library' : 'Search songs, albums, artists, podcasts');
 
 	const wide = new MediaQuery('min-width: 640px');
 
@@ -67,7 +73,7 @@
 
 	$effect(() => {
 		const q = text;
-		if (!active || !q.trim() || link) return;
+		if (!active || !q.trim() || link || library) return;
 		const timer = setTimeout(() => {
 			const id = ++asked;
 			suggestions(q)
@@ -82,7 +88,7 @@
 		return () => clearTimeout(timer);
 	});
 
-	type Row = { text: string; recent: boolean; link?: Link; detected?: DetectedSong };
+	type Row = { text: string; recent: boolean; link?: Link; detected?: DetectedSong; library?: boolean };
 	const rows = $derived.by((): Row[] => {
 		if (detectedOpen) return recognized.songs.map((song) => ({ text: `${song.title} ${song.artist}`, recent: false, detected: song }));
 		if (link) return [{ text: linkLabel(link), recent: false, link }];
@@ -90,6 +96,10 @@
 		if (!q) return recent.slice(0, 10).map((t) => ({ text: t, recent: true }));
 		// Matching recent searches first (at most two), then YTM's suggestions.
 		const mine = recent.filter((t) => t.toLowerCase().startsWith(q) && t.toLowerCase() !== q).slice(0, 2);
+		if (library) {
+			const names = librarySearch.suggest(text, 8).filter((t) => !mine.some((m) => m.toLowerCase() === t.toLowerCase()));
+			return [...mine.map((t) => ({ text: t, recent: true })), ...names.slice(0, 8 - mine.length).map((t) => ({ text: t, recent: false, library: true }))];
+		}
 		const theirs = found.filter((t) => !mine.includes(t));
 		return [...mine.map((t) => ({ text: t, recent: true })), ...theirs.slice(0, 8 - mine.length).map((t) => ({ text: t, recent: false }))];
 	});
@@ -104,7 +114,8 @@
 		highlighted = -1;
 	}
 
-	async function open() {
+	export async function open() {
+		if (library) librarySearch.ensure();
 		// On phones the search page is a history entry, so the back button closes it.
 		if (!wide.current && !page.state.searching) pushState('', { searching: true });
 		active = true;
@@ -207,7 +218,8 @@
 		enterkeyhint="search"
 		autocomplete="off"
 		spellcheck="false"
-		placeholder="Search songs, albums, artists, podcasts"
+		placeholder={prompt}
+		aria-label={library ? prompt : undefined}
 		role="combobox"
 		aria-expanded={active && rows.length > 0}
 		aria-controls="search-suggestions"
@@ -251,7 +263,7 @@
 				onpointerdown={(e) => e.preventDefault()}
 				onclick={() => (row.link ? openLink(row.link, text.trim()) : search(row.text))}
 			>
-				<Icon name={row.link ? 'open' : row.detected ? 'note' : row.recent ? 'history' : 'search'} size={22} class="shrink-0 text-muted" />
+				<Icon name={row.link ? 'open' : row.detected ? 'note' : row.recent ? 'history' : row.library ? 'library' : 'search'} size={22} class="shrink-0 text-muted" />
 				{#if row.link}
 					<span class="min-w-0 flex-1 truncate font-bold {full ? 'text-base' : ''}">{row.text}</span>
 				{:else if row.detected}
@@ -294,12 +306,12 @@
 {:else}
 	<!-- Phones: a search icon (or a field that fills the bar); searching happens on its own page. -->
 	{#if fills}
-		<button class="flex min-w-0 flex-1 items-center gap-3 rounded-lg bg-raised px-3 py-2 text-left" aria-label="Search" onclick={open}>
+		<button class="flex min-w-0 flex-1 items-center gap-3 rounded-lg bg-raised px-3 py-2 text-left" aria-label={library ? 'Search your library' : 'Search'} onclick={open}>
 			<Icon name="search" size={22} class="shrink-0 text-muted" />
-			<span class="min-w-0 flex-1 truncate {text ? '' : 'text-muted'}">{text || 'Search'}</span>
+			<span class="min-w-0 flex-1 truncate {text ? '' : 'text-muted'}">{text || (library ? 'Search your library' : 'Search')}</span>
 		</button>
 	{:else}
-		<button class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label="Search" onclick={open}>
+		<button class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label={library ? 'Search your library' : 'Search'} onclick={open}>
 			<Icon name="search" size={24} />
 		</button>
 	{/if}

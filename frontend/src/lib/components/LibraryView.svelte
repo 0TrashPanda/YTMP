@@ -1,19 +1,33 @@
 <script lang="ts">
 	// Your library, like YTM's: your playlists (Liked music first) and podcasts, through your
-	// YouTube Music sign-in. Signed out, it asks you to sign in. The search field filters it by
-	// name (and author), as you type. With a YTMP account, History opens your listening history;
-	// Import brings playlists from Spotify.
+	// YouTube Music sign-in. Signed out, it asks you to sign in. With Settings → Search's Library
+	// tab setting on, the search bar at the top searches your library; off, the search field
+	// here filters it by name (and author), as you type. With a YTMP account, History opens your
+	// listening history; Import brings playlists from Spotify.
 	import { getLibrary, lastSeen } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
 	import { fuzzyFind } from '../format';
 	import type { HomePage } from '../protocol.gen';
 	import type { Card } from './CardGrid.svelte';
+	import { settings } from '../settings.svelte';
 	import { youtube } from '../youtube.svelte';
 	import { listening } from '../listening.svelte';
 	import CardGrid from './CardGrid.svelte';
 	import Icon from './Icon.svelte';
 
-	let { onToast, onHistory, onImport, ...open }: { onToast: (text: string) => void; onHistory: () => void; onImport: () => void } & PageHandlers = $props();
+	let {
+		onToast,
+		onHistory,
+		onImport,
+		onSearch,
+		...open
+	}: {
+		onToast: (text: string) => void;
+		onHistory: () => void;
+		onImport: () => void;
+		/** Phones with only a search icon at the top: opens the search bar (a field here says what it searches). */
+		onSearch?: () => void;
+	} & PageHandlers = $props();
 
 	let library = $state<HomePage | null>(null);
 	let error = $state<string | null>(null);
@@ -94,13 +108,20 @@
 			{/each}
 		</div>
 	{:else}
-		<label class="mx-2 flex items-center gap-3 rounded-lg bg-raised px-4 py-2 sm:max-w-md">
-			<Icon name="search" size={22} class="shrink-0 text-muted" />
-			<input class="min-w-0 flex-1 bg-transparent py-1 outline-none placeholder:text-muted" type="text" bind:value={query} placeholder="Search your library" aria-label="Search your library" autocapitalize="none" spellcheck="false" enterkeyhint="search" />
-			{#if query}
-				<button class="-my-1 -mr-2 rounded-full p-1.5 text-muted hover:text-white" aria-label="Clear" onclick={() => (query = '')}><Icon name="close" size={20} /></button>
-			{/if}
-		</label>
+		{#if !settings.libraryTabSearch.value}
+			<label class="mx-2 flex items-center gap-3 rounded-lg bg-raised px-4 py-2 sm:max-w-md">
+				<Icon name="search" size={22} class="shrink-0 text-muted" />
+				<input class="min-w-0 flex-1 bg-transparent py-1 outline-none placeholder:text-muted" type="text" bind:value={query} placeholder="Search your library" aria-label="Search your library" autocapitalize="none" spellcheck="false" enterkeyhint="search" />
+				{#if query}
+					<button class="-my-1 -mr-2 rounded-full p-1.5 text-muted hover:text-white" aria-label="Clear" onclick={() => (query = '')}><Icon name="close" size={20} /></button>
+				{/if}
+			</label>
+		{:else if onSearch}
+			<button class="mx-2 flex items-center gap-3 rounded-lg bg-raised px-4 py-3 text-left text-muted sm:hidden" onclick={onSearch}>
+				<Icon name="search" size={22} class="shrink-0" />
+				Search your library
+			</button>
+		{/if}
 		{#each sections as section, i (section.title + i)}
 			<section class="flex flex-col gap-3">
 				<h2 class="px-2 text-xl font-bold sm:text-2xl">{section.title}</h2>

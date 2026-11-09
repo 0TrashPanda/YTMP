@@ -31,6 +31,15 @@ describe('fuzzyIndex', () => {
 	});
 });
 
+describe('fuzzyIndex, not loose', () => {
+	it('still finds words and typos, but not letters in order', () => {
+		const list = ['Road trip', 'Yellow'];
+		expect(fuzzyIndex(list, (s) => s)('rt')).toEqual(['Road trip']);
+		expect(fuzzyIndex(list, (s) => s, false)('rt')).toEqual([]);
+		expect(fuzzyIndex(list, (s) => s, false)('yelow')).toEqual(['Yellow']);
+	});
+});
+
 describe('fuzzyFind', () => {
 	const items = ['Liked music', 'Road trip', 'Café del Mar', 'Daft Punk – Discovery'];
 	const find = (query: string) => fuzzyFind(items, query, (s) => s);

@@ -69,7 +69,7 @@ function inOrder(word: string, text: string): boolean {
 }
 
 /** How well one typed word fits [text] (higher is better), or null when it doesn't. */
-function wordScore(word: string, text: string, words: string[]): number | null {
+function wordScore(word: string, text: string, words: string[], loose: boolean): number | null {
 	if (words.includes(word)) return 100;
 	if (words.some((w) => w.startsWith(word))) return 80;
 	if (text.includes(word)) return 60;
@@ -84,7 +84,7 @@ function wordScore(word: string, text: string, words: string[]): number | null {
 		);
 		if (close) return 40;
 	}
-	if (word.length >= 2 && inOrder(word, text)) return 20;
+	if (loose && word.length >= 2 && inOrder(word, text)) return 20;
 	return null;
 }
 
@@ -100,9 +100,11 @@ export function fuzzyFind<T>(items: T[], query: string, text: (item: T) => strin
 
 /**
  * [fuzzyFind] for a list searched again on every typed letter (the whole song graph): each
- * item's text is prepared once, and the returned function searches it.
+ * item's text is prepared once, and the returned function searches it. Not [loose]: only
+ * words, parts of words and typos, not letters in order (for long lists of song titles
+ * among other results, where those would find too much).
  */
-export function fuzzyIndex<T>(items: T[], text: (item: T) => string): (query: string) => T[] {
+export function fuzzyIndex<T>(items: T[], text: (item: T) => string, loose = true): (query: string) => T[] {
 	const prepared = items.map((item) => {
 		const haystack = plain(text(item));
 		return { item, haystack, words: haystack.split(/[^\p{L}\p{N}]+/u).filter(Boolean) };
@@ -114,7 +116,7 @@ export function fuzzyIndex<T>(items: T[], text: (item: T) => string): (query: st
 		for (const { item, haystack, words } of prepared) {
 			let total = 0;
 			for (const word of typed) {
-				const score = wordScore(word, haystack, words);
+				const score = wordScore(word, haystack, words, loose);
 				if (score === null) {
 					total = -1;
 					break;

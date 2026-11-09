@@ -429,6 +429,7 @@ let refreshLibrary = false;
 /** Your library changed (or you pulled it down): load it again next time (the kept one shows meanwhile). */
 export function forgetLibrary(): void {
 	cache.delete('me:library');
+	cache.delete('me:playlist:LM');
 	refreshLibrary = true;
 }
 
@@ -443,6 +444,9 @@ export function useYoutubeFrom(remote: { server: string; token: string; personal
 	forgetPersonal();
 	cache.delete('home');
 }
+
+/** The server your YouTube Music comes from, when that's not this host (see [useYoutubeFrom]). */
+export const youtubeSource = (): string | null => youtubeFrom?.server ?? null;
 
 /**
  * Where your YouTube Music likes are (`/api/me/likes`), for the app's home screen widget: this

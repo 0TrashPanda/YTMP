@@ -25,6 +25,7 @@
 	import OutputsSheet from '../../../lib/components/OutputsSheet.svelte';
 	import SaveSheet from '../../../lib/components/SaveSheet.svelte';
 	import { youtube } from '../../../lib/youtube.svelte';
+	import { librarySearch } from '../../../lib/librarySearch.svelte';
 	import SearchResults from '../../../lib/components/SearchResults.svelte';
 	import ArtistView from '../../../lib/components/ArtistView.svelte';
 	import AlbumView from '../../../lib/components/AlbumView.svelte';
@@ -89,6 +90,7 @@
 	let player = $state<RoomPlayer | null>(null);
 	// The search chip: stays as picked for the next search.
 	let searchType = $state<SearchType>('all');
+	let searchBox = $state<SearchBox>();
 	/** What's open over the page: one sheet, menu or dialog at a time. Back closes it. */
 	type Sheet =
 		| { kind: 'menu'; target: MenuTarget }
@@ -197,13 +199,22 @@
 		if (podcast.id) show({ kind: 'podcast', id: podcast.id, title: podcast.name });
 	}
 
+	/** The search bar searches only your library: on the Library tab (and its results), if set so. */
+	const libraryBar = $derived(settings.libraryTabSearch.value && !!youtube.account && (top.kind === 'library' || (top.kind === 'search' && !!top.library)));
+
 	function searchFor(text: string) {
-		show({ kind: 'search', query: text });
+		show({ kind: 'search', query: text, library: libraryBar || undefined });
+	}
+
+	/** A chip: leaving "only your library" is a full search of the same words. */
+	function pickSearchType(type: SearchType) {
+		searchType = type;
+		if (top.kind === 'search' && top.library) show({ kind: 'search', query: top.query });
 	}
 
 	/** A link pasted in the search box: its page, or a song as the search's result (SearchResults), or another room. */
 	function openLink(link: Link, text: string) {
-		if (link.kind === 'song') searchFor(text);
+		if (link.kind === 'song') show({ kind: 'search', query: text });
 		else if (link.kind === 'album') show({ kind: 'album', id: link.id, title: '' });
 		else if (link.kind === 'playlist') openPlaylist({ id: link.id, title: '' });
 		else if (link.kind === 'artist') show({ kind: 'artist', id: link.id, name: '' });
@@ -479,6 +490,7 @@
 	function pullEnd() {
 		if (pull >= PULL_TO_REFRESH && top.kind === 'library') {
 			forgetLibrary();
+			librarySearch.refresh();
 			libraryVersion++;
 		} else if (pull >= PULL_TO_REFRESH) {
 			forgetHome();
@@ -631,7 +643,7 @@
 						<button class="text-xl font-black tracking-tight sm:hidden" title="Home" onclick={goHome}>
 							YT<span class="text-accent">MP</span>
 						</button>
-						<SearchBox {query} fills={searchFills(room)} onopen={() => (headerHidden = false)} onsearch={searchFor} onlink={openLink} />
+						<SearchBox bind:this={searchBox} {query} fills={searchFills(room)} library={libraryBar} onopen={() => (headerHidden = false)} onsearch={searchFor} onlink={openLink} />
 						<div class="ml-auto flex items-center gap-2">
 							<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
 							<!-- Phones: centered in the header. -->
@@ -729,7 +741,10 @@
 									{room}
 									query={view.query}
 									type={searchType}
-									onType={(t) => (searchType = t)}
+									library={view.library}
+									onType={pickSearchType}
+									onLibrary={() => show({ kind: 'search', query: view.query, library: true })}
+									onReorder={() => (sheet = { kind: 'settings', start: 'search' })}
 									onToast={toast}
 									onMenu={openMenu}
 									onArtist={openArtist}
@@ -791,6 +806,7 @@
 								onToast={toast}
 								onHistory={() => show({ kind: 'history' })}
 								onImport={() => show({ kind: 'import' })}
+								onSearch={searchFills(room) ? undefined : () => searchBox?.open()}
 								onArtist={openArtist}
 								onAlbum={(a) => openAlbum(a)}
 								onPlaylist={(p) => openPlaylist(p, true)}

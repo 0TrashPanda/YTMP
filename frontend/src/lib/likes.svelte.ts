@@ -2,6 +2,7 @@
 // player, the player bar and the song menu so they always agree. Needs your YouTube Music sign-in.
 import { SvelteMap } from 'svelte/reactivity';
 import { getRating, setRating } from './api';
+import { librarySearch } from './librarySearch.svelte';
 import { nativeBridge } from './native';
 import { isYoutubeSong } from './ownModule.svelte';
 import type { LikeStatus } from './protocol.gen';
@@ -19,7 +20,13 @@ class Likes {
 	constructor() {
 		// A like from the app's home screen widget.
 		if (typeof window !== 'undefined' && nativeBridge)
-			window.__ytmpNative = { ...window.__ytmpNative, onLiked: (songId, liked) => this.#known.set(songId, liked ? 'like' : 'none') };
+			window.__ytmpNative = {
+				...window.__ytmpNative,
+				onLiked: (songId, liked) => {
+					this.#known.set(songId, liked ? 'like' : 'none');
+					librarySearch.likeChanged(songId, liked);
+				}
+			};
 	}
 
 	/** Tells the app's home screen widget (bridge: likeChanged). */
@@ -68,6 +75,7 @@ class Likes {
 		try {
 			await setRating(songId, { liked: rating === 'like', disliked: rating === 'dislike' });
 			this.#tellApp(songId, rating);
+			librarySearch.likeChanged(songId, rating === 'like');
 			onToast(
 				rating === 'like'
 					? 'Added to Liked music'

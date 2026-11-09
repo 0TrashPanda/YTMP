@@ -4,6 +4,7 @@
 // cookies from a browser, and the server keeps them (server/.../YoutubeLinks.kt).
 import { forgetPersonal, getHost, getYoutubeAccount, likesAccess, setYoutubeHistory, setYoutubePersonalize, signInToYoutube, signOutOfYoutube, useYoutubeFrom } from './api';
 import { identity } from './account';
+import { forgetLiked } from './keptLiked';
 import { nativeBridge } from './native';
 import type { YoutubeAccount, YoutubeHistory } from './protocol.gen';
 
@@ -168,6 +169,7 @@ class YoutubeSignIn {
 
 	async signOut(): Promise<void> {
 		await signOutOfYoutube();
+		void forgetLiked();
 		this.account = null;
 		this.version++;
 		this.tellApp();

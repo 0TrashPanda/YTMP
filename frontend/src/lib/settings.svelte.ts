@@ -271,6 +271,10 @@ export const settings = {
 	soloHidden: new Setting<unknown>('soloHidden', undefined, (raw) => raw),
 	/** Without the room code at the top, search fills the top bar as a field (also on phones). */
 	soloSearchField: new Setting('soloSearchField', true, bool),
+	/** The search bar on the Library tab searches only your library (librarySearch.svelte.ts). */
+	libraryTabSearch: new Setting('libraryTabSearch', true, bool),
+	/** The order of the sections on the search page (searchOrder.svelte.ts). */
+	searchOrder: new Setting<string[]>('searchOrder', [], (raw) => (Array.isArray(raw) ? [...new Set(raw.filter((k): k is string => typeof k === 'string'))] : undefined)),
 	/** The Local tab shows the music on the network. */
 	localNetwork: new Setting('localNetwork', true, bool, flag('ytmp.localNetwork'))
 };

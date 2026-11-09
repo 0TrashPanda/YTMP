@@ -10,7 +10,8 @@ export type Section = 'home' | 'library' | 'local';
 
 /** Pages opened on top of them. */
 export type View =
-	| { kind: 'search'; query: string }
+	/** [library]: only your library (the Library chip, or the search bar on the Library tab). */
+	| { kind: 'search'; query: string; library?: boolean }
 	| { kind: 'similar'; song: Song; from?: RadioFrom }
 	| { kind: 'artist'; id: string; name: string }
 	| { kind: 'album'; id: string; title: string }

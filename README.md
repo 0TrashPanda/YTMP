@@ -62,7 +62,9 @@ Music, without Premium, and not tied to a single music service.
 - Home with YouTube Music's suggestions (quick picks, new releases, mixes), made your own:
   pins (as tiles, or with their songs), sections hidden, moved, or shown as a list.
 - Search with suggestions while typing and YouTube Music's chips: songs, videos, albums,
-  artists, playlists, podcasts, episodes.
+  artists, playlists, podcasts, episodes. Put its sections in the order you like, with a
+  section for what matches in your own library (liked songs, playlists, podcasts); on the
+  Library tab the search bar searches only your library.
 - Paste a YouTube Music or YouTube link in the search box to open that song, album,
   playlist, artist or podcast (or a YTMP room link to open the room).
 - On a Pixel, a music-note icon in the search box lists the songs Now Playing recognized

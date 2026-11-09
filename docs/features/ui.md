@@ -60,11 +60,12 @@ Like YTM:
   sections* hides YTM's sections of podcasts and episodes. A section's **⋮** on Home does the
   same in place. YTM picks and names its sections, so they're known by name; a new one shows
   where YTM puts it.
-- **Library** ✅ (with a linked YouTube Music account): your playlists and podcasts, with a
-  search field at the top that finds them by name or author as you type. It's forgiving:
-  typos ("chlil"), letters in order or initials ("rdtrip", "rt" for *Road trip*), no
-  accents needed; best matches first. The same search is above your playlists in the
-  desktop left side.
+- **Library** ✅ (with a linked YouTube Music account): your playlists and podcasts. The
+  search bar at the top searches only your library here ([search](#search); *Settings →
+  Search*). With that setting off, a search field on the page finds them by name or author as
+  you type. It's forgiving: typos ("chlil"), letters in order or initials ("rdtrip", "rt"
+  for *Road trip*), no accents needed; best matches first. The same search is above your
+  playlists in the desktop left side.
 - **Explore** (planned): new releases, charts, moods & genres.
 
 ## Player
@@ -182,12 +183,33 @@ suggestions (*Open this album*, …) that Enter or a tap opens. Links don't go i
 searches.
 
 Like YouTube Music, **chips** above the results pick what to search for ✅: **All**,
-**Songs**, **Videos**, **Albums**, **Artists**, **Community playlists** and **Featured
+**Library** (only your own library, see below), **Songs**, **Videos**, **Albums**, **Artists**, **Community playlists** and **Featured
 playlists** (YouTube Music's own). *All* shows the **top result** as a big card, then a few
 of each kind, each with **More** (which picks that chip). The chip stays as picked for
 the next search. Songs and videos play like songs (tap = add to queue); albums, artists and
 playlists open their page. **Podcasts** and **Episodes** have chips too (see below);
 profiles are left out.
+
+**Your library in search** ✅ (signed in to YouTube Music): *All* has a section **From your
+library** with what matches in your liked songs, playlists and podcasts, by title or artist;
+capitals, accents and small typos don't matter. The rest of the results never wait for it.
+Songs in it work like everywhere else in search; playlists and podcasts open their page.
+*More* picks the Library chip, with every match. Your liked songs are read once, a part at
+a time, and kept on the device; after that only the newest ones are looked at, when they're
+older than *New suggestions after* (Settings → Home) or after you pull your Library down.
+
+**The order of the sections** ✅ (*Settings → Search*, or *Change the order of these
+sections* under the results of *All*): move sections up and down, *Defaults* puts them back. By
+default: top result, songs, from your library, artists, albums, videos, then the rest. A
+section the saved order doesn't know yet goes where the default order puts it.
+
+**On the Library tab the search bar searches your library** ✅ (*Library tab searches your
+library* in *Settings → Search*, on by default): it says *Search your library* and suggests
+from your library, without asking YouTube Music. Enter or a suggestion shows the Library
+chip's results, with *Search everywhere for "…"* under them to run the same search fully
+(the other chips do the same). On other tabs it searches everything again. On phones with
+only a search icon at the top, a field on the Library page opens the same search. With the
+setting off the search bar works as on any other page, and the Library page has its own filter field.
 
 ## Podcasts ✅
 

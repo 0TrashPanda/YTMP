@@ -12,6 +12,7 @@
 		| 'look'
 		| 'player'
 		| 'home'
+		| 'search'
 		| 'menu'
 		| 'gestures'
 		| 'solo'
@@ -63,6 +64,7 @@
 	import Toggle from './Toggle.svelte';
 	import YoutubeSection from './YoutubeSection.svelte';
 	import RadioSection from './RadioSection.svelte';
+	import SearchSection from './SearchSection.svelte';
 
 	let {
 		start = null,
@@ -149,6 +151,7 @@
 						['look', 'Look', 'palette', true],
 						['player', 'Player', 'play', true],
 						['home', 'Home', 'home', true],
+						['search', 'Search', 'search', true],
 						['menu', 'Song menu', 'more', true],
 						['gestures', 'Taps and swipes', 'tune', true],
 						['solo', 'Solo rooms', 'person', true]
@@ -188,7 +191,7 @@
 	const pageSettings: Partial<Record<SettingsSection, Setting<unknown>>> = { home: settings.home, menu: settings.songMenu, solo: settings.soloHidden };
 	const pageSetting = $derived(pageSettings[section]);
 	/** Pages with settings that follow your account: a word on that at the bottom. */
-	const followsAccount = $derived(['playback', 'adding', 'look', 'player', 'home', 'menu', 'gestures', 'solo', 'local'].includes(section));
+	const followsAccount = $derived(['playback', 'adding', 'look', 'player', 'home', 'search', 'menu', 'gestures', 'solo', 'local'].includes(section));
 
 	/** Phones: the list was shown, so Back goes there from a page. */
 	// svelte-ignore state_referenced_locally
@@ -742,6 +745,8 @@
 			<NumberField value={settings.homeRefresh.value} min={0} max={7 * 24 * 60} unit="min" label="New suggestions after" onchange={(v) => settings.homeRefresh.set(v)} />
 		</Choice>
 		<HomeSection />
+	{:else if id === 'search'}
+		<SearchSection />
 	{:else if id === 'radio'}
 		<RadioSection {onToast} {onThisPhone} {onGraph} />
 	{:else if id === 'menu'}

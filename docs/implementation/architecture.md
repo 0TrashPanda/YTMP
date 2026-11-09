@@ -137,6 +137,14 @@ autoplay policy (`lib/autoplay.ts`) lets the reloaded page play on; then the pla
 when the next song starts and the room page switches *Play here* back on (`appUpdate.resumes`). The host serves `index.html` and `version.json` with `no-cache`
 and the hashed files under `_app/immutable/` for a year (`webApp` in `host/.../Application.kt`).
 
+Search's own sections are in `SearchResults.svelte`: `lib/searchOrder.svelte.ts` is the order of
+its sections (a new section type: an entry in `SEARCH_SECTIONS` where it belongs by default; the
+order a user saved gets it from there), `lib/librarySearch.svelte.ts` the matches in your
+library. That one only uses what the app already fetches: `getLibrary` and Liked music
+(`getPlaylist('LM')` and its parts, paced), kept in IndexedDB by `lib/keptLiked.ts`, so a search
+costs no extra requests; on the Library tab the search bar (`libraryBar` on the room page)
+opens the same results with `library` set on the search page.
+
 **The YouTube Music module** (`ytm-module/ytmp_ytm/`): `core.py` talks to YouTube Music and
 yt-dlp, `parse.py` turns its answers into YTMP's songs and pages, `http.py` is the HTTP API.
 
