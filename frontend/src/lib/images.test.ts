@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
 let quality = 'high';
+let first = 'small';
 vi.mock('./settings.svelte', () => ({
 	settings: {
 		get imageQuality() {
 			return { value: quality };
+		},
+		get smallFirst() {
+			return { value: first };
 		}
 	}
 }));
@@ -41,5 +45,14 @@ describe('small first', () => {
 	it('not on Low quality: that saves data, and its pictures are small already', () => {
 		quality = 'low';
 		expect(smallUrl(album, 544)).toBeUndefined();
+	});
+
+	it('Tiny asks for 60 px; Off shows only the sharp one', () => {
+		quality = 'high';
+		first = 'tiny';
+		expect(smallUrl(album, 400)).toBe(`${base}=w60-h60-l90-rj`);
+		first = 'off';
+		expect(smallUrl(album, 400)).toBeUndefined();
+		first = 'small';
 	});
 });

@@ -123,6 +123,8 @@ Like YTM:
   player's art, the top of album, playlist, podcast and artist pages) show a small version at
   once and the sharp one as soon as it's in, so a page fills quickly on a slow connection.
   Often the small one is there already, from a list or the player bar. Not on Low quality.
+  Settings → Look → **Small pictures first**: **Small** (default, 120 px), **Tiny** (60 px:
+  quickest, blurrier at first) or **Off** (wait for the sharp one).
 - **Dislike button in the player bar** ✅ (Settings → Player): Normal, Dimmed
   (darker until you point at it) or Hidden.
 - **Swiping up on the player's tabs** ✅ (Settings → Player): opens **that tab**

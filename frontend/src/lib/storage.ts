@@ -46,6 +46,8 @@ export type ClearRoomBy = 'button' | 'swipe' | 'both';
 export type SwipeSkips = 'both' | 'mini' | 'art' | 'off';
 export type ImageQuality = 'high' | 'low';
 export type VideoArt = 'crop' | 'fit';
+/** Big pictures first show a small one: 120 px (small), 60 px (tiny, fastest), or not (off). */
+export type SmallFirst = 'small' | 'tiny' | 'off';
 /** The songs a long list shows at a time: 100, 300 or 1000, or a number typed in between these. */
 export const PAGE_SIZES = { min: 10, max: 5000 };
 /** A YouTube Music module on this computer, to get stream links from your own internet connection. Switched off: kept, not used. */

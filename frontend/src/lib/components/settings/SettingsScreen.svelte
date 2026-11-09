@@ -38,7 +38,7 @@
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
 	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type PlaylistPick, type Setting } from '../../settings.svelte';
-	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SwipeOpens, type TabOrder, type TallPlayer, type VideoArt, type ClearRoomBy } from '../../storage';
+	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SmallFirst, type SwipeOpens, type TabOrder, type TallPlayer, type VideoArt, type ClearRoomBy } from '../../storage';
 	import { fold, LABELS, mark, matches, rowsOf, searchWords } from '../../settingsSearch';
 	import { youtube } from '../../youtube.svelte';
 	import Icon, { type IconName } from '../Icon.svelte';
@@ -652,6 +652,16 @@
 				['high', 'High'],
 				['low', 'Low']
 			] as [ImageQuality, string][]}
+		/>
+		<Choice
+			label="Small pictures first"
+			hint="Big pictures (cards on Home, the player's album art, the top of album and playlist pages) show a small version at once, then the sharp one when it's in. Tiny is quickest but blurrier at first. Not with Low image quality."
+			setting={settings.smallFirst}
+			options={[
+				['small', 'Small'],
+				['tiny', 'Tiny'],
+				['off', 'Off: wait for the sharp one']
+			] as [SmallFirst, string][]}
 		/>
 		<Choice
 			label="Upright screen"

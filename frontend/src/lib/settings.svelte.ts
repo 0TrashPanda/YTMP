@@ -9,7 +9,7 @@
 // account when it has none yet, else it stays this device's own if it's different (see [load]).
 import { listening } from './listening.svelte';
 import { preferences } from './preferences.svelte';
-import type { SwipeSkips, ClearRoomBy, DislikeButton, ImageQuality, SwipeOpens, TabOrder, TallPlayer, VideoArt } from './storage';
+import type { SwipeSkips, ClearRoomBy, DislikeButton, ImageQuality, SmallFirst, SwipeOpens, TabOrder, TallPlayer, VideoArt } from './storage';
 import { PAGE_SIZES, read, write } from './storage';
 
 export type PlaylistPick = 'first' | 'random';
@@ -172,6 +172,7 @@ const counts = (raw: unknown) => {
 
 const imageQuality = oneOf<ImageQuality>('high', 'low');
 const videoArt = oneOf<VideoArt>('crop', 'fit');
+const smallFirst = oneOf<SmallFirst>('small', 'tiny', 'off');
 const dislikeButton = oneOf<DislikeButton>('normal', 'dim', 'hidden');
 const swipeOpens = oneOf<SwipeOpens>('tab', 'upnext');
 const tabOrder = oneOf<TabOrder>('upnext', 'related');
@@ -228,6 +229,7 @@ export const settings = {
 
 	// Look
 	imageQuality: new Setting('imageQuality', 'high' as ImageQuality, imageQuality, word('ytmp.imageQuality', imageQuality)),
+	smallFirst: new Setting('smallFirst', 'small' as SmallFirst, smallFirst),
 	videoArt: new Setting('videoArt', 'crop' as VideoArt, videoArt, word('ytmp.videoArt', videoArt)),
 	/** How many songs a long list shows at first, and adds each time for more. */
 	pageSize: new Setting('pageSize', 300, pageSize, { key: 'ytmp.pageSize', parse: (raw) => pageSize(Number(raw)) }),

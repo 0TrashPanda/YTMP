@@ -9,6 +9,9 @@ export const images = {
 	get quality() {
 		return settings.imageQuality.value;
 	},
+	get smallFirst() {
+		return settings.smallFirst.value;
+	},
 	get videoArt() {
 		return settings.videoArt.value;
 	},
@@ -54,15 +57,23 @@ export function thumbUrl(thumbnails: Thumbnail[], size: number): string | undefi
 }
 
 /**
- * Small first: big pictures show a small one (~7 KB instead of ~50 KB for a card) while the sharp
- * one loads (Picture.svelte). Measured on a home page: 24 cards are 170 KB at 120 px and 1.1 MB at
- * 400 px. Lists and the player bar load the same small one, so it's often there already.
+ * Small first (setting "Small pictures first"): big pictures show a small one (~7 KB instead of
+ * ~50 KB for a card) while the sharp one loads (Picture.svelte). Measured on a home page: 24 cards
+ * are 66 KB at 60 px, 170 KB at 120 px and 1.1 MB at 400 px. Lists and the player bar load the
+ * small one (the 120 px picture YouTube Music lists; song lists the 60 px one), so it's often
+ * there already.
  */
 export const SMALL = 96;
+/** "Tiny": the 60 px picture, fastest but blurrier. */
+export const TINY = 48;
 
-/** The small picture to show first for one shown [size] px wide; none for small pictures and on Low quality. */
+/** The small picture to show first for one shown [size] px wide; none for small pictures, when it's off and on Low quality. */
 export function smallUrl(thumbnails: Thumbnail[], size: number): string | undefined {
-	if (images.quality === 'low' || size <= 160) return undefined;
-	const small = thumbUrl(thumbnails, SMALL);
+	const first = images.smallFirst;
+	if (first === 'off' || images.quality === 'low' || size <= 160) return undefined;
+	let small = thumbUrl(thumbnails, first === 'tiny' ? TINY : SMALL);
+	// Tiny: Google's pictures at 60 px, also when only the 120 px one is listed.
+	if (first === 'tiny' && small && GOOGLE.test(small))
+		small = small.replace(GOOGLE_SIZE, (all, w, h) => (+w > 60 ? `=w60-h${Math.round((60 * +h) / +w)}` : all));
 	return small === thumbUrl(thumbnails, size) ? undefined : small;
 }
