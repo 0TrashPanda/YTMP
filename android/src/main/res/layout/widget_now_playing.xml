@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The home screen widget (NowPlayingWidget), like YouTube Music's: the song's art in a circle,
+    play/pause on its bottom left and the thumbs up on its top right. The sizes here are for
+    Android 11; from Android 12 on the widget scales them to its size.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:theme="@android:style/Theme.DeviceDefault.DayNight">
+
+    <!-- The square the circle fits in: centred in the widget's cells. -->
+    <FrameLayout
+        tools:ignore="UselessParent"
+        android:id="@+id/widget_square"
+        android:layout_width="140dp"
+        android:layout_height="140dp"
+        android:layout_gravity="center">
+
+        <ImageView
+            android:id="@+id/widget_art"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/widget_open"
+            android:scaleType="fitCenter"
+            android:src="@drawable/widget_art_empty" />
+
+        <ImageView
+            android:id="@+id/widget_play"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_gravity="bottom|start"
+            android:background="@drawable/widget_play_bg"
+            android:contentDescription="@string/widget_play"
+            android:padding="11dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_widget_play"
+            android:tint="@color/widget_play_icon" />
+
+        <ImageView
+            android:id="@+id/widget_like"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/widget_like_bg"
+            android:contentDescription="@string/widget_like"
+            android:padding="9dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_widget_like"
+            android:tint="@color/widget_like_icon" />
+    </FrameLayout>
+</FrameLayout>

@@ -33,6 +33,14 @@ The Android app needs **Android 11 or newer**. A native Linux app is a [future i
   background.
 - **Media controls**: lock screen and notification controls, and headphone / Bluetooth
   buttons (play/pause, next, previous).
+- **Home screen widget** ✅: like YouTube Music's. The song's art in a circle, a play/pause
+  button on its bottom left and a thumbs up on its top right, in the phone's own colours
+  (Material You, from Android 12). Tap the art to open the app. Play/pause works like the lock
+  screen's (in a party, pausing only stops it on your phone); the thumbs up adds the song to
+  your Liked music (it only shows when you're signed in to YouTube Music, and not for your own
+  music). It shows the song that plays here, on your speakers or in the room you're in, and
+  keeps the last one (paused) when the app is closed. Resizable; long-press the home screen →
+  *Widgets* → *YTMP*.
 - **Offline** ✅: without internet, cached and downloaded
   songs (*Local → Cached on this phone*) and the phone's own music still play, in a solo room
   or in a room on the local network.

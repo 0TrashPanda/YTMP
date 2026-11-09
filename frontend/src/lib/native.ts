@@ -104,6 +104,10 @@ export interface NativeBridge {
 	setEqualizer?(json: string): void;
 	/** The phone's name, as in Android's settings (bridge version 15), to tell your devices apart in a room. */
 	deviceName?(): string;
+	/** Where your YouTube Music likes are, for the home screen widget: JSON { base, token }, or null when signed out. */
+	setLikes?(json: string | null): void;
+	/** A like the page knows or changed, so the home screen widget shows it too. */
+	likeChanged?(songId: string, liked: boolean): void;
 }
 
 /** A song a Pixel's Now Playing recognized (android/.../NowPlayingParser.kt); [at] is epoch milliseconds. */
@@ -156,6 +160,8 @@ export interface NativeCallbacks {
 	onDownloadWaiting?(songId: string): void;
 	/** Back from downloadSong: null when the song is in the Music folder, else why not. */
 	onDownloaded?(songId: string, error: string | null): void;
+	/** A like changed from the home screen widget. */
+	onLiked?(songId: string, liked: boolean): void;
 	/** Now Playing recognized a song: the list of recent ones, newest first. */
 	onNowPlaying?(songs: DetectedSong[]): void;
 }

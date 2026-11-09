@@ -239,6 +239,10 @@ class PlaybackService : MediaSessionService() {
         session = MediaSession.Builder(this, RoomPlayer(exo).also { roomPlayer = it }).setSessionActivity(openApp).setCallback(Earbuds()).build()
 
         speakerPlayer = SpeakerPlayer(SpeakerControls())
+        // The home screen widget shows what the session shows.
+        exo.addListener(sessionListener)
+        speakerPlayer.addListener(sessionListener)
+        PlaybackHub.sessionPlayPause = widgetPlayPause
 
         PlaybackHub.followerCommands = follower::command
         audioManager = getSystemService(AudioManager::class.java)
@@ -272,10 +276,16 @@ class PlaybackService : MediaSessionService() {
             }
         }
         scope.launch {
-            combine(PlaybackHub.target, follower.room) { target, room -> merge(target, room) }.collect { apply(it) }
+            combine(PlaybackHub.target, follower.room) { target, room -> merge(target, room) }.collect {
+                apply(it)
+                publishSession()
+            }
         }
         scope.launch {
-            combine(PlaybackHub.target, follower.room, nearby, ::Triple).collect { (target, room, near) -> showSpeakers(target, room, near) }
+            combine(PlaybackHub.target, follower.room, nearby, ::Triple).collect { (target, room, near) ->
+                showSpeakers(target, room, near)
+                publishSession()
+            }
         }
         // The sleep timer: runs here, so it works with the page frozen (screen off).
         scope.launch {
@@ -349,6 +359,8 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         if (PlaybackHub.followerCommands == follower::command) PlaybackHub.followerCommands = null
         PlaybackHub.speakerSession.value = null
+        if (PlaybackHub.sessionPlayPause === widgetPlayPause) PlaybackHub.sessionPlayPause = null
+        PlaybackHub.session.value = null
         contentResolver.unregisterContentObserver(volumeObserver)
         holdLocks(false)
         follower.close()
@@ -929,6 +941,31 @@ class PlaybackService : MediaSessionService() {
         session.player = if (show) speakerPlayer else roomPlayer
         PlaybackHub.speakerSession.value = if (show) session.platformToken else null
         setKeepForeground(show || current?.let { it.enabled && it.item != null } == true)
+    }
+
+    private val sessionListener = object : Player.Listener {
+        override fun onEvents(player: Player, events: Player.Events) = publishSession()
+    }
+
+    /** Tells the home screen widget what the media session shows. */
+    private fun publishSession() {
+        val player = session.player
+        val target = current
+        val playing = if (player.currentMediaItem != null) player.playWhenReady else target?.playing == true
+        PlaybackHub.session.value = WidgetNow(target?.item, playing)
+    }
+
+    /**
+     * The widget's play/pause: the media session's own (so with others listening along, pause
+     * stops playing here, as on the lock screen); with nothing loaded here, the room's.
+     */
+    private val widgetPlayPause: () -> Unit = {
+        val player = session.player
+        val target = current
+        when {
+            player.currentMediaItem != null -> if (player.playWhenReady) player.pause() else player.play()
+            target?.room != null && target.item != null -> PlaybackHub.command(if (target.playing) """{"kind":"Pause"}""" else """{"kind":"Play"}""")
+        }
     }
 
     private inner class SpeakerControls : SpeakerPlayer.Controls {

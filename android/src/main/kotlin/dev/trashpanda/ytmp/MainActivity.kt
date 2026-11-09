@@ -198,6 +198,7 @@ class MainActivity : ComponentActivity() {
 
         PlaybackHub.commandSink = commandSink
         PlaybackHub.statusSink = statusSink
+        WidgetLikes.pageSink = likedSink
         // The sleep timer changed (also when it went off in the player): the page shows it.
         lifecycleScope.launch {
             PlaybackHub.sleep.collect { setting ->
@@ -335,10 +336,12 @@ class MainActivity : ComponentActivity() {
         js("window.__ytmpNative && window.__ytmpNative.onAskCommand && window.__ytmpNative.onAskCommand($command, ${System.currentTimeMillis()})")
     }
     private val statusSink: (String) -> Unit = { status -> js("window.__ytmpNative && window.__ytmpNative.onStatus && window.__ytmpNative.onStatus(${JSONObject.quote(status)})") }
+    private val likedSink: (String, Boolean) -> Unit = { songId, liked -> js("window.__ytmpNative && window.__ytmpNative.onLiked && window.__ytmpNative.onLiked(${JSONObject.quote(songId)}, $liked)") }
 
     override fun onDestroy() {
         if (PlaybackHub.commandSink === commandSink) PlaybackHub.commandSink = null
         if (PlaybackHub.statusSink === statusSink) PlaybackHub.statusSink = null
+        if (WidgetLikes.pageSink === likedSink) WidgetLikes.pageSink = null
         if (isFinishing) PlaybackHub.target.value = null
         webView.destroy()
         super.onDestroy()
@@ -509,6 +512,17 @@ class MainActivity : ComponentActivity() {
         /** Opens Android's notification access settings, where YTMP is allowed to read Now Playing (bridge version 13). */
         @JavascriptInterface
         fun openNowPlayingAccess() = runOnUiThread { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+
+        /** Where your YouTube Music likes are, for the home screen widget: JSON { base, token }, or null when signed out. */
+        @JavascriptInterface
+        fun setLikes(json: String?) {
+            // Only the app's own pages (the phone's, your server's) say where your account is.
+            if (currentUrl?.let(::isAppPage) == true) WidgetLikes.setAccess(json)
+        }
+
+        /** The page knows or changed a like (also of the song the widget shows). */
+        @JavascriptInterface
+        fun likeChanged(songId: String, liked: Boolean) = WidgetLikes.heard(songId, liked)
 
         /** JSON list of DetectedSong, newest first (bridge version 13); changes come as onNowPlaying. */
         @JavascriptInterface

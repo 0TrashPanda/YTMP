@@ -2,6 +2,7 @@
 // player, the player bar and the song menu so they always agree. Needs your YouTube Music sign-in.
 import { SvelteMap } from 'svelte/reactivity';
 import { getRating, setRating } from './api';
+import { nativeBridge } from './native';
 import { isYoutubeSong } from './ownModule.svelte';
 import type { LikeStatus } from './protocol.gen';
 import { youtube } from './youtube.svelte';
@@ -14,6 +15,21 @@ class Likes {
 	#known = new SvelteMap<string, Rating>();
 	#asked = new Set<string>();
 	#version = 0;
+
+	constructor() {
+		// A like from the app's home screen widget.
+		if (typeof window !== 'undefined' && nativeBridge)
+			window.__ytmpNative = { ...window.__ytmpNative, onLiked: (songId, liked) => this.#known.set(songId, liked ? 'like' : 'none') };
+	}
+
+	/** Tells the app's home screen widget (bridge: likeChanged). */
+	#tellApp(songId: string, rating: Rating): void {
+		try {
+			nativeBridge?.likeChanged?.(songId, rating === 'like');
+		} catch {
+			// An older app.
+		}
+	}
 
 	/** Your thumbs on [songId]; null while not known (see [load]) or signed out. */
 	rating(songId: string | undefined): Rating | null {
@@ -38,7 +54,10 @@ class Likes {
 		if (!youtube.account || !isYoutubeSong(songId) || this.#asked.has(songId)) return;
 		this.#asked.add(songId);
 		getRating(songId)
-			.then((s) => this.#known.set(songId, toRating(s)))
+			.then((s) => {
+				this.#known.set(songId, toRating(s));
+				this.#tellApp(songId, toRating(s));
+			})
 			.catch(() => this.#asked.delete(songId));
 	}
 
@@ -48,6 +67,7 @@ class Likes {
 		this.#known.set(songId, rating);
 		try {
 			await setRating(songId, { liked: rating === 'like', disliked: rating === 'dislike' });
+			this.#tellApp(songId, rating);
 			onToast(
 				rating === 'like'
 					? 'Added to Liked music'

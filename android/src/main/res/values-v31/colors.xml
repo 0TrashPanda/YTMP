@@ -1,0 +1,9 @@
+<resources>
+    <!-- The home screen widget follows the phone's own colours (Material You), like YouTube Music's. -->
+    <color name="widget_play_bg">@android:color/system_accent1_100</color>
+    <color name="widget_play_icon">@android:color/system_accent1_700</color>
+    <color name="widget_like_bg">@android:color/system_accent3_100</color>
+    <color name="widget_like_icon">@android:color/system_accent3_600</color>
+    <color name="widget_art_empty">@android:color/system_accent1_700</color>
+    <color name="widget_art_empty_icon">@android:color/system_accent1_100</color>
+</resources>

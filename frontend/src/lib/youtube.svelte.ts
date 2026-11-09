@@ -2,7 +2,7 @@
 // happens in the app (android/.../YoutubeLoginActivity.kt), and the cookies stay there. On a
 // server it belongs to your YTMP account there: you sign in through the app, or paste the
 // cookies from a browser, and the server keeps them (server/.../YoutubeLinks.kt).
-import { forgetPersonal, getHost, getYoutubeAccount, setYoutubeHistory, setYoutubePersonalize, signInToYoutube, signOutOfYoutube, useYoutubeFrom } from './api';
+import { forgetPersonal, getHost, getYoutubeAccount, likesAccess, setYoutubeHistory, setYoutubePersonalize, signInToYoutube, signOutOfYoutube, useYoutubeFrom } from './api';
 import { identity } from './account';
 import { nativeBridge } from './native';
 import type { YoutubeAccount, YoutubeHistory } from './protocol.gen';
@@ -79,6 +79,7 @@ class YoutubeSignIn {
 			this.account = status.account;
 			this.history = status.history;
 			this.personalize = status.personalize;
+			this.tellApp();
 		} catch {
 			// Offline, or an older host: no sign-in.
 		}
@@ -169,6 +170,16 @@ class YoutubeSignIn {
 		await signOutOfYoutube();
 		this.account = null;
 		this.version++;
+		this.tellApp();
+	}
+
+	/** The app's home screen widget likes songs the same way (bridge: setLikes). */
+	private tellApp(): void {
+		try {
+			nativeBridge?.setLikes?.(this.account ? JSON.stringify(likesAccess()) : null);
+		} catch {
+			// An older app.
+		}
 	}
 }
 

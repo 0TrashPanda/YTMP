@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget in the widget picker on Android 11 (later versions show the layout itself). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="140dp"
+    android:height="140dp"
+    android:viewportWidth="140"
+    android:viewportHeight="140">
+    <path android:fillColor="@color/widget_art_empty" android:pathData="M70,0a70,70 0,1 1,0 140a70,70 0,1 1,0 -140z" />
+    <group android:translateX="40" android:translateY="40" android:scaleX="2.5" android:scaleY="2.5">
+        <path android:fillColor="@color/widget_art_empty_icon" android:pathData="M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55 -2.21,0 -4,1.79 -4,4s1.79,4 4,4 4,-1.79 4,-4V7h4V3h-6z" />
+    </group>
+    <path android:fillColor="@color/widget_play_bg" android:pathData="M14,94h18a14,14 0,0 1,14 14v18a14,14 0,0 1,-14 14h-18a14,14 0,0 1,-14 -14v-18a14,14 0,0 1,14 -14z" />
+    <group android:translateX="11" android:translateY="105">
+        <path android:fillColor="@color/widget_play_icon" android:pathData="M8,5v14l11,-7z" />
+    </group>
+    <path android:fillColor="@color/widget_like_bg" android:pathData="M121,0a19,19 0,1 1,0 38a19,19 0,1 1,0 -38z" />
+    <group android:translateX="111" android:translateY="9" android:scaleX="0.833" android:scaleY="0.833">
+        <path android:fillColor="@color/widget_like_icon" android:pathData="M21,8h-6.31l0.95,-4.57 0.03,-0.32c0,-0.41 -0.17,-0.79 -0.44,-1.06L14.17,1 7.58,7.59C7.22,7.950 7,8.45 7,9v10c0,1.1 0.9,2 2,2h9c0.83,0 1.54,-0.5 1.84,-1.22l3.02,-7.05c0.09,-0.23 0.14,-0.47 0.14,-0.73v-2c0,-1.1 -0.9,-2 -2,-2zM21,12l-3,7H9V9l4.34,-4.34L12.23,10H21v2zM1,9h4v12H1z" />
+    </group>
+</vector>
