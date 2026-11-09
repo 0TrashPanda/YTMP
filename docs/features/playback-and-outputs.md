@@ -187,6 +187,23 @@ Implementation: [implementation/playback-sync.md](../implementation/playback-syn
 - **Gapless playback**: no silence between songs (for example live albums or DJ mixes).
 - **Crossfade**: optional fade between songs, with a configurable length. Off by default.
 
+## Playing next to other apps ✅
+
+Normally the app works like any music app: when an audiobook or a video starts, the music
+stops playing on the phone, and starting music stops the other app. *Settings → Sound → Keep
+playing with other apps* (in the app, off by default) lets both play at the same time:
+
+- The music doesn't stop or get quieter when another app plays sound, and starting or resuming
+  the music doesn't stop the other app. Nobody else in the room notices anything.
+- **Calls** (a phone call or an internet call like WhatsApp, also while it rings) still make
+  the music quiet on this phone, until the call is over. The room goes on, like without the
+  setting.
+- Unplugging headphones or Bluetooth disconnecting does what *Headphones disconnected* says,
+  as always. Music and podcasts are treated the same.
+- Other apps' sounds, like a navigation voice, don't make the music quieter either.
+
+Implementation: [implementation/android-app.md](../implementation/android-app.md).
+
 ## Equalizer ✅
 
 Changes the sound of **your own device's playback**, like a phone's or a car's equalizer. In

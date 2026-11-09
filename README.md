@@ -134,6 +134,8 @@ Music, without Premium, and not tied to a single music service.
   setting as you type, and you can change it right in the results.
 - An equalizer (*Settings → Sound*): ten bands and presets (Bass boost, Spoken word, …).
   In the app the phone's speaker, wired headphones and each Bluetooth device keep their own.
+- In the app, *Settings → Sound → Keep playing with other apps* lets music play at the same time
+  as an audiobook or a video: neither stops the other. Calls still make the music quiet.
 - A song menu (⋮, right-click or hold) you can arrange yourself (*Settings → Song menu*):
   order, hide actions, dividers. On a phone it slides up from the bottom like YouTube
   Music's, with three big buttons at the top that you pick. Hold an action for more:

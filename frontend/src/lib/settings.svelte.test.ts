@@ -89,6 +89,18 @@ describe('settings', () => {
 		expect(localStorage.getItem('ytmp.nextPlays')).toBeNull();
 	});
 
+	it('play next to other apps only when asked to, and tell the player when it changes', async () => {
+		const settings = await start();
+		expect(settings.mixWithOtherApps.value).toBe(false);
+		const announced = vi.fn();
+		const before = globalThis.window;
+		vi.stubGlobal('window', { dispatchEvent: announced });
+		settings.mixWithOtherApps.set(true);
+		vi.stubGlobal('window', before);
+		expect(settings.mixWithOtherApps.value).toBe(true);
+		expect(announced).toHaveBeenCalled();
+	});
+
 	it('without an account stay in this browser', async () => {
 		loggedIn = false;
 		localStorage.setItem('ytmp.pageSize', '1000');
