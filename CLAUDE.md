@@ -39,6 +39,7 @@ what's planned is marked there.
 
 ## How the owner likes to work
 
+- Always pull before starting work (`git pull`), so you build on the latest GitHub state.
 - Ask before committing to pushing or releasing; commit locally freely.
 - Ask before any test that plays sound on the home speakers or TV (say which and how loud).
 - The owner's own phone runs real release builds: never install a debug build over it (it
