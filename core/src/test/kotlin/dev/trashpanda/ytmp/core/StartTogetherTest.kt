@@ -257,6 +257,20 @@ class StartTogetherTest {
     }
 
     @Test
+    fun `a song of unknown length can be sought into, not just to the start`() = runTest {
+        // Some listings leave the length out (0). An hour-long DJ set kept going back to 0 s:
+        // every seek was clamped to that "length".
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        room.run(owner, Command.PlayNow(song(1).copy(durationMs = 0)))
+        runCurrent()
+        room.run(owner, Command.Seek(1_400))
+        assertEquals(1_400, room.playback(owner).positionMs)
+        room.run(owner, Command.Seek(40 * 60_000))
+        assertEquals(40 * 60_000L, room.playback(owner).positionMs)
+    }
+
+    @Test
     fun `the song doesn't end while it waits`() = runTest {
         val room = newRoom()
         val owner = room.connect("Owner", owner = true)

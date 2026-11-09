@@ -156,7 +156,9 @@ once.
   changes. A download (`POST /api/download`) of a cached song is made from its file too.
 - **No lookup**: for a cached song the room's `StreamResolver` (`SongCache.streams`) answers
   the host's own path, `/api/audio/ytm%3A…`, without a `stream` call to the module or yt-dlp.
-  The exact length comes from the index.
+  The exact length comes from the index. A song kept without one (a listing left it out,
+  `durationMs` 0) gets it from one `stream` call, remembered in the index, and plays from the
+  cache all the same: without a length the room can't end the song.
 - **All listeners in a server room**: that path is the song's stream link
   (`NowPlaying.streamUrl` may be a path on the room's host). Browsers play it as it is; the
   app adds the room's host. A device that may not stream through the host (`[audio] proxy =

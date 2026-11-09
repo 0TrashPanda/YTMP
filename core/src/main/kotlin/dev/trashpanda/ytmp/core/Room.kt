@@ -1584,12 +1584,18 @@ class Room(
     private fun position(): Long = playback.position(playingNow())
 
     private fun seek(positionMs: Long) {
-        val duration = current?.song?.durationMs ?: 0
-        playback.set(positionMs.coerceIn(0, maxOf(0, duration)))
+        playback.set(withinSong(positionMs, current?.song?.durationMs ?: 0))
         // Seeking while it waits for the players: it plays from there now.
         startGate.stop()
         emitPlayback()
     }
+
+    /**
+     * [positionMs] within the song. A length of 0 is unknown (some listings leave it out), not
+     * "ends at 0": clamped to it, every seek of a long DJ set went back to the start.
+     */
+    private fun withinSong(positionMs: Long, durationMs: Long): Long =
+        if (durationMs > 0) positionMs.coerceIn(0, durationMs) else maxOf(0, positionMs)
 
     /** Players and outputs that load a starting song and say when they have it. */
     private fun players(): List<String> = buildList {
@@ -1613,7 +1619,7 @@ class Room(
     private fun stalled(member: Member, itemId: String, positionMs: Long) {
         val item = current ?: return
         if (item.itemId != itemId || !playingNow() || players() != listOf(member.id)) return
-        playback.set(positionMs.coerceIn(0, maxOf(0, item.song.durationMs)))
+        playback.set(withinSong(positionMs, item.song.durationMs))
         startGate.reset()
         startGate.wait(scope, mutex) {
             if (startGate.waiting && (notReady().isEmpty() || startGate.waitedMs >= STALL_WAIT_MS)) startTogether(notReady())

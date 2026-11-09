@@ -252,8 +252,27 @@ class SongCache(
 
         override suspend fun resolve(songId: String): ResolvedStream {
             val length = savedLength(songId) ?: return lookup.resolve(songId)
-            return ResolvedStream(audioPath(songId), length.takeIf { it > 0 })
+            if (length > 0) return ResolvedStream(audioPath(songId), length)
+            // Kept without its length (some listings leave it out): the room needs it to end
+            // the song, so ask YouTube once, remember it, and play the kept file all the same.
+            val looked = try {
+                lookup.resolve(songId).durationMs?.takeIf { it > 0 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            if (looked != null) rememberLength(songId, looked)
+            return ResolvedStream(audioPath(songId), looked)
         }
+    }
+
+    private fun rememberLength(songId: String, durationMs: Long) {
+        synchronized(lock) {
+            val entry = entries[songId] ?: return
+            entries[songId] = entry.copy(song = entry.song.copy(durationMs = durationMs))
+        }
+        saveSoon()
     }
 
     private fun savedLength(songId: String): Long? {

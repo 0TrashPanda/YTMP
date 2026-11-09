@@ -47,7 +47,7 @@ class SongCacheTest {
     }
 
     /** YouTube, as far as the cache is concerned: lookups and whole songs, both counted. */
-    private inner class FakeYoutube(private val pieceDelayMs: Long = 0) : StreamResolver, AudioFiles {
+    private inner class FakeYoutube(private val pieceDelayMs: Long = 0, private val lengths: Map<String, Long> = emptyMap()) : StreamResolver, AudioFiles {
         val lookups = CopyOnWriteArrayList<String>()
         val downloads = CopyOnWriteArrayList<String>()
 
@@ -55,7 +55,7 @@ class SongCacheTest {
 
         override suspend fun resolve(songId: String): ResolvedStream {
             lookups += songId
-            return ResolvedStream("https://youtube.example/$songId", null)
+            return ResolvedStream("https://youtube.example/$songId", lengths[songId])
         }
 
         override suspend fun download(songId: String, to: File, started: (type: String, size: Long?) -> Unit): String {
@@ -107,6 +107,23 @@ class SongCacheTest {
         assertEquals(200_000, stream.durationMs)
         assertEquals(listOf("ytm:a"), youtube.lookups)
         assertContentEquals(bytesOf("a"), File(cache.localUri(song.id)!!.removePrefix("file:")).readBytes())
+    }
+
+    @Test
+    fun `a song kept without its length gets it from YouTube once`() = runBlocking {
+        // A listing left out the length of an hour-long DJ set: played from the cache without
+        // one, the room had nothing to end it by (and seeks went back to 0 s).
+        val youtube = FakeYoutube(lengths = mapOf("ytm:set" to 3_700_000L))
+        val cache = cache(youtube)
+        val song = song("set", durationMs = 0)
+        play(cache, song, listOf(0 to 50_000))
+        assertTrue(cache.has(song.id))
+
+        val stream = cache.streams.resolve(song.id)
+        assertEquals("/api/audio/ytm%3Aset", stream.url)
+        assertEquals(3_700_000L, stream.durationMs)
+        assertEquals(3_700_000L, cache.streams.resolve(song.id).durationMs)
+        assertEquals(listOf("ytm:set"), youtube.lookups)
     }
 
     @Test
