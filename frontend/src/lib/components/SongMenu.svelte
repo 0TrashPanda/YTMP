@@ -28,6 +28,7 @@
 	// The song menu (docs/features/ui.md#song-menu): right-click a song, or its ⋮ button. Laid out
 	// as set in Settings → Song menu (songMenu.svelte.ts). Phones get a sheet from the bottom, like
 	// YouTube Music's, with big buttons at the top; wider screens a menu where it was opened.
+	import { keepInView } from '../keepInView';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { fly, fade } from 'svelte/transition';
 	import type { Command, RadioFrom, RadioOptions } from '../protocol.gen';
@@ -470,24 +471,8 @@
 	const phone = new MediaQuery('max-width: 639px');
 	const layout = $derived(arrange(songMenuLayout(), entries, phone.current));
 
-	// Keep the menu on screen: opened at the pointer, moved left or up when it doesn't fit, and again
-	// whenever its size changes (a held action's choices are wider and taller than the menu).
-	let menu = $state<HTMLElement>();
-	let left = $state(0);
-	let top = $state(0);
-	$effect(() => {
-		const el = menu;
-		if (!el) return;
-		const fit = () => {
-			const { width, height } = el.getBoundingClientRect();
-			left = Math.max(8, Math.min(target.x, window.innerWidth - width - 8));
-			top = target.y + height > window.innerHeight - 8 ? Math.max(8, target.y - height) : target.y;
-		};
-		fit();
-		const watch = new ResizeObserver(fit);
-		watch.observe(el);
-		return () => watch.disconnect();
-	});
+	// Opened at the pointer, and kept on screen (moved left, or above it) by keepInView.
+	const at = $derived({ top: target.y, bottom: target.y, left: target.x, right: target.x });
 
 	// The sheet follows the finger down, and closes when let go far enough (from the top of its list).
 	let list = $state<HTMLElement>();
@@ -614,10 +599,10 @@
 	<!-- Click anywhere else (or right-click) to close. -->
 	<div class="fixed inset-0 z-[55]" role="presentation" onclick={onClose} oncontextmenu={(e) => (e.preventDefault(), onClose())}></div>
 	<div
-		bind:this={menu}
-		class="fixed z-[56] max-h-[calc(100vh-16px)] max-w-[calc(100vw-16px)] {sub ? 'w-80' : 'w-64'} overflow-y-auto rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line"
-		style:left="{left}px"
-		style:top="{top}px"
+		use:keepInView={at}
+		class="fixed z-[56] {sub ? 'w-80' : 'w-64'} rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line"
+		style:left="{target.x}px"
+		style:top="{target.y}px"
 		role="menu"
 	>
 		{#if sub}

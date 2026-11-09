@@ -1,6 +1,7 @@
 <script lang="ts">
 	// The speed podcast episodes play at, for everyone in the room (music always plays at 1×).
 	// Shows the speed; a tap opens the speeds to pick from, like YouTube Music's, or to type one.
+	import { keepInView } from '../keepInView';
 	import type { RoomConnection } from '../room.svelte';
 	import NumberField from './NumberField.svelte';
 
@@ -36,7 +37,7 @@
 	</button>
 	{#if open}
 		<div class="fixed inset-0 z-[55]" role="presentation" onclick={() => (open = false)}></div>
-		<div class="absolute left-1/2 z-[56] w-36 -translate-x-1/2 overflow-hidden rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line {up ? 'bottom-full mb-2' : 'top-full mt-2'}" role="menu">
+		<div use:keepInView class="absolute left-1/2 z-[56] w-36 -translate-x-1/2 overflow-hidden rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line {up ? 'bottom-full mb-2' : 'top-full mt-2'}" role="menu">
 			<div class="px-4 pt-1 pb-2 text-xs text-muted">Speed</div>
 			{#each SPEEDS as s (s)}
 				<button role="menuitemradio" aria-checked={s === speed} class="flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-line {s === speed ? 'font-bold text-accent' : ''}" onclick={() => pick(s)}>

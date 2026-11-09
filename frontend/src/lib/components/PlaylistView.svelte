@@ -1,6 +1,7 @@
 <script lang="ts">
 	// A playlist page (community or YouTube Music's own, or one of yours): its songs, in order.
 	// Long ones load in parts: more songs as you scroll down.
+	import { keepInView } from '../keepInView';
 	import { smallUrl, thumbUrl } from '../images.svelte';
 	import Picture from './Picture.svelte';
 	import { deletePlaylist, getPlaylist, getPlaylistPart, movePlaylistItem, renamePlaylist } from '../api';
@@ -222,7 +223,7 @@
 								<Icon name="more" />
 							</button>
 							{#if menuOpen}
-								<div class="absolute top-10 left-0 z-20 flex w-44 flex-col rounded-lg bg-surface p-1.5 shadow-xl ring-1 ring-line">
+								<div use:keepInView class="absolute top-10 left-0 z-20 flex w-44 flex-col rounded-lg bg-surface p-1.5 shadow-xl ring-1 ring-line">
 									<button class="rounded px-3 py-2 text-left text-sm hover:bg-raised" onclick={() => ((renaming = playlist?.title ?? ''), (menuOpen = false))}>Rename</button>
 									<button class="rounded px-3 py-2 text-left text-sm text-accent hover:bg-raised" onclick={remove}>Delete playlist</button>
 								</div>

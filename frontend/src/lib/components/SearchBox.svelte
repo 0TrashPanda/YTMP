@@ -250,7 +250,7 @@
 {/snippet}
 
 {#snippet list(full: boolean)}
-	<ul id="search-suggestions" role="listbox" class={full ? 'flex-1 overflow-y-auto py-1' : 'absolute top-full right-0 left-0 z-30 rounded-b-lg border-t border-line bg-raised py-2 shadow-2xl'}>
+	<ul id="search-suggestions" role="listbox" class={full ? 'flex-1 overflow-y-auto py-1' : 'absolute top-full right-0 left-0 z-30 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-b-lg border-t border-line bg-raised py-2 shadow-2xl'}>
 		{#each rows as row, i (row.text)}
 			{@const [typed, rest] = parts(row.text)}
 			<!-- The keyboard works on the input (↑/↓/Enter), the usual combobox pattern. -->

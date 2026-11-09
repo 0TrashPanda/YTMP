@@ -6,6 +6,7 @@
 	// has all of that for every section (home.svelte.ts), and a speed dial (YTM's 3×3 covers).
 	// Your pins: tiles in the Pinned section (a speed dial),
 	// or each its own section with its songs. They show at once: nothing to wait for.
+	import { keepInView } from '../keepInView';
 	import { getHome, lastSeen } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
 	import { cardTiles, songTiles } from '../dial';
@@ -114,7 +115,7 @@
 		{#if sectionMenu === block.key}
 			<!-- A tap anywhere else closes it. -->
 			<button class="fixed inset-0 z-[55] cursor-default" aria-label="Close" onclick={() => (sectionMenu = null)}></button>
-			<div class="absolute top-full right-2 z-[56] w-56 overflow-hidden rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line" role="menu">
+			<div use:keepInView class="absolute top-full right-2 z-[56] w-56 overflow-hidden rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line" role="menu">
 				{#each actions(block, i) as [action, label] (action)}
 					<button class="block w-full px-4 py-2.5 text-left text-sm hover:bg-line" role="menuitem" onclick={() => sectionAction(block, action)}>{label}</button>
 				{/each}

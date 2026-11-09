@@ -5,6 +5,7 @@
 <script lang="ts">
 	// A room's settings, as pages of Settings (SettingsScreen.svelte → This room): Overview, Queue,
 	// and People (members, roles, bans). Changes wait for Save: everyone in the room gets them at once.
+	import { keepInView } from '../../keepInView';
 	import { untrack } from 'svelte';
 	import { DEFAULT_ROLE_COLOR, rank } from '../../permissions';
 	import type { Command, HostInfo, Participant, Permission, Role, RoomOpenMode } from '../../protocol.gen';
@@ -452,7 +453,7 @@
 							{/if}
 						</div>
 						{#if menuFor === person.id}
-							<div class="absolute top-12 right-2 z-10 flex w-52 flex-col rounded-xl bg-raised py-2 shadow-2xl">
+							<div use:keepInView class="absolute top-12 right-2 z-10 flex w-52 flex-col rounded-xl bg-raised py-2 shadow-2xl">
 								{#if me?.isOwner && person.id !== me.id && !person.screen}
 									<button class="px-4 py-2 text-left text-sm hover:bg-line" onclick={() => makeOwner(person)}>Make owner</button>
 								{/if}

@@ -39,7 +39,7 @@
 
 <div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={onClose}>
 	<div
-		class="w-full max-w-sm rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
+		class="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 		role="dialog"
 		aria-label="Show on a TV"
 		tabindex="-1"
