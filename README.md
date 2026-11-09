@@ -128,7 +128,8 @@ Music, without Premium, and not tied to a single music service.
   Party screen…), in *Settings → Solo rooms*. Without the room code, search fills the top bar.
 - One Settings screen in YouTube Music's style, with the room's own settings at the top when
   you're in a room. Your settings are kept on your YTMP account, so all your devices have them;
-  the phone icon next to one keeps it different on that device.
+  the phone icon next to one keeps it different on that device. *Search settings* finds any
+  setting as you type, and you can change it right in the results.
 - An equalizer (*Settings → Sound*): ten bands and presets (Bass boost, Spoken word, …).
   In the app the phone's speaker, wired headphones and each Bluetooth device keep their own.
 - A song menu (⋮, right-click or hold) you can arrange yourself (*Settings → Song menu*):
