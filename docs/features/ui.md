@@ -386,6 +386,14 @@ song's menu on an album's or artist's page has no *Go to* that same page.
   - **Music and storage**: **Local music**, **Song cache and downloads** (the app) and
     **Where songs play from** (browsers: the order, and your own module).
   - **App** (version, updates, logs, opening the room you were in, the Back button) and **Server admin** (invites, accounts).
+  - **Search** ✅: *Search settings* at the top of the list finds a setting as you type, by
+    its name or what it says about itself, on every page you have (like Android's settings).
+    Pages whose name matches come first; under them each matching setting with its page
+    (*Playing · Playback*), and it can be changed right there. Tapping a setting's name, or
+    the page above it, opens that page at the setting (it lights up briefly). A heading
+    (like *Mix* in Radio) shows its whole card. Nothing found says so. Back or Esc closes the
+    search. Settings this device doesn't have (podcasts' skip silence in a browser, the
+    equalizer without the app) aren't found.
 - **Your settings on all your devices** ✅: logged in with your YTMP account, almost every
   setting is kept on your account, so all your devices have it, and a change on one shows up
   on the others (when you come back to the app). A phone icon next to a setting keeps it

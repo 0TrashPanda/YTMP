@@ -1,3 +1,7 @@
+<script lang="ts" module>
+	export type Tab = 'accounts' | 'settings' | 'rooms' | 'log' | 'about';
+</script>
+
 <script lang="ts">
 	// Settings → Server admin (the server's admins only): accounts and invite links, the server's
 	// settings, its rooms, and versions (docs/features/server-admin.md).
@@ -8,9 +12,21 @@
 	import AdminRooms from './AdminRooms.svelte';
 	import AdminSettings from './AdminSettings.svelte';
 
-	let { info, me, onToast }: { info: AuthServerInfo; me: AccountInfo; onToast: (text: string) => void } = $props();
+	let {
+		info,
+		me,
+		all = false,
+		start = 'accounts',
+		onToast
+	}: {
+		info: AuthServerInfo;
+		me: AccountInfo;
+		/** The settings search: every tab with settings at once (each in a data-admin-tab). */
+		all?: boolean;
+		start?: Tab;
+		onToast: (text: string) => void;
+	} = $props();
 
-	type Tab = 'accounts' | 'settings' | 'rooms' | 'log' | 'about';
 	const tabs: [Tab, string][] = [
 		['accounts', 'Accounts'],
 		['settings', 'Settings'],
@@ -18,9 +34,15 @@
 		['log', 'Log'],
 		['about', 'About']
 	];
-	let tab = $state<Tab>('accounts');
+	// svelte-ignore state_referenced_locally
+	let tab = $state<Tab>(start);
 </script>
 
+{#if all}
+	<div class="flex flex-col gap-6" data-admin-tab="accounts"><AdminAccounts {info} {me} {onToast} /></div>
+	<div class="flex flex-col gap-6" data-admin-tab="settings"><AdminSettings {onToast} /></div>
+	<div class="flex flex-col gap-6" data-admin-tab="about"><AdminAbout {onToast} /></div>
+{:else}
 <div class="flex gap-2 overflow-x-auto [scrollbar-width:none]" role="tablist">
 	{#each tabs as [value, label] (value)}
 		<button
@@ -42,4 +64,5 @@
 	<AdminLog {onToast} />
 {:else}
 	<AdminAbout {onToast} />
+{/if}
 {/if}

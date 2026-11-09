@@ -119,7 +119,13 @@ goes under its id, and `arrange` in `lib/songMenu.svelte.ts` lays them out as se
 goes in `settings` in `lib/settings.svelte.ts` (a `Setting`: it follows your account and can be
 kept different on a device; `Choice` and `Toggle` in `components/settings/` show it with the
 phone icon), or in `saved` (`lib/storage.ts`) when it only makes sense on one device. Its page
-in Settings is in `SettingsScreen.svelte`; a room's own settings in `RoomSections.svelte`. Calls to the host are in `lib/api.ts`, to your account's server in
+in Settings is in `SettingsScreen.svelte`; a room's own settings in `RoomSections.svelte`.
+The settings search finds a new setting by itself: it shows every page at once (the `body`
+snippet in `SettingsScreen.svelte`) and `lib/settingsSearch.ts` keeps the rows whose words
+match. A row is found by its name (`Toggle`, `Choice`, `CountList`, or a custom row's
+`<p class="font-medium">`): the biggest part around it with no other name in it, so a
+custom row needs a wrapper of its own around its name, hint and controls. `data-search-keep`
+(the room's Save bar) shows with any match. Calls to the host are in `lib/api.ts`, to your account's server in
 `lib/account.ts` and `lib/listening.svelte.ts`.
 A new version on the host: SvelteKit sees that `_app/version.json` changed (on focus, every
 10 minutes, and when the room's WebSocket reconnects), and `lib/appUpdate.svelte.ts` reloads
