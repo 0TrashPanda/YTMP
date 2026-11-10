@@ -19,7 +19,7 @@ vi.mock('./keptLiked', () => ({ readLiked: async () => store.kept, writeLiked: a
 vi.mock('./settings.svelte', () => ({ settings: { homeRefresh: { value: 360 } } }));
 vi.mock('./youtube.svelte', () => ({ youtube: { account: { name: 'Me', handle: null } } }));
 
-const { due, librarySearch, MAX_LIKED, withNewest } = await import('./librarySearch.svelte');
+const { byArtist, due, librarySearch, MAX_LIKED, withNewest } = await import('./librarySearch.svelte');
 const { youtube } = await import('./youtube.svelte');
 
 const ALL = { songs: 10, items: 10, loose: false };
@@ -132,5 +132,53 @@ describe('searching your library', () => {
 		librarySearch.ensure();
 		await settle();
 		expect(librarySearch.suggest('road', 5)).toEqual(['Road trip', 'Road home']);
+	});
+});
+
+describe("an artist's songs in your library", () => {
+	const by = (id: string, title: string, artists: { id: string | null; name: string }[]): Song => ({ ...song(id, title), artists });
+	const DAFT = { id: 'UCdaft', name: 'Daft Punk' };
+	const podcast = (id: string, author: string | null): SearchItem => ({ kind: 'podcast', id, title: id, author, thumbnails: [] });
+	const owned = (id: string, author: string | null): SearchItem => ({ kind: 'playlist', id, title: id, author, itemCount: null, thumbnails: [] });
+
+	it('finds songs by the artist ID, also as one of several artists, in the order of Liked music', () => {
+		const songs = [
+			by('1', 'One More Time', [{ id: 'UCdaft', name: 'Daft Punk' }]),
+			by('2', 'Yellow', [{ id: 'UCcold', name: 'Coldplay' }]),
+			by('3', 'Get Lucky', [{ id: 'UCdaft', name: 'Daft Punk' }, { id: 'UCpw', name: 'Pharrell Williams' }]),
+			by('4', 'Starboy', [{ id: 'UCweeknd', name: 'The Weeknd' }, { id: 'MPLAUCdaft', name: 'Daft Punk' }])
+		];
+		expect(byArtist(songs, [], DAFT).songs.map((s) => s.id)).toEqual(['1', '3', '4']);
+	});
+
+	it('does not take another artist with the same or a similar name when songs have IDs', () => {
+		const songs = [by('1', 'A', [{ id: 'UCother', name: 'Daft Punk' }]), by('2', 'B', [{ id: 'UCtribute', name: 'Daft Punk Tribute' }])];
+		expect(byArtist(songs, [], DAFT).songs).toEqual([]);
+	});
+
+	it('falls back to the whole name, ignoring case, accents and punctuation, when a song has no artist ID', () => {
+		const songs = [
+			by('1', 'Halo', [{ id: null, name: 'BEYONCE' }]),
+			by('2', 'Crazy in Love', [{ id: null, name: 'Beyoncé feat. Jay-Z' }]),
+			by('3', 'Tribute', [{ id: null, name: 'Beyoncé Tribute Band' }]),
+			by('4', 'Shy', [{ id: null, name: 'Beyonc' }])
+		];
+		expect(byArtist(songs, [], { id: 'UCb', name: 'Beyoncé' }).songs.map((s) => s.id)).toEqual(['1', '2']);
+		expect(byArtist([by('5', 'X', [{ id: null, name: 'Simon and Garfunkel' }])], [], { id: 'UCsg', name: 'Simon & Garfunkel' }).songs).toHaveLength(1);
+	});
+
+	it("finds the artist's podcasts and playlists in your library by name, not Liked music", () => {
+		const sections = [
+			{ items: [owned('LM', 'Daft Punk'), owned('PL1', 'Daft Punk'), owned('PL2', 'Someone else')] },
+			{ items: [podcast('P1', 'daft punk'), podcast('P2', 'Daft Punkish'), podcast('P3', null)] }
+		];
+		expect(byArtist([], sections, DAFT).items.map((i) => ('id' in i ? i.id : ''))).toEqual(['PL1', 'P1']);
+	});
+
+	it('shows nothing without a YouTube Music sign-in', () => {
+		const account = youtube.account;
+		youtube.account = null;
+		expect(librarySearch.ofArtist(DAFT)).toEqual({ songs: [], items: [] });
+		youtube.account = account;
 	});
 });

@@ -31,7 +31,7 @@ export function artUrl(song: Song, size: number): string | null {
 }
 
 /** Lowercase, without accents: "cafe" finds "Café". */
-const plain = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+export const plain = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
 /** Rows for [editDistance], kept between calls (it runs for every word of every item). */
 let rows = [new Uint16Array(32), new Uint16Array(32), new Uint16Array(32)];

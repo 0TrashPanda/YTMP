@@ -153,6 +153,8 @@ const json = <T>(key: string, parse: (raw: unknown) => T | undefined): Old<T> =>
 	}
 });
 const object = (raw: unknown) => (raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : undefined);
+/** A list of section keys (an order of sections), each once. */
+const keys = (raw: unknown) => (Array.isArray(raw) ? [...new Set(raw.filter((k): k is string => typeof k === 'string'))] : undefined);
 const pageSize = (raw: unknown) => {
 	const size = typeof raw === 'number' ? Math.round(raw) : NaN;
 	return size >= PAGE_SIZES.min && size <= PAGE_SIZES.max ? size : undefined;
@@ -273,8 +275,10 @@ export const settings = {
 	soloSearchField: new Setting('soloSearchField', true, bool),
 	/** The search bar on the Library tab searches only your library (librarySearch.svelte.ts). */
 	libraryTabSearch: new Setting('libraryTabSearch', true, bool),
-	/** The order of the sections on the search page (searchOrder.svelte.ts). */
-	searchOrder: new Setting<string[]>('searchOrder', [], (raw) => (Array.isArray(raw) ? [...new Set(raw.filter((k): k is string => typeof k === 'string'))] : undefined)),
+	/** The order of the sections on the search page (sectionOrder.svelte.ts). */
+	searchOrder: new Setting<string[]>('searchOrder', [], keys),
+	/** The order of the sections on an artist's page (sectionOrder.svelte.ts). */
+	artistOrder: new Setting<string[]>('artistOrder', [], keys),
 	/** The Local tab shows the music on the network. */
 	localNetwork: new Setting('localNetwork', true, bool, flag('ytmp.localNetwork'))
 };

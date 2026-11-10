@@ -340,7 +340,23 @@ song's menu on an album's or artist's page has no *Go to* that same page.
 >
 > **Artist pages** show the artist's top songs, albums and singles, with *Radio* and
 > *Add top songs*. **Show all** under the songs opens all their songs (YTM's list, up to 200)
-> as a page with *Play*, *Play next* and *Add to queue*. **Album pages** list the songs in order, with *Play*, *Play next* and
+> as a page with *Play*, *Play next* and *Add to queue*.
+>
+> **From your library** on an artist's page ✅ (signed in to YouTube Music): their songs you
+> liked, newest first (five, with *Show all*), then their playlists and podcasts you saved.
+> By default it's right above *Songs*. Songs count when the artist is one of the song's
+> artists; it goes by the artist itself, so another artist with the same or a similar name
+> doesn't show up (only a song that doesn't say which artist it is goes by the name, the whole
+> name, without minding capitals or accents). Its songs work like the others on the page (tap,
+> ⋮, swipes). The page never waits for it: it uses the liked songs and library the app already
+> keeps (the same as [search](#search)'s *From your library*), and it's left out when there's
+> nothing of theirs, you're not signed in, or your library isn't there yet.
+>
+> **The order of an artist's page** ✅ (*Settings → Artist pages*, or *Change the order of
+> these sections* at the bottom of the page): move *From your library*, *Songs*, *Albums* and
+> *Singles & EPs* up and down; *Defaults* puts them back. A section the saved order doesn't
+> know yet goes where the default order puts it, and one YouTube Music adds that YTMP has no
+> name for goes last. **Album pages** list the songs in order, with *Play*, *Play next* and
 > *Add to queue*. Artist and album names under the current song open them.
 
 | Action | Notes |
@@ -415,8 +431,9 @@ song's menu on an album's or artist's page has no *Go to* that same page.
     songs** (long playlists, see [queue](queue.md#long-playlists); when to say what's going
     on, below) and **Sound** (equalizer, headphones, playing next to other apps).
   - **How it looks**: **Look** (image quality, video pictures, songs per page), **Player**
-    (the tabs, the dislike button), **Home**, **Song menu**, **Taps and swipes** and **Solo
-    rooms** (what a solo room leaves out, below).
+    (the tabs, the dislike button), **Home**, **Search** (the order of the results, the Library
+    tab's search bar), **Artist pages** (the order of an artist's page), **Song menu**, **Taps
+    and swipes** and **Solo rooms** (what a solo room leaves out, below).
   - **Music and storage**: **Local music**, **Song cache and downloads** (the app) and
     **Where songs play from** (browsers: the order, and your own module).
   - **App** (version, updates, logs, opening the room you were in, the Back button) and **Server admin** (invites, accounts).

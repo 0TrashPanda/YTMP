@@ -1,15 +1,16 @@
-// Finding things in your own library: the "From your library" section of search, and the search
-// bar on the Library tab (searchOrder.svelte.ts, SearchResults.svelte, SearchBox.svelte).
+// Finding things in your own library: the "From your library" section of search and of an
+// artist's page, and the search bar on the Library tab (sectionOrder.svelte.ts,
+// SearchResults.svelte, ArtistView.svelte, SearchBox.svelte).
 //
 // It only looks at what the app already has: your library (playlists and podcasts) and Liked
-// music, read once and kept in this browser (keptLiked.ts). Nothing happens until you search,
-// and matching is local, so a search never waits for this and each search costs no extra
-// request. Liked music is read in parts with a pause between them, and afterwards only its newest
+// music, read once and kept in this browser (keptLiked.ts). Nothing happens until you search or
+// open an artist, and matching is local, so a search or an artist page never waits for this and
+// costs no extra request. Liked music is read in parts with a pause between them, and afterwards only its newest
 // part is looked at when the list is older than Settings → Home's "New suggestions after":
 // many YouTube requests in a short time can get the home network blocked.
 import { untrack } from 'svelte';
 import { getLibrary, getPlaylist, getPlaylistPart, lastSeen, youtubeSource } from './api';
-import { fuzzyIndex } from './format';
+import { fuzzyIndex, plain } from './format';
 import { readLiked, writeLiked, type KeptLiked } from './keptLiked';
 import type { HomePage, SearchItem, Song } from './protocol.gen';
 import { settings } from './settings.svelte';
@@ -50,6 +51,63 @@ export interface FindOptions {
 }
 
 const NOTHING: LibraryMatches = { songs: [], sections: [] };
+
+/** One artist's songs and other things in your library (an artist's page). */
+export interface ArtistMatches {
+	songs: Song[];
+	/** Playlists and podcasts (and albums, when your library has them) by the artist. */
+	items: SearchItem[];
+}
+
+const NONE: ArtistMatches = { songs: [], items: [] };
+
+/** An artist's ID as songs and pages have it (an artist page's can start with MPLA). */
+const bareId = (id: string) => id.replace(/^MPLA/, '');
+
+/** A name to compare: no case, accents or punctuation ("AC/DC" is "ac dc", "Beyoncé" is "beyonce", "&" is "and"). */
+const nameKey = (name: string) => plain(name).replace(/&/g, ' and ').split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ');
+
+/** The names in a credit without an ID: the whole, and each of "A & B", "A, B", "A feat. C" and "A x B". */
+function namesIn(credit: string): string[] {
+	const parts = credit.split(/\s*(?:,|&|\+|\s(?:x|×|feat\.?|ft\.?|featuring|with|and)\s)\s*/i);
+	return [credit, ...parts].map(nameKey).filter(Boolean);
+}
+
+/**
+ * Whether a credit is [artist]: by ID when it has one (so another artist with the same or a
+ * similar name doesn't count), else by name, the whole name, ignoring case and accents.
+ */
+function isArtist(credit: { id?: string | null; name: string }, artist: { id: string; name: string }): boolean {
+	if (credit.id) return bareId(credit.id) === bareId(artist.id);
+	const name = nameKey(artist.name);
+	return !!name && namesIn(credit.name).includes(name);
+}
+
+/** What's by [artist] in [songs] (Liked music, newest first) and [sections] (your library). */
+export function byArtist(songs: Song[], sections: { items: SearchItem[] }[], artist: { id: string; name: string }): ArtistMatches {
+	const theirs = (song: Song) => song.artists.some((a) => isArtist(a, artist));
+	const items = sections.flatMap((section) =>
+		section.items.filter((item) => {
+			switch (item.kind) {
+				case 'album':
+					return item.artists.some((a) => isArtist(a, artist));
+				case 'playlist':
+					// Liked music is "by" you; its songs are the songs above.
+					return item.id !== 'LM' && !!item.author && isArtist({ name: item.author }, artist);
+				case 'podcast':
+					return !!item.author && isArtist({ name: item.author }, artist);
+				default:
+					return false; // songs come from Liked music; the artist is this page
+			}
+		})
+	);
+	const seen = new Set<string>();
+	const unique = items.filter((item) => {
+		const key = item.kind === 'album' ? `album:${item.album.id}` : `${item.kind}:${'id' in item ? item.id : ''}`;
+		return !seen.has(key) && !!seen.add(key);
+	});
+	return { songs: songs.filter(theirs), items: unique };
+}
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const songText = (song: Song) => `${song.title} ${song.artists.map((a) => a.name).join(' ')}`;
@@ -213,6 +271,12 @@ class LibrarySearch {
 				.map((section) => ({ title: section.title, items: fuzzyIndex(section.items, itemText, loose)(query).slice(0, items) }))
 				.filter((section) => section.items.length)
 		};
+	}
+
+	/** What's by [artist] in your library; nothing without a YouTube Music sign-in. Reactive. */
+	ofArtist(artist: { id: string; name: string }): ArtistMatches {
+		if (!youtube.account) return NONE;
+		return byArtist(this.songs, this.library?.sections ?? [], artist);
 	}
 
 	/** Names to suggest while typing, best first, each once. */

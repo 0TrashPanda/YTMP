@@ -763,8 +763,10 @@
 									name={view.name}
 									onToast={toast}
 									onMenu={openMenu}
-									onAlbum={(a) => openAlbum({ id: a.id, name: a.title })}
+									onAlbum={(a) => openAlbum(a)}
 									onPlaylist={openPlaylist}
+									onPodcast={openPodcast}
+									onReorder={() => (sheet = { kind: 'settings', start: 'artist' })}
 								/>
 							{:else if view.kind === 'album'}
 								<AlbumView {room} id={view.id} title={view.title} onToast={toast} onMenu={openMenu} onArtist={openArtist} />

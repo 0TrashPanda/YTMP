@@ -69,7 +69,8 @@ Music, without Premium, and not tied to a single music service.
   playlist, artist or podcast (or a YTMP room link to open the room).
 - Recognize a song like YouTube Music's song search: the microphone icon in the search box
   listens and shows that exact song to play or queue (Shazam; in every room, a phone's too).
-- Artist, album, playlist and podcast pages.
+- Artist, album, playlist and podcast pages. An artist's page has a section with their songs
+  you liked and their playlists and podcasts you saved, and its sections go in the order you like.
 - Lyrics, synced line by line (from LRCLIB or YouTube Music), and a karaoke mode that shows
   them large on the party screen and in everyone's player.
 - Radio from a song (it can clear the songs that played before too, like YouTube Music),

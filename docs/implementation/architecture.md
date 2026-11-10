@@ -137,12 +137,15 @@ autoplay policy (`lib/autoplay.ts`) lets the reloaded page play on; then the pla
 when the next song starts and the room page switches *Play here* back on (`appUpdate.resumes`). The host serves `index.html` and `version.json` with `no-cache`
 and the hashed files under `_app/immutable/` for a year (`webApp` in `host/.../Application.kt`).
 
-Search's own sections are in `SearchResults.svelte`: `lib/searchOrder.svelte.ts` is the order of
-its sections (a new section type: an entry in `SEARCH_SECTIONS` where it belongs by default; the
-order a user saved gets it from there), `lib/librarySearch.svelte.ts` the matches in your
-library. That one only uses what the app already fetches: `getLibrary` and Liked music
+Search's own sections are in `SearchResults.svelte`, an artist page's in `ArtistView.svelte`:
+`lib/sectionOrder.svelte.ts` is the order of a page's sections, one `SectionOrder` per page
+(`searchOrder`, `artistOrder`, each with its setting; a new section type: an entry in its list
+where it belongs by default, and the order a user saved gets it from there; a key without an
+entry goes last). `components/settings/SectionOrderList.svelte` is its settings list.
+`lib/librarySearch.svelte.ts` has the matches in your library (`find` for search, `ofArtist`
+for an artist page: by artist ID, by name only for a credit without one). That one only uses what the app already fetches: `getLibrary` and Liked music
 (`getPlaylist('LM')` and its parts, paced), kept in IndexedDB by `lib/keptLiked.ts`, so a search
-costs no extra requests; on the Library tab the search bar (`libraryBar` on the room page)
+costs no extra requests (nor does an artist page); on the Library tab the search bar (`libraryBar` on the room page)
 opens the same results with `library` set on the search page.
 
 **The YouTube Music module** (`ytm-module/ytmp_ytm/`): `core.py` talks to YouTube Music and

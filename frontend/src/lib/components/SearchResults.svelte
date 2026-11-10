@@ -3,7 +3,7 @@
 	// song. Songs: tap = what Tap does in song lists, ⋮ or right-click = song menu. Albums, artists and
 	// playlists open their page. All also has a section with what matches in your own library
 	// (librarySearch.svelte.ts), the sections in the order of Settings → Search
-	// (searchOrder.svelte.ts); the Library chip shows only your library, without asking YouTube Music.
+	// (sectionOrder.svelte.ts); the Library chip shows only your library, without asking YouTube Music.
 	import { smallUrl, thumbUrl } from '../images.svelte';
 	import Picture from './Picture.svelte';
 	import { getSong, search, similar } from '../api';
@@ -12,7 +12,7 @@
 	import { itemCard } from '../cards';
 	import { artistNames } from '../format';
 	import { librarySearch } from '../librarySearch.svelte';
-	import { arrangeSections, LIBRARY_SECTION, TOP_SECTION } from '../searchOrder.svelte';
+	import { LIBRARY_SECTION, searchOrder, TOP_SECTION } from '../sectionOrder.svelte';
 	import { settings } from '../settings.svelte';
 	import { youtube } from '../youtube.svelte';
 	import type { RadioFrom, AlbumRef, ArtistRef, PodcastRef, SearchItem, SearchPage, SearchType, Song } from '../protocol.gen';
@@ -151,7 +151,7 @@
 		const items = [...asItems(mine.songs), ...mine.sections.flatMap((s) => s.items)];
 		// Waiting for the first results it stays out, so they don't push it around when they come.
 		const section = items.length && !(loading && pageEmpty) ? [{ key: LIBRARY_SECTION, title: 'From your library', type: null, items, big: false, mine: true }] : [];
-		return arrangeSections([...theirs, ...section], (s) => s.key, settings.searchOrder.value);
+		return searchOrder.arrange([...theirs, ...section], (s) => s.key);
 	});
 
 	const empty = $derived(shown.every((s) => s.items.length === 0));
