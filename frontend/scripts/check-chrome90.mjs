@@ -3,8 +3,10 @@
 // when the built app uses one that isn't polyfilled (`pnpm build` runs it after Vite).
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = new URL('..', import.meta.url).pathname;
+// A path on every system (`.pathname` gives /C:/… on Windows).
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 // Built-ins newer than Chrome 90 (the Chrome version that added them), and how they look in the built code.
 const NEWER = [

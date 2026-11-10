@@ -49,8 +49,9 @@
 {:else}
 <div
 	bind:this={scroller}
+	data-carousel={row ? '' : undefined}
 	class={row
-		? 'grid snap-x auto-cols-[9.5rem] grid-flow-col gap-4 overflow-x-auto scroll-px-2 px-2 pb-2 [scrollbar-width:none] sm:auto-cols-[11rem]'
+		? 'grid snap-x auto-cols-[9.5rem] grid-flow-col gap-4 overflow-x-auto scroll-px-2 px-2 pb-2 [scrollbar-width:none] sm:auto-cols-[11rem] [&::-webkit-scrollbar]:hidden'
 		: 'grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2'}
 >
 	{#each unique as card (card.key)}

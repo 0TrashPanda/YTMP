@@ -195,6 +195,28 @@
 		else await slide(id, () => (dropped = null));
 	}
 
+	/**
+	 * The keyboard: ↑ ↓ on a song's handle move it one place within its own list (Up next,
+	 * Autoplay or the played songs); Home / End to its top or bottom. A screen reader hears where.
+	 */
+	let moved = $state('');
+	function moveKey(event: KeyboardEvent, slot: Slot) {
+		if (slot.kind !== 'item') return;
+		const items = slot.place === 'history' ? roomState?.history : slot.place === 'queue' ? roomState?.queue : roomState?.autoplay;
+		if (!items) return;
+		const at = items.findIndex((item) => item.itemId === slot.item.itemId);
+		const to = { ArrowUp: at - 1, ArrowDown: at + 1, Home: 0, End: items.length - 1 }[event.key];
+		if (to === undefined) return;
+		event.preventDefault();
+		if (at < 0 || to < 0 || to >= items.length || to === at) return;
+		moved = `${slot.item.song.title}: ${to + 1} of ${items.length}`;
+		const id = slot.item.itemId;
+		// Moving its row takes the focus away: back on its handle, once shown and once the host moved it.
+		const refocus = () => tick().then(() => list?.querySelector<HTMLElement>(`[data-move-id="${CSS.escape(id)}"]`)?.focus());
+		void refocus();
+		void room.run({ kind: 'MoveItem', itemId: id, list: slot.place, toIndex: to }).then(refocus);
+	}
+
 	/** Where every slot is shown now (with its transform), by id, in the list's own coordinates. */
 	function shownAt(): Map<string, number> {
 		const top = (list?.getBoundingClientRect().top ?? 0) - (list?.scrollTop ?? 0);
@@ -446,7 +468,7 @@
 						{roomState?.autoplaySeed ? `Songs like ${roomState.autoplaySeed.title}` : 'Plays when the queue runs out'}
 					</span>
 					{#if room.can('autoplay_from_here')}
-						<button class="shrink-0 rounded-full px-2 py-0.5 text-xs text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearAutoplay' })}>
+						<button class="tap shrink-0 rounded-full px-3 py-1 text-xs text-muted hover:bg-raised hover:text-white" aria-label="Clear autoplay" onclick={() => room.run({ kind: 'ClearAutoplay' })}>
 							Clear
 						</button>
 					{/if}
@@ -517,7 +539,10 @@
 						{#if room.can('reorder')}
 							<button
 								class="tap cursor-grab touch-none rounded-full p-1.5 text-muted hover:text-white active:cursor-grabbing"
-								aria-label="Drag to move"
+								aria-label="Move {slot.item.song.title}"
+								title="Drag it, or use the arrow keys"
+								data-move-id={slot.item.itemId}
+								onkeydown={(e) => moveKey(e, slot)}
 								onpointerdown={(e) => startDrag(e, index)}
 								onpointermove={moveDrag}
 								onpointerup={endDrag}
@@ -536,5 +561,6 @@
 		{#if roomState && !roomState.nowPlaying && roomState.queue.length === 0 && roomState.autoplay.length === 0}
 			<p class="px-2 py-8 text-center text-sm text-muted">The queue is empty. Search for a song to get started.</p>
 		{/if}
+		<p class="sr-only" aria-live="polite">{moved}</p>
 	</div>
 </aside>

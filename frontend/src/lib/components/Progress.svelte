@@ -18,7 +18,7 @@
 <div class={className}>
 	<input
 		type="range"
-		class="relative z-10 -my-1.5 block h-4 w-full cursor-pointer appearance-none accent-accent"
+		class="relative z-10 -my-1.5 block h-4 w-full appearance-none accent-accent {current ? 'cursor-pointer' : 'cursor-default [&::-moz-range-thumb]:opacity-0 [&::-webkit-slider-thumb]:opacity-0'}"
 		min="0"
 		max={duration || 1}
 		value={shown}

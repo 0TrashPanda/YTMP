@@ -13,7 +13,7 @@
 
 <div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" transition:fade|global={{ duration: motionMs(150) }} onclick={onClose}>
 	<div
-		class="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-raised pt-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-2xl sm:rounded-2xl"
+		class="max-h-screen-90 w-full max-w-sm overflow-y-auto rounded-t-2xl bg-raised pt-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-2xl sm:rounded-2xl"
 		role="menu"
 		tabindex="-1"
 		aria-label={title}

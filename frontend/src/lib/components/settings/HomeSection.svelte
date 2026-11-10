@@ -22,7 +22,7 @@
 	});
 	const changed = $derived(home.hidden.length > 0 || Object.keys(home.layouts).length > 0 || home.hidePodcasts);
 	const iconButton = 'rounded-full p-1.5 text-muted hover:bg-raised hover:text-white disabled:opacity-30';
-	const select = 'rounded-lg bg-raised px-2 py-1.5 text-sm outline-none';
+	const select = 'rounded-lg bg-raised px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-white/40';
 </script>
 
 <div class="flex flex-col gap-8">

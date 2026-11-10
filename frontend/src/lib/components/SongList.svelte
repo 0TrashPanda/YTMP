@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { playingMark } from '../playingMark';
 	// A list of songs (search, find similar, artist, album, playlist, history and Local pages). Tap,
 	// swipe right, swipe left and hold do what Settings → Taps and swipes says (play next, add
@@ -63,6 +64,31 @@
 		const rows = [...(list?.querySelectorAll<HTMLElement>('[data-row]') ?? [])];
 		drag = { from: index, startY: event.clientY, offset: 0, mids: rows.map((r) => r.offsetTop + r.offsetHeight / 2), height: rows[index]?.offsetHeight ?? 64 };
 	}
+	/**
+	 * The keyboard: ↑ ↓ on a song's handle move it one place (Home / End: to the top or bottom).
+	 * The handle keeps the focus at the song's new place, and a screen reader hears where it is.
+	 */
+	let moved = $state('');
+	let refocus: number | null = null;
+	function moveKey(event: KeyboardEvent, index: number) {
+		const to = { ArrowUp: index - 1, ArrowDown: index + 1, Home: 0, End: songs.length - 1 }[event.key];
+		if (to === undefined) return;
+		event.preventDefault();
+		if (to < 0 || to >= songs.length || to === index) return;
+		refocus = to;
+		moved = `${songs[index].title}: ${to + 1} of ${songs.length}`;
+		onMove?.(index, to);
+	}
+	$effect(() => {
+		void songs;
+		if (refocus === null) return;
+		const at = refocus;
+		void tick().then(() => {
+			list?.querySelector<HTMLElement>(`[data-move="${at}"]`)?.focus();
+			if (refocus === at) refocus = null;
+		});
+	});
+
 	function endDrag() {
 		const d = drag;
 		const to = drop;
@@ -200,7 +226,10 @@
 		{#if onMove}
 			<button
 				class="tap cursor-grab touch-none rounded-full p-2 text-muted hover:text-white active:cursor-grabbing"
-				aria-label="Drag to move"
+				aria-label="Move {song.title}"
+				title="Drag it, or use the arrow keys"
+				data-move={i}
+				onkeydown={(e) => moveKey(e, i)}
 				onpointerdown={(e) => startDrag(e, i)}
 				onpointermove={(e) => drag && (drag.offset = e.clientY - drag.startY)}
 				onpointerup={endDrag}
@@ -212,4 +241,5 @@
 	</div>
 	</div>
 {/each}
+<p class="sr-only" aria-live="polite">{moved}</p>
 </div>

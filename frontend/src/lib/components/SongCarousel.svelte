@@ -25,7 +25,8 @@
 
 <div
 	bind:this={scroller}
-	class="grid snap-x grid-flow-col gap-x-2 overflow-x-auto px-0 [scrollbar-width:none]
+	data-carousel
+	class="grid snap-x grid-flow-col gap-x-2 overflow-x-auto px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
 		{songs.length > 4 ? 'auto-cols-[88%] sm:auto-cols-[24rem]' : 'auto-cols-[100%] sm:auto-cols-[32rem]'}"
 	style:grid-template-rows="repeat({Math.min(4, songs.length)}, auto)"
 >

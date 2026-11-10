@@ -330,7 +330,7 @@
 	onDestroy(() => window.removeEventListener('keydown', onKey));
 </script>
 
-<div class="fixed inset-0 z-[60] flex bg-bg" role="dialog" aria-modal="true" aria-label="Settings" use:modal>
+<div class="fixed inset-0 z-[60] flex bg-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]" role="dialog" aria-modal="true" aria-label="Settings" use:modal>
 	<!-- The pages -->
 	<nav class="{showingSection || searching ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col overflow-y-auto border-line px-2 pt-4 pb-8 md:w-72 md:border-r md:pt-6">
 		<div class="mb-2 flex items-center gap-2 px-2">
@@ -376,7 +376,7 @@
 		<div class="flex min-w-0 flex-1 flex-col">
 			<div class="mx-auto flex w-full max-w-2xl shrink-0 items-center gap-2 px-4 pt-4 pb-2 md:px-8 md:pt-8">
 				<button class="rounded-full p-1.5 hover:bg-raised" aria-label="Close search" onclick={closeSearch}><Icon name="back" /></button>
-				<div class="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-raised pr-1 pl-4">
+				<div class="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-raised pr-1 pl-4 focus-within:ring-2 focus-within:ring-white/40">
 					<input
 						bind:this={searchInput}
 						bind:value={query}
@@ -566,7 +566,7 @@
 				setting={settings.skipSilence}
 			/>
 		{:else}
-			<p class="text-xs text-muted">Keyboard: <kbd>Space</kbd> or <kbd>K</kbd> play/pause · <kbd>N</kbd> next · <kbd>P</kbd> previous · <kbd>←</kbd> <kbd>→</kbd> 10 seconds back or ahead · <kbd>↑</kbd> <kbd>↓</kbd> volume · <kbd>/</kbd> search.</p>
+			<p class="text-xs text-muted">Keyboard (<kbd>?</kbd> shows them all): <kbd>Space</kbd> or <kbd>K</kbd> play/pause · <kbd>N</kbd> next · <kbd>P</kbd> previous · <kbd>←</kbd> <kbd>→</kbd> 10 seconds back or ahead · <kbd>↑</kbd> <kbd>↓</kbd> volume · <kbd>/</kbd> search.</p>
 		{/if}
 	{:else if id === 'adding'}
 		<Choice
@@ -765,6 +765,11 @@
 				['tab', 'That tab'],
 				['upnext', 'Always Up next']
 			] as [SwipeOpens, string][]}
+		/>
+		<Toggle
+			label="Slide long titles"
+			hint="A song title too long for the player slides along slowly to show the rest, like YouTube Music. Off: it's cut off with '…'. Never with Reduce motion."
+			setting={settings.titleScroll}
 		/>
 		<Toggle
 			label="Song playing above Up next"

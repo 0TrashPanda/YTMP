@@ -85,7 +85,7 @@
 	}
 
 	const card = 'flex flex-col gap-3 rounded-xl bg-raised/60 p-4';
-	const input = 'rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2';
+	const input = 'rounded-lg bg-raised px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-white/40 ring-white/40 focus:ring-2';
 	const yourServer = $derived(host?.authServers.find((s) => s.url && me?.account.id.endsWith(`@${s.issuer}`))?.url ?? null);
 </script>
 
@@ -125,7 +125,7 @@
 					<p class="text-xs text-muted">Radio, autoplay and Find similar mix in songs you often play after each other. What everyone on this server plays counts too.</p>
 				</div>
 				<select
-					class="rounded-lg bg-raised px-3 py-2.5 outline-none"
+					class="rounded-lg bg-raised px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-white/40"
 					value={s.historyRadio}
 					disabled={busy}
 					onchange={(e) => saveSettings({ ...s, historyRadio: e.currentTarget.value as HistoryRadio })}
@@ -144,7 +144,7 @@
 				change this in its settings).
 			</p>
 			<select
-				class="rounded-lg bg-raised px-3 py-2.5 outline-none"
+				class="rounded-lg bg-raised px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-white/40"
 				value={s.openElsewhere}
 				disabled={busy}
 				onchange={(e) => saveSettings({ ...s, openElsewhere: e.currentTarget.value as RoomOpenMode })}

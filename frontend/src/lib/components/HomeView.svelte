@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scrollBehavior } from '../motion.svelte';
 	// The home page, like YTM's: rows of suggestions. Songs (quick picks) are a grid of rows
 	// that scrolls sideways (tap = play next, ⋮ or right-click = song menu); albums,
 	// playlists, artists and podcasts are cards that open their page. Each section's ⋮ hides it,
@@ -44,15 +45,27 @@
 	/** The section whose ⋮ menu is open (its key). */
 	let sectionMenu = $state<string | null>(null);
 
-	getHome()
-		.then((h) => {
-			home = h;
-			seen(h.sections);
-		})
-		.catch((e) => (error = e instanceof Error ? e.message : 'Could not load suggestions'));
+	let loadingAgain = $state(false);
+	function load() {
+		error = null;
+		getHome()
+			.then((h) => {
+				home = h;
+				seen(h.sections);
+			})
+			.catch((e) => (error = e instanceof Error ? e.message : 'Could not load suggestions'))
+			.finally(() => (loadingAgain = false));
+	}
+	load();
 
 	const songs = (items: SearchItem[]): Song[] => items.flatMap((i) => (i.kind === 'song' ? [i.song] : []));
 	const cards = (items: SearchItem[]) => items.flatMap((i) => itemCard(i, open) ?? []);
+
+	/** ‹ or › of a section: its row moves along by most of its width. */
+	function slide(event: MouseEvent, way: -1 | 1) {
+		const row = (event.currentTarget as HTMLElement).closest('section')?.querySelector<HTMLElement>('[data-carousel]');
+		row?.scrollBy({ left: way * row.clientWidth * 0.9, behavior: scrollBehavior() });
+	}
 
 	function openPin(pin: Pin) {
 		if (pin.kind === 'playlist') open.onPlaylist({ id: pin.id, title: pin.title }, pin.personal);
@@ -101,6 +114,17 @@
 {#snippet header(block: Block, i: number)}
 	<div class="relative flex items-center gap-2 px-2">
 		<h2 class="min-w-0 flex-1 truncate text-xl font-bold sm:text-2xl">{block.title}</h2>
+		<!-- With a mouse, like YTM: ‹ › scroll the row a screen's width (phones swipe it). -->
+		{#if block.layout === 'carousel' && (block.kind === 'ytm' || block.kind === 'pin')}
+			<div class="hidden shrink-0 gap-2 pointer-fine:flex">
+				<button class="grid h-9 w-9 place-items-center rounded-full border border-line hover:bg-raised" aria-label="Back in {block.title}" onclick={(e) => slide(e, -1)}>
+					<Icon name="chevron" size={22} class="rotate-180" />
+				</button>
+				<button class="grid h-9 w-9 place-items-center rounded-full border border-line hover:bg-raised" aria-label="More in {block.title}" onclick={(e) => slide(e, 1)}>
+					<Icon name="chevron" size={22} />
+				</button>
+			</div>
+		{/if}
 		{#if block.kind === 'pin'}
 			<button class="shrink-0 rounded-full border border-line px-3 py-1 text-sm font-medium hover:bg-raised" onclick={() => openPin(block.pin)}>More</button>
 		{/if}
@@ -180,9 +204,17 @@
 		</section>
 	{/each}
 	{#if error && !home}
-		<div class="flex flex-col items-center gap-2 py-16 text-center text-muted">
-			<Icon name="search" size={48} />
-			<p>Search for a song to start the music.</p>
+		<!-- Home couldn't load: say so, with Try again; searching still works. -->
+		<div class="flex flex-col items-center gap-3 py-16 text-center" role="alert">
+			<p class="text-muted">Couldn't load Home: {error}</p>
+			<button
+				class="rounded-full bg-raised px-5 py-2 text-sm font-medium hover:bg-line disabled:opacity-40"
+				disabled={loadingAgain}
+				onclick={() => ((loadingAgain = true), load())}
+			>
+				{loadingAgain ? 'Loading…' : 'Try again'}
+			</button>
+			<p class="text-sm text-muted">Or search for a song to start the music.</p>
 		</div>
 	{:else if !home}
 		<!-- Placeholders the size of the real thing, so the page doesn't jump. -->

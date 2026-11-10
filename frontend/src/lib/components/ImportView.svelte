@@ -501,7 +501,7 @@
 										searchYourself();
 									}}
 								>
-									<input class="min-w-0 flex-1 rounded-lg bg-raised px-3 py-2 outline-none" bind:value={query} placeholder="Search YouTube Music" aria-label="Search YouTube Music" enterkeyhint="search" />
+									<input class="min-w-0 flex-1 rounded-lg bg-raised px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-white/40" bind:value={query} placeholder="Search YouTube Music" aria-label="Search YouTube Music" enterkeyhint="search" />
 									<button class="rounded-full bg-raised p-2 hover:bg-line disabled:opacity-50" aria-label="Search" disabled={searching}><Icon name="search" size={20} /></button>
 								</form>
 								{#if row.state !== 'left_out'}
@@ -532,7 +532,7 @@
 						readLink();
 					}}
 				>
-					<input class="min-w-0 flex-1 rounded-lg bg-raised px-3 py-2.5 outline-none" bind:value={link} placeholder="https://open.spotify.com/playlist/…" aria-label="Spotify link" inputmode="url" autocapitalize="none" spellcheck="false" enterkeyhint="go" />
+					<input class="min-w-0 flex-1 rounded-lg bg-raised px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-white/40" bind:value={link} placeholder="https://open.spotify.com/playlist/…" aria-label="Spotify link" inputmode="url" autocapitalize="none" spellcheck="false" enterkeyhint="go" />
 					<button class="rounded-full bg-white px-5 py-2.5 font-medium text-black disabled:opacity-50" disabled={reading || !link.trim()}>{reading ? 'Reading…' : 'Read'}</button>
 				</form>
 			</section>
@@ -583,7 +583,7 @@
 									{#each playlists as p (p.id)}<option value="pl:{p.id}">Add to {p.title}</option>{/each}
 								</select>
 								{#if pick.target.kind === 'new_playlist'}
-									<input class="rounded-lg bg-surface px-3 py-1.5 outline-none" bind:value={pick.target.title} maxlength="150" aria-label="Playlist name" />
+									<input class="rounded-lg bg-surface px-3 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-white/40" bind:value={pick.target.title} maxlength="150" aria-label="Playlist name" />
 								{/if}
 							</div>
 						{:else if pick.on}

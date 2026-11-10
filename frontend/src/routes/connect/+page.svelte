@@ -118,7 +118,7 @@
 			</p>
 			<p class="text-sm text-muted">That host will see your name and account ID. It never sees your password.</p>
 			<label class="flex items-start gap-2 text-sm">
-				<input type="checkbox" class="mt-0.5 accent-accent" bind:checked={withYoutube} />
+				<input type="checkbox" class="mt-0.5 h-5 w-5 shrink-0 accent-accent" bind:checked={withYoutube} />
 				<span>
 					Also use my YouTube Music and history there
 					<span class="block text-xs text-muted">

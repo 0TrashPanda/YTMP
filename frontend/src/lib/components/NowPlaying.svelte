@@ -27,6 +27,7 @@
 	import { sleepTimer } from '../sleepTimer.svelte';
 	import Icon from './Icon.svelte';
 	import Lyrics from './Lyrics.svelte';
+	import Marquee from './Marquee.svelte';
 	import NextButton from './NextButton.svelte';
 	import RepeatButton from './RepeatButton.svelte';
 	import ShuffleButton from './ShuffleButton.svelte';
@@ -320,7 +321,7 @@
 {/snippet}
 
 <div
-	class="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-bg lg:absolute lg:top-14 lg:z-30 {dragging ? '' : 'transition-transform duration-200 ease-out'}"
+	class="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] lg:absolute lg:top-14 lg:z-30 {dragging ? '' : 'transition-transform duration-200 ease-out'}"
 	style:transform={dragY ? `translateY(${dragY}px)` : undefined}
 	transition:slideUp
 	role="dialog"
@@ -423,7 +424,7 @@
 			{#if song && current}
 				<div class="flex w-full max-w-[36rem] min-w-0 shrink-0 items-center gap-1 lg:hidden" role="presentation" oncontextmenu={onSongMenu}>
 				<div class="min-w-0 flex-1">
-					<h1 class="truncate text-2xl font-bold">{song.title}</h1>
+					<h1 class="text-2xl font-bold"><Marquee text={song.title} /></h1>
 					<p class="truncate text-muted">
 						{#if song.podcast}
 							{@const podcast = song.podcast}

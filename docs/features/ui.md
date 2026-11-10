@@ -152,6 +152,20 @@ Like YTM:
   songs to the queue*, with one **Undo** that takes all three out again. *Where messages show*:
   **in the middle** (default) or, on a computer, **at the bottom left** like YTM. Swipe one down
   to hide it. Screen readers read them out.
+- **Long titles slide** ✅ in the full player, like YTM: a song title too long to fit waits,
+  slides along slowly to show the rest, and starts over. *Settings → Player → Slide long
+  titles* (on by default) switches it off (cut off with "…" then); never with Reduce motion.
+- **Rows on Home** ✅ (carousels) show dots for where you are; with a mouse, **‹ ›** next to the
+  section's title move it along, like YTM.
+- **With nothing playing** ✅ the player bar's controls are greyed and it says *Search for a song
+  to start*.
+- **Something missing** ✅ (a name, a room code): pressing Join, Solo or Party says so at that
+  field (it gets the focus, shakes and says *Enter your name first*), instead of the buttons only
+  looking faded.
+- **Search and Home that couldn't load** ✅ say so, with **Try again**.
+- **Phones with a notch or gesture bar** ✅: the top bar, the bottom bars, the full player,
+  search and Settings keep clear of them; sheets are at most as tall as the part of the screen
+  you can see.
 - **Dialogs and sheets** ✅ (menus, Play on, Share, Settings): the keyboard stays inside while
   one is open (Tab goes round, the page behind can't be reached), Escape closes it, and closed,
   the keyboard is back where it was.
@@ -584,9 +598,18 @@ and hides choices you don't use; saved with the menu's layout.
 ## Keyboard shortcuts ✅
 
 In a browser (not in the app): **Space** or **K** play/pause, **N** next, **P** previous,
-**←** / **→** 10 seconds back or ahead, **↑** / **↓** volume, **/** jumps to the search box.
-They do what the buttons do (so they need the same permissions), and aren't active while
-typing, in a dialog, or with Ctrl, Alt or Cmd held. Listed under *Settings → Playback*.
+**←** / **→** 10 seconds back or ahead, **↑** / **↓** volume, **/** jumps to the search box,
+**?** shows them all (like YTM). They do what the buttons do (so they need the same
+permissions), and aren't active while typing, in a dialog, or with Ctrl, Alt or Cmd held. Also
+listed under *Settings → Playback*.
+
+**Moving songs with the keyboard** ✅: on a song's drag handle (reached with Tab), **↑** / **↓**
+move it one place, **Home** / **End** to the top or bottom of its list (in Up next: within the
+queue, Autoplay or the played songs; on your own playlists: the playlist). The handle keeps the
+focus, and a screen reader hears where the song is now.
+
+Reached with the keyboard, everything shows a **white ring** where it is ✅; a search field
+without a box of its own rings the box around it.
 
 ## Lyrics
 

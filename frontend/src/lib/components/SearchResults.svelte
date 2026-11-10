@@ -81,6 +81,8 @@
 	const link = $derived(similarTo ? null : parseLink(query));
 	let loading = $state(false);
 	let error = $state<string | null>(null);
+	/** Try again after an error: the search runs once more. */
+	let attempt = $state(0);
 
 	/** Only your library: nothing is asked of YouTube Music. */
 	const libraryOnly = $derived(library && !!youtube.account && !similarTo && !link);
@@ -96,6 +98,7 @@
 
 	// Cancel searches that are no longer needed.
 	$effect(() => {
+		void attempt;
 		const q = query.trim();
 		const seed = similarTo;
 		const t = type;
@@ -200,7 +203,10 @@
 	{/if}
 
 	{#if error}
-		<p class="px-2 text-muted">{error}</p>
+		<div class="flex flex-col items-center gap-3 py-12 text-center" role="alert">
+			<p class="text-muted">Couldn't search: {error}</p>
+			<button class="rounded-full bg-raised px-5 py-2 text-sm font-medium hover:bg-line" onclick={() => attempt++}>Try again</button>
+		</div>
 	{:else if (loading && pageEmpty) || libraryBusy}
 		<Skeleton />
 	{:else if empty && libraryOnly}

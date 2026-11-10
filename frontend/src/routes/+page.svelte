@@ -106,8 +106,43 @@
 		if (window.__ytmpNative) window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: undefined, onBack: undefined };
 	});
 
+	/**
+	 * A button pressed while something it needs is missing (a name, a code) says what, at that
+	 * field: it gets the focus, shakes and says it, instead of the button just looking faded.
+	 */
+	let nameInput = $state<HTMLInputElement>();
+	let joinCodeInput = $state<HTMLInputElement>();
+	let roomCodeInput = $state<HTMLInputElement>();
+	let missing = $state<{ field: 'name' | 'joinCode' | 'roomCode'; text: string | null } | null>(null);
+	let shaking = $state<string | null>(null);
+	$effect(() => {
+		void name;
+		void code;
+		void roomCode;
+		missing = null;
+	});
+
+	function needs(fields: ('name' | 'joinCode' | 'roomCode')[]): boolean {
+		for (const field of fields) {
+			if (field === 'name' && !validName) return flag(field, 'Enter your name first', nameInput);
+			if (field === 'joinCode' && !code.trim()) return flag(field, "Enter the room's code", joinCodeInput);
+			// It already says what's wrong under it.
+			if (field === 'roomCode' && !codeOk) return flag(field, null, roomCodeInput);
+		}
+		return false;
+	}
+
+	function flag(field: 'name' | 'joinCode' | 'roomCode', text: string | null, input: HTMLInputElement | undefined): true {
+		missing = { field, text };
+		input?.focus();
+		shaking = field;
+		setTimeout(() => shaking === field && (shaking = null), 300);
+		return true;
+	}
+
 	async function join(event: SubmitEvent) {
 		event.preventDefault();
+		if (needs(['name', 'joinCode'])) return;
 		await attempt(async () => {
 			const room = await getRoom(code.trim());
 			saved.displayName = name.trim();
@@ -308,7 +343,7 @@
 		<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
-			class="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
+			class="flex max-h-screen-90 w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 			role="dialog"
 			aria-label="Close {room.name}"
 			tabindex="-1"
@@ -366,7 +401,7 @@
 		<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
-			class="flex max-h-[90vh] w-full max-w-sm flex-col gap-3 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
+			class="flex max-h-screen-90 w-full max-w-sm flex-col gap-3 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 			role="dialog"
 			aria-label="Open {room.name}"
 			tabindex="-1"
@@ -395,7 +430,8 @@
 		<input
 			class="rounded-lg bg-raised px-4 py-3 font-mono tracking-[0.2em] uppercase outline-none placeholder:font-sans placeholder:tracking-normal placeholder:normal-case {codeOk && !codeTaken
 				? 'ring-white/40 focus:ring-2'
-				: 'ring-2 ring-accent'}"
+				: 'ring-2 ring-accent'} {shaking === 'roomCode' ? 'shake' : ''}"
+			bind:this={roomCodeInput}
 			bind:value={roomCode}
 			maxlength="12"
 			placeholder="Code (optional)"
@@ -465,12 +501,18 @@
 			<label class="flex flex-col gap-2">
 				<span class="text-sm text-muted">Your name</span>
 				<input
-					class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
+					bind:this={nameInput}
+					class="rounded-lg bg-raised px-4 py-3 outline-none focus:ring-2 {missing?.field === 'name' ? 'ring-2 ring-accent' : 'ring-white/40'} {shaking === 'name' ? 'shake' : ''}"
+					aria-invalid={missing?.field === 'name'}
+					aria-describedby={missing?.field === 'name' ? 'name-missing' : undefined}
 					bind:value={name}
 					maxlength="32"
 					placeholder="What should others see?"
 					autocomplete="nickname"
 				/>
+				{#if missing?.field === 'name'}
+					<span id="name-missing" class="text-sm text-accent" role="alert">{missing.text}</span>
+				{/if}
 			</label>
 			{#each host?.authServers ?? [] as server (server.issuer)}
 				<a href={identity.loginUrl(server)} class="-mt-3 text-center text-sm text-muted underline">
@@ -479,7 +521,7 @@
 			{/each}
 			{#if host?.authServers.length}
 				<label class="-mt-3 flex items-center justify-center gap-2 text-sm text-muted">
-					<input type="checkbox" class="accent-accent" bind:checked={hideFromHistory} />
+					<input type="checkbox" class="h-5 w-5 shrink-0 accent-accent" bind:checked={hideFromHistory} />
 					Keep me out of others' listening history
 				</label>
 			{/if}
@@ -499,8 +541,8 @@
 				<div class="grid grid-cols-2 gap-3">
 					<button
 						class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
-						disabled={busy || !validName || !codeOk}
-						onclick={() => hostRoom('private')}
+						disabled={busy}
+						onclick={() => !needs(['name', 'roomCode']) && hostRoom('private')}
 					>
 						<Icon name="headphones" />
 						<span class="font-medium">Solo</span>
@@ -508,8 +550,8 @@
 					</button>
 					<button
 						class="flex flex-col items-center gap-1 rounded-xl bg-accent-strong p-3 disabled:opacity-40"
-						disabled={busy || !validName || !codeOk}
-						onclick={() => hostRoom('public')}
+						disabled={busy}
+						onclick={() => !needs(['name', 'roomCode']) && hostRoom('public')}
 					>
 						<Icon name="people" />
 						<span class="font-medium">Party</span>
@@ -559,7 +601,10 @@
 			<form class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line" onsubmit={join}>
 				<h2 class="text-lg font-bold">Join a room</h2>
 				<input
-					class="rounded-lg bg-raised px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] uppercase outline-none ring-white/40 focus:ring-2"
+					bind:this={joinCodeInput}
+					class="rounded-lg bg-raised px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] uppercase outline-none focus:ring-2 {missing?.field === 'joinCode' ? 'ring-2 ring-accent' : 'ring-white/40'} {shaking === 'joinCode' ? 'shake' : ''}"
+					aria-label="Room code to join"
+					aria-invalid={missing?.field === 'joinCode'}
 					bind:value={code}
 					maxlength="12"
 					placeholder="CODE"
@@ -567,7 +612,10 @@
 					autocomplete="off"
 					spellcheck="false"
 				/>
-				<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy || !validName || !code.trim()}>
+				{#if missing?.field === 'joinCode'}
+					<span class="-mt-1 text-center text-sm text-accent" role="alert">{missing.text}</span>
+				{/if}
+				<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy}>
 					Join
 				</button>
 			</form>
@@ -586,8 +634,8 @@
 						<div class="grid grid-cols-2 gap-3">
 							<button
 								class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
-								disabled={busy || !validName || !codeOk}
-								onclick={() => hostRoom('private')}
+								disabled={busy}
+								onclick={() => !needs(['name', 'roomCode']) && hostRoom('private')}
 							>
 								<Icon name="headphones" />
 								<span class="font-medium">Solo</span>
@@ -595,8 +643,8 @@
 							</button>
 							<button
 								class="flex flex-col items-center gap-1 rounded-xl bg-accent-strong p-3 disabled:opacity-40"
-								disabled={busy || !validName || !codeOk}
-								onclick={() => hostRoom('public')}
+								disabled={busy}
+								onclick={() => !needs(['name', 'roomCode']) && hostRoom('public')}
 							>
 								<Icon name="people" />
 								<span class="font-medium">Party</span>
@@ -606,8 +654,8 @@
 					{:else}
 						<button
 							class="rounded-full bg-accent-strong py-3 font-medium disabled:opacity-40"
-							disabled={busy || !validName || !codeOk}
-							onclick={() => hostRoom('public')}
+							disabled={busy}
+							onclick={() => !needs(['name', 'roomCode']) && hostRoom('public')}
 						>
 							Host
 						</button>
@@ -625,8 +673,7 @@
 				{#each nearby as room (room.url + room.code)}
 					<button
 						class="flex items-center gap-3 rounded-lg bg-surface px-3 py-3 text-left ring-1 ring-line disabled:opacity-40"
-						disabled={!validName}
-						onclick={() => joinNearby(room)}
+						onclick={() => !needs(['name']) && joinNearby(room)}
 					>
 						<Icon name="people" size={20} class="text-muted" />
 						<span class="min-w-0 flex-1 truncate">{room.name}</span>

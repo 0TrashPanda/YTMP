@@ -189,7 +189,7 @@
 	}
 
 	const label = 'mb-1.5 block text-sm font-medium';
-	const input = 'w-full rounded-lg bg-raised px-3 py-2 text-sm outline-none disabled:opacity-60';
+	const input = 'w-full rounded-lg bg-raised px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60';
 </script>
 
 {#snippet toggle(title: string, hint: string, checked: boolean, onchange: (on: boolean) => void)}
@@ -430,7 +430,7 @@
 						</div>
 						{#if role && roles.some((r) => canAssign(person, r.id))}
 							<select
-								class="max-w-32 shrink-0 cursor-pointer rounded-full bg-raised py-1 pr-2 pl-3 text-xs font-medium outline-none group-hover:bg-line"
+								class="max-w-32 shrink-0 cursor-pointer rounded-full bg-raised py-1 pr-2 pl-3 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-white/40 group-hover:bg-line"
 								value={person.roleId}
 								aria-label="Role of {person.name}"
 								onchange={(e) => run({ kind: 'AssignRole', participantId: person.id, roleId: e.currentTarget.value })}

@@ -262,6 +262,8 @@ export const settings = {
 	/** Messages that follow each other become one ("Added 3 songs to the queue"); off: each shows, stacked. */
 	toastMerge: new Setting('toastMerge', true, bool),
 	toastPlace: new Setting('toastPlace', 'center' as ToastPlace, toastPlace),
+	/** The full player's song title slides along when it's too long, like YTM (Marquee.svelte). */
+	titleScroll: new Setting('titleScroll', true, bool),
 	/** Phones: the song playing, with play/pause, above Up next, Lyrics and Related, like YTM (Settings → Player). */
 	upNextSongRow: new Setting('upNextSongRow', true, bool),
 	/** On a touch screen, holding doesn't select text (text fields still can); app.css's `hold-no-select`. */

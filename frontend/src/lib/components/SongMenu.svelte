@@ -548,7 +548,7 @@
 {#if phone.current}
 	<div class="fixed inset-0 z-[55] bg-black/60" role="presentation" transition:fade|global={{ duration: motionMs(150) }} onclick={onClose}></div>
 	<div
-		class="fixed inset-x-0 bottom-0 z-[56] flex max-h-[85vh] flex-col rounded-t-2xl bg-raised pb-[env(safe-area-inset-bottom)] shadow-2xl {dragY ? '' : 'transition-transform'}"
+		class="fixed inset-x-0 bottom-0 z-[56] flex max-h-screen-85 flex-col rounded-t-2xl bg-raised pb-[env(safe-area-inset-bottom)] shadow-2xl {dragY ? '' : 'transition-transform'}"
 		style:transform="translateY({dragY}px)"
 		role="menu"
 		tabindex="-1"

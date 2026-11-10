@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	import { hold } from '../hold';
 	import { playOnLast } from '../playOn';
 	import { holds } from '../songMenu.svelte';
@@ -60,6 +61,17 @@
 	} = $props();
 
 	let showOutputs = $state(false);
+	/** ? shows the keyboard shortcuts, like YTM. */
+	let showKeys = $state(false);
+	const KEYS: [string[], string][] = [
+		[['Space', 'K'], 'Play or pause'],
+		[['N'], 'Next song'],
+		[['P'], 'Previous song'],
+		[['←', '→'], '10 seconds back or ahead'],
+		[['↑', '↓'], 'Volume'],
+		[['/'], 'Search'],
+		[['?'], 'These shortcuts']
+	];
 	const activeOutputs = $derived(room.state?.outputs.filter((o) => o.active).length ?? 0);
 
 	const current = $derived(room.state?.nowPlaying ?? null);
@@ -151,6 +163,8 @@
 			player.setVolume(Math.max(0, Math.round((player.volume - 0.05) * 100) / 100));
 		} else if (key === '/') {
 			document.querySelector<HTMLInputElement>('input[data-search]')?.focus();
+		} else if (key === '?') {
+			showKeys = true;
 		} else {
 			handled = false;
 		}
@@ -240,7 +254,7 @@
 			<button class="flex min-w-0 flex-1 items-center gap-2.5 text-left" data-opens-player disabled={!current} onclick={() => onExpand(true)} oncontextmenu={onSongMenu}>
 				<Art song={current?.item.song ?? null} size={96} class="h-10 w-10 shrink-0" />
 				<div class="min-w-0 flex-1">
-					<div class="truncate text-sm font-medium">{current?.item.song.title ?? 'Nothing playing'}</div>
+					<div class="truncate text-sm font-medium {current ? '' : 'text-muted'}">{current?.item.song.title ?? 'Search for a song to start'}</div>
 					<div class="truncate text-xs text-muted">
 						{#if current}{artistNames(current.item.song)}{status}{/if}
 					</div>
@@ -248,7 +262,7 @@
 			</button>
 			<button
 				class="shrink-0 rounded-full p-1.5 disabled:opacity-40"
-				disabled={playing ? !canPause(room, player) : !room.can('play_pause')}
+				disabled={!current || (playing ? !canPause(room, player) : !room.can('play_pause'))}
 				aria-label={playing ? 'Pause' : 'Play'}
 				onclick={() => (playing ? pause(room, player) : play(room, player))}
 			>
@@ -273,7 +287,7 @@
 				{#snippet playPause()}
 					<button
 						class="rounded-full p-2 hover:bg-raised disabled:opacity-40"
-						disabled={playing ? !canPause(room, player) : !room.can('play_pause')}
+						disabled={!current || (playing ? !canPause(room, player) : !room.can('play_pause'))}
 						aria-label={playing ? 'Pause' : 'Play'}
 						onclick={() => (playing ? pause(room, player) : play(room, player))}
 					>
@@ -290,17 +304,19 @@
 				{#if current?.item.song.podcast}
 					<SpeedButton {room} {onToast} up />
 				{/if}
-				<span class="pl-2 text-xs whitespace-nowrap text-muted tabular-nums">
-					{formatTime(Math.min(positionMs, duration))} / {formatTime(duration)}
-				</span>
+				{#if current}
+					<span class="pl-2 text-xs whitespace-nowrap text-muted tabular-nums">
+						{formatTime(Math.min(positionMs, duration))} / {formatTime(duration)}
+					</span>
+				{/if}
 				<SourceBadge source={player.audioSource} class="ml-2" />
 			</div>
 
 			<div class="flex w-full max-w-xl min-w-0 items-center justify-center gap-3 justify-self-center" role="presentation" oncontextmenu={onSongMenu}>
 				<div class="flex min-w-0 items-center gap-3" title={current ? `Added by ${current.item.addedByName}` : undefined}>
-					<Art song={current?.item.song ?? null} size={96} class="h-12 w-12 shrink-0" />
+					{#if current}<Art song={current.item.song} size={96} class="h-12 w-12 shrink-0" />{/if}
 					<div class="min-w-0">
-						<div class="truncate font-medium">{current?.item.song.title ?? 'Nothing playing'}</div>
+						<div class="truncate font-medium {current ? '' : 'text-muted'}">{current?.item.song.title ?? 'Search for a song to start'}</div>
 						{#if current}
 							{@const song = current.item.song}
 							<div class="truncate text-sm text-muted">
@@ -421,6 +437,28 @@
 	</div>
 	{#if showOutputs}
 		<OutputsSheet {room} {player} onClose={() => (showOutputs = false)} {onToast} />
+	{/if}
+	{#if showKeys}
+		<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" role="presentation" onclick={() => (showKeys = false)}>
+			<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<div class="w-full max-w-sm rounded-2xl bg-surface p-6 ring-1 ring-line" role="dialog" aria-label="Keyboard shortcuts" tabindex="-1" use:modal={() => (showKeys = false)} onclick={(e) => e.stopPropagation()}>
+				<h2 class="mb-4 text-lg font-bold">Keyboard shortcuts</h2>
+				<dl class="flex flex-col gap-2.5 text-sm">
+					{#each KEYS as [keys, what] (what)}
+						<div class="flex items-center justify-between gap-4">
+							<dt class="text-muted">{what}</dt>
+							<dd class="flex gap-1">
+								{#each keys as k (k)}<kbd class="min-w-7 rounded bg-raised px-2 py-0.5 text-center font-sans text-xs ring-1 ring-line">{k}</kbd>{/each}
+							</dd>
+						</div>
+					{/each}
+				</dl>
+				<div class="mt-5 flex justify-end">
+					<button class="rounded-full px-4 py-2 text-sm font-medium hover:bg-raised" onclick={() => (showKeys = false)}>Close</button>
+				</div>
+			</div>
+		</div>
 	{/if}
 	{#if player.error}
 		<p class="px-4 pb-2 text-sm text-accent">{player.error}</p>

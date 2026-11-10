@@ -56,7 +56,7 @@
 			<label class="flex items-center gap-4">
 				<span class="min-w-0 flex-1 text-sm">Button {i + 1}</span>
 				<select
-					class="rounded-lg bg-raised px-3 py-2 text-sm outline-none"
+					class="rounded-lg bg-raised px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-white/40"
 					value={songMenu.buttons[i] ?? ''}
 					onchange={(e) => setButton(i, (e.currentTarget.value || null) as MenuAction | null)}
 				>

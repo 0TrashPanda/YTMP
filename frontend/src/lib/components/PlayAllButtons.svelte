@@ -164,7 +164,7 @@
 		<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
-			class="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
+			class="flex max-h-screen-90 w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 			role="dialog"
 			aria-label="How many songs"
 			tabindex="-1"

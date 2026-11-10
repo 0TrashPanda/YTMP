@@ -46,7 +46,7 @@
 	onDestroy(() => window.removeEventListener('keydown', onKey));
 
 	const label = 'mb-2 block text-sm font-medium';
-	const input = 'w-full rounded bg-raised px-3 py-2.5 text-white outline-none';
+	const input = 'w-full rounded bg-raised px-3 py-2.5 text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40';
 </script>
 
 <div class="fixed inset-0 z-[60] flex bg-bg text-white" role="dialog" aria-modal="true" aria-label="Your roles" use:modal>

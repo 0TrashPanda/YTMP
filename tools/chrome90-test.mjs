@@ -12,8 +12,10 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { createServer } from 'node:net';
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const repo = new URL('..', import.meta.url).pathname;
+// A path on every system (`.pathname` gives /C:/… on Windows).
+const repo = fileURLToPath(new URL('..', import.meta.url));
 const CHROME_DIR = join(homedir(), '.cache/ytmp/chromium-90');
 const CHROME = join(CHROME_DIR, 'chrome-linux/chrome');
 // Chromium 90.0.4430.0 (the build archive has no build at exactly the branch point).

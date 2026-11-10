@@ -582,7 +582,7 @@
 			{/if}
 			{#if host?.authServers.length}
 				<label class="flex items-center gap-2 text-sm text-muted">
-					<input type="checkbox" class="accent-accent" checked={saved.hideFromHistory} onchange={(e) => (saved.hideFromHistory = e.currentTarget.checked)} />
+					<input type="checkbox" class="h-5 w-5 shrink-0 accent-accent" checked={saved.hideFromHistory} onchange={(e) => (saved.hideFromHistory = e.currentTarget.checked)} />
 					Keep me out of others' listening history
 				</label>
 			{/if}
@@ -663,7 +663,7 @@
 					class="h-full overflow-y-auto overscroll-y-contain"
 				>
 					<header
-						class="sticky top-0 z-20 flex items-center gap-3 border-b lg:z-40 border-line bg-bg/95 px-3 py-2 max-[360px]:gap-0.5 max-[360px]:px-1.5 backdrop-blur transition-transform duration-200 sm:h-14 sm:px-6 lg:translate-y-0
+						class="sticky top-0 z-20 flex items-center gap-3 border-b lg:z-40 border-line bg-bg/95 px-3 py-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] max-[360px]:gap-0.5 max-[360px]:px-1.5 backdrop-blur transition-transform duration-200 sm:h-14 sm:px-6 lg:translate-y-0
 							{headerHidden ? '-translate-y-full' : ''}"
 					>
 						<!-- Desktop: the logo is on the left side (Sidebar), so search starts where the page does, like YTM. -->
@@ -886,7 +886,8 @@
 		</div>
 
 		{#if player}
-			<div bind:clientHeight={barHeight}>
+			<!-- The last bar at the bottom keeps clear of the phone's gesture bar (safe area). -->
+			<div bind:clientHeight={barHeight} class={sections.length > 1 ? '' : 'bg-surface pb-[env(safe-area-inset-bottom)]'}>
 			<PlayerBar
 				{room}
 				{player}
@@ -904,7 +905,7 @@
 		{/if}
 		{#if sections.length > 1}
 			<!-- Like YTM's bottom bar, on phones (desktop: the Sidebar). -->
-			<nav class="flex shrink-0 bg-surface sm:hidden" bind:clientHeight={navHeight}>
+			<nav class="flex shrink-0 bg-surface pb-[env(safe-area-inset-bottom)] sm:hidden" bind:clientHeight={navHeight}>
 				{#each sections as [value, label] (value)}
 					{@const active = section === value && !view}
 					<button class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs {active ? 'text-white' : 'text-muted'}" aria-current={active ? 'page' : undefined} onclick={() => pickSection(value)}>

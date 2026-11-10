@@ -26,10 +26,12 @@ body {
 	overscroll-behavior-y: none;
 }
 
-/* Thin scrollbars like YTM. */
-* {
-	scrollbar-width: thin;
-	scrollbar-color: #444 transparent;
+/* Thin scrollbars like YTM (a layer under the utilities: rows that hide theirs, like carousels, can). */
+@layer base {
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: #444 transparent;
+	}
 }
 
 @keyframes shake {
@@ -90,6 +92,15 @@ html.motion-reduce :is(.loading-run, .animate-pulse, .playing-bars *) {
 	}
 }
 
+/* A long title sliding along (Marquee.svelte): wait, slide to the end, wait, start over. */
+@keyframes marquee {
+	0%, 15% { transform: translateX(0); }
+	85%, 100% { transform: translateX(var(--marquee-shift)); }
+}
+.marquee {
+	animation: marquee 10s linear infinite;
+}
+
 /* The song playing, in lists: three bars moving like YTM's (standing still while paused). */
 @keyframes playing-bar {
 	0%, 100% { transform: scaleY(0.3); }
@@ -104,6 +115,47 @@ html.motion-reduce :is(.loading-run, .animate-pulse, .playing-bars *) {
 }
 .playing-bars.moving i:nth-child(2) { animation-delay: -0.3s; }
 .playing-bars.moving i:nth-child(3) { animation-delay: -0.6s; }
+
+/*
+ * Reached with the keyboard (Tab), everything shows where it is: a white ring, like YTM's. A text
+ * field without a box of its own (search fields) rings the box around it.
+ */
+@layer base {
+	:focus-visible {
+		outline: 2px solid #fff;
+		outline-offset: 2px;
+	}
+	/* A dialog itself, focused when it opens (use:modal): no ring around the whole of it. */
+	:is([role='dialog'], [role='alertdialog'], [role='menu']):focus-visible {
+		outline: none;
+	}
+	input:focus-visible,
+	textarea:focus-visible,
+	select:focus-visible {
+		outline-offset: 0;
+	}
+	label:has(input[class~='bg-transparent']:focus-visible) {
+		outline: 2px solid rgb(255 255 255 / 0.6);
+		outline-offset: 0;
+	}
+}
+
+/*
+ * Sheets and dialogs as tall as most of the screen: of the part you can see (`dvh`, without the
+ * browser's own bars on a phone), and plain `vh` where a browser doesn't know that (Chrome 90).
+ */
+@utility max-h-screen-80 {
+	max-height: 80vh;
+	max-height: 80dvh;
+}
+@utility max-h-screen-85 {
+	max-height: 85vh;
+	max-height: 85dvh;
+}
+@utility max-h-screen-90 {
+	max-height: 90vh;
+	max-height: 90dvh;
+}
 
 /*
  * Touch screens: small icon buttons (`tap`) get a finger-sized tap area, like YTM's 48dp; the

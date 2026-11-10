@@ -33,7 +33,7 @@
 		goto('/');
 	}
 
-	const input = 'w-full rounded-lg bg-raised px-3 py-2.5 outline-none';
+	const input = 'w-full rounded-lg bg-raised px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-white/40';
 </script>
 
 {#if !direct}
@@ -41,7 +41,7 @@
 		<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
-			class="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
+			class="flex max-h-screen-90 w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 			role="dialog"
 			aria-label="Leave room"
 			tabindex="-1"

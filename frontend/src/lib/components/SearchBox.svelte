@@ -288,7 +288,7 @@
 		</button>
 	{/if}
 	{#if active}
-		<div class="fixed inset-0 z-50 flex flex-col bg-bg" use:portal>
+		<div class="fixed inset-0 z-50 flex flex-col bg-bg pt-[env(safe-area-inset-top)]" use:portal>
 			<div class="flex items-center gap-2 border-b border-line px-2 py-2">
 				<button class="rounded-full p-2 hover:bg-raised" aria-label="Close search" onclick={close}>
 					<Icon name="back" size={24} />

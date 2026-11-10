@@ -35,7 +35,7 @@
 				<label class="flex items-center gap-4">
 					<span class="min-w-0 flex-1 text-sm">{label}</span>
 					<select
-						class="rounded-lg bg-raised px-3 py-2 text-sm outline-none"
+						class="rounded-lg bg-raised px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-white/40"
 						value={gestures[where][gesture]}
 						onchange={(e) => setGesture(where, gesture, e.currentTarget.value as QueueAction)}
 					>
