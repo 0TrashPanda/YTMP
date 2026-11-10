@@ -22,7 +22,8 @@
 		toAutoplay = false,
 		whole,
 		onToast,
-		children
+		children,
+		row = true
 	}: {
 		room: RoomConnection;
 		/** Null while loading. */
@@ -38,6 +39,8 @@
 		onToast: (text: string) => void;
 		/** More buttons at the end of the row. */
 		children?: Snippet;
+		/** False: no buttons, only what they do (the card menu calls the exported ones). */
+		row?: boolean;
 	} = $props();
 
 	type Amount = { count: number; how: PlaylistPick };
@@ -97,7 +100,7 @@
 		});
 	}
 
-	async function addToAutoplay() {
+	export async function addToAutoplay() {
 		const amount = await howMany('Add');
 		if (amount)
 			await withSongs(amount, (n) => `Adding ${n} to autoplay…`, async (list, label) => {
@@ -106,27 +109,40 @@
 			});
 	}
 
-	async function addAll(position: 'next' | 'end') {
+	export async function addAll(position: 'next' | 'end') {
 		const amount = await howMany('Add');
 		if (amount) await withSongs(amount, (n) => `Adding ${n}…`, (list, label) => (position === 'next' ? playNext : addToQueue)(room, list, label, onToast));
 	}
 
 	/** Plays it (from song [start] on: the ones before it are left out, like YouTube Music). */
-	async function playNow(start = 0) {
+	export async function playNow(start = 0) {
 		const amount = await howMany('Play', start);
-		if (amount)
-			await withSongs(
-				amount,
-				(n) => `Starting ${n}…`,
-				async (list) => {
-					const [first, ...rest] = list;
-					// A party is asked first (the room's "Ask before interrupting"); cancelled, nothing is added.
-					let e = await room.run({ kind: 'PlayNow', song: first });
-					if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
-					if (e && !room.wasNoticed(e)) onToast(e.message);
-				},
-				start
-			);
+		if (amount) await withSongs(amount, (n) => `Starting ${n}…`, playList, start);
+	}
+
+	/** Shuffle play: plays it in random order (a long one: that many picked at random). */
+	export async function shufflePlay() {
+		const amount = await howMany('Play');
+		if (amount) await withSongs({ ...amount, how: 'random' }, (n) => `Shuffling ${n}…`, (list) => playList(shuffled(list)));
+	}
+
+	/** [list] in random order (Fisher–Yates). */
+	function shuffled<T>(list: T[]): T[] {
+		const out = [...list];
+		for (let i = out.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[out[i], out[j]] = [out[j], out[i]];
+		}
+		return out;
+	}
+
+	/** The first song plays now, the rest come next. */
+	async function playList(list: Song[]) {
+		const [first, ...rest] = list;
+		// A party is asked first (the room's "Ask before interrupting"); cancelled, nothing is added.
+		let e = await room.run({ kind: 'PlayNow', song: first });
+		if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
+		if (e && !room.wasNoticed(e)) onToast(e.message);
 	}
 
 	/** Plays it from the song at [index] on (tapping a song on the page). */
@@ -135,6 +151,7 @@
 	}
 </script>
 
+{#if row}
 <div class="mt-3 flex flex-wrap gap-2">
 	{#if room.can('play_now')}
 		<button class="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-40" disabled={!songs?.length} onclick={() => playNow()}>
@@ -158,6 +175,7 @@
 	{/if}
 	{@render children?.()}
 </div>
+{/if}
 
 {#if asking}
 	<div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={() => answer(null)}>

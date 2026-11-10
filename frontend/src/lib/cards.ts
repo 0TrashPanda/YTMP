@@ -26,7 +26,8 @@ export function itemCard(item: SearchItem, open: PageHandlers): Card | null {
 				art: thumbUrl(item.album.thumbnails, CARD),
 				small: smallUrl(item.album.thumbnails, CARD),
 				open: () => open.onAlbum({ id: item.album.id, name: item.album.title }),
-				prefetch: () => prefetch('album', item.album.id)
+				prefetch: () => prefetch('album', item.album.id),
+				menu: { kind: 'album', id: item.album.id, title: item.album.title, subtitle: '', art: thumbUrl(item.album.thumbnails, 120) }
 			};
 		case 'artist':
 			return {
@@ -37,7 +38,8 @@ export function itemCard(item: SearchItem, open: PageHandlers): Card | null {
 				small: smallUrl(item.thumbnails, CARD),
 				round: true,
 				open: () => open.onArtist({ id: item.id, name: item.name }),
-				prefetch: () => prefetch('artist', item.id)
+				prefetch: () => prefetch('artist', item.id),
+				menu: { kind: 'artist', id: item.id, title: item.name, subtitle: 'Artist', art: thumbUrl(item.thumbnails, 120) }
 			};
 		case 'podcast':
 			return {
@@ -47,7 +49,8 @@ export function itemCard(item: SearchItem, open: PageHandlers): Card | null {
 				art: thumbUrl(item.thumbnails, CARD),
 				small: smallUrl(item.thumbnails, CARD),
 				open: () => open.onPodcast({ id: item.id, name: item.title }),
-				prefetch: () => prefetch('podcast', item.id)
+				prefetch: () => prefetch('podcast', item.id),
+				menu: { kind: 'podcast', id: item.id, title: item.title, subtitle: item.author ?? 'Podcast', art: thumbUrl(item.thumbnails, 120) }
 			};
 		case 'playlist':
 			return {
@@ -57,7 +60,8 @@ export function itemCard(item: SearchItem, open: PageHandlers): Card | null {
 				art: thumbUrl(item.thumbnails, CARD),
 				small: smallUrl(item.thumbnails, CARD),
 				open: () => open.onPlaylist({ id: item.id, title: item.title }),
-				prefetch: () => prefetch('playlist', item.id)
+				prefetch: () => prefetch('playlist', item.id),
+				menu: { kind: 'playlist', id: item.id, title: item.title, subtitle: item.author ?? 'Playlist', art: thumbUrl(item.thumbnails, 120) }
 			};
 		case 'song':
 			return null;

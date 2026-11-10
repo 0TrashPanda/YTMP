@@ -34,6 +34,7 @@
 	import PodcastView from '../../../lib/components/PodcastView.svelte';
 	import SearchBox from '../../../lib/components/SearchBox.svelte';
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
+	import CardMenu from '../../../lib/components/CardMenu.svelte';
 	import { preferences } from '../../../lib/preferences.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
 	import { mergeActions, type ToastAction, type ToastGroup } from '../../../lib/songActions';
@@ -968,6 +969,9 @@
 	{:else if sheet?.kind === 'share'}
 		<ShareSheet {room} {host} onClose={() => close('share')} onToast={toast} onClone={room.can('clone_room') ? () => (sheet = { kind: 'clone' }) : undefined} />
 	{/if}
+
+	<!-- An album's, playlist's, artist's or podcast's menu (hold its card, right-click it, or its ⋮). -->
+	<CardMenu {room} onToast={toast} />
 
 	{#if room.asking}
 		<InterruptDialog {room} />

@@ -364,6 +364,23 @@ on the device.
 With **fair ordering** on, *play next* puts the song in your next fair slot (the message
 says "Added … in your next turn"), unless you have the *Reorder* permission.
 
+## Card menu ✅
+
+Albums, playlists, artists and podcasts shown as cards (Home, search, artist pages) have a menu,
+like YouTube Music's: **hold** the card on a touch screen, **right-click** it, or its **⋮**,
+which shows on the picture when you point at it with a mouse. A sheet from the bottom on a
+phone, a menu at the card on a computer.
+
+- **Album or playlist**: Play, Shuffle play, Play next, Add to queue (a playlist: Add to
+  autoplay, as on its page), Start radio (from its first song). These use the same limits as the
+  page's buttons (*Settings → Adding songs*: at most so many songs, or asked first).
+- **Artist**: Start radio, Shuffle songs (its top songs), Add top songs to the queue.
+- **Podcast**: Play the latest episode.
+- **All**: Pin to Home (or Unpin), Share (the phone's share sheet, or the YouTube Music link
+  copied).
+
+What you may not do in a party (no permission) is left out.
+
 ## Song menu
 
 **Every song** has the same menu, wherever it appears ✅: search results (also the top

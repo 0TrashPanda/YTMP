@@ -1,4 +1,5 @@
 <script lang="ts" module>
+	import type { CardTarget } from '../cardMenu.svelte';
 	/** An album, artist, podcast or playlist as a card. */
 	export interface Card {
 		key: string;
@@ -12,10 +13,14 @@
 		open: () => void;
 		/** Starts loading the page, so it opens instantly. */
 		prefetch?: () => void;
+		/** Its menu (hold, right-click, or ⋮ with a mouse): what it's for (cardMenu.svelte.ts). */
+		menu?: CardTarget;
 	}
 </script>
 
 <script lang="ts">
+	import { openCardMenu } from '../cardMenu.svelte';
+	import { menuAt } from '../songActions';
 	import { hideIfBroken } from '../pictures';
 	import Icon from './Icon.svelte';
 	import Picture from './Picture.svelte';
@@ -26,12 +31,21 @@
 	// YouTube Music can list the same album or playlist twice: show it once.
 	const unique = $derived(cards.filter((c, i) => cards.findIndex((d) => d.key === c.key) === i));
 	let scroller = $state<HTMLElement>();
+
+	/** Hold or right-click a card ([atPointer]: the menu at the pointer), or its ⋮: its menu. */
+	function menu(event: MouseEvent, card: Card, atPointer: boolean) {
+		if (!card.menu) return;
+		event.preventDefault();
+		event.stopPropagation();
+		openCardMenu({ ...card.menu, subtitle: card.menu.subtitle || card.subtitle }, menuAt(event.currentTarget as HTMLElement, event, atPointer));
+	}
 </script>
 
 {#if list}
 	<div class="flex flex-col">
 		{#each unique as card (card.key)}
-			<button class="flex min-w-0 items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-raised" onclick={card.open} onpointerenter={card.prefetch} ontouchstart={card.prefetch}>
+			<div class="group flex min-w-0 items-center rounded-md hover:bg-raised">
+			<button class="flex min-w-0 flex-1 items-center gap-3 px-2 py-1.5 text-left" onclick={card.open} oncontextmenu={(e) => menu(e, card, true)} onpointerenter={card.prefetch} ontouchstart={card.prefetch}>
 				<div class="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden bg-raised text-muted {card.round ? 'rounded-full' : 'rounded'}">
 					<Icon name={card.round ? 'person' : 'note'} size={24} class="absolute" />
 					{#if card.art}
@@ -44,6 +58,13 @@
 					<p class="truncate text-sm text-muted">{card.subtitle}</p>
 				</div>
 			</button>
+			{#if card.menu}
+				<!-- With a mouse, like YTM: a ⋮ when you point at it (touch screens hold the card). -->
+				<button class="mr-1 hidden shrink-0 rounded-full p-2 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus-visible:opacity-100 pointer-fine:block" aria-label="More for {card.title}" onclick={(e) => menu(e, card, false)}>
+					<Icon name="more" size={20} />
+				</button>
+			{/if}
+			</div>
 		{/each}
 	</div>
 {:else}
@@ -55,7 +76,8 @@
 		: 'grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2'}
 >
 	{#each unique as card (card.key)}
-		<button class="group flex min-w-0 snap-start flex-col gap-2 text-left" onclick={card.open} onpointerenter={card.prefetch} ontouchstart={card.prefetch}>
+		<div class="group relative min-w-0 snap-start">
+		<button class="flex w-full min-w-0 flex-col gap-2 text-left" onclick={card.open} oncontextmenu={(e) => menu(e, card, true)} onpointerenter={card.prefetch} ontouchstart={card.prefetch}>
 			<div class="relative grid aspect-square w-full place-items-center overflow-hidden bg-raised text-muted {card.round ? 'rounded-full' : 'rounded-md'}">
 				<!-- Under the picture: shows when there's none, or it doesn't load. -->
 				<Icon name={card.round ? 'person' : 'note'} size={40} class="absolute" />
@@ -68,6 +90,17 @@
 				<p class="truncate text-xs text-muted">{card.subtitle}</p>
 			</div>
 		</button>
+		{#if card.menu}
+			<!-- With a mouse, like YTM: a ⋮ on the picture when you point at it (touch screens hold the card). -->
+			<button
+				class="absolute top-1.5 right-1.5 hidden h-8 w-8 place-items-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 hover:bg-black/80 focus-visible:opacity-100 pointer-fine:grid"
+				aria-label="More for {card.title}"
+				onclick={(e) => menu(e, card, false)}
+			>
+				<Icon name="more" size={20} />
+			</button>
+		{/if}
+		</div>
 	{/each}
 </div>
 {#if row}
