@@ -244,7 +244,7 @@
 						</button>
 						{#if first.kind === 'song'}
 							<button
-								class="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-2 text-muted hover:bg-surface hover:text-white"
+								class="tap absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-2 text-muted hover:bg-surface hover:text-white"
 								aria-label="More for {first.song.title}"
 								onclick={(e) => onMenu({ song: first.song, place: 'search', ...menuAt(e.currentTarget) })}
 							>

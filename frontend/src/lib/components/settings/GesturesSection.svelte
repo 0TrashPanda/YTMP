@@ -59,6 +59,16 @@
 			['off', 'Off']
 		] as [SwipeSkips, string][]}
 	/>
+	<Toggle
+		label="Bigger buttons"
+		hint="On a touch screen, small buttons like ⋮, the drag handle and the ones at the top get a finger-sized tap area (48 pixels). The icons stay the same size."
+		setting={settings.bigTaps}
+	/>
+	<Toggle
+		label="⋮ on songs"
+		hint="On a touch screen, songs show their ⋮ button. Off: hold a song for its menu (where Hold opens the menu; elsewhere the ⋮ stays)."
+		setting={settings.songMoreButton}
+	/>
 	<Toggle label="Holding doesn't select text" hint="On a touch screen, so holding a song or button never selects its words. Text fields can still be selected." setting={settings.holdNoSelect} />
 	<p class="text-xs text-muted">
 		Swipes are for touch screens. A right-click (or ⋮) always opens the song menu, also when Hold does something else.

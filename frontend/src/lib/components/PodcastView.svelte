@@ -9,7 +9,7 @@
 	import { youtube } from '../youtube.svelte';
 	import { listening } from '../listening.svelte';
 	import { menuAt, playNow, tapSong } from '../songActions';
-	import { ACTION_NAMES, gestures } from '../gestures.svelte';
+	import { ACTION_NAMES, gestures, moreButtonClass } from '../gestures.svelte';
 	import { formatTime } from '../format';
 	import type { Episode, EpisodeProgress, PodcastPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -183,7 +183,7 @@
 							{/if}
 						</div>
 					</button>
-					<button class="rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="More for {episode.song.title}" onclick={(e) => menu(e, episode, false)}>
+					<button class="tap rounded-full p-2 text-muted hover:bg-line hover:text-white {moreButtonClass(true)}" aria-label="More for {episode.song.title}" onclick={(e) => menu(e, episode, false)}>
 						<Icon name="more" />
 					</button>
 				</div>

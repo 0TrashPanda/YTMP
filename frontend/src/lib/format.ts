@@ -8,6 +8,15 @@ export function formatTime(ms: number): string {
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+/** How long a list of songs takes, rounded to minutes: "23 min", "1 hr 5 min", "2 hr". */
+export function formatLength(ms: number): string {
+	const minutes = Math.max(1, Math.round(ms / 60_000));
+	const hours = Math.floor(minutes / 60);
+	const rest = minutes % 60;
+	if (!hours) return `${minutes} min`;
+	return rest ? `${hours} hr ${rest} min` : `${hours} hr`;
+}
+
 /** How long ago [ms] was, roughly: "just now", "5 min ago", "3 h ago", "2 days ago", or the date. */
 export function timeAgo(ms: number, now: number = Date.now()): string {
 	const minutes = Math.floor((now - ms) / 60_000);

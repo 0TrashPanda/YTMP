@@ -5,8 +5,9 @@
 	// left and hold do what Settings → Taps and swipes says (play, play next, remove like YTM,
 	// the song menu by default); right-click or ⋮ on hover with a mouse: the song menu.
 	import { tick } from 'svelte';
-	import { artistNames, formatTime } from '../format';
-	import { ACTION_ICONS, ACTION_NAMES, RowGestures, type QueueAction } from '../gestures.svelte';
+	import { artistNames, formatLength, formatTime } from '../format';
+	import { keepInView } from '../keepInView';
+	import { ACTION_ICONS, ACTION_NAMES, moreButtonClass, RowGestures, type QueueAction } from '../gestures.svelte';
 	import { menuAt, startRadio } from '../songActions';
 	import { RADIO_FROM, withFrom } from '../radio.svelte';
 	import { settings } from '../settings.svelte';
@@ -40,6 +41,22 @@
 		!!roomState?.history.length && room.can(roomState.history.every((i) => i.addedBy === room.participantId) ? 'remove_own' : 'remove_others')
 	);
 	let list = $state<HTMLElement>();
+	/** The ⋮ next to the song count: Remove played songs, Clear queue, Clear room. */
+	const hasMenu = $derived(canClearPlayed || canClear || canClearRoom);
+	let queueMenu = $state(false);
+	/** Like YTM's line above the queue: how many songs are queued and how long they take. */
+	const summary = $derived.by(() => {
+		const queue = roomState?.queue ?? [];
+		if (!queue.length) return '';
+		const ms = queue.reduce((total, item) => total + (item.song.durationMs ?? 0), 0);
+		const songs = `${queue.length} ${queue.length === 1 ? 'song' : 'songs'}`;
+		return ms ? `${songs} · ${formatLength(ms)}` : songs;
+	});
+
+	function menuAction(command: 'ClearHistory' | 'ClearQueue' | 'ClearRoom') {
+		queueMenu = false;
+		room.run({ kind: command });
+	}
 
 	const slots = $derived.by((): Slot[] => {
 		const s = roomState;
@@ -344,23 +361,53 @@
 </script>
 
 <aside class="flex h-full min-h-0 flex-col">
-	{#if title || canClearPlayed || canClear || canClearRoom}
-		<div class="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 px-4 {title ? 'pt-4' : 'pt-2'} pb-2">
-			<h2 class="flex-1 text-sm font-medium tracking-wide whitespace-nowrap text-muted uppercase">{title ? 'Up next' : ''}</h2>
-			{#if canClearPlayed}
-				<button class="rounded-full px-2 py-0.5 text-xs whitespace-nowrap text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearHistory' })}>
-					Remove played songs
+	{#if title || hasMenu || summary}
+		<div class="relative flex min-h-12 items-center gap-2 pr-2 pl-4 {title ? 'pt-3' : 'pt-1'}">
+			<div class="min-w-0 flex-1">
+				{#if title}
+					<h2 class="text-sm font-medium tracking-wide whitespace-nowrap text-muted uppercase">Up next</h2>
+				{/if}
+				{#if summary}
+					<p class="truncate text-sm font-medium">{summary}</p>
+				{/if}
+			</div>
+			{#if hasMenu}
+				<button
+					class="tap flex shrink-0 rounded-full p-2 text-muted hover:bg-raised hover:text-white"
+					aria-label="Up next options"
+					aria-haspopup="menu"
+					aria-expanded={queueMenu}
+					onclick={() => (queueMenu = !queueMenu)}
+				>
+					<Icon name="more" size={20} />
 				</button>
-			{/if}
-			{#if canClear}
-				<button class="rounded-full px-2 py-0.5 text-xs whitespace-nowrap text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearQueue' })}>
-					Clear queue
-				</button>
-			{/if}
-			{#if canClearRoom}
-				<button class="rounded-full px-2 py-0.5 text-xs whitespace-nowrap text-muted hover:bg-raised hover:text-white" onclick={() => room.run({ kind: 'ClearRoom' })}>
-					Clear room
-				</button>
+				{#if queueMenu}
+					<!-- A tap anywhere else closes it. -->
+					<button class="fixed inset-0 z-[55] cursor-default" aria-label="Close" onclick={() => (queueMenu = false)}></button>
+					<div
+						use:keepInView
+						class="absolute top-full right-2 z-[56] w-60 max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line"
+						role="menu"
+						tabindex="-1"
+						onkeydown={(e) => e.key === 'Escape' && (queueMenu = false)}
+					>
+						{#if canClearPlayed}
+							<button class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-line" role="menuitem" onclick={() => menuAction('ClearHistory')}>
+								<Icon name="history" size={20} class="text-muted" />Remove played songs
+							</button>
+						{/if}
+						{#if canClear}
+							<button class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-line" role="menuitem" onclick={() => menuAction('ClearQueue')}>
+								<Icon name="queue" size={20} class="text-muted" />Clear queue
+							</button>
+						{/if}
+						{#if canClearRoom}
+							<button class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-line" role="menuitem" onclick={() => menuAction('ClearRoom')}>
+								<Icon name="remove" size={20} class="text-muted" />Clear room
+							</button>
+						{/if}
+					</div>
+				{/if}
 			{/if}
 		</div>
 	{/if}
@@ -455,11 +502,11 @@
 								<div class="truncate text-sm font-medium {slot.kind === 'current' ? 'text-white' : ''}">{slot.item.song.title}</div>
 								<div class="truncate text-xs text-muted">{subtitle(slot.item, place)}</div>
 							</div>
-							<span class="text-xs text-muted tabular-nums">{slot.item.song.durationMs ? formatTime(slot.item.song.durationMs) : ''}</span>
+							<span class="text-xs text-muted tabular-nums max-[360px]:hidden">{slot.item.song.durationMs ? formatTime(slot.item.song.durationMs) : ''}</span>
 						</button>
 						<!-- With a mouse, on hover; touch screens hold the song for the menu, or (when Hold does something else) have it here. -->
 						<button
-							class="rounded-full p-1.5 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus:opacity-100 {rows.of(slot).hold === 'menu' ? 'pointer-coarse:hidden' : 'pointer-coarse:opacity-100'}"
+							class="tap rounded-full p-1.5 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus:opacity-100 pointer-coarse:opacity-100 {moreButtonClass(rows.of(slot).hold === 'menu')}"
 							aria-label="More for {slot.item.song.title}"
 							onclick={(e) => menu(slot, e, false)}
 						>
@@ -467,7 +514,7 @@
 						</button>
 						{#if room.can('reorder')}
 							<button
-								class="cursor-grab touch-none rounded-full p-1.5 text-muted hover:text-white active:cursor-grabbing"
+								class="tap cursor-grab touch-none rounded-full p-1.5 text-muted hover:text-white active:cursor-grabbing"
 								aria-label="Drag to move"
 								onpointerdown={(e) => startDrag(e, index)}
 								onpointermove={moveDrag}

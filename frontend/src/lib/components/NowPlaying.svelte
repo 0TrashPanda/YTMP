@@ -327,7 +327,7 @@
 >
 	<!-- The album art, blurred, as the background (YTM uses its colours). -->
 	{#if song}
-		<div class="pointer-events-none absolute inset-0 -z-10 opacity-40">
+		<div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden opacity-40">
 			<Art {song} size={96} class="h-full w-full scale-125 blur-3xl" />
 		</div>
 		<div class="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-transparent to-bg"></div>
@@ -341,7 +341,7 @@
 		ontouchend={onTouchEnd}
 		ontouchcancel={onTouchEnd}
 	>
-		<button class="rounded-full p-2 hover:bg-white/10" aria-label="Close the player" onclick={onClose}>
+		<button class="tap rounded-full p-2 hover:bg-white/10" aria-label="Close the player" onclick={onClose}>
 			<Icon name="collapse" size={28} />
 		</button>
 		<div class="min-w-0 flex-1 truncate text-center text-sm text-muted lg:hidden">{shows(room, 'roomName') ? room.state?.room.name : ''}</div>
@@ -355,7 +355,7 @@
 		<div class="ml-auto flex items-center lg:hidden">
 			{#if shows(room, 'cast')}
 				<button
-					class="rounded-full p-2 hover:bg-white/10 {activeOutputs.length ? 'text-accent' : ''}"
+					class="tap rounded-full p-2 hover:bg-white/10 {activeOutputs.length ? 'text-accent' : ''}"
 					aria-label="Play on"
 					onclick={() => (showOutputs = true)}
 					use:hold={holds('playOn') ? () => void playOnLast(room, onToast).then((done) => done || (showOutputs = true)) : null}
@@ -364,7 +364,7 @@
 				</button>
 			{/if}
 			{#if current}
-				<button class="rounded-full p-2 hover:bg-white/10" aria-label="More for {current.item.song.title}" onclick={moreButton}>
+				<button class="tap rounded-full p-2 hover:bg-white/10" aria-label="More for {current.item.song.title}" onclick={moreButton}>
 					<Icon name="more" />
 				</button>
 			{/if}
@@ -378,7 +378,7 @@
 	>
 		<!-- The song: everything on phones, only the art on desktop (the player bar has the rest, like YTM). -->
 		<div
-			class="flex min-h-0 min-w-0 flex-1 touch-pan-x flex-col items-center justify-center gap-5 px-6 pb-2"
+			class="flex min-h-0 min-w-0 flex-1 touch-pan-x flex-col items-center justify-center gap-5 px-6 pb-2 max-[360px]:px-3"
 			role="presentation"
 			ontouchstart={onTouchStart}
 			ontouchmove={onTouchMove}
@@ -486,7 +486,7 @@
 						</button>
 						{#snippet playPause()}
 							<button
-								class="mx-2 grid h-18 w-18 place-items-center rounded-full bg-white text-black disabled:opacity-40"
+								class="mx-2 grid size-[72px] shrink-0 place-items-center rounded-full bg-white max-[360px]:mx-0 max-[360px]:size-[60px] text-black disabled:opacity-40"
 								disabled={playing ? !canPause(room, player) : !room.can('play_pause')}
 								aria-label={playing ? 'Pause' : 'Play'}
 								onclick={() => (playing ? pause(room, player) : play(room, player))}

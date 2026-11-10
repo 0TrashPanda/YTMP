@@ -9,7 +9,7 @@ export const SOLO_PARTS: [SoloPart, string, string][] = [
 	['code', 'Room code and share button', 'At the top, next to search.'],
 	['roomName', 'Room name in the player', 'Above the album art.'],
 	['cast', 'Play on buttons', 'In the player and the player bar. Play on stays in the menu behind your picture.'],
-	['playingOn', '"Playing on" under the controls', 'Where the music plays (phones).'],
+	['playingOn', '"Playing on" in the player', 'Where the music plays: under the controls on phones, next to Play here on a computer.'],
 	['karaoke', 'Karaoke', 'The button on the Lyrics tab.'],
 	['partyMenu', 'Party items in the menu', 'Party screen, Show on a TV and Clone room, behind your picture. Making the room public stays there.']
 ];

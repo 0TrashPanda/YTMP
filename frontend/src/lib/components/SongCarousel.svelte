@@ -2,7 +2,7 @@
 	// Songs in a grid of (up to) four rows that scrolls sideways, like YTM's quick picks (Home): tap = what
 	// Tap does in song lists, ⋮ or right-click = song menu.
 	import { artistNames } from '../format';
-	import { ACTION_NAMES, gestures } from '../gestures.svelte';
+	import { ACTION_NAMES, gestures, moreButtonClass } from '../gestures.svelte';
 	import { menuAt, tapSong } from '../songActions';
 	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -37,7 +37,7 @@
 					<div class="truncate text-sm text-muted">{artistNames(song)}{song.album ? ` • ${song.album.name}` : ''}</div>
 				</div>
 			</button>
-			<button class="shrink-0 rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="More for {song.title}" onclick={(e) => menu(e, song, false)}>
+			<button class="tap shrink-0 rounded-full p-2 text-muted hover:bg-line hover:text-white {moreButtonClass(true)}" aria-label="More for {song.title}" onclick={(e) => menu(e, song, false)}>
 				<Icon name="more" size={20} />
 			</button>
 		</div>

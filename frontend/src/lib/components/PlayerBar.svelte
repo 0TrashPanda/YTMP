@@ -70,6 +70,11 @@
 	// A paused room may not have the stream yet (a restored room gets it on play): only loading while playing.
 	const loading = $derived(current !== null && (current.streamUrl === null || !!playback?.starting) && playing);
 	const status = $derived(loading ? ' • loading…' : player.buffering ? ' • buffering…' : '');
+	/**
+	 * Desktop: the room plays but not on this device, nor on a speaker or TV it chose: says so next
+	 * to Play here (the phone's player says "Not playing here"). Settings → Solo rooms can hide it.
+	 */
+	const silentHere = $derived(!!current && playing && !player.enabled && activeOutputs === 0 && shows(room, 'playingOn'));
 
 	// Phones: swipe the mini player up to open the full player (a tap opens it too). Down
 	// clears the room when Settings → Playback says so (Undo puts it back), like YTM's mini player.
@@ -249,7 +254,7 @@
 			>
 				<Icon name={playing ? 'pause' : 'play'} size={32} />
 			</button>
-			<NextButton {room} size={26} class="shrink-0 p-1.5" />
+			<NextButton {room} size={26} class="tap shrink-0 p-1.5" />
 		</div>
 		<!-- At the bottom, between the mini player and the bottom bar, like YTM. -->
 		<div class="h-0.5 bg-white/15">
@@ -285,13 +290,13 @@
 				{#if current?.item.song.podcast}
 					<SpeedButton {room} {onToast} up />
 				{/if}
-				<span class="pl-2 text-xs text-muted tabular-nums">
+				<span class="pl-2 text-xs whitespace-nowrap text-muted tabular-nums">
 					{formatTime(Math.min(positionMs, duration))} / {formatTime(duration)}
 				</span>
 				<SourceBadge source={player.audioSource} class="ml-2" />
 			</div>
 
-			<div class="flex max-w-xl min-w-0 items-center gap-3 justify-self-center" role="presentation" oncontextmenu={onSongMenu}>
+			<div class="flex w-full max-w-xl min-w-0 items-center justify-center gap-3 justify-self-center" role="presentation" oncontextmenu={onSongMenu}>
 				<div class="flex min-w-0 items-center gap-3" title={current ? `Added by ${current.item.addedByName}` : undefined}>
 					<Art song={current?.item.song ?? null} size={96} class="h-12 w-12 shrink-0" />
 					<div class="min-w-0">
@@ -388,15 +393,20 @@
 						<Icon name="cast" size={20} />
 					</button>
 				{/if}
+				{#if silentHere}
+					<span class="hidden text-sm whitespace-nowrap text-muted lg:inline">Not playing here</span>
+				{/if}
 				<button
 					data-listen-toggle
-					class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium
-						{player.enabled ? 'bg-white text-black' : 'bg-raised hover:bg-line'}"
+					class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap
+						{player.enabled ? 'bg-white text-black' : silentHere ? 'bg-raised ring-1 ring-white/70 hover:bg-line' : 'bg-raised hover:bg-line'}"
+					aria-pressed={player.enabled}
+					aria-label="Play here"
 					onclick={() => (player.enabled ? player.disable() : player.enable())}
-					title="Play the music on this device"
+					title={silentHere ? 'Not playing on this device: play the music here' : 'Play the music on this device'}
 				>
 					<Icon name="headphones" size={20} />
-					<span class="hidden lg:inline">{player.enabled ? 'Playing here' : 'Play here'}</span>
+					<span class="{silentHere ? 'inline' : 'hidden lg:inline'}" aria-hidden="true">{player.enabled ? 'Playing here' : 'Play here'}</span>
 				</button>
 				<button
 					class="rounded-full p-2 hover:bg-raised disabled:opacity-40"

@@ -58,6 +58,19 @@ body {
 	animation: art-flash 0.7s ease-out forwards;
 }
 
+/*
+ * Touch screens: small icon buttons (`tap`) get a finger-sized tap area, like YTM's 48dp; the
+ * icon keeps its size (Settings → Taps and swipes, on by default). With a mouse nothing changes.
+ */
+@media (pointer: coarse) {
+	.big-taps .tap {
+		min-width: 48px;
+		min-height: 48px;
+		justify-content: center;
+		align-items: center;
+	}
+}
+
 /* Holding on a touch screen doesn't select text (a setting, on by default); text fields still can. */
 @media (pointer: coarse) {
 	.hold-no-select body {

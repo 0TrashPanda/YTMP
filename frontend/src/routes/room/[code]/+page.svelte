@@ -638,7 +638,7 @@
 					class="h-full overflow-y-auto overscroll-y-contain"
 				>
 					<header
-						class="sticky top-0 z-20 flex items-center gap-3 border-b lg:z-40 border-line bg-bg/95 px-3 py-2 backdrop-blur transition-transform duration-200 sm:h-14 sm:px-6 lg:translate-y-0
+						class="sticky top-0 z-20 flex items-center gap-3 border-b lg:z-40 border-line bg-bg/95 px-3 py-2 max-[360px]:gap-0.5 max-[360px]:px-1.5 backdrop-blur transition-transform duration-200 sm:h-14 sm:px-6 lg:translate-y-0
 							{headerHidden ? '-translate-y-full' : ''}"
 					>
 						<!-- Desktop: the logo is on the left side (Sidebar), so search starts where the page does, like YTM. -->
@@ -646,12 +646,13 @@
 							YT<span class="text-accent">MP</span>
 						</button>
 						<SearchBox bind:this={searchBox} {query} fills={searchFills(room)} library={libraryBar} onopen={() => (headerHidden = false)} onsearch={searchFor} onlink={openLink} onlisten={host?.canRecognize && canListen() ? () => (sheet = { kind: 'listen' }) : undefined} />
-						<div class="ml-auto flex items-center gap-2">
+						<!-- Phones: this side takes the rest of the bar, so the code sits in its middle without covering a button. -->
+						<div class="ml-auto flex min-w-0 items-center gap-2 max-sm:flex-1 max-sm:gap-0">
 							<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
 							<!-- Phones: centered in the header. -->
 							{#if shows(room, 'code')}
 								<button
-									class="flex items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line max-sm:absolute max-sm:left-1/2 max-sm:-translate-x-1/2"
+									class="flex shrink-0 items-center gap-2 rounded-full bg-raised px-3 py-1.5 font-mono tracking-widest hover:bg-line max-sm:mx-auto max-[360px]:px-2 max-[360px]:tracking-normal"
 									onclick={() => (sheet = { kind: 'share' })}
 									title={room.state?.room.visibility === 'private' ? 'Solo room' : 'Share this room'}
 								>
@@ -659,12 +660,12 @@
 										<Icon name="headphones" size={16} class="text-muted" />
 									{/if}
 									{code}
-									<Icon name="share" size={16} class="text-muted" />
+									<Icon name="share" size={16} class="text-muted max-[340px]:hidden" />
 								</button>
 							{/if}
 							{#if !solo}
 								<button
-									class="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
+									class="tap flex shrink-0 items-center gap-1 rounded-full px-2 py-1.5 text-sm text-muted hover:bg-raised hover:text-white"
 									aria-label="People in this room"
 									onclick={() => (sheet = { kind: 'settings', start: 'room-people' })}
 									title={room.state?.participants
@@ -677,7 +678,7 @@
 								</button>
 							{/if}
 							<!-- Your account and the settings (YTM keeps them behind the avatar too). -->
-							<button class="shrink-0 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (sheet = { kind: 'avatar' })}>
+							<button class="tap flex shrink-0 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (sheet = { kind: 'avatar' })}>
 								{#if youtube.account?.photoUrl}
 									<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-7 w-7 rounded-full" />
 								{:else}

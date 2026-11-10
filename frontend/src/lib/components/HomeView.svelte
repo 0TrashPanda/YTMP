@@ -105,7 +105,7 @@
 			<button class="shrink-0 rounded-full border border-line px-3 py-1 text-sm font-medium hover:bg-raised" onclick={() => openPin(block.pin)}>More</button>
 		{/if}
 		<button
-			class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white"
+			class="tap shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white"
 			aria-label="Options for {block.title}"
 			aria-expanded={sectionMenu === block.key}
 			onclick={() => (sectionMenu = sectionMenu === block.key ? null : block.key)}

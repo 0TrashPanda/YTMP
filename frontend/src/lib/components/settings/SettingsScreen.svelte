@@ -39,7 +39,7 @@
 	import { preferences } from '../../preferences.svelte';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
-	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type PlaylistPick, type Setting } from '../../settings.svelte';
+	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type CloseRoom, type PlaylistPick, type Setting } from '../../settings.svelte';
 	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SmallFirst, type SwipeOpens, type TabOrder, type TallPlayer, type VideoArt, type ClearRoomBy } from '../../storage';
 	import { fold, LABELS, mark, matches, rowsOf, searchWords } from '../../settingsSearch';
 	import { youtube } from '../../youtube.svelte';
@@ -533,6 +533,24 @@
 			label="Ask before leaving a room"
 			hint="Off: Leave room leaves right away. As the owner of a party room with others in it, it still asks who runs the room after you."
 			setting={settings.askLeave}
+		/>
+		<Choice
+			label="Close a solo room"
+			hint="With the ✕ in the room list. Right away: it's gone from the list, with Undo for a few seconds."
+			setting={settings.closeSolo}
+			options={[
+				['undo', 'Right away, with Undo'],
+				['ask', 'Ask first']
+			] as [CloseRoom, string][]}
+		/>
+		<Choice
+			label="Close a party room"
+			hint="With the ✕ in the room list. Closing removes everyone in it and deletes its queue."
+			setting={settings.closeParty}
+			options={[
+				['ask', 'Ask first'],
+				['undo', 'Right away, with Undo']
+			] as [CloseRoom, string][]}
 		/>
 		<Toggle
 			label="Your other devices can switch Play here on"

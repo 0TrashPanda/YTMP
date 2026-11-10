@@ -101,6 +101,7 @@
 	}
 
 	onDestroy(() => {
+		finishClosing();
 		if (window.__ytmpNative) window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: undefined, onBack: undefined };
 	});
 
@@ -193,6 +194,49 @@
 		return minutes < 60 ? `seen ${minutes} min ago` : `seen ${Math.round(minutes / 60)} h ago`;
 	}
 
+	/**
+	 * Closing a room from the list, as Settings → Playback says for its kind: at once with Undo
+	 * (it's gone from the list and closes for real after a few seconds), or asked first.
+	 */
+	const CLOSE_UNDO_MS = 6000;
+	let closing = $state<{ room: RoomInfo; timer: ReturnType<typeof setTimeout> } | null>(null);
+	let askingClose = $state<RoomInfo | null>(null);
+	let dontAskClose = $state(false);
+	const closeSetting = (room: RoomInfo) => (room.visibility === 'private' ? settings.closeSolo : settings.closeParty);
+
+	function startClose(room: RoomInfo) {
+		if (closeSetting(room).value === 'ask') {
+			dontAskClose = false;
+			askingClose = room;
+		} else closeWithUndo(room);
+	}
+
+	function closeWithUndo(room: RoomInfo) {
+		finishClosing(); // An earlier one closes now.
+		closing = { room, timer: setTimeout(finishClosing, CLOSE_UNDO_MS) };
+	}
+
+	function finishClosing() {
+		const c = closing;
+		if (!c) return;
+		clearTimeout(c.timer);
+		closing = null;
+		void close(c.room);
+	}
+
+	function undoClose() {
+		if (closing) clearTimeout(closing.timer);
+		closing = null;
+	}
+
+	function confirmClose() {
+		const room = askingClose;
+		askingClose = null;
+		if (!room) return;
+		if (dontAskClose) closeSetting(room).set('undo');
+		void close(room);
+	}
+
 	async function close(room: RoomInfo) {
 		await attempt(async () => {
 			await closeRoom(room.code);
@@ -235,7 +279,7 @@
 
 {#if host && !(host.accountsOnly && !me)}
 	<!-- Who you are and Settings, like in a room. -->
-	<button class="fixed top-3 right-3 z-10 rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (profileOpen = true)}>
+	<button class="tap absolute top-3 right-3 z-10 flex rounded-full p-1" aria-label="Account and settings" title="Account and settings" onclick={() => (profileOpen = true)}>
 		{#if youtube.account?.photoUrl}
 			<img src={youtube.account.photoUrl} alt="" referrerpolicy="no-referrer" class="h-8 w-8 rounded-full" />
 		{:else}
@@ -256,6 +300,38 @@
 			setTimeout(() => toastText === text && (toastText = null), 3000);
 		}}
 	/>
+{/if}
+{#if askingClose}
+	{@const room = askingClose}
+	<div class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={() => (askingClose = null)}>
+		<div
+			class="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
+			role="dialog"
+			aria-label="Close {room.name}"
+			tabindex="-1"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && (askingClose = null)}
+		>
+			<h2 class="text-lg font-bold">Close '{room.name}'?</h2>
+			<p class="text-sm text-muted">
+				{room.visibility === 'private' ? 'Its queue is deleted.' : 'Everyone in it is removed and its queue is deleted.'} This can't be undone.
+			</p>
+			<label class="flex items-center gap-3 text-sm">
+				<input type="checkbox" class="h-5 w-5 shrink-0 accent-accent" bind:checked={dontAskClose} />
+				<span>Don't ask again: close with Undo instead <span class="text-muted">(Settings → Playback)</span></span>
+			</label>
+			<div class="flex justify-end gap-2">
+				<button class="rounded-full px-4 py-2 text-sm font-medium hover:bg-raised" onclick={() => (askingClose = null)}>Cancel</button>
+				<button class="rounded-full bg-accent px-4 py-2 text-sm font-medium" onclick={confirmClose}>Close room</button>
+			</div>
+		</div>
+	</div>
+{/if}
+{#if closing}
+	<div class="fixed inset-x-0 bottom-8 z-[80] mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg" role="status">
+		<span class="min-w-0 truncate">Closed '{closing.room.name}'</span>
+		<button class="shrink-0 font-bold" onclick={undoClose}>Undo</button>
+	</div>
 {/if}
 {#if toastText}
 	<p class="fixed inset-x-0 bottom-8 z-[80] mx-auto w-fit rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">{toastText}</p>
@@ -317,7 +393,7 @@
 				: 'ring-2 ring-accent'}"
 			bind:value={roomCode}
 			maxlength="12"
-			placeholder="Room code (optional)"
+			placeholder="Code (optional)"
 			aria-label="Room code"
 			autocapitalize="characters"
 			autocomplete="off"
@@ -335,7 +411,7 @@
 	{#if myRooms.length > 0}
 		<section class="flex flex-col gap-1">
 			<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">{title}</h2>
-			{#each myRooms as room (room.code)}
+			{#each myRooms.filter((r) => r.code !== closing?.room.code) as room (room.code)}
 				<div class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2 ring-1 ring-line">
 					<a href="/room/{room.code}" class="flex min-w-0 flex-1 items-center gap-3">
 						<Icon name={room.visibility === 'private' ? 'headphones' : 'people'} size={20} class="text-muted" />
@@ -343,9 +419,10 @@
 						<span class="font-mono text-sm text-muted">{room.code}</span>
 					</a>
 					<button
-						class="rounded-full p-1.5 text-muted hover:bg-line hover:text-white"
-						aria-label="Close room"
-						onclick={() => close(room)}
+						class="tap ml-1 flex rounded-full p-1.5 text-muted hover:bg-line hover:text-white"
+						aria-label="Close {room.name}"
+						title="Close room"
+						onclick={() => startClose(room)}
 					>
 						<Icon name="close" size={18} />
 					</button>

@@ -13,6 +13,8 @@ import type { SwipeSkips, ClearRoomBy, DislikeButton, ImageQuality, SmallFirst, 
 import { PAGE_SIZES, read, write } from './storage';
 
 export type PlaylistPick = 'first' | 'random';
+/** Closing one of your rooms from the room list: at once with Undo, or asked first. */
+export type CloseRoom = 'undo' | 'ask';
 /** How many songs of one playlist may be added at most (Settings → Adding songs). */
 export const ADD_LIMITS = { min: 10, max: 5000 };
 /** At most this many choices when it asks how many. */
@@ -181,6 +183,7 @@ const tabOrder = oneOf<TabOrder>('upnext', 'related');
 const tallPlayer = oneOf<TallPlayer>('stacked', 'side');
 const clearRoomBy = oneOf<ClearRoomBy>('button', 'swipe', 'both');
 const swipeSkips = oneOf<SwipeSkips>('both', 'mini', 'art', 'off');
+const closeRoom = oneOf<CloseRoom>('undo', 'ask');
 
 export const settings = {
 	// Playback
@@ -212,6 +215,10 @@ export const settings = {
 	playStartsHere: new Setting('playStartsHere', true, bool),
 	/** Leave room asks first (not for a party room's owner with others in it: they pick who runs it). */
 	askLeave: new Setting('askLeave', true, bool),
+	/** Closing a solo room in the room list: at once with Undo, or asked first. */
+	closeSolo: new Setting('closeSolo', 'undo' as CloseRoom, closeRoom),
+	/** The same for a party room (everyone in it is removed): asked first, or at once with Undo. */
+	closeParty: new Setting('closeParty', 'ask' as CloseRoom, closeRoom),
 
 	// Adding songs
 	/** At most this many songs of one playlist (or album) go into the queue without asking. */
@@ -246,6 +253,10 @@ export const settings = {
 	swipeSkips: new Setting('swipeSkips', 'both' as SwipeSkips, swipeSkips),
 	/** On a touch screen, holding doesn't select text (text fields still can); app.css's `hold-no-select`. */
 	holdNoSelect: new Setting('holdNoSelect', true, bool),
+	/** On a touch screen, small icon buttons get a finger-sized (48px) tap area; app.css's `big-taps`. */
+	bigTaps: new Setting('bigTaps', true, bool),
+	/** On a touch screen, songs show their ⋮ also where holding a song opens its menu (off: only holding does). */
+	songMoreButton: new Setting('songMoreButton', false, bool),
 
 	// The rest keep their own shape (and check it where they're used).
 	/** Taps and swipes on songs in lists, in the queue and in Autoplay (gestures.svelte.ts). */

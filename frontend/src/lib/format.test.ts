@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { formatTime, fuzzyFind, fuzzyIndex, timeAgo, typedNumber } from './format';
+import { formatLength, formatTime, fuzzyFind, fuzzyIndex, timeAgo, typedNumber } from './format';
+
+describe('formatLength', () => {
+	it('is minutes, and hours from an hour on', () => {
+		expect(formatLength(20_000)).toBe('1 min');
+		expect(formatLength(23 * 60_000 + 10_000)).toBe('23 min');
+		expect(formatLength(65 * 60_000)).toBe('1 hr 5 min');
+		expect(formatLength(120 * 60_000)).toBe('2 hr');
+	});
+});
 
 describe('formatTime', () => {
 	it('is minutes and seconds', () => {

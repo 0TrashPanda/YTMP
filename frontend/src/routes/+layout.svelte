@@ -60,6 +60,10 @@
 	$effect(() => {
 		document.documentElement.classList.toggle('hold-no-select', settings.holdNoSelect.value);
 	});
+	// Finger-sized tap areas on small icon buttons (Settings → Taps and swipes).
+	$effect(() => {
+		document.documentElement.classList.toggle('big-taps', settings.bigTaps.value);
+	});
 </script>
 
 <svelte:window onclick={dropMouseFocus} />
@@ -72,9 +76,11 @@
 {#if toApp}
 	<!-- Shown in the browser while (or if) the app opens; the browser can't tell whether it did. -->
 	<main class="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-		<h1 class="text-xl font-medium">Opening in the YTMP app…</h1>
-		<a href={toApp} class="rounded-full bg-white px-6 py-3 font-medium text-black">Open in the app</a>
-		<a href={webLink()} class="text-sm text-muted underline">Continue in the browser</a>
+		<h1 class="text-xl font-medium">Open in the YTMP app?</h1>
+		<p class="max-w-xs text-sm text-muted">No app? Continue in the browser: everything works there too.</p>
+		<a href={toApp} class="w-full max-w-xs rounded-full bg-white px-6 py-3 font-medium text-black">Open in the app</a>
+		<!-- A full page load: this page decides once, when it loads, whether to offer the app. -->
+		<a href={webLink()} data-sveltekit-reload class="w-full max-w-xs rounded-full bg-raised px-6 py-3 font-medium hover:bg-line">Continue in the browser</a>
 	</main>
 {:else if ready}
 	{@render children()}

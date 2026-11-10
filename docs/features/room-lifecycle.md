@@ -29,6 +29,13 @@ Playback*, on by default), or **Don't ask again** in that question, switches tha
 Room then leaves right away. The owner of a party room with others in it is still asked, since
 they pick who takes over.
 
+**Closing a room** ✅ from the room list (its ✕) ends it for everyone. How it goes is a setting,
+separately for solo and party rooms (*Settings → Playback → Close a solo room / Close a party
+room*): **right away, with Undo** (the room is gone from the list and closes for real after a
+few seconds, unless you tap *Undo*; the default for solo rooms), or **ask first** (*Close
+'Room'?*, the default for party rooms, since everyone in it is removed). **Don't ask again** in
+that question switches the room's kind to *right away, with Undo*.
+
 A room with an owner account that gets an owner with another account (or a guest) stops
 being the old owner's on their other devices ([room sync](room-sync.md)), and starts being the
 new owner's. Its radio then uses the new owner's YouTube Music sign-in where there is one.

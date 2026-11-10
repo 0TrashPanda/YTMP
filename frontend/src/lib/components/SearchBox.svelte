@@ -283,7 +283,7 @@
 			<span class="min-w-0 flex-1 truncate {text ? '' : 'text-muted'}">{text || (library ? 'Search your library' : 'Search')}</span>
 		</button>
 	{:else}
-		<button class="shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label={library ? 'Search your library' : 'Search'} onclick={open}>
+		<button class="tap shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white" aria-label={library ? 'Search your library' : 'Search'} onclick={open}>
 			<Icon name="search" size={24} />
 		</button>
 	{/if}

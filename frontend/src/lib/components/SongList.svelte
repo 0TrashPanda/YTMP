@@ -4,7 +4,7 @@
 	// to queue, play now, the song menu by default; in an empty room a tap on album and playlist
 	// pages plays it from that song, Settings → Playback); ⋮ or right-click = song menu.
 	import { artistNames, formatTime } from '../format';
-	import { ACTION_ICONS, ACTION_NAMES, gestures, pageTap, RowGestures, type QueueAction } from '../gestures.svelte';
+	import { ACTION_ICONS, ACTION_NAMES, gestures, moreButtonClass, pageTap, RowGestures, type QueueAction } from '../gestures.svelte';
 	import { settings } from '../settings.svelte';
 	import { addToQueue, menuAt, playNext, playNow, quoted, startRadio } from '../songActions';
 	import type { Song } from '../protocol.gen';
@@ -185,12 +185,12 @@
 			<!-- Some listings have no length (episodes in search); it's known once it plays. -->
 			<span class="text-sm text-muted tabular-nums">{song.durationMs ? formatTime(song.durationMs) : ''}</span>
 		</button>
-		<button class="rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="More for {song.title}" onclick={(e) => menu({ song, index: i }, e, false)}>
+		<button class="tap rounded-full p-2 text-muted hover:bg-line hover:text-white {moreButtonClass(rows.of({ song, index: i }).hold === 'menu')}" aria-label="More for {song.title}" onclick={(e) => menu({ song, index: i }, e, false)}>
 			<Icon name="more" />
 		</button>
 		{#if onMove}
 			<button
-				class="cursor-grab touch-none rounded-full p-2 text-muted hover:text-white active:cursor-grabbing"
+				class="tap cursor-grab touch-none rounded-full p-2 text-muted hover:text-white active:cursor-grabbing"
 				aria-label="Drag to move"
 				onpointerdown={(e) => startDrag(e, i)}
 				onpointermove={(e) => drag && (drag.offset = e.clientY - drag.startY)}

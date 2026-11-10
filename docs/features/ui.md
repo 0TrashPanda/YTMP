@@ -85,7 +85,9 @@ Like YTM:
   **repeat** on either side for music, like YTM. At the top: close (˅),
   **Play on** (cast icon) and the song menu (⋮). Below the controls it says where the
   music plays ("Playing on this device and Kitchen", or *Not playing here. Tap to
-  listen*). **Swipe down**, the ˅ or the phone's **Back** closes it.
+  listen*). On a computer, while the room plays but not on this device (nor on a speaker or TV),
+  the player bar says **Not playing here** next to a highlighted **Play here**. *Settings → Solo
+  rooms → "Playing on" in the player* hides both in solo rooms. **Swipe down**, the ˅ or the phone's **Back** closes it.
 - **Where the song comes from** ✅: while it plays on this device, a small label next to
   *Added by* (desktop: next to the time in the player bar): **YouTube** (straight from
   YouTube), **Server** or **Host phone** (the host sends it: saved there, its music files, or
@@ -307,6 +309,15 @@ a party you're asked before it interrupts the music. Long playlists load the son
 needed. It works on every playlist page (also Liked music and YouTube Music's own playlists
 like *New episodes*).
 
+✅ **Bigger buttons** on a touch screen (on by default, *Settings → Taps and swipes*): small
+icon buttons (⋮, the drag handle, the ones at the top, Next in the mini player) get a
+finger-sized tap area of 48 pixels, like YTM; the icons stay the same size. With a mouse nothing
+changes.
+
+✅ **⋮ on songs** on a touch screen (off by default, *Settings → Taps and swipes*): songs leave
+out their ⋮ where holding a song opens its menu, so their titles get more room. Switched on,
+the ⋮ shows. Where *Hold* does something else, the ⋮ always shows.
+
 ✅ **Holding doesn't select text** on a touch screen (on by default, *Settings → Taps and
 swipes*), so holding a song or button never selects its words; text fields still can be
 selected. Switched off, a hold selects text as usual.
@@ -314,7 +325,7 @@ selected. Switched off, a hold selects text as usual.
 A swiped song shows what letting go does underneath, in green once it's far enough (red to
 remove); a short swipe does nothing. An action someone may not do (no permission) doesn't
 swipe. A **right-click** or **⋮** always opens the song menu, also when *Hold* does something
-else (in *Up next* the ⋮ then shows on touch screens too). Swipes are for touch screens. Saved
+else (on touch screens the ⋮ then shows, see *⋮ on songs* above). Swipes are for touch screens. Saved
 on the device.
 
 With **fair ordering** on, *play next* puts the song in your next fair slot (the message

@@ -88,6 +88,14 @@ export const gestures = {
 	}
 };
 
+/**
+ * The classes for a song's ⋮: on a touch screen it's left out where holding the song opens its
+ * menu ([holdOpensMenu]), unless Settings → Taps and swipes shows it. With a mouse it always shows.
+ */
+export function moreButtonClass(holdOpensMenu: boolean): string {
+	return holdOpensMenu && !settings.songMoreButton.value ? 'pointer-coarse:hidden' : '';
+}
+
 /** Before the queue changes: Autoplay keeps what it has. */
 function pinAutoplay(): void {
 	if (!autoplaySet()) settings.gesturesAutoplay.set({ v: VERSION, ...gestures.autoplay });

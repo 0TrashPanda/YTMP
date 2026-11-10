@@ -44,9 +44,15 @@ added by someone: hold *Remove* in the [song menu](ui.md#song-menu)) and *Remove
 songs* also show **Undo**, for the queue, the history and autoplay alike. Those songs come
 back exactly where they were, still added by whoever added them.
 
+## Above Up next ✅
+
+Like YouTube Music's line above the queue, Up next starts with how many songs are queued and
+how long they take (*4 songs · 23 min*), and a **⋮** with *Remove played songs*, *Clear queue*
+and *Clear room*, the ones you may do (all with Undo).
+
 ## Remove played songs ✅
 
-*Remove played songs*, next to *Clear queue* and *Clear room* above Up next, empties the
+*Remove played songs*, in the **⋮** above Up next (with *Clear queue* and *Clear room*), empties the
 [history](#queue-history): every song above the current one, played or skipped. The song
 that plays, the queue and autoplay stay. It needs the same permissions as *Clear queue*:
 *Remove own songs* when they're all yours, otherwise *Remove others' songs*. Radio and
@@ -85,8 +91,8 @@ queue runs out.
 - **Clear room** ✅ stops the song and empties the queue and autoplay at once (the song goes
   into the history as skipped). **Undo** puts it all back for 2 minutes: the song where it
   was, playing or paused, the queue and autoplay, as long as nothing else was played or
-  queued in between. Under *Settings → Playback → Clear room* you choose how: a **Clear room**
-  button above Up next, **swiping the mini player down** on a phone (like YTM), or both. It
+  queued in between. Under *Settings → Playback → Clear room* you choose how: **Clear room**
+  in the ⋮ above Up next, **swiping the mini player down** on a phone (like YTM), or both. It
   needs the permissions to remove those songs (and *Autoplay from here* when autoplay has
   songs); in a party room it asks first while others listen, and the others see who did it.
 - The autoplay queue is visible below the queue. By default a tap adds an autoplay song to the
