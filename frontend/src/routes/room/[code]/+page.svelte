@@ -671,8 +671,8 @@
 							YT<span class="text-accent">MP</span>
 						</button>
 						<SearchBox bind:this={searchBox} {query} fills={searchFills(room)} library={libraryBar} onopen={() => (headerHidden = false)} onsearch={searchFor} onlink={openLink} onlisten={host?.canRecognize && canListen() ? () => (sheet = { kind: 'listen' }) : undefined} />
-						<!-- Phones: this side takes the rest of the bar, so the code sits in its middle without covering a button. -->
-						<div class="ml-auto flex min-w-0 items-center gap-2 max-sm:flex-1 max-sm:gap-0">
+						<!-- Phones: with the code, this side takes the rest of the bar, so the code sits in its middle without covering a button; without it, it stays at the right. -->
+						<div class="ml-auto flex min-w-0 items-center gap-2 max-sm:gap-0 {shows(room, 'code') ? 'max-sm:flex-1' : ''}">
 							<span class="hidden truncate text-sm font-medium md:inline">{room.state?.room.name}</span>
 							<!-- Phones: centered in the header. -->
 							{#if shows(room, 'code')}

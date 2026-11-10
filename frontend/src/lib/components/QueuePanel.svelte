@@ -46,6 +46,8 @@
 	/** The ⋮ next to the song count: Remove played songs, Clear queue, Clear room. */
 	const hasMenu = $derived(canClearPlayed || canClear || canClearRoom);
 	let queueMenu = $state(false);
+	const seed = $derived(roomState?.autoplaySeed && !roomState.autoplaySeed.podcast ? roomState.autoplaySeed : null);
+	const showChips = $derived(!!seed && room.can('autoplay_from_here') && chips.length > 1);
 	/** Like YTM's line above the queue: how many songs are queued and how long they take. */
 	const summary = $derived.by(() => {
 		const queue = roomState?.queue ?? [];
@@ -54,6 +56,11 @@
 		const songs = `${queue.length} ${queue.length === 1 ? 'song' : 'songs'}`;
 		return ms ? `${songs} · ${formatLength(ms)}` : songs;
 	});
+	/**
+	 * Nothing queued (no song count to sit next to): the ⋮ goes at the end of the Radio from
+	 * chips, if Settings → Player says so and they show; else on the line saying what plays.
+	 */
+	const menuOnChips = $derived(settings.upNextMenu.value === 'chips' && !summary && showChips);
 
 	function menuAction(command: 'ClearHistory' | 'ClearQueue' | 'ClearRoom') {
 		queueMenu = false;
@@ -385,70 +392,87 @@
 </script>
 
 <aside class="flex h-full min-h-0 flex-col">
-	{#if title || hasMenu || summary}
-		<div class="relative flex min-h-12 items-center gap-2 pr-2 pl-4 {title ? 'pt-3' : 'pt-1'}">
+	<!-- Up next's ⋮ (Remove played songs, Clear queue, Clear room), wherever it goes. -->
+	{#snippet menuButton()}
+		<div class="relative shrink-0">
+			<button
+				class="tap flex rounded-full p-2 text-muted hover:bg-raised hover:text-white"
+				aria-label="Up next options"
+				aria-haspopup="menu"
+				aria-expanded={queueMenu}
+				onclick={() => (queueMenu = !queueMenu)}
+			>
+				<Icon name="more" size={20} />
+			</button>
+			{#if queueMenu}
+				<!-- A tap anywhere else closes it. -->
+				<button class="fixed inset-0 z-[55] cursor-default" aria-label="Close" onclick={() => (queueMenu = false)}></button>
+				<div
+					use:keepInView
+					class="absolute top-full right-0 z-[56] w-60 max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line"
+					role="menu"
+					tabindex="-1"
+					onkeydown={(e) => e.key === 'Escape' && (queueMenu = false)}
+				>
+					{#if canClearPlayed}
+						<button class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-line" role="menuitem" onclick={() => menuAction('ClearHistory')}>
+							<Icon name="history" size={20} class="text-muted" />Remove played songs
+						</button>
+					{/if}
+					{#if canClear}
+						<button class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-line" role="menuitem" onclick={() => menuAction('ClearQueue')}>
+							<Icon name="queue" size={20} class="text-muted" />Clear queue
+						</button>
+					{/if}
+					{#if canClearRoom}
+						<button class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-line" role="menuitem" onclick={() => menuAction('ClearRoom')}>
+							<Icon name="remove" size={20} class="text-muted" />Clear room
+						</button>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	{/snippet}
+	{#if title || summary || (hasMenu && !menuOnChips)}
+		<div class="flex min-h-12 items-center gap-2 pr-2 pl-4 {title ? 'pt-3' : 'pt-1'}">
 			<div class="min-w-0 flex-1">
 				{#if title}
 					<h2 class="text-sm font-medium tracking-wide whitespace-nowrap text-muted uppercase">Up next</h2>
 				{/if}
 				{#if summary}
 					<p class="truncate text-sm font-medium">{summary}</p>
+				{:else if seed && !title}
+					<!-- Nothing queued: what plays instead, like YTM's "Playing from". -->
+					<p class="text-xs text-muted">Playing from</p>
+					<p class="truncate text-sm font-medium">Radio: songs like {seed.title}</p>
+				{:else if !title}
+					<p class="truncate text-sm text-muted">Nothing queued</p>
 				{/if}
 			</div>
-			{#if hasMenu}
-				<button
-					class="tap flex shrink-0 rounded-full p-2 text-muted hover:bg-raised hover:text-white"
-					aria-label="Up next options"
-					aria-haspopup="menu"
-					aria-expanded={queueMenu}
-					onclick={() => (queueMenu = !queueMenu)}
-				>
-					<Icon name="more" size={20} />
-				</button>
-				{#if queueMenu}
-					<!-- A tap anywhere else closes it. -->
-					<button class="fixed inset-0 z-[55] cursor-default" aria-label="Close" onclick={() => (queueMenu = false)}></button>
-					<div
-						use:keepInView
-						class="absolute top-full right-2 z-[56] w-60 max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg bg-raised py-1 shadow-2xl ring-1 ring-line"
-						role="menu"
-						tabindex="-1"
-						onkeydown={(e) => e.key === 'Escape' && (queueMenu = false)}
-					>
-						{#if canClearPlayed}
-							<button class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-line" role="menuitem" onclick={() => menuAction('ClearHistory')}>
-								<Icon name="history" size={20} class="text-muted" />Remove played songs
-							</button>
-						{/if}
-						{#if canClear}
-							<button class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-line" role="menuitem" onclick={() => menuAction('ClearQueue')}>
-								<Icon name="queue" size={20} class="text-muted" />Clear queue
-							</button>
-						{/if}
-						{#if canClearRoom}
-							<button class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-line" role="menuitem" onclick={() => menuAction('ClearRoom')}>
-								<Icon name="remove" size={20} class="text-muted" />Clear room
-							</button>
-						{/if}
-					</div>
-				{/if}
+			{#if hasMenu && !menuOnChips}
+				{@render menuButton()}
 			{/if}
 		</div>
 	{/if}
 	<!-- Like YouTube Music's chips above Up next: what the radio playing now is made from. -->
 	<!-- Settings → Radio hides the ones you don't use; the one playing always shows. -->
-	{#if roomState?.autoplaySeed && !roomState.autoplaySeed.podcast && room.can('autoplay_from_here') && chips.length > 1}
-		<div class="flex shrink-0 gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]" role="group" aria-label="Radio from">
-			{#each chips as f (f.value)}
-				<button
-					class="shrink-0 rounded-lg px-3 py-1.5 text-sm {from === f.value ? 'bg-white text-black' : 'bg-raised hover:bg-line'}"
-					aria-pressed={from === f.value}
-					title={f.hint}
-					onclick={() => from !== f.value && room.run({ kind: 'SetRadioOptions', options: withFrom(roomState?.radioOptions, f.value) })}
-				>
-					{f.label}
-				</button>
-			{/each}
+	{#if showChips}
+		<div class="flex shrink-0 items-center gap-1 pr-2 pb-2">
+			<div class="flex min-w-0 flex-1 gap-2 overflow-x-auto pl-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Radio from">
+				{#each chips as f (f.value)}
+					<button
+						class="shrink-0 rounded-lg px-3 py-1.5 text-sm {from === f.value ? 'bg-white text-black' : 'bg-raised hover:bg-line'}"
+						aria-pressed={from === f.value}
+						title={f.hint}
+						onclick={() => from !== f.value && room.run({ kind: 'SetRadioOptions', options: withFrom(roomState?.radioOptions, f.value) })}
+					>
+						{f.label}
+					</button>
+				{/each}
+			</div>
+			{#if hasMenu && menuOnChips}
+				{@render menuButton()}
+			{/if}
 		</div>
 	{/if}
 	<div bind:this={list} onscroll={follow} class="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4">
@@ -460,7 +484,7 @@
 				<div
 					data-slot
 					data-id={id}
-					class="flex h-10 items-end gap-2 px-2 pb-1 {instant ? '' : 'transition-transform'}"
+					class="flex h-12 items-center gap-2 px-2 {instant ? '' : 'transition-transform'}"
 					style:transform="translateY({offsetOf(id, index)}px)"
 				>
 					<h3 class="text-sm font-medium tracking-wide text-muted uppercase">Autoplay</h3>

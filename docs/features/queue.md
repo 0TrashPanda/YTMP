@@ -55,7 +55,10 @@ Messages that follow each other combine (*Added 3 songs to the queue*), with one
 
 Like YouTube Music's line above the queue, Up next starts with how many songs are queued and
 how long they take (*4 songs · 23 min*), and a **⋮** with *Remove played songs*, *Clear queue*
-and *Clear room*, the ones you may do (all with Undo).
+and *Clear room*, the ones you may do (all with Undo). With nothing queued the line says what
+plays instead (*Playing from: Radio: songs like …*, or *Nothing queued*). *Settings → Player →
+Up next's ⋮ with nothing queued* can put the ⋮ at the end of the *Radio from* chips instead,
+without that line.
 
 ## Remove played songs ✅
 

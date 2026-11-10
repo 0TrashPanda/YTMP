@@ -19,6 +19,8 @@ export type CloseRoom = 'undo' | 'ask';
 export type ReduceMotion = 'system' | 'on' | 'off';
 /** Where messages (toasts) show: centered at the bottom, or (on a computer) at the bottom left like YTM. */
 export type ToastPlace = 'center' | 'left';
+/** Up next's ⋮ with nothing queued: on a line saying what plays ("Playing from …"), or at the end of the Radio from chips. */
+export type UpNextMenu = 'line' | 'chips';
 /** How many songs of one playlist may be added at most (Settings → Adding songs). */
 export const ADD_LIMITS = { min: 10, max: 5000 };
 /** At most this many choices when it asks how many. */
@@ -190,6 +192,7 @@ const swipeSkips = oneOf<SwipeSkips>('both', 'mini', 'art', 'off');
 const closeRoom = oneOf<CloseRoom>('undo', 'ask');
 const reduceMotion = oneOf<ReduceMotion>('system', 'on', 'off');
 const toastPlace = oneOf<ToastPlace>('center', 'left');
+const upNextMenu = oneOf<UpNextMenu>('line', 'chips');
 
 export const settings = {
 	// Playback
@@ -262,6 +265,7 @@ export const settings = {
 	/** Messages that follow each other become one ("Added 3 songs to the queue"); off: each shows, stacked. */
 	toastMerge: new Setting('toastMerge', true, bool),
 	toastPlace: new Setting('toastPlace', 'center' as ToastPlace, toastPlace),
+	upNextMenu: new Setting('upNextMenu', 'line' as UpNextMenu, upNextMenu),
 	/** The full player's song title slides along when it's too long, like YTM (Marquee.svelte). */
 	titleScroll: new Setting('titleScroll', true, bool),
 	/** Phones: the song playing, with play/pause, above Up next, Lyrics and Related, like YTM (Settings → Player). */

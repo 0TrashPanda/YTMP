@@ -40,7 +40,7 @@
 	import { preferences } from '../../preferences.svelte';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
-	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type CloseRoom, type PlaylistPick, type ReduceMotion, type ToastPlace, type Setting } from '../../settings.svelte';
+	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type CloseRoom, type PlaylistPick, type ReduceMotion, type ToastPlace, type UpNextMenu, type Setting } from '../../settings.svelte';
 	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SmallFirst, type SwipeOpens, type TabOrder, type TallPlayer, type VideoArt, type ClearRoomBy } from '../../storage';
 	import { fold, LABELS, mark, matches, rowsOf, searchWords } from '../../settingsSearch';
 	import { youtube } from '../../youtube.svelte';
@@ -765,6 +765,15 @@
 				['tab', 'That tab'],
 				['upnext', 'Always Up next']
 			] as [SwipeOpens, string][]}
+		/>
+		<Choice
+			label="Up next's ⋮ with nothing queued"
+			hint="The ⋮ above Up next (Remove played songs, Clear queue, Clear room) sits next to the song count. With nothing queued: on a line saying what plays instead ('Playing from', like YouTube Music), or at the end of the Radio from chips."
+			setting={settings.upNextMenu}
+			options={[
+				['line', 'On a Playing from line'],
+				['chips', 'Next to the chips']
+			] as [UpNextMenu, string][]}
 		/>
 		<Toggle
 			label="Slide long titles"
