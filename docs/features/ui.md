@@ -100,7 +100,13 @@ Like YTM:
   slides it up over the player, and so does **swiping a tab up**; swipe it down, from the tabs or from the list once it is
   scrolled to the top, or tap the handle to close it), next to the album art on desktop. *Up next* is the queue
   (see below); *Related* is [find similar](history-and-recommendations.md#find-similar)
-  for the current song. *Lyrics* ✅ sits between them (see [lyrics](#lyrics)).
+  for the current song. *Lyrics* ✅ sits between them (see [lyrics](#lyrics)). On a phone the
+  open sheet keeps **the song playing** at its top ✅ (art, title, play/pause and next, like YTM;
+  tap it to go back to the player). *Settings → Player → Song playing above Up next* (on by
+  default) can leave it out.
+- **The song playing is marked** ✅ in lists (search, albums, playlists, Quick picks, Up next)
+  like YTM: bars over its art (instead of its number on an album), moving while it plays and
+  standing still while paused.
 - **Next when the room votes to skip** ✅: for people who may only vote, Next votes (red
   while you've voted, pressed again takes it back) and shows the votes so far, like *1/2*.
   See [vote to skip](queue.md#vote-to-skip).
@@ -136,6 +142,19 @@ Like YTM:
   like YTM: Up next · Lyrics · Related) or **Related first** (Related · Lyrics · Up next).
 - **Up next opens at the current song** ✅, right away (no scrolling down to it); when the
   song changes while it's open, it glides along.
+- **Reduce motion** ✅ (Settings → Look): **Like this device** (default, the phone's or
+  computer's own accessibility setting), **On** or **Off**. On, the player and sheets appear
+  without sliding, nothing pops or scrolls smoothly, and the bars on the song playing stand
+  still; what shows that something is loading stays, standing still.
+- **Messages** ✅ (like "Added "One More Time" to the queue") show just above the player bar
+  (and the phone's bottom bar). *Settings → Look → Combine messages* (on by default) shows one
+  at a time, and ones that follow each other become one: three songs added quickly say *Added 3
+  songs to the queue*, with one **Undo** that takes all three out again. *Where messages show*:
+  **in the middle** (default) or, on a computer, **at the bottom left** like YTM. Swipe one down
+  to hide it. Screen readers read them out.
+- **Dialogs and sheets** ✅ (menus, Play on, Share, Settings): the keyboard stays inside while
+  one is open (Tab goes round, the page behind can't be reached), Escape closes it, and closed,
+  the keyboard is back where it was.
 - **Video pictures** ✅ (Settings → Look): songs from a music video only have a
   wide picture. **Crop** (default, like YTM) fills the square; **Fit** shows all of it, with
   bars above and below.

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scrollBehavior } from '../motion.svelte';
 	// Importing playlists (Library → Import, docs/features/importing-playlists.md): your imports,
 	// a new one from a Spotify data export (what's in it, where each list goes, the settings),
 	// and one import's page, with the songs to check. YTMP looks the songs up on the host with
@@ -247,7 +248,7 @@
 			await tick();
 			const at = rows.findIndex((r) => r.key === row.key);
 			const keep = rows[at >= 0 ? at : Math.min(index, rows.length - 1)];
-			if (keep) document.querySelector(`[data-row="${CSS.escape(keep.key)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+			if (keep) document.querySelector(`[data-row="${CSS.escape(keep.key)}"]`)?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
 			refresh();
 		} catch (e) {
 			onToast(message(e, "Couldn't save that"));

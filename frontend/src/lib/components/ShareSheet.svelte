@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	import { renderSVG } from 'uqr';
 	import type { HostInfo } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
@@ -69,13 +70,15 @@
 </script>
 
 <div class="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={onClose}>
+	<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
 		class="flex max-h-[90vh] w-full max-w-sm flex-col items-center gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 		role="dialog"
 		aria-label="Share room"
 		tabindex="-1"
 		onclick={(e) => e.stopPropagation()}
-		onkeydown={(e) => e.key === 'Escape' && onClose()}
+		use:modal={() => onClose()}
 	>
 		<div class="flex w-full items-center justify-between">
 			<h2 class="text-lg font-bold">{info?.name}</h2>
@@ -85,7 +88,7 @@
 		{#if isPrivate}
 			<p class="text-center text-muted">This is a <strong class="text-white">solo room</strong>: only you can listen here.</p>
 			{#if isOwner}
-				<button class="w-full rounded-full bg-accent py-3 font-medium" onclick={makePublic}>
+				<button class="w-full rounded-full bg-accent-strong py-3 font-medium" onclick={makePublic}>
 					Make public, so friends on this Wi-Fi can join
 				</button>
 			{/if}

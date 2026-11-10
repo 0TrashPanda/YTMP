@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	// Leave Room. The owner of a party room picks who runs it after them (the person with the
 	// top role who's been here longest is suggested), or nobody (they stay the owner).
 	// Everyone else, and a solo room's owner, just leave: asked first, unless that's switched
@@ -37,13 +38,15 @@
 
 {#if !direct}
 	<div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={onClose}>
+		<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
 			class="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 			role="dialog"
 			aria-label="Leave room"
 			tabindex="-1"
 			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => e.key === 'Escape' && onClose()}
+			use:modal={() => onClose()}
 		>
 			<h2 class="text-lg font-bold">Leave '{rs.room.name}'?</h2>
 			{#if asks}
@@ -67,7 +70,7 @@
 			{/if}
 			<div class="flex justify-end gap-2">
 				<button class="rounded-full px-4 py-2 text-sm font-medium hover:bg-raised" onclick={onClose}>Cancel</button>
-				<button class="rounded-full bg-accent px-4 py-2 text-sm font-medium disabled:opacity-50" disabled={busy} onclick={() => leave(asks ? nextOwner || null : null)}>
+				<button class="rounded-full bg-accent-strong px-4 py-2 text-sm font-medium disabled:opacity-50" disabled={busy} onclick={() => leave(asks ? nextOwner || null : null)}>
 					Leave room
 				</button>
 			</div>

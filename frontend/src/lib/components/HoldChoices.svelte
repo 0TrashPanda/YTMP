@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { motionMs } from '../motion.svelte';
+	import { modal } from '../modal';
 	// The choices of a held player button (Shuffle, Next): a small sheet from the bottom on a
 	// phone, a box in the middle on wider screens. Picking one closes it.
 	import { fade, fly } from 'svelte/transition';
@@ -9,13 +11,14 @@
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} />
 
-<div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" transition:fade|global={{ duration: 150 }} onclick={onClose}>
+<div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" transition:fade|global={{ duration: motionMs(150) }} onclick={onClose}>
 	<div
 		class="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-raised pt-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-2xl sm:rounded-2xl"
 		role="menu"
 		tabindex="-1"
 		aria-label={title}
-		transition:fly|global={{ y: 300, duration: 200, opacity: 1 }}
+		use:modal
+		transition:fly|global={{ y: 300, duration: motionMs(200), opacity: 1 }}
 		onclick={(e) => e.stopPropagation()}
 		onkeydown={() => {}}
 	>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../lib/modal';
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { identity, logInOnce, type Identity } from '../lib/account';
@@ -304,13 +305,15 @@
 {#if askingClose}
 	{@const room = askingClose}
 	<div class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={() => (askingClose = null)}>
+		<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
 			class="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 			role="dialog"
 			aria-label="Close {room.name}"
 			tabindex="-1"
 			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => e.key === 'Escape' && (askingClose = null)}
+			use:modal={() => (askingClose = null)}
 		>
 			<h2 class="text-lg font-bold">Close '{room.name}'?</h2>
 			<p class="text-sm text-muted">
@@ -322,7 +325,7 @@
 			</label>
 			<div class="flex justify-end gap-2">
 				<button class="rounded-full px-4 py-2 text-sm font-medium hover:bg-raised" onclick={() => (askingClose = null)}>Cancel</button>
-				<button class="rounded-full bg-accent px-4 py-2 text-sm font-medium" onclick={confirmClose}>Close room</button>
+				<button class="rounded-full bg-accent-strong px-4 py-2 text-sm font-medium" onclick={confirmClose}>Close room</button>
 			</div>
 		</div>
 	</div>
@@ -360,13 +363,15 @@
 	{@const room = choosing}
 	<!-- Ask: open it where it lives, or move it here. -->
 	<div class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={() => (choosing = null)}>
+		<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
 			class="flex max-h-[90vh] w-full max-w-sm flex-col gap-3 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 			role="dialog"
 			aria-label="Open {room.name}"
 			tabindex="-1"
 			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => e.key === 'Escape' && (choosing = null)}
+			use:modal={() => (choosing = null)}
 		>
 			<h2 class="text-lg font-bold">{room.name}</h2>
 			<p class="text-sm text-muted">
@@ -502,13 +507,13 @@
 						<span class="text-xs text-muted">Just you</span>
 					</button>
 					<button
-						class="flex flex-col items-center gap-1 rounded-xl bg-accent p-3 disabled:opacity-40"
+						class="flex flex-col items-center gap-1 rounded-xl bg-accent-strong p-3 disabled:opacity-40"
 						disabled={busy || !validName || !codeOk}
 						onclick={() => hostRoom('public')}
 					>
 						<Icon name="people" />
 						<span class="font-medium">Party</span>
-						<span class="text-xs text-white/80">Friends on this Wi-Fi join</span>
+						<span class="text-xs text-white">Friends on this Wi-Fi join</span>
 					</button>
 				</div>
 			</section>
@@ -589,18 +594,18 @@
 								<span class="text-xs text-muted">{me ? 'Just you, on all your devices' : 'Just you, in this browser'}</span>
 							</button>
 							<button
-								class="flex flex-col items-center gap-1 rounded-xl bg-accent p-3 disabled:opacity-40"
+								class="flex flex-col items-center gap-1 rounded-xl bg-accent-strong p-3 disabled:opacity-40"
 								disabled={busy || !validName || !codeOk}
 								onclick={() => hostRoom('public')}
 							>
 								<Icon name="people" />
 								<span class="font-medium">Party</span>
-								<span class="text-xs text-white/80">Friends join with the code</span>
+								<span class="text-xs text-white">Friends join with the code</span>
 							</button>
 						</div>
 					{:else}
 						<button
-							class="rounded-full bg-accent py-3 font-medium disabled:opacity-40"
+							class="rounded-full bg-accent-strong py-3 font-medium disabled:opacity-40"
 							disabled={busy || !validName || !codeOk}
 							onclick={() => hostRoom('public')}
 						>

@@ -187,7 +187,7 @@
 					<input type="date" class="rounded-lg bg-raised px-3 py-2" bind:value={from} aria-label="From" />
 					<span class="text-muted">to</span>
 					<input type="date" class="rounded-lg bg-raised px-3 py-2" bind:value={to} aria-label="To" />
-					<button class="ml-auto rounded-full bg-accent px-4 py-2 text-sm font-medium" onclick={removeRange}>
+					<button class="ml-auto rounded-full bg-accent-strong px-4 py-2 text-sm font-medium" onclick={removeRange}>
 						{from || to ? 'Delete these days' : 'Delete everything'}
 					</button>
 				</div>

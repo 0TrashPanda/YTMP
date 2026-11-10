@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { motionMs } from '../motion.svelte';
+	import { modal } from '../modal';
 	// The song graph (docs/features/history-and-recommendations.md#the-graph-view): around a song
 	// (its neighbours and theirs), or your most played songs. Lines are where YTMP learned that
 	// two songs go together, coloured by where from; the sliders change how much each part
@@ -274,7 +276,7 @@
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} />
 
-<div class="fixed inset-0 z-[65] flex flex-col bg-surface" role="dialog" aria-label="Song graph" transition:fade|global={{ duration: 120 }}>
+<div class="fixed inset-0 z-[65] flex flex-col bg-surface" role="dialog" aria-label="Song graph" use:modal transition:fade|global={{ duration: motionMs(120) }}>
 	<header class="flex shrink-0 items-center gap-2 px-2 pt-[max(env(safe-area-inset-top),0.5rem)] pb-2">
 		<button class="rounded-full p-2 hover:bg-raised" aria-label="Close" onclick={onClose}><Icon name="back" /></button>
 		<div class="min-w-0 flex-1">

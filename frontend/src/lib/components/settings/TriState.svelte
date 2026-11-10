@@ -5,7 +5,7 @@
 	let { value, disabled = false, canAllow = true, onchange }: { value: Override; disabled?: boolean; canAllow?: boolean; onchange: (v: Override) => void } = $props();
 
 	const options: { v: Override; label: string; on: string }[] = [
-		{ v: 'deny', label: 'Deny', on: 'bg-accent text-white' },
+		{ v: 'deny', label: 'Deny', on: 'bg-accent-strong text-white' },
 		{ v: 'inherit', label: 'Follow role', on: 'bg-[#4e5058] text-white' },
 		{ v: 'allow', label: 'Allow', on: 'bg-good text-white' }
 	];

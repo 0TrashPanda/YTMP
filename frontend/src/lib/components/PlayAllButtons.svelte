@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	// Play, Play next and Add to queue for a whole album or playlist. A playlist goes into
 	// autoplay instead of the queue ([toAutoplay]): it plays when the queue is empty.
 	// A long one adds at most the set number of songs, or asks first above another, with the
@@ -160,13 +161,15 @@
 
 {#if asking}
 	<div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={() => answer(null)}>
+		<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
 			class="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 			role="dialog"
 			aria-label="How many songs"
 			tabindex="-1"
 			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => e.key === 'Escape' && answer(null)}
+			use:modal={() => answer(null)}
 		>
 			<!-- The name can be long: the number of songs gets its own line. -->
 			<h2 class="line-clamp-2 text-lg font-bold">{name}</h2>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scrollBehavior } from '../../../lib/motion.svelte';
 	import { positionNow } from '../../../lib/sync';
 	import { page } from '$app/state';
 	import { goto, pushState, replaceState } from '$app/navigation';
@@ -35,7 +36,8 @@
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
 	import { preferences } from '../../../lib/preferences.svelte';
 	import type { AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
-	import type { ToastAction } from '../../../lib/songActions';
+	import { mergeActions, type ToastAction, type ToastGroup } from '../../../lib/songActions';
+	import { swipeAway } from '../../../lib/swipeAway';
 	import GraphView from '../../../lib/components/GraphView.svelte';
 	import type { Link } from '../../../lib/links';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
@@ -111,7 +113,7 @@
 	const stack = new PageStack({
 		scrollTop: () => scroller?.scrollTop ?? 0,
 		scrollTo: scrollPageTo,
-		toTop: () => scroller?.scrollTo({ top: 0, behavior: 'smooth' }),
+		toTop: () => scroller?.scrollTo({ top: 0, behavior: scrollBehavior() }),
 		leaving: closePlayer
 	});
 	const top = $derived(stack.top);
@@ -232,7 +234,11 @@
 		event.preventDefault();
 		openMenu({ song: item.song, item, place: 'current', x: event.clientX, y: event.clientY });
 	}
-	let toasts = $state<{ id: number; text: string; action?: ToastAction }[]>([]);
+	let toasts = $state<{ id: number; text: string; action?: ToastAction; group?: ToastGroup }[]>([]);
+	const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
+	/** How tall the player bar and the phone's bottom bar are: messages show just above them. */
+	let barHeight = $state(0);
+	let navHeight = $state(0);
 	let now = $state(Date.now());
 	let toastId = 0;
 
@@ -394,12 +400,31 @@
 		lastScrollTop = top;
 	}
 
-	function toast(text: string, action?: ToastAction) {
+	/**
+	 * Shows a message for a few seconds (one with a button a bit longer). With Settings → Look →
+	 * Combine messages (on by default) only the newest shows, and ones of a kind that follow each
+	 * other become one ("Added 3 songs to the queue", one Undo for all three).
+	 */
+	function toast(text: string, action?: ToastAction, group?: ToastGroup) {
 		// Negative, so they never clash with the host's notice IDs.
 		const id = -++toastId;
-		toasts.push({ id, text, action });
-		// One with a button stays a bit longer, to reach it.
-		setTimeout(() => (toasts = toasts.filter((t) => t.id !== id)), action ? 6000 : 3000);
+		let entry = { id, text, action, group };
+		if (settings.toastMerge.value) {
+			const last = toasts.at(-1);
+			if (group && last?.group?.key === group.key) {
+				const count = last.group.count + group.count;
+				entry = { id, text: group.text(count), action: mergeActions(room, last.action, action), group: { ...group, count } };
+			}
+			for (const t of toasts) clearTimeout(toastTimers.get(t.id));
+			toasts = [entry];
+		} else toasts.push(entry);
+		toastTimers.set(id, setTimeout(() => dismissToast(id), entry.action ? 6000 : 3000));
+	}
+
+	function dismissToast(id: number) {
+		clearTimeout(toastTimers.get(id));
+		toastTimers.delete(id);
+		toasts = toasts.filter((t) => t.id !== id);
 	}
 
 	const solo = $derived(room?.state?.room.visibility === 'private');
@@ -422,7 +447,7 @@
 		}
 		if (back()) return 'handled';
 		if (scroller && scroller.scrollTop > 0) {
-			scroller.scrollTo({ top: 0, behavior: 'smooth' });
+			scroller.scrollTo({ top: 0, behavior: scrollBehavior() });
 			return 'handled';
 		}
 		if (saved.backLimit(solo) === 'home') return 'exit';
@@ -706,7 +731,7 @@
 					{/if}
 					{#if room.state?.migration && room.state.migration.target.code !== code && migrationDismissed !== room.state.migration.target.url}
 						{@const offer = room.state.migration}
-						<div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-accent/90 px-4 py-2 text-center text-sm">
+						<div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-accent-strong px-4 py-2 text-center text-sm">
 							<span>{offer.fromName} moved the party to <strong>{offer.target.name}</strong>.</span>
 							<a class="rounded-full bg-white px-3 py-1 font-medium text-black" href={room.migrationLink(offer.target.url)}>Go there</a>
 							<button class="underline" onclick={() => (migrationDismissed = offer.target.url)}>Stay here</button>
@@ -861,6 +886,7 @@
 		</div>
 
 		{#if player}
+			<div bind:clientHeight={barHeight}>
 			<PlayerBar
 				{room}
 				{player}
@@ -874,10 +900,11 @@
 				onPodcast={openPodcast}
 				onSleepTimer={() => (sheet = { kind: 'sleep' })}
 			/>
+			</div>
 		{/if}
 		{#if sections.length > 1}
 			<!-- Like YTM's bottom bar, on phones (desktop: the Sidebar). -->
-			<nav class="flex shrink-0 bg-surface sm:hidden">
+			<nav class="flex shrink-0 bg-surface sm:hidden" bind:clientHeight={navHeight}>
 				{#each sections as [value, label] (value)}
 					{@const active = section === value && !view}
 					<button class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs {active ? 'text-white' : 'text-muted'}" aria-current={active ? 'page' : undefined} onclick={() => pickSection(value)}>
@@ -945,31 +972,35 @@
 		<InterruptDialog {room} />
 	{/if}
 
-	<div class="pointer-events-none fixed inset-x-0 bottom-28 z-[80] flex flex-col items-center gap-2 px-4">
+	<!-- Messages: just above the player bar (and the phone's bottom bar), centered or (Settings → Look) at the bottom left on a computer. Swipe one down to hide it. -->
+	<div
+		class="pointer-events-none fixed inset-x-0 z-[80] flex flex-col gap-2 px-4 {settings.toastPlace.value === 'left' ? 'items-center sm:items-start sm:px-6' : 'items-center'}"
+		style:bottom="{barHeight + navHeight + 12}px"
+		aria-live="polite"
+	>
 		{#if room.undo}
-			<div class="pointer-events-auto flex items-center gap-3 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">
+			<div class="pointer-events-auto flex max-w-full items-center gap-3 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg" use:swipeAway={() => room && (room.undo = null)}>
 				<span class="min-w-0 truncate">{room.undo.text}</span>
 				<button class="shrink-0 font-bold" onclick={() => room?.undoRemove()}>Undo</button>
 			</div>
 		{/if}
 		{#each busy as b (b.id)}
-			<div class="flex items-center gap-2.5 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg" role="status">
+			<div class="flex max-w-full items-center gap-2.5 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">
 				<span class="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-black/20 border-t-black"></span>
 				<span class="line-clamp-2">{b.text}</span>
 			</div>
 		{/each}
-		{#each [...room.notices, ...toasts] as message (message.id + message.text)}
+		<!-- Combined (the setting): the newest of the host's notices and of this page's messages. -->
+		{#each settings.toastMerge.value ? [...room.notices.slice(-1), ...toasts] : [...room.notices, ...toasts] as message (message.id + message.text)}
 			{@const action = (message as { action?: ToastAction }).action}
+			{@const hide = () => (message.id < 0 ? dismissToast(message.id) : room?.dismissNotice(message.id))}
 			{#if action}
-				<div class="pointer-events-auto flex items-center gap-3 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg">
+				<div class="pointer-events-auto flex max-w-full items-center gap-3 rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg" use:swipeAway={hide}>
 					<span class="min-w-0 truncate">{message.text}</span>
-					<button class="shrink-0 font-bold" onclick={() => ((toasts = toasts.filter((t) => t.id !== message.id)), action.run())}>{action.label}</button>
+					<button class="shrink-0 font-bold" onclick={() => (dismissToast(message.id), action.run())}>{action.label}</button>
 				</div>
 			{:else}
-				<button
-					class="pointer-events-auto rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg"
-					onclick={() => room?.dismissNotice(message.id)}
-				>
+				<button class="pointer-events-auto max-w-full rounded-lg bg-white px-4 py-2 text-sm text-black shadow-lg" use:swipeAway={hide} onclick={hide}>
 					{message.text}
 				</button>
 			{/if}

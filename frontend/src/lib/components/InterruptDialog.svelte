@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	// "Pause for everyone?": in a party room, what would interrupt the music for the others
 	// (pause, seek, skip, play something else) waits for this (room.asking). Always runs it and
 	// doesn't ask again (Settings → Playback switches it back on).
@@ -34,13 +35,15 @@
 </script>
 
 <div class="fixed inset-0 z-[90] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={() => asking.answer(false)}>
+	<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
 		class="flex w-full max-w-sm flex-col gap-4 rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 		role="alertdialog"
 		aria-label={title}
 		tabindex="-1"
 		onclick={(e) => e.stopPropagation()}
-		onkeydown={(e) => e.key === 'Escape' && asking.answer(false)}
+		use:modal={() => asking.answer(false)}
 	>
 		<h2 class="text-lg font-bold">{title}</h2>
 		<p class="text-sm text-muted">
@@ -49,7 +52,7 @@
 		<div class="flex justify-end gap-2">
 			<button class="rounded-full px-4 py-2 text-sm font-medium hover:bg-raised" onclick={() => asking.answer(false)}>No</button>
 			<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => asking.answer(true)}>Just once</button>
-			<button class="rounded-full bg-accent px-4 py-2 text-sm font-medium" onclick={always}>Always</button>
+			<button class="rounded-full bg-accent-strong px-4 py-2 text-sm font-medium" onclick={always}>Always</button>
 		</div>
 	</div>
 </div>

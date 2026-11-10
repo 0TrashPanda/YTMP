@@ -15,6 +15,10 @@ import { PAGE_SIZES, read, write } from './storage';
 export type PlaylistPick = 'first' | 'random';
 /** Closing one of your rooms from the room list: at once with Undo, or asked first. */
 export type CloseRoom = 'undo' | 'ask';
+/** Moving things (the player sliding up, swipes, smooth scrolling): as the device asks, always less, or always. */
+export type ReduceMotion = 'system' | 'on' | 'off';
+/** Where messages (toasts) show: centered at the bottom, or (on a computer) at the bottom left like YTM. */
+export type ToastPlace = 'center' | 'left';
 /** How many songs of one playlist may be added at most (Settings → Adding songs). */
 export const ADD_LIMITS = { min: 10, max: 5000 };
 /** At most this many choices when it asks how many. */
@@ -184,6 +188,8 @@ const tallPlayer = oneOf<TallPlayer>('stacked', 'side');
 const clearRoomBy = oneOf<ClearRoomBy>('button', 'swipe', 'both');
 const swipeSkips = oneOf<SwipeSkips>('both', 'mini', 'art', 'off');
 const closeRoom = oneOf<CloseRoom>('undo', 'ask');
+const reduceMotion = oneOf<ReduceMotion>('system', 'on', 'off');
+const toastPlace = oneOf<ToastPlace>('center', 'left');
 
 export const settings = {
 	// Playback
@@ -251,6 +257,13 @@ export const settings = {
 	tallPlayer: new Setting('tallPlayer', 'stacked' as TallPlayer, tallPlayer),
 	/** Swiping the mini player or the full player's art sideways: left is Next, right is Previous, like YTM. */
 	swipeSkips: new Setting('swipeSkips', 'both' as SwipeSkips, swipeSkips),
+	/** Less moving: follows the device's own setting, or always on, or always off (motion.svelte.ts). */
+	reduceMotion: new Setting('reduceMotion', 'system' as ReduceMotion, reduceMotion),
+	/** Messages that follow each other become one ("Added 3 songs to the queue"); off: each shows, stacked. */
+	toastMerge: new Setting('toastMerge', true, bool),
+	toastPlace: new Setting('toastPlace', 'center' as ToastPlace, toastPlace),
+	/** Phones: the song playing, with play/pause, above Up next, Lyrics and Related, like YTM (Settings → Player). */
+	upNextSongRow: new Setting('upNextSongRow', true, bool),
 	/** On a touch screen, holding doesn't select text (text fields still can); app.css's `hold-no-select`. */
 	holdNoSelect: new Setting('holdNoSelect', true, bool),
 	/** On a touch screen, small icon buttons get a finger-sized (48px) tap area; app.css's `big-taps`. */

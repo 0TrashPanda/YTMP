@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	// Recognize a song (docs/features/ui.md), like YouTube Music's song search: the microphone
 	// listens (listen.ts). Shazam's answer shows at once (its cover, title and artist), and the
 	// buttons come when the song is found on YouTube Music (Play, Play next, Add to queue);
@@ -53,13 +54,15 @@
 </script>
 
 <div class="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 sm:items-center" role="presentation" onclick={onClose}>
+	<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
 		class="flex w-full max-w-sm flex-col items-center gap-5 rounded-t-2xl bg-surface p-6 pb-8 text-center ring-1 ring-line sm:rounded-2xl"
 		role="dialog"
 		aria-label="Recognize a song"
 		tabindex="-1"
 		onclick={(e) => e.stopPropagation()}
-		onkeydown={(e) => e.key === 'Escape' && onClose()}
+		use:modal={() => onClose()}
 	>
 		{#if !heard}
 			<!-- Listening: a pulsing microphone. -->

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	// "Show on a TV": the TV opens <host>/tv and shows a code; entering it here makes the TV
 	// this room's party screen (docs/features/ui.md#party-screen).
 	import { linkScreen } from '../api';
@@ -38,13 +39,15 @@
 </script>
 
 <div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={onClose}>
+	<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
 		class="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 		role="dialog"
 		aria-label="Show on a TV"
 		tabindex="-1"
 		onclick={(e) => e.stopPropagation()}
-		onkeydown={(e) => e.key === 'Escape' && onClose()}
+		use:modal={() => onClose()}
 	>
 	<form class="flex flex-col gap-4" onsubmit={link}>
 		<h2 class="text-lg font-bold">Show on a TV</h2>

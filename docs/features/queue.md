@@ -44,6 +44,13 @@ added by someone: hold *Remove* in the [song menu](ui.md#song-menu)) and *Remove
 songs* also show **Undo**, for the queue, the history and autoplay alike. Those songs come
 back exactly where they were, still added by whoever added them.
 
+## Undo after adding ✅
+
+The message after adding songs (*Added "One More Time" to the queue*, *Playing … next*) has
+**Undo**: it takes those songs out of the queue again (and that removal has its own Undo).
+Messages that follow each other combine (*Added 3 songs to the queue*), with one Undo for all
+([messages](ui.md)).
+
 ## Above Up next ✅
 
 Like YouTube Music's line above the queue, Up next starts with how many songs are queued and

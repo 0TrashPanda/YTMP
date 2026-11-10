@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	// "Clone room": a new room with a copy of this one (queue, history, autoplay, roles, where
 	// the song is), here, on this phone or on your server. Optionally everyone is invited or
 	// moved to it, and keeps their role (docs/features/room-lifecycle.md#cloning-a-room).
@@ -112,13 +113,15 @@
 </script>
 
 <div class="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={onClose}>
+	<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
 		class="flex max-h-[90%] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-t-2xl bg-surface p-6 ring-1 ring-line sm:rounded-2xl"
 		role="dialog"
 		aria-label="Clone room"
 		tabindex="-1"
 		onclick={(e) => e.stopPropagation()}
-		onkeydown={(e) => e.key === 'Escape' && onClose()}
+		use:modal={() => onClose()}
 	>
 		<div class="flex items-center justify-between">
 			<h2 class="text-lg font-bold">Clone room</h2>

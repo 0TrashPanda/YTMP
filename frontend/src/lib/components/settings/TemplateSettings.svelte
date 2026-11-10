@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../../modal';
 	// Your role template: the roles every room you create starts with. Same editor as a
 	// room's roles, saved to your account.
 	import { onDestroy, onMount } from 'svelte';
@@ -48,7 +49,7 @@
 	const input = 'w-full rounded bg-raised px-3 py-2.5 text-white outline-none';
 </script>
 
-<div class="fixed inset-0 z-[60] flex bg-bg text-white" role="dialog" aria-modal="true" aria-label="Your roles">
+<div class="fixed inset-0 z-[60] flex bg-bg text-white" role="dialog" aria-modal="true" aria-label="Your roles" use:modal>
 	<nav class="{showingSection ? 'hidden md:flex' : 'flex'} w-full shrink-0 justify-end bg-surface md:w-[min(40%,280px)] lg:w-[calc(50%-370px)] lg:min-w-[218px]">
 		<div class="flex w-full flex-col gap-0.5 px-2 py-6 md:w-[218px] md:pt-[60px] md:pr-1.5 md:pl-5">
 			<h2 class="px-2.5 pb-1.5 text-sm font-medium">Your room template</h2>

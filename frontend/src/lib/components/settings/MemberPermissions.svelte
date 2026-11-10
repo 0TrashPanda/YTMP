@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../../modal';
 	// Per-person overrides, like Discord's channel permission overrides: ✗ deny, / follow the role, ✓ allow.
 	import { PERMISSION_GROUPS, type Override } from '../../permissions';
 	import type { Participant, Permission, Role } from '../../protocol.gen';
@@ -54,7 +55,7 @@
 </script>
 
 <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" role="presentation" onclick={(e) => e.target === e.currentTarget && close()}>
-	<div class="flex max-h-full w-full max-w-xl flex-col rounded-lg bg-bg text-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Permissions for {person.name}">
+	<div class="flex max-h-full w-full max-w-xl flex-col rounded-lg bg-bg text-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Permissions for {person.name}" use:modal={() => close()}>
 		<div class="flex items-start gap-3 p-4 pb-2">
 			<div class="min-w-0 flex-1">
 				<h2 class="text-xl font-medium text-white">Permissions for {person.name}</h2>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { playingMark } from '../playingMark';
 	// A list of songs (search, find similar, artist, album, playlist, history and Local pages). Tap,
 	// swipe right, swipe left and hold do what Settings → Taps and swipes says (play next, add
 	// to queue, play now, the song menu by default; in an empty room a tap on album and playlist
@@ -150,7 +151,7 @@
 			{@const action = rows.actionFor({ song, index: i }, offset)}
 			<div
 				class="absolute inset-0 flex items-center gap-2 px-5 text-sm font-medium text-white transition-colors
-					{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(key) ? (action === 'remove' ? 'bg-accent' : 'bg-good') : 'bg-line'}"
+					{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(key) ? (action === 'remove' ? 'bg-accent-strong' : 'bg-good') : 'bg-line'}"
 			>
 				<Icon name={ACTION_ICONS[action]} size={22} />
 				{ACTION_NAMES[action]}
@@ -169,9 +170,17 @@
 	>
 		<button class="flex min-w-0 flex-1 items-center gap-3 text-left" onclick={(e) => rows.act('tap', { song, index: i }, e, e.currentTarget.parentElement)} title={ACTION_NAMES[rows.of({ song, index: i }).tap]}>
 			{#if numbered}
-				<span class="w-8 shrink-0 text-center text-muted tabular-nums">{i + 1}</span>
+				{@const mark = playingMark(room, song.id)}
+				{#if mark}
+					<!-- The song playing: bars instead of its number, like YTM. -->
+					<span class="playing-bars {mark} flex h-4 w-8 shrink-0 items-end justify-center gap-[3px]" aria-hidden="true">
+						<i class="block h-full w-[3px] rounded-sm bg-white"></i><i class="block h-full w-[3px] rounded-sm bg-white"></i><i class="block h-full w-[3px] rounded-sm bg-white"></i>
+					</span>
+				{:else}
+					<span class="w-8 shrink-0 text-center text-muted tabular-nums">{i + 1}</span>
+				{/if}
 			{:else}
-				<Art {song} size={48} class="h-12 w-12" />
+				<Art {song} size={48} class="h-12 w-12" playing={playingMark(room, song.id)} />
 			{/if}
 			<div class="min-w-0 flex-1">
 				<div class="truncate font-medium">{song.title}</div>

@@ -25,6 +25,7 @@
 </script>
 
 <script lang="ts">
+	import { modal } from '../../modal';
 	// Settings: one full screen, the same everywhere (in a room, on the room list, and your
 	// server's /account). A list of pages under a few headings (phones: the list first; wide
 	// screens: next to the page), like YouTube Music's. In a room it starts with the room's own
@@ -39,7 +40,7 @@
 	import { preferences } from '../../preferences.svelte';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
-	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type CloseRoom, type PlaylistPick, type Setting } from '../../settings.svelte';
+	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type CloseRoom, type PlaylistPick, type ReduceMotion, type ToastPlace, type Setting } from '../../settings.svelte';
 	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SmallFirst, type SwipeOpens, type TabOrder, type TallPlayer, type VideoArt, type ClearRoomBy } from '../../storage';
 	import { fold, LABELS, mark, matches, rowsOf, searchWords } from '../../settingsSearch';
 	import { youtube } from '../../youtube.svelte';
@@ -329,7 +330,7 @@
 	onDestroy(() => window.removeEventListener('keydown', onKey));
 </script>
 
-<div class="fixed inset-0 z-[60] flex bg-bg" role="dialog" aria-modal="true" aria-label="Settings">
+<div class="fixed inset-0 z-[60] flex bg-bg" role="dialog" aria-modal="true" aria-label="Settings" use:modal>
 	<!-- The pages -->
 	<nav class="{showingSection || searching ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col overflow-y-auto border-line px-2 pt-4 pb-8 md:w-72 md:border-r md:pt-6">
 		<div class="mb-2 flex items-center gap-2 px-2">
@@ -722,6 +723,30 @@
 		>
 			<NumberField value={settings.pageSize.value} min={PAGE_SIZES.min} max={PAGE_SIZES.max} unit="songs" label="Songs per page" onchange={(v) => settings.pageSize.set(v)} />
 		</Choice>
+		<Choice
+			label="Reduce motion"
+			hint="Less moving on screen: the player and sheets appear without sliding, nothing pops or scrolls smoothly, and the bars on the song playing stand still. By default as your phone or computer is set (its accessibility settings)."
+			setting={settings.reduceMotion}
+			options={[
+				['system', 'Like this device'],
+				['on', 'On'],
+				['off', 'Off']
+			] as [ReduceMotion, string][]}
+		/>
+		<Toggle
+			label="Combine messages"
+			hint="Messages at the bottom show one at a time, and ones that follow each other become one: three songs added quickly say 'Added 3 songs to the queue', with one Undo for all three. Off: each shows, stacked."
+			setting={settings.toastMerge}
+		/>
+		<Choice
+			label="Where messages show"
+			hint="Just above the player bar: in the middle, or on a computer at the bottom left like YouTube Music. Swipe one down to hide it."
+			setting={settings.toastPlace}
+			options={[
+				['center', 'In the middle'],
+				['left', 'Bottom left (computers)']
+			] as [ToastPlace, string][]}
+		/>
 	{:else if id === 'player'}
 		<Choice
 			label="Order of the tabs"
@@ -740,6 +765,11 @@
 				['tab', 'That tab'],
 				['upnext', 'Always Up next']
 			] as [SwipeOpens, string][]}
+		/>
+		<Toggle
+			label="Song playing above Up next"
+			hint="On a phone, with Up next, Lyrics or Related open: the song playing stays at the top, with play/pause and next, like YouTube Music. Tap it to go back to the player."
+			setting={settings.upNextSongRow}
 		/>
 		<Choice
 			label="Dislike button in the player bar"

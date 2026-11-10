@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	// The avatar (top right): who you are, what you do often in this room (share, play on,
 	// clone, its settings, leave), and Settings for the rest. Like YouTube Music's account menu.
 	import { identity } from '../account';
@@ -58,13 +59,15 @@
 {/snippet}
 
 <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-start sm:justify-end sm:bg-transparent" role="presentation" onclick={onClose}>
+	<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
 		class="flex max-h-[90%] w-full flex-col gap-1 overflow-y-auto rounded-t-2xl bg-surface p-3 ring-1 ring-line sm:mt-14 sm:mr-3 sm:w-80 sm:rounded-xl sm:shadow-2xl"
 		role="dialog"
 		aria-label="Account and settings"
 		tabindex="-1"
 		onclick={(e) => e.stopPropagation()}
-		onkeydown={(e) => e.key === 'Escape' && onClose()}
+		use:modal={() => onClose()}
 	>
 		<!-- Who you are: your YTMP account and your YouTube Music. -->
 		<button class="flex items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-raised" onclick={() => run(() => onSettings('account'))}>

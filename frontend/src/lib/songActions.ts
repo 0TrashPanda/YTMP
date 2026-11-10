@@ -12,9 +12,21 @@ import type { RoomConnection } from './room.svelte';
 export interface ToastAction {
 	label: string;
 	run: () => void;
+	/** Undo of songs just added: the queue items it takes out again (merged messages take them all). */
+	added?: () => string[];
 }
 
-export type Toast = (text: string, action?: ToastAction) => void;
+/**
+ * Messages of one kind that follow each other become one (Settings → Look → Combine messages):
+ * [count] things, said by [text] ("Added 3 songs to the queue").
+ */
+export interface ToastGroup {
+	key: string;
+	count: number;
+	text: (count: number) => string;
+}
+
+export type Toast = (text: string, action?: ToastAction, group?: ToastGroup) => void;
 
 /** How a message names one song. */
 export const quoted = (song: Song) => `"${song.title}"`;
@@ -24,12 +36,48 @@ export const quoted = (song: Song) => `"${song.title}"`;
  * it right away, or what went wrong (unless the room said so already). Returns whether it worked.
  */
 export async function runCommand(room: RoomConnection, command: Command, onToast: Toast, done?: string): Promise<boolean> {
+	const added = command.kind === 'AddSongs' && command.position !== 'autoplay' ? addedExtras(room, command.songs, command.position) : null;
+	const say = (text: string) => (added ? onToast(text, added.action, added.group) : onToast(text));
 	const sent = room.send(command);
-	if (sent.shown && done) onToast(done);
+	if (sent.shown && done) say(done);
 	const error = await sent.done;
 	if (error && !room.wasNoticed(error)) onToast(error.message);
-	else if (!error && !sent.shown && done) onToast(done);
+	else if (!error && !sent.shown && done) say(done);
 	return !error;
+}
+
+/**
+ * Songs added to the queue: Undo takes them out again, and messages about adding merge
+ * ("Added 3 songs to the queue"). The songs are found afterwards: yours, of these songs, and not
+ * in the queue before.
+ */
+function addedExtras(room: RoomConnection, songs: Song[], position: 'next' | 'end'): { action: ToastAction; group: ToastGroup } {
+	const before = new Set((room.state?.queue ?? []).map((item) => item.itemId));
+	const ids = new Set(songs.map((song) => song.id));
+	const added = () =>
+		(room.state?.queue ?? []).filter((item) => !before.has(item.itemId) && item.addedBy === room.participantId && ids.has(item.song.id)).map((item) => item.itemId);
+	const plural = (n: number) => `${n} ${n === 1 ? 'song' : 'songs'}`;
+	return {
+		action: { label: 'Undo', added, run: () => removeAdded(room, added()) },
+		group: {
+			key: `added:${position}`,
+			count: songs.length,
+			text: (n) => (position === 'end' ? `Added ${plural(n)} to the queue` : room.playNextText(plural(n)))
+		}
+	};
+}
+
+function removeAdded(room: RoomConnection, itemIds: string[]) {
+	if (itemIds.length) void room.run({ kind: 'RemoveItems', itemIds });
+}
+
+/** The button of two merged messages: both Undos at once, else the newer one's. */
+export function mergeActions(room: RoomConnection | null, older: ToastAction | undefined, newer: ToastAction | undefined): ToastAction | undefined {
+	if (!room || !older?.added || !newer?.added) return newer;
+	const a = older.added;
+	const b = newer.added;
+	const added = () => [...new Set([...a(), ...b()])];
+	return { label: 'Undo', added, run: () => removeAdded(room, added()) };
 }
 
 // [name]: how the message names the songs, like `"One More Time"`, a playlist's name or "12 songs by Daft Punk".

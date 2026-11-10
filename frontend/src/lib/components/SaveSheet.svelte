@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { modal } from '../modal';
 	// "Save to playlist", like YTM's: your own YouTube Music playlists, or a new one.
 	import { whileBusy } from '../busy.svelte';
 	import { settings } from '../settings.svelte';
@@ -54,13 +55,15 @@
 </script>
 
 <div class="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={onClose}>
+	<!-- Keys: use:modal (Escape, Tab). The click only keeps it from reaching the backdrop. -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
 		class="flex max-h-[80vh] w-full max-w-sm flex-col rounded-t-2xl bg-surface ring-1 ring-line sm:rounded-2xl"
 		role="dialog"
 		aria-label="Save to playlist"
 		tabindex="-1"
 		onclick={(e) => e.stopPropagation()}
-		onkeydown={(e) => e.key === 'Escape' && onClose()}
+		use:modal={() => onClose()}
 	>
 		<div class="flex items-center gap-3 border-b border-line p-4">
 			<Art {song} size={96} class="h-10 w-10" />

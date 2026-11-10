@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scrollBehavior } from '../motion.svelte';
 	// A song's lyrics (docs/features/ui.md#lyrics). Timed ones follow the song, with the line
 	// being sung highlighted (tap a line to go there); plain ones are text. [large]: karaoke mode,
 	// on the party screen and in the full player: big lines that glide up as the song goes, the
@@ -63,7 +64,7 @@
 		if (!list || large || index < 0 || Date.now() - scrolledAt < 4000 || !list.clientHeight) return;
 		const line = list.querySelector<HTMLElement>(`[data-line="${index}"]`);
 		if (!line) return;
-		list.scrollTo({ top: line.offsetTop - list.clientHeight / 2 + line.offsetHeight / 2, behavior: placedIn === list ? 'smooth' : 'instant' });
+		list.scrollTo({ top: line.offsetTop - list.clientHeight / 2 + line.offsetHeight / 2, behavior: placedIn === list ? scrollBehavior() : 'instant' });
 		placedIn = list;
 	});
 

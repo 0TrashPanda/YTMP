@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { motionMs } from '../motion.svelte';
+	import { modal } from '../modal';
 	// The whole song graph (docs/features/history-and-recommendations.md#the-whole-graph): every
 	// song, laid out by the server so songs that go together are close, in groups much like
 	// genres. Your listening, everyone else's and YouTube Music's radios, any of them together,
@@ -552,7 +554,7 @@
 
 <svelte:window onkeydown={escape} onresize={resized} />
 
-<div class="fixed inset-0 z-[70] flex flex-col bg-surface" role="dialog" aria-label="Whole song graph" transition:fade|global={{ duration: 120 }}>
+<div class="fixed inset-0 z-[70] flex flex-col bg-surface" role="dialog" aria-label="Whole song graph" use:modal transition:fade|global={{ duration: motionMs(120) }}>
 	<!-- One slim row: the map gets the room. -->
 	<header class="flex shrink-0 items-center gap-1.5 px-1.5 pt-[max(env(safe-area-inset-top),0.25rem)] pb-1">
 		<button class="shrink-0 rounded-full p-1.5 hover:bg-raised" aria-label="Back" onclick={onClose}><Icon name="back" size={22} /></button>

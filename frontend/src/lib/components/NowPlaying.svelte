@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { motionMs } from '../motion.svelte';
 	// The full player, like YTM's. Phones (and tablets): the whole screen, with the album art,
 	// the song, the position, the controls and where it plays; "Up next" and "Related" slide up
 	// over it. Swipe down (or the chevron, or Back) closes it. Desktop: above the player bar,
@@ -230,7 +231,7 @@
 	function slideUp(_node: HTMLElement) {
 		const from = dragY;
 		const to = window.innerHeight;
-		return { duration: 250, easing: cubicOut, css: (t: number) => `transform: translateY(${from + (1 - t) * (to - from)}px)` };
+		return { duration: motionMs(250), easing: cubicOut, css: (t: number) => `transform: translateY(${from + (1 - t) * (to - from)}px)` };
 	}
 
 	// Swipe Up next / Related down to close it: from the handle and tabs, or from the list
@@ -556,7 +557,7 @@
 		<div
 			class="absolute inset-x-0 top-14 bottom-0 z-10 flex flex-col rounded-t-2xl bg-surface shadow-2xl lg:hidden {sheetY ? '' : 'transition-transform'}"
 			style:transform={sheetY ? `translateY(${sheetY}px)` : undefined}
-			transition:fly={{ y: 600, duration: 200, opacity: 1 }}
+			transition:fly={{ y: 600, duration: motionMs(200), opacity: 1 }}
 			role="presentation"
 			ontouchstart={sheetTouchStart}
 			ontouchmove={sheetTouchMove}
@@ -566,6 +567,27 @@
 			<button class="flex shrink-0 justify-center pt-2" aria-label="Close" onclick={() => (sheet = false)}>
 				<span class="h-1 w-10 rounded-full bg-white/30"></span>
 			</button>
+			<!-- Like YTM: the song playing stays in reach above the tabs (Settings → Player can leave it out). -->
+			{#if settings.upNextSongRow.value && current && song}
+				<div class="flex shrink-0 items-center gap-1 pr-1 pb-1 pl-4">
+					<button class="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label="Back to the player" onclick={() => (sheet = false)}>
+						<Art {song} size={96} class="h-10 w-10" />
+						<span class="min-w-0 flex-1">
+							<span class="block truncate text-sm font-medium">{song.title}</span>
+							<span class="block truncate text-xs text-muted">{song.artists.map((a) => a.name).join(', ')}</span>
+						</span>
+					</button>
+					<button
+						class="tap shrink-0 rounded-full p-2 disabled:opacity-40"
+						disabled={playing ? !canPause(room, player) : !room.can('play_pause')}
+						aria-label={playing ? 'Pause' : 'Play'}
+						onclick={() => (playing ? pause(room, player) : play(room, player))}
+					>
+						<Icon name={playing ? 'pause' : 'play'} size={28} />
+					</button>
+					<NextButton {room} size={24} class="tap shrink-0 p-2" />
+				</div>
+			{/if}
 			{@render tabs()}
 			<div class="min-h-0 flex-1">{@render tabContent()}</div>
 		</div>

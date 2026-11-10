@@ -60,6 +60,12 @@
 	$effect(() => {
 		document.documentElement.classList.toggle('hold-no-select', settings.holdNoSelect.value);
 	});
+	// Reduce motion (Settings → Look): app.css follows the device unless this says always or never.
+	$effect(() => {
+		const set = settings.reduceMotion.value;
+		document.documentElement.classList.toggle('motion-reduce', set === 'on');
+		document.documentElement.classList.toggle('motion-full', set === 'off');
+	});
 	// Finger-sized tap areas on small icon buttons (Settings → Taps and swipes).
 	$effect(() => {
 		document.documentElement.classList.toggle('big-taps', settings.bigTaps.value);

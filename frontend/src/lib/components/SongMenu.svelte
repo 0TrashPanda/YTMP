@@ -25,6 +25,8 @@
 </script>
 
 <script lang="ts">
+	import { motionMs } from '../motion.svelte';
+	import { modal } from '../modal';
 	// The song menu (docs/features/ui.md#song-menu): right-click a song, or its ⋮ button. Laid out
 	// as set in Settings → Song menu (songMenu.svelte.ts). Phones get a sheet from the bottom, like
 	// YouTube Music's, with big buttons at the top; wider screens a menu where it was opened.
@@ -544,13 +546,14 @@
 {/snippet}
 
 {#if phone.current}
-	<div class="fixed inset-0 z-[55] bg-black/60" role="presentation" transition:fade|global={{ duration: 150 }} onclick={onClose}></div>
+	<div class="fixed inset-0 z-[55] bg-black/60" role="presentation" transition:fade|global={{ duration: motionMs(150) }} onclick={onClose}></div>
 	<div
 		class="fixed inset-x-0 bottom-0 z-[56] flex max-h-[85vh] flex-col rounded-t-2xl bg-raised pb-[env(safe-area-inset-bottom)] shadow-2xl {dragY ? '' : 'transition-transform'}"
 		style:transform="translateY({dragY}px)"
 		role="menu"
 		tabindex="-1"
-		transition:fly|global={{ y: 500, duration: 200, opacity: 1 }}
+		use:modal
+		transition:fly|global={{ y: 500, duration: motionMs(200), opacity: 1 }}
 		ontouchstart={touchStart}
 		ontouchmove={touchMove}
 		ontouchend={touchEnd}
@@ -604,6 +607,7 @@
 		style:left="{target.x}px"
 		style:top="{target.y}px"
 		role="menu"
+		use:modal
 	>
 		{#if sub}
 			<div class="flex flex-col">{@render held(sub, false)}</div>

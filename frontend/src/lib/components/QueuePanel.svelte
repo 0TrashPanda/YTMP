@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { playingMark } from '../playingMark';
+	import { scrollBehavior } from '../motion.svelte';
 	// "Up next": played songs, the current one, the queue and the autoplay queue as one list.
 	// Every song can be dragged anywhere in it (a played song moved below the current one
 	// plays again; the current one keeps playing, and the songs it's dragged past change sides). Tap, swipe right, swipe
@@ -87,7 +89,7 @@
 		tick().then(() => {
 			if (!list || list.scrollHeight <= list.clientHeight) return;
 			const current = list.querySelector<HTMLElement>('[data-current]');
-			if (current) list.scrollTo({ top: current.offsetTop - list.clientHeight / 2, behavior: placed ? 'smooth' : 'instant' });
+			if (current) list.scrollTo({ top: current.offsetTop - list.clientHeight / 2, behavior: placed ? scrollBehavior() : 'instant' });
 			placed = true;
 		});
 	});
@@ -469,7 +471,7 @@
 						{@const action = rows.actionFor(slot, offset)}
 						<div
 							class="absolute inset-0 flex items-center gap-2 px-5 text-sm font-medium text-white transition-colors
-								{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(slot.key) ? (action === 'remove' ? 'bg-accent' : 'bg-good') : 'bg-line'}"
+								{offset > 0 ? 'justify-start' : 'justify-end'} {swipe.far(slot.key) ? (action === 'remove' ? 'bg-accent-strong' : 'bg-good') : 'bg-line'}"
 						>
 							<Icon name={ACTION_ICONS[action]} size={22} />
 							{ACTION_NAMES[action]}
@@ -478,7 +480,7 @@
 					<div
 						class="relative flex h-full touch-pan-y items-center gap-2 rounded-md px-2 select-none
 							{slot.kind === 'current' ? 'bg-raised' : swiping || removing === slot.key ? 'bg-surface' : 'hover:bg-raised'}
-							{place === 'history' && !dragging && !swiping ? 'opacity-50' : ''}
+							{place === 'history' && !dragging && !swiping ? 'opacity-70' : ''}
 							{dragging ? 'bg-line' : ''}
 							{swiping ? '' : 'transition-transform duration-200'}"
 						style:transform="translateX({swipeOffset(slot.key)})"
@@ -497,7 +499,7 @@
 							onclick={(e) => rows.act('tap', slot, e, e.currentTarget.parentElement)}
 							title={ACTION_NAMES[rows.of(slot).tap]}
 						>
-							<Art song={slot.item.song} size={40} class="h-10 w-10" />
+							<Art song={slot.item.song} size={40} class="h-10 w-10" playing={slot.kind === 'current' ? playingMark(room, slot.item.song.id) : null} />
 							<div class="min-w-0 flex-1">
 								<div class="truncate text-sm font-medium {slot.kind === 'current' ? 'text-white' : ''}">{slot.item.song.title}</div>
 								<div class="truncate text-xs text-muted">{subtitle(slot.item, place)}</div>
