@@ -168,6 +168,11 @@ Music, without Premium, and not tied to a single music service.
   phone it can also keep the songs you liked last, the songs in your YouTube Music history, and
   the songs you played most from a Google Takeout export (how recent and how often is yours to
   choose, with the number of songs shown as you choose).
+- **Playlists offline** in the app, like YouTube Music's downloads: *Keep offline* on a playlist
+  keeps its songs on the phone and keeps up with songs added later, and *Keep your most played
+  playlists* does that by itself for the ones you play most. Every playlist whose songs are all on
+  the phone (however they got there) shows in *Local → Cached on this phone → Playlists* and plays
+  without internet.
 
 **People and accounts**
 - Roles and permissions with a Discord-style editor (one role per person plus per-person

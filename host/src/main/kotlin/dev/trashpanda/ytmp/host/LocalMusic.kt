@@ -10,6 +10,7 @@ import dev.trashpanda.ytmp.protocol.AlbumSummary
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.LocalGroup
+import dev.trashpanda.ytmp.protocol.LocalPlaylist
 import dev.trashpanda.ytmp.protocol.LocalLibraries
 import dev.trashpanda.ytmp.protocol.LocalLibraryKind
 import dev.trashpanda.ytmp.protocol.LocalLibraryPage
@@ -81,7 +82,13 @@ interface LocalLibrary {
 
     /** Sends the song's cover, [size] px (`/api/local/art/…`), for a library whose [artUrl] points there; false when it has none. */
     suspend fun respondArt(call: ApplicationCall, key: String, size: Int): Boolean = false
+
+    /** Playlists made of its songs (the song cache: YouTube Music playlists that are all on the phone). */
+    suspend fun playlists(): List<LibraryPlaylist> = emptyList()
 }
+
+/** A playlist of a [LocalLibrary]: its songs as track keys, in order. */
+data class LibraryPlaylist(val id: String, val title: String, val author: String?, val keys: List<String>)
 
 /**
  * The host's local music: its libraries as songs, albums and artists, for the Local tab
@@ -135,7 +142,20 @@ class LocalMusic {
                 .map { g -> g.copy(name = g.songs.map { b.trackOf.getValue(songs[it].id).genre }.groupingBy { it }.eachCount().maxBy { it.value }.key) }
                 .sortedBy { it.name.lowercase() },
             folders = groups { it.folder.trim('/') }.sortedBy { it.name.lowercase() },
+            playlists = playlists(library, b, songs, place),
         )
+    }
+
+    /** The library's playlists, their songs as places in [songs]; a song it doesn't list (a copy left out) is skipped. */
+    private suspend fun playlists(library: LocalLibrary, b: Built, songs: List<Song>, place: Map<String, Int>): List<LocalPlaylist> {
+        val lists = runCatching { library.playlists() }.getOrDefault(emptyList())
+        if (lists.isEmpty()) return emptyList()
+        val idOfKey = b.trackOf.entries.associate { (id, track) -> track.key to id }
+        return lists.mapNotNull { p ->
+            val places = p.keys.mapNotNull { key -> idOfKey[key]?.let(place::get) }
+            if (places.isEmpty()) return@mapNotNull null
+            LocalPlaylist(p.id, p.title, p.author, songs[places.first()].thumbnails, places)
+        }.sortedBy { it.title.lowercase() }
     }
 
     /** Null when [id] isn't local music. */

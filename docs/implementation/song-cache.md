@@ -149,6 +149,43 @@ all of it `fromYoutubeWaiting` (why not now), `fromYoutubeBusy`, `fromYoutubeErr
 `fromYoutubeNextAt` (when it looks again by itself); saving the settings (*Retry now*) looks at
 once.
 
+## Playlists offline
+
+Phone only. `KeptPlaylists` (`host/`) keeps `offline-playlists.json` in the app's files: the
+playlists it knows (ID, title, author, cover, songs, when read, the library's song count then,
+`tooLong` over 1000 songs, `inLibrary`) and the IDs kept by hand. Feature:
+[playlists offline](../features/sources.md#playlists-offline).
+
+- **Reading**: each round (at start, every 6 hours, after 30 minutes on an error, at once on a
+  change) it reads the account's library (`youtube.library()`, its *Playlists*; signed out:
+  skipped) and reads a playlist whole (`part`, in parts, 3 s apart) when it's new, its library count
+  changed, it was marked changed, or it's a day old. Kept playlists outside the library are read
+  as anyone (`cached.playlist`). Playlists gone from the library are forgotten unless kept.
+  `PhoneYoutubeAccount` tells it about changes made in the app (`onPlaylistChanged`: add, remove,
+  move, rename, delete; Liked music on a like, read at the next round unless kept) and about a
+  playlist shown whole (`onPlaylistRead`, a first part without `more`: `seen`).
+- **Most played** (`pickMostPlayed`, pref `mostPlayedPlaylists`, 0–20): library playlists (not
+  `LM`, not `tooLong`) by the plays of their songs in the last 30 days (`SongCache.recentPlays`),
+  most first, each only when the songs of the kept and picked playlists still fit in 90 % of the
+  cache (cached songs at their size, missing ones at `usualSongBytes`, downloads free).
+- **Fetching**: the kept, then the picked playlists' missing songs (`SongCache.wanted`), through
+  `SongCache.fetch`, 10 s apart, behind `hold` (*Keep songs in the background*: Wi-Fi) and
+  `fetchGate`. Before each: the kept songs (`keptSongs`) plus one song must fit in 90 % of the size,
+  else `waiting = "full"` with the playlist's name. Three failed fetches in a row end the round.
+- **Keeping**: `SongCache.kept` is `keptSongs`: `trim` removes them last (after every other song),
+  `clear` leaves them (turning the cache off removes them too).
+- **Complete**: a playlist read, not too long, with every song `SongCache.here` (cached, or in
+  `DownloadedSongs`: downloads and matched phone songs). `SongCache.playlists` hands them to the
+  *Cached on this phone* library (`LocalLibrary.playlists`), and `LocalMusic.page` lists them as
+  `LocalLibraryPage.playlists` (`LocalPlaylist`: the songs as places in the page, the cover of the
+  first song, so it shows offline). The Local tab loads that page without the page cache, and the
+  list of libraries fresh each time it opens.
+- **API** (`songCacheRoutes`, phone only): `GET /api/cache/playlists` (`OfflinePlaylists`: the kept,
+  picked and complete ones with `songs`, `here`, `notKept` (not cacheable and not downloaded),
+  `tooLong`, `read`; `waiting`, `full`, `busy`, `error`), `POST /api/cache/playlists/keep`
+  (`KeepPlaylistRequest`; refused while the cache is off). The most played count is in
+  `SongCacheSettings`/`SongCacheStatus.mostPlayedPlaylists`.
+
 ## Using it
 
 - **The host's audio route** (`/api/audio/{songId}`) answers from the cache when it has the
@@ -234,7 +271,9 @@ more recent: a song played ten times last month outlives one played once yesterd
 playing now or next in a room, the song the phone's own player plays, and songs coming in are
 never removed, and downloads aren't in the cache to remove.
 
-*Clear cache* removes everything that isn't playing. A smaller size removes songs right away
+Songs of [playlists kept offline](#playlists-offline) go last: only when nothing else is left.
+
+*Clear cache* removes everything that isn't playing or in a playlist kept offline. A smaller size removes songs right away
 by the same rule; *Off* (`0`) empties it.
 
 ## Settings

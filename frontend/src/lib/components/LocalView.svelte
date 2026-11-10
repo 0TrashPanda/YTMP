@@ -7,7 +7,8 @@
 	import { itemCard, type PageHandlers } from '../cards';
 	import { fuzzyFind } from '../format';
 	import { local, loadLocal, localPlace, subfolders, type LocalChip } from '../local.svelte';
-	import type { LocalGroup, LocalLibraryPage, SearchItem, Song } from '../protocol.gen';
+	import type { LocalGroup, LocalLibraryPage, LocalPlaylist, SearchItem, Song } from '../protocol.gen';
+	import { thumbUrl } from '../images.svelte';
 	import { settings } from '../settings.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import CardGrid, { type Card } from './CardGrid.svelte';
@@ -21,6 +22,7 @@
 		onMenu,
 		onGenre,
 		onFolder,
+		onLocalPlaylist,
 		...open
 	}: {
 		room: RoomConnection;
@@ -28,9 +30,11 @@
 		onMenu: (target: MenuTarget) => void;
 		onGenre: (library: string, name: string) => void;
 		onFolder: (library: string, path: string) => void;
+		onLocalPlaylist: (library: string, id: string) => void;
 	} & PageHandlers = $props();
 
-	const chips: [LocalChip, string][] = [
+	const allChips: [LocalChip, string][] = [
+		['playlists', 'Playlists'],
 		['albums', 'Albums'],
 		['artists', 'Artists'],
 		['songs', 'Songs'],
@@ -44,10 +48,15 @@
 	const pageSize = settings.pageSize.value;
 	const shown = $derived(Math.max(localPlace.songsShown, pageSize));
 
+	// As it is now: "Cached on this phone" shows once songs are kept, and its count changes as they come and go.
 	$effect(() => {
-		void loadLocal();
+		void loadLocal(true);
 	});
 
+	// Playlists only where there are some (the playlists that are all on this phone), first, like YouTube Music's downloads.
+	const chips = $derived(allChips.filter(([value]) => value !== 'playlists' || !!page?.playlists.length));
+	/** The chip shown: Playlists picked before, in a library that has none now, shows Albums. */
+	const chip = $derived<LocalChip>(localPlace.chip === 'playlists' && page && !page.playlists.length ? 'albums' : localPlace.chip);
 	const libraries = $derived(local.libraries ?? []);
 	const libraryId = $derived(libraries.find((l) => l.id === localPlace.library)?.id ?? libraries[0]?.id ?? null);
 
@@ -68,6 +77,7 @@
 	const artists = $derived(page ? fuzzyFind(cards(page.artists), query, text) : []);
 	const songs = $derived(page ? fuzzyFind(page.songs, query, (s: Song) => `${s.title} ${s.artists.map((a) => a.name).join(' ')} ${s.album?.name ?? ''}`) : []);
 	const genres = $derived(page ? fuzzyFind(page.genres, query, (g: LocalGroup) => g.name) : []);
+	const playlists = $derived(page ? fuzzyFind(page.playlists, query, (p: LocalPlaylist) => `${p.title} ${p.author ?? ''}`) : []);
 	/**
 	 * Where the folder list starts: the top, or - when the top holds nothing but one folder (the
 	 * phone's "Music", say) - inside that folder, and so on while it's the only one.
@@ -160,7 +170,7 @@
 		<div class="flex items-center gap-2 px-2">
 			<div bind:this={chipRow} class="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none]">
 				{#each chips as [value, label] (value)}
-					<button class="shrink-0 rounded-lg px-3 py-1.5 text-sm {localPlace.chip === value ? 'bg-white text-black' : 'bg-raised hover:bg-line'}" onclick={() => (localPlace.chip = value)}>{label}</button>
+					<button class="shrink-0 rounded-lg px-3 py-1.5 text-sm {chip === value ? 'bg-white text-black' : 'bg-raised hover:bg-line'}" onclick={() => (localPlace.chip = value)}>{label}</button>
 				{/each}
 			</div>
 			{#if room.can('play_now')}
@@ -184,11 +194,31 @@
 					<div class="aspect-square rounded-md bg-raised"></div>
 				{/each}
 			</div>
-		{:else if localPlace.chip === 'albums'}
+		{:else if chip === 'playlists'}
+			{#if playlists.length}
+				<div class="flex flex-col gap-1">
+					{#each playlists as playlist (playlist.id)}
+						<button class="flex items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-raised" onclick={() => libraryId && onLocalPlaylist(libraryId, playlist.id)}>
+							{#if thumbUrl(playlist.thumbnails, 120)}
+								<img src={thumbUrl(playlist.thumbnails, 120)} alt="" class="h-12 w-12 shrink-0 rounded object-cover" loading="lazy" />
+							{:else}
+								<span class="grid h-12 w-12 shrink-0 place-items-center rounded bg-raised"><Icon name="library" class="text-muted" /></span>
+							{/if}
+							<span class="min-w-0 flex-1">
+								<span class="block truncate font-medium">{playlist.title}</span>
+								<span class="block truncate text-sm text-muted">Playlist • {playlist.songs.length} {playlist.songs.length === 1 ? 'song' : 'songs'}</span>
+							</span>
+						</button>
+					{/each}
+				</div>
+			{:else}
+				<p class="px-2 text-muted">{query.trim() ? `No playlists match “${query.trim()}”.` : 'No playlists with all their songs on this phone.'}</p>
+			{/if}
+		{:else if chip === 'albums'}
 			{#if albums.length}<CardGrid cards={albums} />{:else}<p class="px-2 text-muted">{query.trim() ? `No albums match “${query.trim()}”.` : 'No albums.'}</p>{/if}
-		{:else if localPlace.chip === 'artists'}
+		{:else if chip === 'artists'}
 			{#if artists.length}<CardGrid cards={artists} />{:else}<p class="px-2 text-muted">{query.trim() ? `No artists match “${query.trim()}”.` : 'No artists.'}</p>{/if}
-		{:else if localPlace.chip === 'genres'}
+		{:else if chip === 'genres'}
 			{#if genres.length}
 				<div class="flex flex-col gap-1">
 					{#each genres as genre (genre.name)}
@@ -202,7 +232,7 @@
 			{:else}
 				<p class="px-2 text-muted">{query.trim() ? `No genres match “${query.trim()}”.` : 'No genres: the songs have none in their tags.'}</p>
 			{/if}
-		{:else if localPlace.chip === 'folders'}
+		{:else if chip === 'folders'}
 			{#if base && !query.trim()}
 				<p class="truncate px-2 text-sm text-muted">{base}</p>
 			{/if}

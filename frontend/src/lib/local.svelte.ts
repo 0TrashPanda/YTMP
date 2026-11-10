@@ -24,8 +24,8 @@ export const local = $state({
 	libraries: null as LocalLibrarySummary[] | null
 });
 
-export type LocalChip = 'albums' | 'artists' | 'songs' | 'genres' | 'folders';
-export const LOCAL_CHIPS: LocalChip[] = ['albums', 'artists', 'songs', 'genres', 'folders'];
+export type LocalChip = 'playlists' | 'albums' | 'artists' | 'songs' | 'genres' | 'folders';
+export const LOCAL_CHIPS: LocalChip[] = ['playlists', 'albums', 'artists', 'songs', 'genres', 'folders'];
 
 type Place = { chip: LocalChip; query: string; library: string | null; scrollTop: number; songsShown: number };
 const START: Place = { chip: 'albums', query: '', library: null, scrollTop: 0, songsShown: 0 };

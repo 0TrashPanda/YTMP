@@ -19,6 +19,8 @@ import dev.trashpanda.ytmp.protocol.DisableAccountRequest
 import dev.trashpanda.ytmp.protocol.DownloadItems
 import dev.trashpanda.ytmp.protocol.DownloadRequest
 import dev.trashpanda.ytmp.protocol.LocalLinkRequest
+import dev.trashpanda.ytmp.protocol.KeepPlaylistRequest
+import dev.trashpanda.ytmp.protocol.OfflinePlaylists
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
@@ -279,6 +281,8 @@ fun main(args: Array<String>) {
     generator.addRoot(DownloadItems.serializer().descriptor)
     generator.addRoot(DownloadRequest.serializer().descriptor)
     generator.addRoot(LocalLinkRequest.serializer().descriptor)
+    generator.addRoot(KeepPlaylistRequest.serializer().descriptor)
+    generator.addRoot(OfflinePlaylists.serializer().descriptor)
     generator.addRoot(YoutubeAccountStatus.serializer().descriptor)
     generator.addRoot(YoutubeHistorySetting.serializer().descriptor)
     generator.addRoot(YoutubePersonalizeSetting.serializer().descriptor)

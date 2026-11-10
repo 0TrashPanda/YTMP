@@ -1,8 +1,10 @@
 <script lang="ts">
-	// A genre or a folder of local music (from the Local tab): its songs, and a folder's folders.
-	// Play and the other buttons take all of it, also what's in the folders inside.
+	// A genre, a folder or a playlist of local music (from the Local tab): its songs, and a
+	// folder's folders. Play and the other buttons take all of it, also what's in the folders
+	// inside. A playlist is one whose songs are all on the phone: it plays from there, offline too.
 	import { getLocalLibrary } from '../api';
 	import { songsUnder, subfolders } from '../local.svelte';
+	import { thumbUrl } from '../images.svelte';
 	import type { LocalLibraryPage } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import { settings } from '../settings.svelte';
@@ -17,15 +19,17 @@
 		library,
 		genre,
 		folder,
+		playlist,
 		onFolder,
 		onToast,
 		onMenu
 	}: {
 		room: RoomConnection;
 		library: string;
-		/** One of these: the genre's name, or the folder's path ("" is the top). */
+		/** One of these: the genre's name, the folder's path ("" is the top), or the playlist's ID. */
 		genre?: string;
 		folder?: string;
+		playlist?: string;
 		onFolder: (path: string) => void;
 		onToast: (text: string) => void;
 		onMenu: (target: MenuTarget) => void;
@@ -42,12 +46,14 @@
 	const pageSize = settings.pageSize.value;
 	let shown = $state(pageSize);
 
-	const title = $derived(genre ?? (folder ? folder.split('/').at(-1)! : 'Music folder'));
+	const list = $derived(playlist !== undefined ? (page?.playlists.find((p) => p.id === playlist) ?? null) : null);
+	const title = $derived(playlist !== undefined ? (list?.title ?? (page ? 'Playlist' : '')) : (genre ?? (folder ? folder.split('/').at(-1)! : 'Music folder')));
 	const inside = $derived(page && folder !== undefined ? subfolders(page.folders, folder) : []);
 	/** The songs listed here: the genre's, or the ones right in the folder. */
 	const songs = $derived.by(() => {
 		if (!page) return [];
-		const places = genre !== undefined ? page.genres.find((g) => g.name === genre)?.songs : page.folders.find((f) => f.name === folder)?.songs;
+		const places =
+			playlist !== undefined ? list?.songs : genre !== undefined ? page.genres.find((g) => g.name === genre)?.songs : page.folders.find((f) => f.name === folder)?.songs;
 		return (places ?? []).map((i) => page!.songs[i]);
 	});
 	/** Everything the buttons play: with a folder, also the songs in the folders inside it. */
@@ -56,8 +62,14 @@
 
 <div class="flex flex-col gap-6">
 	<header class="flex flex-col gap-1 px-2">
-		<p class="text-xs font-medium tracking-wide text-muted uppercase">{genre !== undefined ? 'Genre' : 'Folder'}</p>
+		{#if list && thumbUrl(list.thumbnails, 544)}
+			<img src={thumbUrl(list.thumbnails, 544)} alt="" class="mb-4 aspect-square w-48 rounded-lg object-cover shadow-2xl sm:w-56" />
+		{/if}
+		<p class="text-xs font-medium tracking-wide text-muted uppercase">{playlist !== undefined ? 'Playlist · on this phone' : genre !== undefined ? 'Genre' : 'Folder'}</p>
 		<h1 class="text-3xl font-black break-words sm:text-4xl">{title}</h1>
+		{#if list?.author}
+			<p class="font-medium">{list.author}</p>
+		{/if}
 		{#if folder && folder.includes('/')}
 			<p class="truncate text-sm text-muted">{folder}</p>
 		{/if}
@@ -94,6 +106,8 @@
 					<button class="rounded-full bg-raised px-4 py-1.5 text-sm hover:bg-line" onclick={() => (shown += pageSize)}>Load more</button>
 				</div>
 			{/if}
+		{:else if playlist !== undefined}
+			<p class="px-2 text-muted">Not all of this playlist's songs are on this phone now.</p>
 		{:else if !inside.length}
 			<p class="px-2 text-muted">No songs here.</p>
 		{/if}

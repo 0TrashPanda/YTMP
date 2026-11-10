@@ -8,6 +8,7 @@
 	import Choice from './Choice.svelte';
 	import LocalSongsSection from './LocalSongsSection.svelte';
 	import TakeoutSection from './TakeoutSection.svelte';
+	import PlaylistsOfflineSection from './PlaylistsOfflineSection.svelte';
 
 	let {
 		load,
@@ -89,6 +90,7 @@
 			takeoutDays: null,
 			takeoutMinPlays: null,
 			takeoutRules: null,
+			mostPlayedPlaylists: null,
 			...changes
 		});
 	}
@@ -209,6 +211,9 @@
 				{#if (status.keepLiked || status.fromHistory) && !status.fromTakeout && fromYoutubeNote(status)}
 					<p class="-mt-1 text-xs text-muted">{fromYoutubeNote(status)}</p>
 				{/if}
+			{/if}
+			{#if status.mostPlayedPlaylists != null}
+				<PlaylistsOfflineSection {status} {busy} {patch} {attempt} {onToast} />
 			{/if}
 			{#if status.localSongs != null}
 				<LocalSongsSection {status} {busy} {patch} {attempt} {onToast} />

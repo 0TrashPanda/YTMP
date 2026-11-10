@@ -5,6 +5,8 @@ import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.DownloadItems
 import dev.trashpanda.ytmp.protocol.DownloadRequest
 import dev.trashpanda.ytmp.protocol.LocalLinkRequest
+import dev.trashpanda.ytmp.protocol.KeepPlaylistRequest
+import dev.trashpanda.ytmp.protocol.OfflinePlaylists
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
 import dev.trashpanda.ytmp.protocol.UnmatchedSongs
 import dev.trashpanda.ytmp.protocol.SongCacheStatus
@@ -35,7 +37,8 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
         val status = cache?.status() ?: SongCacheStatus(songs = 0, bytes = 0, maxBytes = 0)
         return if (settings == null) status else status.copy(places = settings.places(), place = settings.place(), settable = true, localSongs = settings.localSongs(), checking = settings.checking(), checkingOf = settings.checkingOf(), localParallel = settings.localParallel(),
             fetchWifiOnly = settings.fetchWifiOnly(), downloadsWifiOnly = settings.downloadsWifiOnly(),
-            localWifiOnly = settings.localWifiOnly(), localCharging = settings.localCharging(), localWaiting = settings.localWaiting()).let { s ->
+            localWifiOnly = settings.localWifiOnly(), localCharging = settings.localCharging(), localWaiting = settings.localWaiting(),
+            mostPlayedPlaylists = settings.playlists()?.mostPlayed).let { s ->
                 val youtube = settings.fromYoutube() ?: return@let s
                 s.copy(keepLiked = youtube.liked, likedOf = youtube.likedOf, likedCached = youtube.likedCached, fromHistory = youtube.fromHistory, fromYoutubeWaiting = youtube.waiting,
                     fromYoutubeBusy = youtube.busy, fromYoutubeError = youtube.error, fromYoutubeNextAt = youtube.nextAt, takeoutGone = if (youtube.fromTakeout) youtube.takeoutGone else 0,
@@ -74,6 +77,22 @@ fun Route.songCacheRoutes(path: String, cache: SongCache?, settings: CacheSettin
             val wanted = call.receive<LocalLinkRequest>()
             phone.link(wanted.key, wanted.link)?.let { throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, it) }
             call.respond(call.status())
+        }
+    }
+    route("/playlists") {
+        suspend fun ApplicationCall.playlists(): KeptPlaylists {
+            status()
+            return settings?.playlists() ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Only on a phone")
+        }
+        fun KeptPlaylists.answer() = OfflinePlaylists(status(), waiting, busy, error, full)
+        get { call.respond(call.playlists().answer()) }
+        // Keep a playlist offline (its songs come into the cache and stay), or stop.
+        post("/keep") {
+            val playlists = call.playlists()
+            val wanted = call.receive<KeepPlaylistRequest>()
+            if (wanted.keep && (cache?.maxBytes ?: 0) <= 0) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Turn the song cache on first (Settings → Song cache and downloads)")
+            playlists.keep(wanted.id, wanted.keep, wanted.title, wanted.thumbnails)
+            call.respond(playlists.answer())
         }
     }
     route("/takeout") {

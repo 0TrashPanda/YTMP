@@ -13,6 +13,8 @@
 	import type { PlaylistPage, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import PinButton from './PinButton.svelte';
+	import KeepOfflineButton from './KeepOfflineButton.svelte';
+	import { onThisPhone } from '../offlinePlaylists.svelte';
 	import PlayAllButtons from './PlayAllButtons.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import SongList from './SongList.svelte';
@@ -39,6 +41,8 @@
 	} = $props();
 
 	let playlist = $state<PlaylistPage | null>(null);
+	/** On the phone's own pages: Keep offline. */
+	const phone = onThisPhone();
 	/** It came through your sign-in (its next parts do too). */
 	let throughYou = false;
 	let error = $state<string | null>(null);
@@ -244,6 +248,9 @@
 			{/if}
 			<PlayAllButtons bind:this={buttons} {room} songs={playlist?.songs ?? null} name={playlist?.title ?? title} toAutoplay whole={playlist?.more ? whole : undefined} total={playlist?.songCount ?? null} {onToast}>
 				<PinButton pin={playlist ? { kind: 'playlist', id, title: playlist.title, art: thumbUrl(playlist.thumbnails, 120), personal: personal || undefined } : null} {onToast} />
+				{#if phone}
+					<KeepOfflineButton {id} title={playlist?.title ?? null} thumbnails={playlist?.thumbnails ?? []} {onToast} />
+				{/if}
 			</PlayAllButtons>
 		</div>
 	</header>

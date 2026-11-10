@@ -97,6 +97,15 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
 
     override suspend fun playlist(id: String, more: String?): PlaylistPage =
         playlists.get(if (more == null) id else "$id\n$more") { requireSignedIn(); ytm().personalPlaylist(id, more) }
+            .also { if (more == null) onPlaylistRead(it) }
+
+    /** A playlist was changed here (songs added, removed or moved; Liked music: a like or dislike). */
+    @Volatile
+    var onPlaylistChanged: (playlistId: String) -> Unit = {}
+
+    /** A playlist's first part was read (a page shows it): all of it, when it has no `more`. */
+    @Volatile
+    var onPlaylistRead: (PlaylistPage) -> Unit = {}
 
     override suspend fun podcast(id: String): PodcastPage {
         requireSignedIn()
@@ -129,18 +138,21 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         ytm().setRating(songId, rating)
         synchronized(ratingsChanged) { ratingsChanged[songId] = rating }
         playlists.clear() // Liked music changed
+        onPlaylistChanged(LIKED_MUSIC)
     }
 
     override suspend fun removeFromPlaylist(playlistId: String, items: List<PlaylistItemRef>) {
         requireSignedIn()
         ytm().removeFromPlaylist(playlistId, items)
         playlists.clear()
+        onPlaylistChanged(playlistId)
     }
 
     override suspend fun movePlaylistItem(playlistId: String, itemId: String, beforeItemId: String?) {
         requireSignedIn()
         ytm().movePlaylistItem(playlistId, itemId, beforeItemId)
         playlists.clear()
+        onPlaylistChanged(playlistId)
     }
 
     override suspend fun renamePlaylist(playlistId: String, title: String) {
@@ -148,6 +160,7 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         ytm().renamePlaylist(playlistId, title)
         playlists.clear()
         libraries.clear()
+        onPlaylistChanged(playlistId)
     }
 
     override suspend fun deletePlaylist(playlistId: String) {
@@ -155,6 +168,7 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         ytm().deletePlaylist(playlistId)
         playlists.clear()
         libraries.clear()
+        onPlaylistChanged(playlistId)
     }
 
     override suspend fun historySetting(): YoutubeHistory =
@@ -183,6 +197,9 @@ class PhoneYoutubeAccount(context: Context, private val ytm: () -> OnDeviceYtm) 
         requireSignedIn()
         ytm().addToPlaylist(playlistId, songIds)
         playlists.clear()
+        // Its number of songs in the library changes too.
+        libraries.clear()
+        onPlaylistChanged(playlistId)
     }
 
     override suspend fun createPlaylist(title: String, songIds: List<String>): String {

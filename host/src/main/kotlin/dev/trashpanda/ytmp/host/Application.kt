@@ -196,6 +196,9 @@ interface CacheSettings {
     /** Songs from the owner's YouTube Music (recent likes, songs from its history played more than once); null: not a setting here. */
     fun fromYoutube(): CachePrefill? = null
 
+    /** Playlists kept offline and the most played ones; null: not a setting here. */
+    fun playlists(): KeptPlaylists? = null
+
     /** The phone's downloads that wait, go or failed. */
     fun downloadQueue(): List<DownloadItem> = emptyList()
 

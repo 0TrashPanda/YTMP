@@ -334,7 +334,14 @@ data class LocalLibraryPage(
     val songs: List<Song>,
     val genres: List<LocalGroup> = emptyList(),
     val folders: List<LocalGroup> = emptyList(),
+    /** YouTube Music playlists whose every song is in this library ("Cached on this phone"), in playlist order. */
+    val playlists: List<LocalPlaylist> = emptyList(),
 )
+
+/** A playlist of a [LocalLibraryPage]: its [songs] as places in the page's songs, in playlist order. */
+@Serializable
+@SerialName("LocalPlaylist")
+data class LocalPlaylist(val id: String, val title: String, val author: String? = null, val thumbnails: List<Thumbnail> = emptyList(), val songs: List<Int>)
 
 /** A genre or folder of a [LocalLibraryPage]: its [songs] as places in the page's songs, in album order. */
 @Serializable
@@ -407,6 +414,8 @@ data class SongCacheStatus(
     val settable: Boolean = false,
     /** Being moved to another place right now. */
     val moving: Boolean = false,
+    /** How many of your most played playlists are kept offline (0: off); null where that isn't a setting (a server). */
+    val mostPlayedPlaylists: Int? = null,
 )
 
 @Serializable
@@ -431,7 +440,49 @@ data class SongCacheSettings(
     val takeoutMinPlays: Int? = null,
     /** All the rules (wins over [takeoutDays] and [takeoutMinPlays]). */
     val takeoutRules: List<TakeoutRule>? = null,
+    /** How many of your most played playlists are kept offline (0: off). */
+    val mostPlayedPlaylists: Int? = null,
 )
+
+/**
+ * A playlist on the phone (`GET /api/cache/playlists`): one you keep offline ([kept]), one of your
+ * most played that's kept by itself ([mostPlayed]), or one whose songs are all here anyway.
+ * [here] of its [songs] are on the phone (cached or downloaded); [notKept] can't go in the
+ * cache (podcast episodes, songs over an hour) and aren't downloaded. [tooLong]: too many
+ * songs to keep (only its first part is known).
+ */
+@Serializable
+@SerialName("OfflinePlaylist")
+data class OfflinePlaylist(
+    val id: String,
+    val title: String,
+    val thumbnails: List<Thumbnail> = emptyList(),
+    val kept: Boolean = false,
+    val mostPlayed: Boolean = false,
+    val songs: Int = 0,
+    val here: Int = 0,
+    val notKept: Int = 0,
+    val tooLong: Boolean = false,
+    /** Its songs are known (it was read); false: not yet. */
+    val read: Boolean = true,
+)
+
+@Serializable
+@SerialName("OfflinePlaylists")
+data class OfflinePlaylists(
+    val playlists: List<OfflinePlaylist>,
+    /** Why songs aren't coming in now ("Wi-Fi", "full", "error"), or null. */
+    val waiting: String? = null,
+    val busy: Boolean = false,
+    val error: String? = null,
+    /** The playlist there isn't room for, with [waiting] "full". */
+    val full: String? = null,
+)
+
+/** `POST /api/cache/playlists/keep`: keep playlist [id] offline (or stop, [keep] false). */
+@Serializable
+@SerialName("KeepPlaylistRequest")
+data class KeepPlaylistRequest(val id: String, val keep: Boolean, val title: String = "", val thumbnails: List<Thumbnail> = emptyList())
 
 /** Takeout songs played at least [minPlays] times in the last [days] days (0: all of it). */
 @Serializable

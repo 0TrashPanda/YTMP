@@ -780,13 +780,14 @@
 								{#key view.jobId}
 									<ImportView jobId={view.jobId} onToast={toast} onJob={(jobId) => show({ kind: 'import', jobId })} onPlaylist={(p) => openPlaylist(p, true)} onMenu={openMenu} />
 								{/key}
-							{:else if view.kind === 'genre' || view.kind === 'folder'}
+							{:else if view.kind === 'genre' || view.kind === 'folder' || view.kind === 'localPlaylist'}
 								{@const library = view.library}
 								<LocalGroupView
 									{room}
 									{library}
 									genre={view.kind === 'genre' ? view.name : undefined}
 									folder={view.kind === 'folder' ? view.path : undefined}
+									playlist={view.kind === 'localPlaylist' ? view.id : undefined}
 									onFolder={(path) => show({ kind: 'folder', library, path })}
 									onToast={toast}
 									onMenu={openMenu}
@@ -803,6 +804,7 @@
 								onPodcast={openPodcast}
 								onGenre={(library, name) => show({ kind: 'genre', library, name })}
 								onFolder={(library, path) => show({ kind: 'folder', library, path })}
+								onLocalPlaylist={(library, id) => show({ kind: 'localPlaylist', library, id })}
 							/>
 						{:else if top.kind === 'library'}
 							{#key libraryVersion}

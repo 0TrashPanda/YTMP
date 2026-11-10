@@ -146,6 +146,17 @@ class SongCache(
     @Volatile
     var playingHere: String? = null
 
+    /**
+     * Songs of playlists kept offline ([KeptPlaylists]): when room is needed they go last,
+     * after every other song, and *Clear cache* leaves them.
+     */
+    @Volatile
+    var kept: () -> Set<String> = { emptySet() }
+
+    /** Playlists whose every song is here, for "Cached on this phone" ([KeptPlaylists.complete]). */
+    @Volatile
+    var playlists: suspend () -> List<LibraryPlaylist> = { emptyList() }
+
     init {
         load()
         scope.launch(Dispatchers.IO) { saveLoop() }
@@ -157,6 +168,18 @@ class SongCache(
         maxBytes > 0 && !moving && song.id.startsWith("ytm:") && song.podcast == null && song.durationMs <= MAX_LENGTH_MS
 
     fun has(songId: String): Boolean = synchronized(lock) { songId in entries }
+
+    /** [songId] is on the phone: cached, downloaded or one of its own songs (a phone). */
+    fun here(songId: String): Boolean = has(songId) || downloads?.find(songId) != null
+
+    /** How big [songId]'s file here is (0: not here). */
+    fun sizeOf(songId: String): Long = synchronized(lock) { entries[songId]?.size ?: 0 }
+
+    /** How often [songId] was played in the last [windowMs] (here, and from the imported histories). */
+    fun recentPlays(songId: String, windowMs: Long): Int {
+        val since = clock() - windowMs
+        return synchronized(lock) { plays[songId]?.count { it >= since } ?: 0 }
+    }
 
     /** The IDs of the songs saved here. */
     fun songIds(): List<String> = synchronized(lock) { entries.keys.toList() }
@@ -697,8 +720,12 @@ class SongCache(
     suspend fun trim(limit: Long = maxBytes) = trimming.withLock {
         if (totalBytes <= limit) return@withLock
         val keep = protectedSongs()
+        val playlists = runCatching { kept() }.getOrDefault(emptySet())
         val now = clock()
-        val order = synchronized(lock) { entries.values.filter { it.song.id !in keep }.sortedBy { keepScore(it, now) } }
+        // Songs of playlists kept offline go last.
+        val order = synchronized(lock) {
+            entries.values.filter { it.song.id !in keep }.sortedWith(compareBy<Entry>({ it.song.id in playlists }, { keepScore(it, now) }))
+        }
         var size = totalBytes
         val target = limit / 10 * 9
         var removed = 0
@@ -728,12 +755,12 @@ class SongCache(
         saveSoon()
     }
 
-    /** Clear cache: everything that isn't playing. */
-    suspend fun clear() {
-        val keep = protectedSongs()
+    /** Clear cache: everything that isn't playing, or in a playlist kept offline ([everything]: those too; the cache is turned off). */
+    suspend fun clear(everything: Boolean = false) {
+        val keep = protectedSongs() + if (everything) emptySet() else runCatching { kept() }.getOrDefault(emptySet())
         val all = synchronized(lock) { entries.keys.toList() }
         all.filter { it !in keep }.forEach(::remove)
-        log.info("Song cache cleared ({} kept: playing)", all.count { it in keep })
+        log.info("Song cache cleared ({} kept: playing, or in a playlist kept offline)", all.count { it in keep })
     }
 
     /** A new size: smaller removes songs right away; 0 turns the cache off and empties it. */
@@ -742,7 +769,7 @@ class SongCache(
         if (maxBytes == 0L) {
             fills.values.forEach { it.cancel() }
             copies.values.toList().forEach { it.drop() }
-            clear()
+            clear(everything = true)
         } else {
             trim()
         }
@@ -858,6 +885,8 @@ class SongCache(
         override suspend fun respond(call: ApplicationCall, key: String, range: String?) = audio(null).respond(call, key, range)
 
         override suspend fun respondArt(call: ApplicationCall, key: String, size: Int) = this@SongCache.respondArt(call, key, size)
+
+        override suspend fun playlists() = runCatching { this@SongCache.playlists() }.getOrDefault(emptyList())
     }
 
     // --- the index ---

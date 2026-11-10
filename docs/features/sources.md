@@ -89,7 +89,8 @@ computer: the left side). It shows when there's local music:
   with the rest of the phone's music. *Use Android's music scan* can be switched off to use only
   the picked folders. A song that is in both shows once.
 
-The tab is like YouTube Music's library: **Albums** (the default, with covers), **Artists**,
+The tab is like YouTube Music's library: **Playlists** (first, in *Cached on this phone*, when
+playlists are all on the phone: [playlists offline](#playlists-offline)), **Albums** (the default, with covers), **Artists**,
 **Songs** (300 at a time, with *Load more*; see [songs per page](ui.md)), **Genres** and
 **Folders** (when the top holds only one folder, like the phone's *Music*, the list starts inside it), a search box that only searches this music (folders at any depth too), and
 **Shuffle all** (plays everything mixed, the queue stays as it is). Albums, artists, genres and
@@ -184,6 +185,8 @@ without internet on the phone. It works by itself: there is nothing to pick.
     room is filled, nothing is pushed out for them; the setting says when the cache is full. They
     come in one at a time with a pause between (so YouTube doesn't block the network), and follow
     *Keep songs in the background* (Wi-Fi only by default).
+- **Playlists offline** ✅ (on the phone, like YouTube Music's downloads): see
+  [playlists offline](#playlists-offline) below.
 - **Music only**: podcast episodes are never cached (they're big and mostly heard once), and
   neither are "songs" over an hour (mixes, whole concerts).
 - A cached song **stays the same YouTube Music song** (likes, radio, lyrics and history work
@@ -222,6 +225,37 @@ without internet on the phone. It works by itself: there is nothing to pick.
   network), and the answer is kept. *Lookups at once* (1, 2, 4 or 8; 1 by default) makes it faster, with more risk of YouTube's bot check. The setting shows how far it is ("120 of 800 phone songs looked up · 95 found on YouTube Music"). They don't count toward the cache's size and are never removed.
 - Only songs from online sources (YouTube Music, later YouTube) are cached. Local music and
   media servers are already files.
+
+### Playlists offline
+
+> Built (phone). Implementation: [song-cache](../implementation/song-cache.md#playlists-offline).
+> Tried on the emulator with a public playlist (downloading, Local, airplane mode); with a
+> signed-in account (your library, most played) only in tests.
+
+- **Keep offline** on a playlist's page (the app, on the phone's own pages; any playlist, yours
+  or someone else's): its songs come into the song cache one by one and stay. The button shows how
+  far it is ("Offline · 4/7"), then *Offline* with a check. Songs added to the playlist later
+  come in too: at once when you add them in the app, otherwise within a day. Tap it again to stop:
+  the songs stay cached like other songs until room is needed.
+- **Keep your most played playlists** (*Settings → Song cache and downloads*; Off, 1, 3, 5, 10 or a
+  number up to 20; off by default): the playlists in your YouTube Music library whose songs you
+  played most in the last 30 days (here, and from the history and Takeout settings above) are kept
+  the same way. Only ones that fit whole are picked; Liked music isn't one of them (*Keep your
+  recent likes* is for that). A playlist that drops off the list keeps its songs as ordinary
+  cached songs; downloads are never touched.
+- **Room**: songs of kept playlists go last when the cache needs room, and *Clear cache* leaves
+  them. Other cached songs make room for them, but kept playlists never take more than the cache's
+  size: when one doesn't fit, the setting says so ("The cache is full before all of … fits").
+  They follow *Keep songs in the background* (Wi-Fi only by default), one song at a time.
+- **In Local**: every playlist whose songs are **all** on the phone (kept, cached by playing,
+  downloaded, or the phone's own matched songs; however they got there) shows under *Cached on
+  this phone → Playlists*, and plays from the phone, also without internet. One that misses even
+  one song isn't there; the settings list the kept ones with how many songs are here ("7 of 8 songs
+  on this phone"). It knows your library's playlists (signed in) and the kept ones, and reads them
+  again when they change.
+- **Podcasts**: episodes aren't cached, so a playlist with episodes is only complete when you
+  [download](ui.md#song-menu) those episodes; the settings say how many can't be kept.
+- Both settings are found by the settings search.
 
 Where the cache is used:
 

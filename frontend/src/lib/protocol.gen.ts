@@ -1413,6 +1413,14 @@ export interface LocalGroup {
   songs: number[];
 }
 
+export interface LocalPlaylist {
+  id: string;
+  title: string;
+  author: string | null;
+  thumbnails: Thumbnail[];
+  songs: number[];
+}
+
 export interface LocalLibraryPage {
   id: string;
   name: string;
@@ -1422,6 +1430,7 @@ export interface LocalLibraryPage {
   songs: Song[];
   genres: LocalGroup[];
   folders: LocalGroup[];
+  playlists: LocalPlaylist[];
 }
 
 export interface TakeoutSummary {
@@ -1477,6 +1486,7 @@ export interface SongCacheStatus {
   place: string | null;
   settable: boolean;
   moving: boolean;
+  mostPlayedPlaylists: number | null;
 }
 
 export interface SongCacheSettings {
@@ -1494,6 +1504,7 @@ export interface SongCacheSettings {
   takeoutDays: number | null;
   takeoutMinPlays: number | null;
   takeoutRules: TakeoutRule[] | null;
+  mostPlayedPlaylists: number | null;
 }
 
 export interface TakeoutPreviewRequest {
@@ -1675,6 +1686,34 @@ export interface DownloadRequest {
 export interface LocalLinkRequest {
   key: string;
   link: string;
+}
+
+export interface KeepPlaylistRequest {
+  id: string;
+  keep: boolean;
+  title: string;
+  thumbnails: Thumbnail[];
+}
+
+export interface OfflinePlaylist {
+  id: string;
+  title: string;
+  thumbnails: Thumbnail[];
+  kept: boolean;
+  mostPlayed: boolean;
+  songs: number;
+  here: number;
+  notKept: number;
+  tooLong: boolean;
+  read: boolean;
+}
+
+export interface OfflinePlaylists {
+  playlists: OfflinePlaylist[];
+  waiting: string | null;
+  busy: boolean;
+  error: string | null;
+  full: string | null;
 }
 
 export interface YoutubeAccount {

@@ -19,6 +19,8 @@ export type View =
 	| { kind: 'podcast'; id: string; title: string }
 	| { kind: 'genre'; library: string; name: string }
 	| { kind: 'folder'; library: string; path: string }
+	/** A playlist that's all on the phone ("Cached on this phone"): plays from there, also offline. */
+	| { kind: 'localPlaylist'; library: string; id: string }
 	| { kind: 'history' }
 	| { kind: 'import'; jobId?: string };
 

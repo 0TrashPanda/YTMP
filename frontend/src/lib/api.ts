@@ -1,6 +1,8 @@
 import type {
 	DownloadItems,
 	LocalLinkRequest,
+	KeepPlaylistRequest,
+	OfflinePlaylists,
 	SongCacheSettings,
 	SongCacheStatus,
 	TakeoutPreview,
@@ -505,7 +507,9 @@ export function getLocalLibraries(fresh = false): Promise<LocalLibraries> {
 
 /** One local library, whole: its albums, artists and songs. */
 export function getLocalLibrary(id: string): Promise<LocalLibraryPage> {
-	return cached(`local:${id}`, () => request(`/api/local/${encodeURIComponent(id)}`));
+	const load = () => request<LocalLibraryPage>(`/api/local/${encodeURIComponent(id)}`);
+	// "Cached on this phone" changes as songs come in and go (and its playlists with them): always as it is now.
+	return id === 'cache' ? load() : cached(`local:${id}`, load);
 }
 
 export function getLibrary(): Promise<HomePage> {
@@ -703,6 +707,16 @@ export function importTakeout(file: File): Promise<SongCacheStatus> {
 
 export function forgetTakeout(): Promise<SongCacheStatus> {
 	return request('/api/cache/takeout', { method: 'DELETE' });
+}
+
+/** The phone's playlists kept offline, its most played ones and the ones that are all on it (docs/implementation/song-cache.md#playlists-offline). */
+export function getOfflinePlaylists(): Promise<OfflinePlaylists> {
+	return request('/api/cache/playlists');
+}
+
+/** Keeps a playlist offline on the phone (its songs come in and stay), or stops. */
+export function keepPlaylist(keep: KeepPlaylistRequest): Promise<OfflinePlaylists> {
+	return request('/api/cache/playlists/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(keep) });
 }
 
 /** Which Takeout songs [rules] would keep (a song that fits several, once). */

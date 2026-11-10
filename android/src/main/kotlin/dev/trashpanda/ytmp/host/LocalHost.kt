@@ -275,6 +275,23 @@ class LocalHost(private val context: Context) {
         songInfo = { id -> ytm.song(id) },
     )
 
+    /** Playlists kept offline, the most played ones, and the ones that are all on the phone (Settings → Song cache and downloads; Local). */
+    private val keptPlaylists = KeptPlaylists(
+        cache,
+        File(context.filesDir, "offline-playlists.json"),
+        library = {
+            if (youtube.account() == null) null
+            else youtube.library().sections.firstOrNull { it.title == "Playlists" }?.items.orEmpty().filterIsInstance<SearchItem.PlaylistResult>()
+        },
+        // Through the owner's sign-in (their private playlists too), else as anyone.
+        part = { id, more ->
+            if (youtube.account() != null) runCatching { youtube.playlist(id, more) }.getOrElse { e -> if (e is CancellationException) throw e; cached.playlist(id, more) }
+            else cached.playlist(id, more)
+        },
+        hold = { if (dataRules.fetchWifiOnly && !dataRules.onWifi()) "Wi-Fi" else null },
+        scope = scope,
+    )
+
     private fun applyFromYoutube() = prefill.set(
         cacheSettings.getInt(CACHE_LIKED, 0), cacheSettings.getBoolean(CACHE_HISTORY, false),
         cacheSettings.getBoolean(CACHE_TAKEOUT, false), takeoutRules(),
@@ -396,6 +413,8 @@ class LocalHost(private val context: Context) {
 
         override fun fromYoutube() = prefill
 
+        override fun playlists() = keptPlaylists
+
         override suspend fun unmatched() = matcher.unmatched()
 
         override suspend fun recheck() = matcher.recheck()
@@ -423,6 +442,7 @@ class LocalHost(private val context: Context) {
                     listOf(TakeoutRule(settings.takeoutDays ?: CachePrefill.DEFAULT_TAKEOUT_DAYS, settings.takeoutMinPlays ?: CachePrefill.DEFAULT_TAKEOUT_MIN_PLAYS))
                 } else null
                 rules?.let { putString(CACHE_TAKEOUT_RULES, ProtocolJson.encodeToString(CachePrefill.cleanRules(it))) }
+                settings.mostPlayedPlaylists?.let { putInt(CACHE_MOST_PLAYED, it.coerceIn(0, KeptPlaylists.MAX_MOST_PLAYED)) }
             }
             settings.fetchWifiOnly?.let { dataRules.fetchWifiOnly = it }
             settings.downloadsWifiOnly?.let { dataRules.downloadsWifiOnly = it }
@@ -433,6 +453,7 @@ class LocalHost(private val context: Context) {
             cache.setMaxBytes(settings.maxBytes)
             cache.moveTo(cacheDir(place))
             showCacheLibrary()
+            settings.mostPlayedPlaylists?.let { keptPlaylists.set(cacheSettings.getInt(CACHE_MOST_PLAYED, 0)) }
             if (listOf(settings.keepLiked, settings.fromHistory, settings.fromTakeout, settings.takeoutDays, settings.takeoutMinPlays, settings.takeoutRules).any { it != null }) applyFromYoutube()
         }
     }
@@ -480,6 +501,12 @@ class LocalHost(private val context: Context) {
         cache.inUse = { rooms.songsInUse() }
         cache.fetchGate = dataRules::awaitFetch
         downloads.onSaved = cache::downloaded
+        cache.kept = keptPlaylists::keptSongs
+        cache.playlists = { keptPlaylists.complete() }
+        youtube.onPlaylistChanged = keptPlaylists::changed
+        youtube.onPlaylistRead = keptPlaylists::seen
+        keptPlaylists.set(cacheSettings.getInt(CACHE_MOST_PLAYED, 0))
+        keptPlaylists.start()
         downloads.restore()
         showCacheLibrary()
         applyLocalSongs()
@@ -622,6 +649,7 @@ class LocalHost(private val context: Context) {
         private const val CACHE_TAKEOUT_DAYS = "takeoutDays"
         private const val CACHE_TAKEOUT_MIN_PLAYS = "takeoutMinPlays"
         private const val CACHE_TAKEOUT_RULES = "takeoutRules"
+        private const val CACHE_MOST_PLAYED = "mostPlayedPlaylists"
         private const val PLACE_PHONE = "phone"
         private const val PLACE_SD = "sd"
         /** About 250 songs. */
