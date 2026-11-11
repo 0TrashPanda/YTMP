@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import org.slf4j.LoggerFactory
+import java.io.File
 
 /** Where the Python module's log (yt-dlp included) goes: the app's log (Python logging levels). */
 class PythonLog {
@@ -56,13 +57,26 @@ class NotSignedInException(message: String) : SourceException(message)
  * yt-dlp), called directly through Chaquopy instead of over HTTP.
  */
 class OnDeviceYtm(context: Context, language: String = "en", location: String = "BE") : SongSearch, StreamResolver, RadioSource, CatalogSource {
+    companion object {
+        /** The yt-dlp in use once the module started, e.g. "2026.11.5 (downloaded; bundled 2026.10.26)". */
+        @Volatile
+        var ytDlpVersion: String? = null
+            private set
+    }
+
     /** A resolved stream: the URL plus the headers YouTube expects when fetching it, and its exact length. */
     class Stream(val url: String, val headers: Map<String, String>, val durationMs: Long?)
 
     private val python: Python
     private val core: PyObject by lazy {
-        python.getModule("ytmp_ytm.core").callAttr("YtmCore", language, location, null).also { it.callAttr("warm_up") }
+        python.getModule("ytmp_ytm.core").callAttr("YtmCore", language, location, null).also {
+            it.callAttr("warm_up")
+            ytDlpVersion = update.callAttr("describe").toString()
+            // Looks for a newer yt-dlp about once a day, used from the next start.
+            update.callAttr("start")
+        }
     }
+    private val update: PyObject
     private val json: PyObject
 
     /**
@@ -84,6 +98,15 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
     init {
         if (!Python.isStarted()) Python.start(AndroidPlatform(context.applicationContext))
         python = Python.getInstance()
+        // yt-dlp keeps itself up to date in a folder of the app's (ytm-module's update.py):
+        // before anything imports yt-dlp, the newest one that works is put first.
+        update = python.getModule("ytmp_ytm.update")
+        try {
+            update.callAttr("activate", File(context.noBackupFilesDir, "ytm-module").path)
+        } catch (e: PyException) {
+            // The bundled yt-dlp still works.
+            LoggerFactory.getLogger("OnDeviceYtm").warn("yt-dlp updates are off: ${e.message}")
+        }
         json = python.getModule("json")
         python.getModule("ytmp_ytm.core").callAttr("log_to", PythonLog())
         // YouTube pages the module couldn't read go with the logs (Send logs), to make tests from.

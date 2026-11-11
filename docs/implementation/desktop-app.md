@@ -90,11 +90,14 @@ How:
   of the app (`android/…/assets/botguard.html`, shared), and `ytmp_ytm/pot.py` asks the shell
   for it over the loopback. If BotGuard doesn't run in WebKitGTK, Linux uses bgutil's provider
   in script mode with the bundled Deno instead.
-- **yt-dlp updates itself** (the plan the phone has too, see
-  [ytm-module.md](ytm-module.md#plan-embed-python-with-chaquopy-and-update-yt-dlp-at-runtime)):
-  the module checks PyPI once a day, puts a newer yt-dlp in the app's data folder and loads it
-  before the bundled one; when it fails to load or its first lookups fail, it goes back to the
-  bundled one. Built once in the module, used by the desktop app and the phone.
+- **yt-dlp updates itself** (built in the module and used by the phone, see
+  [ytm-module.md](ytm-module.md#yt-dlp-updating-itself-)): the module checks PyPI once a day,
+  puts a newer yt-dlp in the app's data folder and loads it before the bundled one at the next
+  start; when it fails to load or its first lookups fail, it goes back to the bundled one. The
+  desktop app only has to start the module with `YTMP_YTM_UPDATE_DIR` set to a folder in its
+  data folder. A PyInstaller build must keep yt-dlp importable from outside the bundle: leave
+  `yt_dlp` and `yt_dlp_ejs` out of the frozen archive as plain files (or check that a folder
+  in front on `sys.path` still wins).
 
 ## Media keys
 
@@ -142,7 +145,7 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
 2. `desktop/`: the shell, the setup page, the window on the server, the initialization script.
 3. The module in the app: PyInstaller builds, Deno, starting and stopping it, the web app
    using *This app* as its own module.
-4. PO tokens and yt-dlp updating itself.
+4. PO tokens, and `YTMP_YTM_UPDATE_DIR` for yt-dlp updating itself (built in the module).
 5. Search, Home and pages through the own module (frontend), with the server as fallback.
 6. The YouTube Music sign-in in the app.
 7. Media keys (if WebKitGTK/WebView2 don't do it), updater, release workflow, README.

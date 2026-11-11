@@ -28,7 +28,8 @@ object LogFiles {
         val out = File(File(context.cacheDir, "shared").apply { mkdirs() }, "ytmp-logs-$stamp.txt")
         File(context.cacheDir, "shared").listFiles()?.filter { it != out && it.name.startsWith("ytmp-logs-") }?.forEach { it.delete() }
         out.bufferedWriter().use { writer ->
-            writer.appendLine("YTMP ${Updates.installedVersion(context)} on ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+            writer.appendLine("YTMP ${Updates.installedVersion(context)} on ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})" +
+                (OnDeviceYtm.ytDlpVersion?.let { ", yt-dlp $it" } ?: ""))
             writer.appendLine()
             if (files.isEmpty()) writer.appendLine("(no logs yet)")
             for (file in files) {

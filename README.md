@@ -133,6 +133,9 @@ Music, without Premium, and not tied to a single music service.
   own volume slider: turn the laptop down from your phone. On a phone it's the media volume.
   A checkbox switches *Play here* on or off there (a browser after one click on its page).
 - The player shows where the song comes from: YouTube, the server (or host phone), or this phone.
+- The app keeps its YouTube lookups working by itself: when YouTube changes something, it
+  gets the fixed yt-dlp within a day, without an app update (and goes back to its own if the
+  new one doesn't work).
 - A sleep timer (in the playing song's ⋮ menu): after some minutes or at the end of the
   song the sound fades out, then a solo room pauses; in a party room only your device stops.
 - Solo rooms can leave out the party bits you don't need alone (room code, Play on, Karaoke,

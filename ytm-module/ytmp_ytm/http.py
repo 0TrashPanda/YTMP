@@ -18,7 +18,7 @@ from fastapi import Depends, FastAPI, Header, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from . import core
+from . import core, update
 
 API_VERSION = 1
 VERSION = "0.1.0"
@@ -373,6 +373,8 @@ def main() -> None:
         pot_url=os.environ.get("YTMP_YTM_POT_URL") or None,
     )
     ytm.warm_up()
+    if os.environ.get("YTMP_YTM_UPDATE_DIR"):
+        update.start()
     app = create_app(ytm, os.environ.get("YTMP_MODULE_KEY") or None)
     uvicorn.run(
         app,
