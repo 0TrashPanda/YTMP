@@ -171,7 +171,11 @@ try {
 	})()`);
 	await sleep(300);
 	await page.evaluate(`document.querySelector('input[placeholder="Your name"]').form.requestSubmit()`);
-	check(await page.waitFor(`${text('Nothing playing')} && !${text('Connecting')}`), 'room page: joined the room');
+	// Joined: the name form is gone, the room is connected, and this browser has its guest token.
+	check(
+		await page.waitFor(`!document.querySelector('input[placeholder="Your name"]') && !${text('Connecting')} && Object.keys(localStorage).some((k) => k.startsWith('ytmp.guest.'))`),
+		'room page: joined the room'
+	);
 	const guestToken = await page.evaluate(`Object.keys(localStorage).filter((k) => k.startsWith('ytmp.guest.')).map((k) => localStorage.getItem(k))[0] ?? null`);
 	check(!!guestToken, 'room page: has a guest token');
 	check(page.errors.length === 0, `room page: no errors${page.errors.length ? `: ${page.errors.join('; ')}` : ''}`);
