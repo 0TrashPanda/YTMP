@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Where this browser plays songs from (see songSources.ts): the order of the three ways, and
 	// your own YouTube Music module on this computer (see ownModule.svelte.ts).
-	import { checkOwnModule, moduleStatus, testOwnModule } from '../../ownModule.svelte';
+	import { checkOwnModule, desktopApp, moduleStatus, testOwnModule } from '../../ownModule.svelte';
 	import { SOURCE_LABELS } from '../../songSources';
 	import { saved, type SongSource } from '../../storage';
 	import Icon from '../Icon.svelte';
@@ -11,6 +11,15 @@
 
 	const card = 'flex flex-col gap-3 rounded-xl bg-raised/60 p-4';
 	const input = 'rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2';
+
+	/** In the desktop app its own module is used: only a switch, no address or key. */
+	const inDesktop = !!desktopApp()?.moduleRequest;
+	let desktopOn = $state(saved.desktopModuleOn);
+
+	function setDesktopOn(on: boolean) {
+		saved.desktopModuleOn = desktopOn = on;
+		void checkOwnModule();
+	}
 
 	const initial = saved.ownModule;
 	let module = $state(initial);
@@ -70,7 +79,16 @@
 						? { ok: false, text: `Doesn’t answer: ${moduleStatus.text}. Trying again every minute.` }
 						: { ok: true, text: 'Checking…' }
 	);
-	const sourceUnused = (source: SongSource) => source === 'own' && !module?.on;
+	const desktopStatus = $derived(
+		!desktopOn
+			? { ok: true, text: 'Switched off: search, pages and songs come from the server.' }
+			: moduleStatus.state === 'works'
+				? { ok: true, text: `Works: ${moduleStatus.text}` }
+				: moduleStatus.state === 'down'
+					? { ok: false, text: `Doesn’t answer: ${moduleStatus.text}. Trying again every minute.` }
+					: { ok: true, text: 'Starting…' }
+	);
+	const sourceUnused = (source: SongSource) => source === 'own' && !(inDesktop ? desktopOn : module?.on);
 </script>
 
 <section class={card}>
@@ -105,6 +123,21 @@
 	</ol>
 </section>
 
+{#if inDesktop}
+	<section class={card}>
+		<div class="flex items-start gap-3">
+			<div class="flex-1">
+				<h3 class="font-bold">This app’s YouTube Music</h3>
+				<p class="text-xs text-muted">
+					This app looks songs up on your computer, so the music comes straight from YouTube on your own connection. Search, Home and the pages come from it
+					too (from the server when it doesn’t answer).
+				</p>
+			</div>
+			<Switch checked={desktopOn} label="Use this app’s YouTube Music" onchange={setDesktopOn} />
+		</div>
+		<p class="text-sm {desktopStatus.ok ? 'text-muted' : 'text-accent'}">{desktopStatus.text}</p>
+	</section>
+{:else}
 <form class={card} onsubmit={save}>
 	<div class="flex items-start gap-3">
 		<div class="flex-1">
@@ -139,3 +172,4 @@
 		Your browser may ask once whether this page may reach devices on your network.
 	</p>
 </form>
+{/if}

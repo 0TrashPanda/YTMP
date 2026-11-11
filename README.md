@@ -223,7 +223,8 @@ Music, without Premium, and not tied to a single music service.
 
 ## What's next
 
-- A desktop app for Windows and Linux that does its own YouTube Music lookups ([plan](docs/implementation/desktop-app.md))
+- A desktop app for Windows and Linux that does its own YouTube Music lookups: being built
+  ([status](docs/implementation/desktop-app.md)), not released yet
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
 - Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists

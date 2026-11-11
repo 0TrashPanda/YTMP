@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>YTMP</title>
+		<style>
+			:root { color-scheme: dark; }
+			body {
+				margin: 0;
+				min-height: 100vh;
+				display: grid;
+				place-items: center;
+				background: #030303;
+				color: #fff;
+				font-family: Roboto, system-ui, sans-serif;
+			}
+			main { width: min(100% - 32px, 380px); display: flex; flex-direction: column; gap: 16px; }
+			h1 { margin: 0; text-align: center; font-size: 44px; font-weight: 900; letter-spacing: -1px; }
+			h1 span { color: #ff0033; }
+			p { margin: 0; color: #aaa; text-align: center; }
+			input {
+				padding: 14px 16px;
+				border: 0;
+				border-radius: 10px;
+				background: #1f1f1f;
+				color: #fff;
+				font-size: 16px;
+			}
+			button:disabled { opacity: 0.6; }
+			button {
+				padding: 14px;
+				border: 0;
+				border-radius: 999px;
+				background: #fff;
+				color: #000;
+				font-size: 16px;
+				font-weight: 500;
+			}
+			.error { color: #ff5c7a; }
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>YT<span>MP</span></h1>
+			<p>Enter the address of a YTMP server.</p>
+			<form id="form">
+				<div style="display: flex; flex-direction: column; gap: 12px">
+					<input id="url" type="url" inputmode="url" autocapitalize="off" autocomplete="url"
+						placeholder="192.168.1.10:8080 or ytmp.example.com" required />
+					<button>Connect</button>
+				</div>
+			</form>
+			<p id="error" class="error"></p>
+		</main>
+		<script>
+			// The desktop app's setup page (desktop/src-tauri/src/main.rs): opens the saved server
+			// when it answers, else asks for one (or says why the saved one didn't open).
+			const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
+			const input = document.getElementById('url');
+			const error = document.getElementById('error');
+			const button = document.querySelector('button');
+			// type=url would reject addresses without http://, so validate ourselves.
+			input.type = 'text';
+			const busy = (text) => {
+				button.disabled = !!text;
+				button.textContent = text || 'Connect';
+			};
+			busy('Opening…');
+			const change = new URLSearchParams(location.search).has('change');
+			invoke('open_saved', { change }).then((state) => {
+				input.value = state.address;
+				error.textContent = state.error;
+				if (!state.address || state.error || change) busy('');
+			}, (e) => { error.textContent = String(e); busy(''); });
+			document.getElementById('form').addEventListener('submit', (event) => {
+				event.preventDefault();
+				const address = input.value.trim();
+				if (!address) return;
+				error.textContent = '';
+				busy('Connecting…');
+				invoke('connect', { address }).catch((e) => { error.textContent = String(e); busy(''); });
+			});
+		</script>
+	</body>
+</html>

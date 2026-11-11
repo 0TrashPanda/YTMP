@@ -38,6 +38,7 @@
 	import { equalizer } from '../../equalizer.svelte';
 	import { clearSongCache, getHost, getSongCache, setSongCache } from '../../api';
 	import { nativeBridge } from '../../native';
+	import { desktopApp } from '../../ownModule.svelte';
 	import { preferences } from '../../preferences.svelte';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
@@ -117,6 +118,8 @@
 	});
 
 	const inApp = !!nativeBridge;
+	/** The desktop app (desktop/), or null. */
+	const desktop = desktopApp();
 	const here = inApp ? 'phone' : 'device';
 	/** On the phone's own pages (its room list and rooms), which keep the phone's song cache. */
 	const onThisPhone = $derived(inApp && host?.kind === 'phone' && ['127.0.0.1', 'localhost'].includes(location.hostname));
@@ -175,7 +178,7 @@
 				[
 					'App',
 					[
-						['app', 'App', 'phone', !!nativeBridge?.appVersion],
+						['app', 'App', 'phone', !!nativeBridge?.appVersion || !!desktop],
 						['sharing', 'Sharing', 'share', !!nativeBridge?.takeShared],
 						['server', 'Server admin', 'server', !!account?.isAdmin && !!info]
 					]
@@ -868,6 +871,20 @@
 				['sheet', 'Sheet']
 			] as [SharedSongLook, string][]}
 		/>
+	{:else if id === 'app' && desktop}
+		<div class="flex items-center gap-3">
+			<div class="flex-1">
+				<p class="text-sm font-medium">Version</p>
+				<p class="text-xs text-muted">YTMP {desktop.version} for {desktop.platform === 'windows' ? 'Windows' : 'Linux'}. New versions are offered when the app starts.</p>
+			</div>
+		</div>
+		<div class="flex items-center gap-3">
+			<div class="flex-1">
+				<p class="text-sm font-medium">Server</p>
+				<p class="text-xs text-muted">{location.host}</p>
+			</div>
+			<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => desktop?.changeServer?.()}>Change server</button>
+		</div>
 	{:else if id === 'app' && nativeBridge?.appVersion}
 		<div class="flex items-center gap-3">
 			<div class="flex-1">

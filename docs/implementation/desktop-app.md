@@ -1,10 +1,12 @@
-# Desktop App (planned)
+# Desktop App (being built)
 
 Feature description: [features/platforms.md](../features/platforms.md#desktop-app-planned).
 
 A **client** for Windows and Linux: the web app in a native window, with the YouTube Music
 module running on the same computer. The room, accounts and room sync stay on the YTMP
-server; every YouTube request comes from the computer. Nothing here is built yet.
+server; every YouTube request comes from the computer. The app is in `desktop/`: ✅ marks
+what's built; not released yet (no release has had the desktop jobs, and Windows hasn't been
+tried).
 
 ## Shape
 
@@ -22,24 +24,32 @@ server; every YouTube request comes from the computer. Nothing here is built yet
 
 - **No Kotlin host on the computer**: it's a client, so no Java runtime is shipped. That's
   most of the memory and size a full host would cost.
-- **The window loads the web app from the server**, like the Android app
+- ✅ **The window loads the web app from the server**, like the Android app
   ([android-app.md](android-app.md#client-mode-milestone-2-)): the app and the server's UI
-  can't get out of sync. A small bundled setup page asks for the server address the first
-  time (changeable later).
-- **The module is the browser's [own module](playback-sync.md#known-risk-ip-bound-stream-urls)**,
-  set up by the app: the shell starts `ytmp-ytm` on `127.0.0.1` with a free port and a new
-  random key on every start (`YTMP_YTM_PORT`, `YTMP_MODULE_KEY`), and stops it with the app.
-- **The page reaches the module through the shell**, not with `fetch`: WebKitGTK blocks an
+  can't get out of sync. The bundled setup page (`desktop/setup/index.html`, the Android
+  app's look) asks for the address the first time (`http://` added when there's none, like the
+  phone); the app keeps it in `settings.json` in its config folder and opens it at the next
+  start when it answers, else the setup page says why. *Settings → App → Change server* goes
+  back to it. Links that open a new window go to the browser. One app at a time (a second
+  start brings the first window up).
+- ✅ **The module is the browser's [own module](playback-sync.md#known-risk-ip-bound-stream-urls)**,
+  set up by the app (`desktop/src-tauri/src/module.rs`): the shell starts it
+  (`python -m ytmp_ytm.http`) on `127.0.0.1` with a free port and a new random key on every
+  start (`YTMP_YTM_PORT`, `YTMP_MODULE_KEY`), waits for `/health`, starts it again when it
+  stops (1 s, then longer up to 30 s), and stops it with the app (on Linux also when the app
+  is killed: `PR_SET_PDEATHSIG`). Its output goes to `module.log` in the app's log folder.
+- ✅ **The page reaches the module through the shell**, not with `fetch`: WebKitGTK blocks an
   https page from fetching `http://127.0.0.1` (mixed content; "Load failed", the request
   never leaves; seen in the Linux check below), and Chrome's loopback exception doesn't
   exist there. An **initialization script** the shell runs on every page sets
-  `window.YtmpDesktop = { version, moduleRequest(path) }`; `moduleRequest` is a Tauri command
+  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer() }`; `moduleRequest` is a Tauri command
   that forwards the request to the module with its key and answers `{ status, body }`. The
   page never sees the module's port or key. The server's origin gets a Tauri capability for
   the command at runtime (it's the address entered at the first start). Same on Windows, so
   there's one way. `ownModule.svelte.ts` sends every module request through one function that
-  uses `moduleRequest` when it's there, and shows the module in *Settings → Where songs play
-  from* as *This app* (can be switched off, not removed).
+  uses `moduleRequest` when it's there. In the app, `activeModule()` is the app's own module
+  (a browser's saved one doesn't count there), shown in *Settings → Where songs play from* as
+  *This app's YouTube Music*, with a switch (`ytmp.desktopModule`) and its state.
 
 ## Why Tauri
 
@@ -66,7 +76,7 @@ The web app asks the own module for:
 - ✅ Every module request goes through `moduleRequest()` (`ownModule.svelte.ts`): `fetch` with
   the key, or, when the shell offers `window.YtmpDesktop.moduleRequest(path)` (a Promise of
   `{ status, body }`), that instead: WebKitGTK won't let the https page fetch
-  `http://127.0.0.1`, so the shell forwards them over Tauri IPC (the shell's side is planned).
+  `http://127.0.0.1`, so the shell forwards them over Tauri IPC.
 - planned, with the app's own YouTube Music sign-in: the `/me/…` requests (library, likes,
   playlists, history, the account's own Home and search), with the sign-in in `X-Ytm-Cookie`.
   Until then they, and the Home and searches of a sign-in on the server, stay with the server.
@@ -83,9 +93,15 @@ How:
 
 ## The YouTube parts on a computer
 
-- **Python**: a PyInstaller one-folder build of `ytm-module/` per OS (Windows, Linux),
-  shipped in the app's resources. Same code as the server's and the phone's module.
-- **yt-dlp's JavaScript runtime**: a bundled **Deno** binary, with the limits the server
+- ✅ **Python**: `desktop/scripts/bundle_module.py` puts a standalone CPython
+  ([python-build-standalone](https://github.com/astral-sh/python-build-standalone), 3.13) with
+  `ytm-module/` installed into `desktop/src-tauri/resources/`, one per OS; downloads pinned and
+  checked by SHA-256. Without Tk, headers, pip and Linux's duplicate `libpython` (the
+  `python3.13` binary has it built in): 85 MB. Same code as the server's and the phone's
+  module. Not PyInstaller: its frozen archive would win over the updated yt-dlp in front on
+  `sys.path`, and Windows' virus scanners often flag its starter.
+- ✅ **yt-dlp's JavaScript runtime**: a bundled **Deno** binary (92 MB, `YTMP_YTM_JS_RUNTIME=deno`,
+  its folder in front on `PATH`), with the limits the server
   already has (`ytmp_ytm/deno.py`: at most 2 at once, capped heap, stopped after 30 s). It
   takes ~250 MB for a few seconds per lookup; the next song is looked up while one plays, so
   that's mostly once per song.
@@ -97,11 +113,9 @@ How:
 - **yt-dlp updates itself** (built in the module and used by the phone, see
   [ytm-module.md](ytm-module.md#yt-dlp-updating-itself-)): the module checks PyPI once a day,
   puts a newer yt-dlp in the app's data folder and loads it before the bundled one at the next
-  start; when it fails to load or its first lookups fail, it goes back to the bundled one. The
-  desktop app only has to start the module with `YTMP_YTM_UPDATE_DIR` set to a folder in its
-  data folder. A PyInstaller build must keep yt-dlp importable from outside the bundle: leave
-  `yt_dlp` and `yt_dlp_ejs` out of the frozen archive as plain files (or check that a folder
-  in front on `sys.path` still wins).
+  start; when it fails to load or its first lookups fail, it goes back to the bundled one. ✅
+  The app starts the module with `YTMP_YTM_UPDATE_DIR` = `ytm-updates` in its data folder;
+  the bundled Python keeps yt-dlp as plain files, so the updated one in front wins.
 
 ## Media keys
 
@@ -118,28 +132,51 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
 - **Windows**: an NSIS installer (`.exe`), per user, no admin rights. It installs WebView2 when
   it's missing (rare on Windows 10/11). Unsigned at first, so SmartScreen warns once
   (*More info → Run anyway*); a code-signing certificate can come later.
-- **Linux**: an **AppImage** with GStreamer inside (so playback doesn't depend on the
-  distribution's plugins), ~80–120 MB. Some distributions need `libfuse2` to run AppImages.
+- ✅ **Linux**: an **AppImage** with GStreamer and WebKitGTK inside (so playback doesn't depend
+  on the distribution's plugins): 230 MB, most of it Deno (92 MB) and Python (85 MB). Built and
+  run on Arch. Some distributions need `libfuse2` to run AppImages. Gotchas when building it:
+  the AppImage's `AppRun` sets `PYTHONHOME`/`PYTHONPATH` for its own folder, which the
+  bundled Python would follow (the app removes them for the module); Tauri doesn't remove old
+  files from `target/release/resources/`, so after changing the bundle delete that folder (and
+  `target/release/bundle/`); on Arch linuxdeploy's `strip` fails on the system's libraries:
+  `NO_STRIP=true pnpm tauri build --bundles appimage`.
   Built on the oldest Ubuntu GitHub has, so it runs on older distributions too. An AUR
   package that installs the same AppImage can come later.
-- **Updates**: Tauri's updater plugin, from the GitHub release's `latest.json`. Updates are
-  signed with an updater key of their own (separate from the APK's; private key in a GitHub
-  secret, its password stays with the owner). The update dialog shows the release notes, like
-  the Android app's.
-- **Release**: `release.yml` gets a job per OS (`windows-latest`, `ubuntu-22.04`): build the
-  web app's bundled setup page, the module with PyInstaller, fetch Deno, `tauri build`, and
-  attach the installer, the AppImage and `latest.json` to the release next to the APK.
-- **Code**: a new `desktop/` folder (Tauri project); the module and the web app stay where they
-  are.
+- ✅ **Updates**: Tauri's updater plugin. 8 s after starting, the app looks through GitHub's
+  list of releases (like the Android app: 0.x releases are pre-releases, which
+  `/releases/latest` skips) for the newest with a `latest.json`, checks it, and offers the
+  version with that release's notes as they are now (*Update* / *Later* / *Skip this
+  version*). *Update* downloads, installs (Windows: the installer, passive) and restarts.
+  Updates are signed with an updater key of their own (separate from the APK's): the public
+  key in `desktop/updater.pub`, built in through `YTMP_UPDATER_PUBKEY`; the private key and
+  its password in the secrets `TAURI_SIGNING_PRIVATE_KEY` / `…_PASSWORD`. Builds without the
+  key (development) don't look for updates. **To do by the owner**: make the key
+  (`cd desktop && pnpm tauri signer generate -w ~/.tauri/ytmp-updater.key`), commit the public
+  key as `desktop/updater.pub` and add the two secrets.
+- ✅ **Release**: `release.yml`'s `desktop` job (after the APK's, which makes the release),
+  per OS (`ubuntu-22.04`, `windows-latest`): the module (`bundle_module.py`), `tauri build`
+  with the tag's version, and uploads `ytmp-<version>-linux-x86_64.AppImage` and
+  `ytmp-<version>-windows-x64-setup.exe` to the release (artifacts on a run by hand). Then
+  `desktop-updates` writes `latest.json` from both signatures and uploads it.
+- **Code**: `desktop/` (Tauri project: `src-tauri/`, `setup/`, `scripts/`); the module and the
+  web app stay where they are. Development: `python desktop/scripts/bundle_module.py` once
+  (or without it the app uses `ytm-module/.venv` and no Deno), then `cd desktop && pnpm
+  install && pnpm tauri dev`.
 
 ## Memory, roughly
 
+Measured with the AppImage on Linux, on the join page (2026-11-11):
+
 | Part | When | About |
 |---|---|---|
-| Window (web view) | always | 100–150 MB |
-| YTM module (Python) | always | 60–80 MB |
+| Web view: the page (`WebKitWebProcess`) | always | ~300 MB |
+| Web view: network | always | ~100 MB |
+| The app itself | always | ~25 MB |
+| YTM module (Python) | always | ~85 MB |
 | Deno | during a song lookup, a few seconds | ~250 MB |
-| BotGuard window | while lookups happen, closes after 10 min without | ~20 MB |
+| BotGuard window (planned) | while lookups happen, closes after 10 min without | ~20 MB |
+
+The page's share is about what the same page takes in a browser tab.
 
 ## Linux check ✅ (2026-11-11)
 
@@ -162,14 +199,14 @@ pages beyond the join page.
 
 ## Order of work
 
-1. ~~Check the risky parts on Linux first~~ ✅, see above.
-2. `desktop/`: the shell, the setup page, the window on the server, the initialization script.
-3. The module in the app: PyInstaller builds, Deno, starting and stopping it, the web app
-   using *This app* as its own module.
-4. PO tokens, and `YTMP_YTM_UPDATE_DIR` for yt-dlp updating itself (built in the module).
-5. ✅ Search, Home and pages through the own module (frontend), with the server as fallback.
-6. The YouTube Music sign-in in the app.
-7. Media keys (if WebKitGTK/WebView2 don't do it), updater, release workflow, README.
+1. ✅ Check the risky parts on Linux first, see above.
+2. ✅ `desktop/`: the shell, the setup page, the window on the server, the initialization script.
+3. ✅ The module in the app: standalone Python, Deno, starting and stopping it, the web app
+   using *This app* as its own module, `YTMP_YTM_UPDATE_DIR`.
+4. ✅ Search, Home and pages through the own module (frontend), with the server as fallback.
+5. ✅ Updater and release workflow (waiting for the owner's updater key); README.
+6. Next: PO tokens (BotGuard in a hidden window) and the YouTube Music sign-in in the app.
+7. Trying it on Windows, and the first release with it.
 
 ## Open questions
 

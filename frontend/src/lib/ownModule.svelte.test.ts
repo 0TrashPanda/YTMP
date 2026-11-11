@@ -87,4 +87,31 @@ describe('your own module', () => {
 		await vi.advanceTimersByTimeAsync(m.RETRY_MS * 3);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
+
+	it('in the desktop app: its own module through the app, on unless switched off', async () => {
+		const moduleRequest = vi.fn(async (path: string) => ({
+			status: 200,
+			body: JSON.stringify(path === 'info' ? { name: 'ytm', version: '0.2.0' } : { url: 'https://youtube/app', expiresAt: Date.now() + 3_600_000 })
+		}));
+		vi.stubGlobal('window', { YtmpDesktop: { version: '0.1.0', platform: 'linux', moduleRequest } });
+		try {
+			// A browser's own module set up before doesn't count in the app.
+			stored.set('ytmp.ownModule', JSON.stringify({ url: 'http://localhost:8401', key: 'k', on: false }));
+			const m = await load();
+			await m.checkOwnModule();
+			expect(m.moduleStatus.state).toBe('works');
+			expect(await m.ownStreamUrl('ytm:abc')).toBe('https://youtube/app');
+			expect(moduleRequest).toHaveBeenCalledWith('songs/ytm%3Aabc/stream');
+			expect(fetchMock).not.toHaveBeenCalled();
+
+			m.switchOffOwnModule();
+			expect(m.moduleStatus.state).toBe('off');
+			expect(stored.get('ytmp.desktopModule')).toBe('off');
+			expect(m.activeModule()).toBeNull();
+		} finally {
+			vi.unstubAllGlobals();
+			vi.stubGlobal('localStorage', { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => void stored.set(key, value), removeItem: (key: string) => void stored.delete(key) });
+			vi.stubGlobal('fetch', fetchMock);
+		}
+	});
 });

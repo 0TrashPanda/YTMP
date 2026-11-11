@@ -10,7 +10,8 @@ what's planned is marked there.
 - `protocol/` message types (Kotlin is the source of truth) · `core/` rooms, queue, roles ·
   `host/` HTTP/WebSocket API, shared by server and phone · `cast/` Chromecast, DIAL and YouTube Lounge clients ·
   `server/` Linux server, accounts, room sync · `android/` the app (WebView, Media3, Chaquopy,
-  its own host) · `frontend/` Svelte 5 + Tailwind · `ytm-module/` Python · `deploy/` Docker
+  its own host) · `desktop/` Windows/Linux app (Tauri, bundles the Python module) ·
+  `frontend/` Svelte 5 + Tailwind · `ytm-module/` Python · `deploy/` Docker
   Compose, Caddy, Proxmox guide · `tools/smoke-test.py`.
 
 ## Commands
@@ -21,6 +22,8 @@ what's planned is marked there.
 - Chrome 90 (older Chromecasts showing the party screen): `pnpm build` checks the built-ins;
   after web app changes also run `node tools/chrome90-test.mjs` (real Chromium 90, own server).
 - Android: `./gradlew :android:assembleDebug`; release lint: `./gradlew :android:lintRelease`.
+- Desktop app: `python desktop/scripts/bundle_module.py` (the module and Deno, once), then
+  `cd desktop && pnpm install && pnpm tauri dev`; an AppImage: `pnpm tauri build --bundles appimage`.
 - After changing anything in `protocol/`: `./gradlew :protocol:generateTs` (new request types
   must also be added as roots in `protocol/.../tsgen/TsGenerator.kt`).
 - Running the server locally needs Java 21 (`JAVA_HOME=/usr/lib/jvm/java-21-openjdk`):

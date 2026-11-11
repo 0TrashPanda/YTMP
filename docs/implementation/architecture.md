@@ -151,6 +151,13 @@ opens the same results with `library` set on the search page.
 **The YouTube Music module** (`ytm-module/ytmp_ytm/`): `core.py` talks to YouTube Music and
 yt-dlp, `parse.py` turns its answers into YTMP's songs and pages, `http.py` is the HTTP API.
 
+**The desktop app** (`desktop/`, see [desktop app](desktop-app.md)): a Tauri shell in
+`src-tauri/src/` (`main.rs`: the window on the server, the setup page in `setup/`, the
+`window.YtmpDesktop` bridge and its commands, updates; `module.rs`: starting the YouTube
+Music module and forwarding the page's requests to it). Something the web app needs from the
+app is a command there (added to `build.rs`'s list and the server's capability in
+`open_server`) and a function on `YtmpDesktop` (`DesktopApp` in `frontend/src/lib/ownModule.svelte.ts`).
+
 ## Web app as an installable app
 
 `frontend/static/manifest.webmanifest` and the icons (`icon-192.png`, `icon-512.png`,

@@ -1,12 +1,16 @@
-# Builds the Android app and publishes it as a GitHub release.
+# Builds the Android app and the desktop app (Windows, Linux) and publishes them as a GitHub
+# release.
 #
-# - Push a tag like v0.2.0: builds YTMP 0.2.0 and makes a release with the APK.
-# - Run it by hand (Actions → Release → Run workflow): builds a test APK, kept as an
-#   artifact of the run, no release.
+# - Push a tag like v0.2.0: builds YTMP 0.2.0 and makes a release with the APK, the Windows
+#   installer, the Linux AppImage and latest.json (the desktop app's updates).
+# - Run it by hand (Actions → Release → Run workflow): builds test versions, kept as
+#   artifacts of the run, no release.
 #
 # Needs the repository secrets YTMP_KEYSTORE_BASE64 (the release keystore, base64) and
 # YTMP_KEYSTORE_PASSWORD. Every release must be signed with the same key, or phones
-# can't update to it.
+# can't update to it. The desktop app's updates are signed with TAURI_SIGNING_PRIVATE_KEY and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD (`pnpm tauri signer generate`, its public key in
+# desktop/updater.pub); without them it's built without updates.
 name: Release
 
 on:
@@ -97,3 +101,144 @@ jobs:
         with:
           name: ytmp-${{ steps.version.outputs.version }}
           path: ytmp-*.apk
+
+  desktop:
+    # After the APK's job, which makes the release.
+    needs: android
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest Ubuntu GitHub has: the AppImage then runs on older distributions too.
+          - os: ubuntu-22.04
+            bundle: appimage
+            platform: linux-x86_64
+          - os: windows-latest
+            bundle: nsis
+            platform: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: desktop/package.json
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf libfuse2 \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav
+
+      - name: Version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="0.0.0-test.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: YouTube Music module
+        run: python desktop/scripts/bundle_module.py
+
+      - name: App
+        working-directory: desktop
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUNDLE: ${{ matrix.bundle }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          pnpm install --frozen-lockfile
+          updates=false
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && [ -f updater.pub ]; then
+            updates=true
+            export YTMP_UPDATER_PUBKEY="$(cat updater.pub)"
+          else
+            echo "::warning::No updater key: this build won't update itself"
+          fi
+          pnpm tauri build --bundles "$BUNDLE" \
+            --config "{\"version\":\"$VERSION\",\"bundle\":{\"createUpdaterArtifacts\":$updates}}"
+          mkdir -p ../out
+          if [ "$BUNDLE" = appimage ]; then
+            file="ytmp-$VERSION-linux-x86_64.AppImage"
+            cp src-tauri/target/release/bundle/appimage/*.AppImage "../out/$file"
+            sig=(src-tauri/target/release/bundle/appimage/*.AppImage.sig)
+          else
+            file="ytmp-$VERSION-windows-x64-setup.exe"
+            cp src-tauri/target/release/bundle/nsis/*-setup.exe "../out/$file"
+            sig=(src-tauri/target/release/bundle/nsis/*-setup.exe.sig)
+          fi
+          if [ -f "${sig[0]}" ]; then cp "${sig[0]}" "../out/$file.sig"; fi
+
+      - name: Upload to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: find out -type f ! -name '*.sig' -exec gh release upload "$GITHUB_REF_NAME" {} --clobber \;
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: out/
+
+  desktop-updates:
+    # latest.json: where the desktop app finds the new version and its signatures.
+    needs: desktop
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: latest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! ls out/*.sig > /dev/null 2>&1; then
+            echo "::warning::No signed updates in this release: no latest.json"
+            exit 0
+          fi
+          python3 - "$version" "$REPO" "$GITHUB_REF_NAME" <<'PY'
+          import json, pathlib, sys, datetime
+          version, repo, tag = sys.argv[1:]
+          platforms = {}
+          for sig in pathlib.Path("out").glob("*.sig"):
+              name = sig.name[: -len(".sig")]
+              platform = "linux-x86_64" if name.endswith(".AppImage") else "windows-x86_64"
+              platforms[platform] = {
+                  "signature": sig.read_text().strip(),
+                  "url": f"https://github.com/{repo}/releases/download/{tag}/{name}",
+              }
+          pathlib.Path("latest.json").write_text(json.dumps({
+              "version": version,
+              "notes": "",
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": platforms,
+          }, indent=2))
+          PY
+          cat latest.json
+          gh release upload "$GITHUB_REF_NAME" latest.json --clobber --repo "$REPO"

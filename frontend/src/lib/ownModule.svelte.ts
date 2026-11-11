@@ -46,8 +46,15 @@ let retry: ReturnType<typeof setTimeout> | undefined;
 /** Counts checks, so one that answers after the settings changed is ignored. */
 let checks = 0;
 
-/** The module, when it's set up and switched on. */
+/** The desktop app (desktop/, docs/implementation/desktop-app.md), or null in a browser or the Android app. */
+export const desktopApp = (): DesktopApp | null => (typeof window !== 'undefined' ? (window.YtmpDesktop ?? null) : null);
+
+/** In the desktop app: its own module, reached through the app (no address or key). */
+export const DESKTOP_MODULE: OwnModule = { url: 'this app', key: '', on: true };
+
+/** The module, when it's set up and switched on: in the desktop app its own one, unless switched off. */
 export const activeModule = (): OwnModule | null => {
+	if (desktopApp()?.moduleRequest) return saved.desktopModuleOn ? DESKTOP_MODULE : null;
 	const module = saved.ownModule;
 	return module?.on ? module : null;
 };
@@ -63,13 +70,20 @@ export interface ModuleAnswer {
 	body: string;
 }
 
+/** What the desktop app gives the page. */
+export interface DesktopApp {
+	version: string;
+	platform: 'linux' | 'windows';
+	/** A GET to the app's module; the app forwards it, since WebKitGTK won't let an https page fetch http://127.0.0.1. */
+	moduleRequest?: (path: string) => Promise<ModuleAnswer>;
+	/** Back to the app's page that asks for the server's address. */
+	changeServer?: () => Promise<void>;
+}
+
 declare global {
 	interface Window {
-		/**
-		 * The desktop app's shell (planned, docs/implementation/desktop-app.md): it forwards module
-		 * requests itself, since WebKitGTK won't let an https page fetch http://127.0.0.1.
-		 */
-		YtmpDesktop?: { moduleRequest?: (path: string) => Promise<ModuleAnswer> };
+		/** The desktop app's shell (desktop/src-tauri/src/main.rs, `bridge_script`); absent elsewhere. */
+		YtmpDesktop?: DesktopApp;
 	}
 }
 
@@ -96,7 +110,7 @@ async function get<T>(module: OwnModule, path: string, timeoutMs = LOOKUP_TIMEOU
 	try {
 		answer = await moduleRequest(module, path, timeoutMs);
 	} catch {
-		throw new ModuleDown(`can't reach your module at ${module.url}`);
+		throw new ModuleDown(module === DESKTOP_MODULE ? "this app's YouTube Music module doesn't answer" : `can't reach your module at ${module.url}`);
 	}
 	const parse = () => {
 		try {
@@ -167,6 +181,11 @@ export async function checkOwnModule(): Promise<void> {
 
 /** Keeps the address and key, but stops using it (until switched on again in the settings). */
 export function switchOffOwnModule(): void {
+	if (desktopApp()?.moduleRequest) {
+		saved.desktopModuleOn = false;
+		void checkOwnModule();
+		return;
+	}
 	const module = saved.ownModule;
 	if (module) saved.ownModule = { ...module, on: false };
 	void checkOwnModule();

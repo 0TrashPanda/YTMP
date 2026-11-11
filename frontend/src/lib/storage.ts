@@ -178,6 +178,13 @@ export const saved = {
 	set ownModule(value: OwnModule | null) {
 		write('ytmp.ownModule', JSON.stringify(value));
 	},
+	/** In the desktop app: whether its own YouTube Music module is used (on unless switched off). */
+	get desktopModuleOn(): boolean {
+		return read('ytmp.desktopModule') !== 'off';
+	},
+	set desktopModuleOn(on: boolean) {
+		write('ytmp.desktopModule', on ? 'on' : 'off');
+	},
 	/** The order this browser tries the ways to play a song in; each one once. */
 	get songSources(): SongSource[] {
 		try {
