@@ -305,15 +305,16 @@ class YtmCore:
         try:
             a = self._ytm.get_artist(artist_id)
         except Exception as e:
-            # YouTube sends some visitors another page layout (no musicImmersiveHeaderRenderer):
-            # read the page ourselves then, the way ytmusicapi does, with whichever header it has.
+            # YouTube sends some visitors another page layout (no musicImmersiveHeaderRenderer), and
+            # some artists have a section ytmusicapi can't read (a carousel without a title): read
+            # the page ourselves then, the way ytmusicapi does, with whichever header it has.
             try:
                 a = _artist_any_header(self._ytm, artist_id)
             except Exception:
                 a = None
             if not a:
                 raise NotFound(str(e)) from e
-            log.info("Artist %s read without ytmusicapi's header (%s)", artist_id, e)
+            log.info("Artist %s read without ytmusicapi (%s)", artist_id, e)
             keep.save("artist", artist_id, e, note="read with the fallback for another header")
         songs_section = a.get("songs") or {}
         # The top songs on the page (5, like YTM shows them). All their songs are a playlist
@@ -905,6 +906,9 @@ def _artist_any_header(ytm: YTMusic, artist_id: str) -> dict | None:
     results = nav(response, SINGLE_COLUMN_TAB + SECTION_LIST, True) or nav(response, [*TWO_COLUMN_RENDERER, *TAB_CONTENT, *SECTION_LIST], True)
     if not results:
         return None
+    # Sections ytmusicapi can't read are left out: a carousel without a title, like the
+    # "Watch the new music video" one some artists have on top.
+    results = [r for r in results if not (isinstance(r, dict) and "header" not in r.get("musicCarouselShelfRenderer", {"header": 1}))]
     header = _header_of(response)
     artist: dict = {
         "name": "".join(r.get("text", "") for r in (header.get("title") or {}).get("runs") or []),
@@ -912,7 +916,7 @@ def _artist_any_header(ytm: YTMusic, artist_id: str) -> dict | None:
         "description": None,
         "songs": {"browseId": None},
     }
-    shelf = results[0].get("musicShelfRenderer") if isinstance(results[0], dict) else None
+    shelf = next((r["musicShelfRenderer"] for r in results if isinstance(r, dict) and "musicShelfRenderer" in r), None)
     if shelf:
         if "navigationEndpoint" in (nav(shelf, TITLE, True) or {}):
             artist["songs"]["browseId"] = nav(shelf, TITLE + NAVIGATION_BROWSE_ID, True)

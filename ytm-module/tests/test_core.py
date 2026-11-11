@@ -713,6 +713,20 @@ def test_artist_page_with_another_header(monkeypatch):
     assert a["albums"] or a["singles"]
 
 
+def test_artist_with_an_untitled_carousel_on_top(monkeypatch):
+    """S3RL's page opens with a "Watch the new music video" carousel without a title, which ytmusicapi can't read."""
+    import json
+    import pathlib
+
+    page = json.loads((pathlib.Path(__file__).parent / "data" / "artist_untitled_carousel.json").read_text())
+    c = core.YtmCore()
+    monkeypatch.setattr(c._ytm, "_send_request", lambda endpoint, body, *a, **k: page)
+    a = c.artist("UCyzA4Kgk21MLlF7UOGzMkYg")
+    assert a["name"] == "S3RL"
+    assert a["songs"] and a["songsPlaylistId"]
+    assert a["albums"] and a["singles"]
+
+
 def test_unreadable_pages_are_kept(monkeypatch, tmp_path):
     """A page that didn't look as expected is written to a file (the newest few), to make a test from."""
     import json
