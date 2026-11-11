@@ -19,7 +19,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [features/rooms-and-roles.md](features/rooms-and-roles.md) | Host / client / solo, rooms, joining, visibility |
 | [features/joining.md](features/joining.md) | Room codes, finding hosts on the LAN (auto, QR, IP) |
 | [features/sharing.md](features/sharing.md) | Sharing rooms and songs: links, holding phones together (NFC), the song screen |
-| [features/platforms.md](features/platforms.md) | What each device type can do, Android app features |
+| [features/platforms.md](features/platforms.md) | What each device type can do, Android app features, the desktop app (planned) |
 | [features/room-lifecycle.md](features/room-lifecycle.md) | Admin leaving, changing the owner, cloning, migration, transfer, multiple solo rooms |
 | [features/room-sync.md](features/room-sync.md) | Your rooms on all your devices: one home, moving between phone and server |
 | [features/queue.md](features/queue.md) | Queue, autoplay queue, history, fair ordering, shuffle, repeat, vote to skip, limits |
@@ -32,7 +32,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [features/sources.md](features/sources.md) | Where music comes from (YTM, YT, local files, …) |
 | [features/playback-and-outputs.md](features/playback-and-outputs.md) | Where music is played (host outputs, client playback), equalizer, sleep timer |
 | [features/server-admin.md](features/server-admin.md) | Admin page, automatic yt-dlp updates |
-| [features/future-ideas.md](features/future-ideas.md) | Not-now ideas: Snapcast output, mic sync, Discord bot, videos, native Linux app, upvotes, approval mode, chat, YTMP likes, graph database, History and Import out of Library, … |
+| [features/future-ideas.md](features/future-ideas.md) | Not-now ideas: Snapcast output, mic sync, Discord bot, videos, upvotes, approval mode, chat, YTMP likes, graph database, History and Import out of Library, … |
 
 ## Implementation
 
@@ -50,6 +50,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [implementation/song-recognition-research.md](implementation/song-recognition-research.md) | Research: why YTMP can't reuse YouTube Music's own recognizer (keep Shazam) |
 | [implementation/storage.md](implementation/storage.md) | Database (SQLite/PostgreSQL), song graph storage, radio generation |
 | [implementation/android-app.md](implementation/android-app.md) | Android app structure, native audio playback, app updates |
+| [implementation/desktop-app.md](implementation/desktop-app.md) | Desktop app for Windows and Linux (planned): Tauri, the module on the computer, packaging |
 | [implementation/playlist-converter.md](implementation/playlist-converter.md) | Playlist converter: readers, matching, stored jobs, writers |
 | [implementation/downloads.md](implementation/downloads.md) | How downloads are made (tagging, formats) |
 | [implementation/song-cache.md](implementation/song-cache.md) | The song cache on server and phone: storing, serving, removing |

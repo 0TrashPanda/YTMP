@@ -26,10 +26,6 @@ With the [YouTube source](sources.md#youtube-source), a room could also show the
 Guests are banned by cookie, which is easy to get around (clear cookies, other browser).
 A future feature could enforce guest bans more strongly (for example by device or IP).
 
-## Native Linux app
-
-A native desktop app for Linux, next to the browser and Android app.
-
 ## Phone → server migration
 
 Move a phone-hosted room to an online server so it survives the phone leaving

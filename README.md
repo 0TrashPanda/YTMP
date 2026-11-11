@@ -219,6 +219,7 @@ Music, without Premium, and not tied to a single music service.
 
 ## What's next
 
+- A desktop app for Windows and Linux that does its own YouTube Music lookups ([plan](docs/implementation/desktop-app.md))
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
 - Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists
@@ -240,6 +241,7 @@ Music, without Premium, and not tied to a single music service.
 | Linux server (Docker) | ✅ Hosts rooms, serves the web app, accounts, listening history and YouTube Music sign-ins |
 | Android 11+ | ✅ Join rooms with native playback, lock screen controls and a home screen widget; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music; updates itself |
 | Web browser | ✅ Join rooms, or host through a server |
+| Windows, desktop Linux | Through the browser; a desktop app is planned |
 | iOS | Not supported (the web app may work, but background playback won't) |
 
 ## Download
