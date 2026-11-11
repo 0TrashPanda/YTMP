@@ -295,6 +295,19 @@ class Database private constructor(private val url: String, private val user: St
                 "CREATE TABLE graph_groups (account_id VARCHAR(32) NOT NULL, variant VARCHAR(64) NOT NULL, song_id VARCHAR(32) NOT NULL, grp INTEGER NOT NULL, PRIMARY KEY (account_id, variant, song_id))",
                 "CREATE TABLE graph_groups_made (account_id VARCHAR(32) NOT NULL, variant VARCHAR(64) NOT NULL, made_from VARCHAR(64) NOT NULL, made_at BIGINT NOT NULL, PRIMARY KEY (account_id, variant))",
             ),
+            // 14: friends, groups of friends and songs shared with them, see Social
+            listOf(
+                "CREATE TABLE friends (account_id VARCHAR(32) NOT NULL, friend_id VARCHAR(32) NOT NULL, since BIGINT NOT NULL, PRIMARY KEY (account_id, friend_id))",
+                "CREATE TABLE friend_requests (from_id VARCHAR(32) NOT NULL, to_id VARCHAR(32) NOT NULL, at BIGINT NOT NULL, PRIMARY KEY (from_id, to_id))",
+                "CREATE INDEX friend_requests_to ON friend_requests (to_id)",
+                "CREATE TABLE friend_groups (id VARCHAR(32) PRIMARY KEY, name VARCHAR(64) NOT NULL, owner_id VARCHAR(32) NOT NULL, created_at BIGINT NOT NULL)",
+                "CREATE TABLE friend_group_members (group_id VARCHAR(32) NOT NULL, account_id VARCHAR(32) NOT NULL, joined_at BIGINT NOT NULL, PRIMARY KEY (group_id, account_id))",
+                "CREATE INDEX friend_group_members_account ON friend_group_members (account_id)",
+                "CREATE TABLE shares (id VARCHAR(32) PRIMARY KEY, from_id VARCHAR(32) NOT NULL, song TEXT NOT NULL, note VARCHAR(200) NOT NULL, at BIGINT NOT NULL)",
+                "CREATE INDEX shares_from ON shares (from_id)",
+                "CREATE TABLE share_recipients (share_id VARCHAR(32) NOT NULL, account_id VARCHAR(32) NOT NULL, group_id VARCHAR(32) NOT NULL, dismissed BOOLEAN NOT NULL, PRIMARY KEY (share_id, account_id))",
+                "CREATE INDEX share_recipients_account ON share_recipients (account_id)",
+            ),
         )
 
         /** Migration 11 freed a lot of space: compact the file once after it. */

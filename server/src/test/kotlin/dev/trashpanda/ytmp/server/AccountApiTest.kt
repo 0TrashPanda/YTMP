@@ -26,6 +26,14 @@ import dev.trashpanda.ytmp.protocol.AccountSettings
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.HistoryPage
+import dev.trashpanda.ytmp.protocol.FriendGroup
+import dev.trashpanda.ytmp.protocol.FriendRequest
+import dev.trashpanda.ytmp.protocol.FriendsOverview
+import dev.trashpanda.ytmp.protocol.GroupRequest
+import dev.trashpanda.ytmp.protocol.Person
+import dev.trashpanda.ytmp.protocol.ReceivedShares
+import dev.trashpanda.ytmp.protocol.ShareRequest
+import dev.trashpanda.ytmp.protocol.ShareResult
 import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import dev.trashpanda.ytmp.protocol.EpisodeProgressList
 import dev.trashpanda.ytmp.protocol.EpisodeProgressReport
@@ -88,7 +96,7 @@ class AccountApiTest {
         val db = Database.open(DatabaseConfig(path = Files.createTempDirectory("ytmp").resolve("ytmp.db").toString()))
         val accounts = Accounts(db)
         val key = accounts.signingKey()
-        val service = AccountService(accounts, "test.example", key, signup, History(db), trackingDefault = true, graph = SongGraph(db), isOwnOrigin = { it == origin }, episodes = Episodes(db))
+        val service = AccountService(accounts, "test.example", key, signup, History(db), trackingDefault = true, graph = SongGraph(db), isOwnOrigin = { it == origin }, episodes = Episodes(db), social = Social(db))
         val auth = TrustedAuthServers(isOwnOrigin = { it == origin }, ownTemplates = service::roleTemplate, ownPlays = service::recordPlay).apply { trust(AuthServerRef(null, "test.example"), key.public) }
         application {
             val scope = CoroutineScope(SupervisorJob())
@@ -350,6 +358,89 @@ class AccountApiTest {
         assertEquals(HttpStatusCode.Unauthorized, client.get("/api/account/preferences") { bearerAuth(friend) }.status)
         assertEquals(HttpStatusCode.BadRequest, put(anna, "[1]").status)
         assertEquals(HttpStatusCode.BadRequest, put(anna, """{"big":"${"x".repeat(70_000)}"}""").status)
+    }
+
+    @Test
+    fun `friends share songs with each other and with groups, and they show until put away`() = testApplication {
+        val service = setup(SignupMode.OPEN)
+        val client = jsonClient()
+        fun signup(name: String) = kotlinx.coroutines.runBlocking { client.postJson("/api/account/signup", SignupRequest(name, "password123", name.replaceFirstChar { it.uppercase() })).body<SessionResponse>().sessionToken }
+        val anna = signup("anna")
+        val bob = signup("bob")
+        val carl = signup("carl")
+        val dana = signup("dana")
+        suspend fun befriend(token: String, username: String) = client.postJson("/api/account/friends", FriendRequest(username), token)
+        suspend fun overview(token: String) = client.get("/api/account/friends") { bearerAuth(token) }.body<FriendsOverview>()
+        suspend fun shares(token: String) = client.get("/api/account/shares") { bearerAuth(token) }.body<ReceivedShares>().shares
+
+        // Friends both ways: one asks, the other says yes.
+        assertEquals(listOf(Person("bob", "Bob")), befriend(anna, "bob").body<FriendsOverview>().outgoing)
+        assertEquals(listOf(Person("anna", "Anna")), overview(bob).incoming)
+        assertEquals(listOf(Person("anna", "Anna")), befriend(bob, "anna").body<FriendsOverview>().friends)
+        assertEquals(listOf(Person("bob", "Bob")), overview(anna).friends)
+        befriend(anna, "carl"); befriend(carl, "anna@test.example")
+        assertEquals(HttpStatusCode.NotFound, befriend(anna, "nobody").status)
+        assertEquals(HttpStatusCode.BadRequest, befriend(anna, "anna").status)
+
+        // A group of Anna's friends; Dana isn't one.
+        assertEquals(HttpStatusCode.BadRequest, client.postJson("/api/account/groups", GroupRequest("Hardcore", listOf("bob", "dana")), anna).status)
+        val group = client.postJson("/api/account/groups", GroupRequest(" Hardcore ", listOf("bob", "carl")), anna).body<FriendGroup>()
+        assertEquals("Hardcore", group.name)
+        assertEquals(listOf("anna", "bob", "carl"), group.members.map { it.username })
+        assertEquals(listOf("Hardcore"), overview(carl).groups.map { it.name })
+
+        // Bob shares with the group: Anna and Carl get it, once each, not Bob himself.
+        val song = Song("ytm:hc1", "Hardcore Song", listOf(ArtistRef(null, "Angerfist")), null, 200_000, emptyList())
+        val shared = client.postJson("/api/account/shares", ShareRequest(song, groups = listOf(group.id), note = "  this one! "), bob).body<ShareResult>()
+        assertEquals(2, shared.recipients)
+        val got = shares(carl).single()
+        assertEquals(song, got.song)
+        assertEquals("Hardcore", got.group)
+        assertEquals(Person("bob", "Bob"), got.from)
+        assertEquals("this one!", got.note)
+        assertTrue(shares(bob).isEmpty())
+        // Not to someone who isn't your friend, nor to a group you're not in.
+        assertEquals(HttpStatusCode.BadRequest, client.postJson("/api/account/shares", ShareRequest(song, friends = listOf("carl")), bob).status)
+        assertEquals(HttpStatusCode.NotFound, client.postJson("/api/account/shares", ShareRequest(song, groups = listOf(group.id)), dana).status)
+        assertEquals(HttpStatusCode.BadRequest, client.postJson("/api/account/shares", ShareRequest(song), bob).status)
+
+        // Directly and through the group: Anna gets it once, from Carl himself.
+        val direct = client.postJson("/api/account/shares", ShareRequest(song.copy(id = "ytm:hc2"), friends = listOf("anna"), groups = listOf(group.id)), carl).body<ShareResult>()
+        assertEquals(2, direct.recipients)
+        assertEquals(listOf("ytm:hc2" to null, "ytm:hc1" to "Hardcore"), shares(anna).map { it.song.id to it.group })
+
+        // Put away: gone for Anna only. Taken back by Carl: gone for everyone.
+        assertEquals(HttpStatusCode.NoContent, client.delete("/api/account/shares/${shared.id}") { bearerAuth(anna) }.status)
+        assertEquals(listOf("ytm:hc2"), shares(anna).map { it.song.id })
+        assertEquals(listOf("ytm:hc1"), shares(carl).map { it.song.id })
+        assertEquals(listOf("ytm:hc2"), shares(bob).map { it.song.id })
+        client.delete("/api/account/shares/${direct.id}") { bearerAuth(carl) }
+        assertTrue(shares(anna).isEmpty())
+        assertTrue(shares(bob).isEmpty())
+        assertEquals(HttpStatusCode.NotFound, client.delete("/api/account/shares/${shared.id}") { bearerAuth(dana) }.status)
+
+        // Pages on other hosts reach it with the history token, not with a host token (every host you join has one).
+        val scoped = client.post("/api/account/history-token") { bearerAuth(anna) }.body<HostTokenResponse>().token
+        val elsewhere = client.postJson("/api/account/host-token", HostTokenRequest("http://192.168.1.50:8765"), anna).body<HostTokenResponse>().token
+        assertEquals(HttpStatusCode.OK, client.get("/api/account/shares") { bearerAuth(scoped) }.status)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/account/friends") { bearerAuth(elsewhere) }.status)
+
+        // Only the owner changes the group; others leave it.
+        assertEquals(HttpStatusCode.BadRequest, client.put("/api/account/groups/${group.id}") { bearerAuth(bob); contentType(ContentType.Application.Json); setBody(GroupRequest("Mine", emptyList())) }.status)
+        val renamed = client.put("/api/account/groups/${group.id}") { bearerAuth(anna); contentType(ContentType.Application.Json); setBody(GroupRequest("Gabber", listOf("bob"))) }.body<FriendGroup>()
+        assertEquals("Gabber" to listOf("anna", "bob"), renamed.name to renamed.members.map { it.username })
+        assertEquals(HttpStatusCode.NoContent, client.delete("/api/account/groups/${group.id}") { bearerAuth(bob) }.status)
+        assertEquals(listOf("anna"), overview(anna).groups.single().members.map { it.username })
+
+        // Unfriending, and deleting an account, take it all away.
+        client.delete("/api/account/friends/carl") { bearerAuth(anna) }
+        assertTrue(overview(carl).friends.isEmpty())
+        client.postJson("/api/account/shares", ShareRequest(song, friends = listOf("anna")), bob)
+        client.postJson("/api/account/groups", GroupRequest("Bob's", listOf("anna")), bob)
+        service.delete(service.accounts.find("bob")!!)
+        assertEquals(FriendsOverview(Person("anna", "Anna"), emptyList(), emptyList(), emptyList(), emptyList()), overview(anna).copy(groups = emptyList()))
+        assertEquals(listOf("Gabber"), overview(anna).groups.map { it.name })
+        assertTrue(shares(anna).isEmpty())
     }
 
     @Test

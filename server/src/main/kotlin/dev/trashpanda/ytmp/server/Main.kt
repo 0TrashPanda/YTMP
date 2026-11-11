@@ -143,7 +143,7 @@ fun main(args: Array<String>) {
         val isOwnOrigin = { origin: String -> origin == ownUrl || origin in localOrigins(config.server.port) }
         val service = AccountService(
             accounts, issuer, key, live.signup, history, live.trackingDefault,
-            graph = graph, isOwnOrigin = isOwnOrigin, episodes = Episodes(db),
+            graph = graph, isOwnOrigin = isOwnOrigin, episodes = Episodes(db), social = Social(db),
         )
         val auth = TrustedAuthServers(
             isOwnOrigin = isOwnOrigin,

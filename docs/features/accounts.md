@@ -39,6 +39,10 @@ and your room defaults are saved to your account.
   and others; a YTMP playlist is then a choice next to a YouTube Music playlist.
 - With a linked YouTube account you can also **create** YTM playlists.
 
+### Friends ✅
+Add friends on your server, make groups of them, and share songs that show on their Home
+(see [friends](friends.md)).
+
 ### Linked media servers
 Link a file server, Plex server or other music server to search and add songs from it.
 A server can have several addresses (local first, internet as fallback), and can be

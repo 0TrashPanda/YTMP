@@ -7,7 +7,12 @@ describe('parseLayout', () => {
 		expect(parseLayout('not a layout')).toEqual(defaultLayout());
 	});
 
-	it('keeps known actions once, and adds new ones at the end', () => {
+	it('adds an action that is new since after the one it follows by default', () => {
+		const layout = parseLayout({ items: ['playNext', 'openYtm', 'divider', 'remove'] });
+		expect(layout.items.indexOf('share')).toBe(layout.items.indexOf('openYtm') + 1);
+	});
+
+	it('keeps known actions once, and adds new ones', () => {
 		const layout = parseLayout({ items: ['remove', 'divider', 'gone', 'remove', 'playNext'], hidden: ['like', 'gone'], buttons: ['radio', 'radio', 'nope'] });
 		expect(layout.items.slice(0, 3)).toEqual(['remove', 'divider', 'playNext']);
 		expect(layout.items.filter((i) => i !== 'divider').sort()).toEqual(Object.keys(MENU_ACTIONS).sort());

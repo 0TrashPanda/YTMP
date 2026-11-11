@@ -52,6 +52,12 @@ import dev.trashpanda.ytmp.protocol.InviteResponse
 import dev.trashpanda.ytmp.protocol.LinkAuthServerRequest
 import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.HistoryPage
+import dev.trashpanda.ytmp.protocol.FriendsOverview
+import dev.trashpanda.ytmp.protocol.FriendRequest
+import dev.trashpanda.ytmp.protocol.GroupRequest
+import dev.trashpanda.ytmp.protocol.ShareRequest
+import dev.trashpanda.ytmp.protocol.ShareResult
+import dev.trashpanda.ytmp.protocol.ReceivedShares
 import dev.trashpanda.ytmp.protocol.EpisodeProgressList
 import dev.trashpanda.ytmp.protocol.MarkEpisodeRequest
 import dev.trashpanda.ytmp.protocol.AccountSettings
@@ -243,6 +249,12 @@ fun main(args: Array<String>) {
     generator.addRoot(LinkAuthServerRequest.serializer().descriptor)
     generator.addRoot(RoleTemplate.serializer().descriptor)
     generator.addRoot(HistoryPage.serializer().descriptor)
+    generator.addRoot(FriendsOverview.serializer().descriptor)
+    generator.addRoot(FriendRequest.serializer().descriptor)
+    generator.addRoot(GroupRequest.serializer().descriptor)
+    generator.addRoot(ShareRequest.serializer().descriptor)
+    generator.addRoot(ShareResult.serializer().descriptor)
+    generator.addRoot(ReceivedShares.serializer().descriptor)
     generator.addRoot(EpisodeProgressList.serializer().descriptor)
     generator.addRoot(MarkEpisodeRequest.serializer().descriptor)
     generator.addRoot(AccountSettings.serializer().descriptor)

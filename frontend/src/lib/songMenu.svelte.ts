@@ -49,7 +49,7 @@ export const MENU_ACTIONS: Record<MenuAction, { name: string; icon: IconName; hi
 	goArtist: { name: 'Go to artist', icon: 'person' },
 	goAlbum: { name: 'Go to album', icon: 'album' },
 	openYtm: { name: 'Open in YouTube Music', icon: 'open' },
-	share: { name: 'Share', icon: 'share', hint: 'Send its link, or hold phones together' },
+	share: { name: 'Share', icon: 'share', hint: 'With friends and groups, its link, or hold phones together' },
 	markPlayed: { name: 'Mark as played', icon: 'check', hint: 'Podcast episodes' },
 	removeListened: { name: 'Remove from your history', icon: 'remove', hint: 'Library → History' },
 	remove: { name: 'Remove from the queue', icon: 'remove', hint: 'Up next' }
@@ -184,7 +184,7 @@ export function defaultLayout(): MenuLayout {
 	return { items: [...DEFAULT_ITEMS], hidden: [], buttons: [...DEFAULT_BUTTONS], hold: {} };
 }
 
-/** Reads a saved layout, keeping what's still known; actions added since then go at the end. */
+/** Reads a saved layout, keeping what's still known; actions added since then go after the one they follow by default. */
 export function parseLayout(saved: unknown): MenuLayout {
 	const layout = defaultLayout();
 	if (!saved || typeof saved !== 'object') return layout;
@@ -201,7 +201,12 @@ export function parseLayout(saved: unknown): MenuLayout {
 	if (Array.isArray(stored.items)) {
 		const items = stored.items.filter((i): i is MenuItem => i === 'divider' || isAction(i));
 		const unique = items.filter((i, n) => i === 'divider' || items.indexOf(i) === n);
-		for (const action of Object.keys(MENU_ACTIONS) as MenuAction[]) if (!unique.includes(action)) unique.push(action);
+		// One added since: after the action it follows in the default layout (else at the end).
+		for (const action of Object.keys(MENU_ACTIONS) as MenuAction[]) {
+			if (unique.includes(action)) continue;
+			const before = DEFAULT_ITEMS.slice(0, DEFAULT_ITEMS.indexOf(action)).findLast((i) => i !== 'divider' && unique.includes(i));
+			unique.splice(before ? unique.indexOf(before) + 1 : unique.length, 0, action);
+		}
 		layout.items = unique;
 	}
 	if (Array.isArray(stored.hidden)) layout.hidden = [...new Set(stored.hidden.filter(isAction))];

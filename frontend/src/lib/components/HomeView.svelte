@@ -13,6 +13,8 @@
 	import { cardTiles, songTiles } from '../dial';
 	import { hideIfBroken } from '../pictures';
 	import { arrange, home as prefs, nudge, seen, setHidden, setLayout, setPinContents, togglePin, type Block, type Layout, type Pin } from '../home.svelte';
+	import { friends } from '../friends.svelte';
+	import FriendShares from './FriendShares.svelte';
 	import type { HomePage, SearchItem, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import CardGrid from './CardGrid.svelte';
@@ -28,6 +30,7 @@
 		onToast,
 		onMenu,
 		onSettings,
+		onFriends,
 		...open
 	}: {
 		room: RoomConnection;
@@ -35,13 +38,15 @@
 		onMenu: (target: MenuTarget) => void;
 		/** Opens Settings → Home. */
 		onSettings: () => void;
+		/** Opens your friends and groups. */
+		onFriends: () => void;
 	} & PageHandlers = $props();
 
 	// The last one, until the new one is here.
 	let home = $state<HomePage | null>(lastSeen('home'));
 	let error = $state<string | null>(null);
 
-	const sections = $derived(arrange(home?.sections ?? null, prefs));
+	const sections = $derived(arrange(home?.sections ?? null, prefs, friends.shares ?? []));
 	/** The section whose ⋮ menu is open (its key). */
 	let sectionMenu = $state<string | null>(null);
 
@@ -51,12 +56,14 @@
 		getHome()
 			.then((h) => {
 				home = h;
-				seen(h.sections);
+				seen(h.sections, friends.shares ?? []);
 			})
 			.catch((e) => (error = e instanceof Error ? e.message : 'Could not load suggestions'))
 			.finally(() => (loadingAgain = false));
 	}
 	load();
+	// What friends shared with you: each time Home shows.
+	void friends.loadShares().then((shares) => home && seen(home.sections, shares));
 
 	const songs = (items: SearchItem[]): Song[] => items.flatMap((i) => (i.kind === 'song' ? [i.song] : []));
 	const cards = (items: SearchItem[]) => items.flatMap((i) => itemCard(i, open) ?? []);
@@ -127,6 +134,8 @@
 		{/if}
 		{#if block.kind === 'pin'}
 			<button class="shrink-0 rounded-full border border-line px-3 py-1 text-sm font-medium hover:bg-raised" onclick={() => openPin(block.pin)}>More</button>
+		{:else if block.kind === 'friends'}
+			<button class="shrink-0 rounded-full border border-line px-3 py-1 text-sm font-medium hover:bg-raised" onclick={onFriends}>Friends</button>
 		{/if}
 		<button
 			class="tap shrink-0 rounded-full p-1.5 text-muted hover:bg-raised hover:text-white"
@@ -187,6 +196,10 @@
 				</div>
 			{:else if block.kind === 'pin'}
 				<PinContents {room} pin={block.pin} layout={block.layout} {onToast} {onMenu} />
+			{:else if block.kind === 'friends' && block.layout === 'dial'}
+				<SpeedDial tiles={songTiles(block.shares.map((s) => s.song), room, onToast, onMenu)} />
+			{:else if block.kind === 'friends'}
+				<FriendShares {room} shares={block.shares} list={block.layout === 'list'} {onToast} {onMenu} />
 			{:else}
 				{@const list = songs(block.section.items)}
 				{@const others = cards(block.section.items)}

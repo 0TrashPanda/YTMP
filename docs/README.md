@@ -25,6 +25,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [features/queue.md](features/queue.md) | Queue, autoplay queue, history, fair ordering, shuffle, repeat, vote to skip, limits |
 | [features/room-management.md](features/room-management.md) | Permissions, kicking, access control, co-admins |
 | [features/accounts.md](features/accounts.md) | Optional accounts, room transfer, playlists, linked YouTube account and media servers |
+| [features/friends.md](features/friends.md) | Friends, groups of friends, sharing songs; *From your friends* on Home |
 | [features/importing-playlists.md](features/importing-playlists.md) | Importing playlists from a Spotify export (later Takeout, linked accounts) into YouTube Music (later YTMP playlists) |
 | [features/history-and-recommendations.md](features/history-and-recommendations.md) | Listening history, recap, song graph, radio/mix, find similar |
 | [features/ui.md](features/ui.md) | YTM-like UI, gestures, song menu, party screen, themes |

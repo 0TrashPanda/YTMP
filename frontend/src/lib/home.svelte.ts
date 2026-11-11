@@ -5,7 +5,7 @@
 // own section. YTM names its sections itself ("Quick picks", "Listen again"…), so they're known
 // by name; a name not seen before goes after the section YTM shows it after. One of your settings
 // (settings.svelte.ts).
-import type { HomeSection } from './protocol.gen';
+import type { HomeSection, ReceivedShare } from './protocol.gen';
 import { settings } from './settings.svelte';
 
 export type Layout = 'carousel' | 'list' | 'dial';
@@ -40,11 +40,15 @@ export type Block = { key: string; title: string; layout: Layout } & (
 	| { kind: 'pinned'; pins: Pin[] }
 	| { kind: 'pin'; pin: Pin }
 	| { kind: 'ytm'; section: HomeSection }
+	| { kind: 'friends'; shares: ReceivedShare[] }
 );
 
 /** The Pinned section's key; a pin's section is `ytmp:pin:…`. YTM's names don't look like this. */
 export const PINNED = 'ytmp:pinned';
 export const pinKey = (pin: Pin) => `ytmp:pin:${pin.kind}:${pin.id}`;
+/** The songs friends shared with you (docs/features/friends.md). */
+export const FRIENDS = 'ytmp:friends';
+export const FRIENDS_TITLE = 'From your friends';
 
 const PIN_KINDS: string[] = ['playlist', 'album', 'artist', 'podcast'];
 
@@ -110,14 +114,16 @@ export function isPodcasts(section: HomeSection): boolean {
 
 /**
  * Every section there is, before your order and hiding: Pinned (when a pin is a tile), the pins
- * with their songs, then YTM's ([sections], null while loading).
+ * with their songs, what friends shared ([shares], when there are any), then YTM's ([sections],
+ * null while loading).
  */
-function allBlocks(sections: HomeSection[] | null, prefs: HomePrefs): Block[] {
+function allBlocks(sections: HomeSection[] | null, prefs: HomePrefs, shares: ReceivedShare[] = []): Block[] {
 	const layout = (key: string): Layout => prefs.layouts[key] ?? defaultLayout(key);
 	const tiles = prefs.pins.filter((p) => !p.contents);
 	return [
 		...(tiles.length ? [{ key: PINNED, title: 'Pinned', layout: layout(PINNED), kind: 'pinned' as const, pins: tiles }] : []),
 		...prefs.pins.filter((p) => p.contents).map((pin) => ({ key: pinKey(pin), title: pin.title, layout: layout(pinKey(pin)), kind: 'pin' as const, pin })),
+		...(shares.length ? [{ key: FRIENDS, title: FRIENDS_TITLE, layout: layout(FRIENDS), kind: 'friends' as const, shares }] : []),
 		...(sections ?? [])
 			.filter((s) => !(prefs.hidePodcasts && isPodcasts(s)))
 			.map((section) => ({ key: section.title, title: section.title, layout: layout(section.title), kind: 'ytm' as const, section }))
@@ -125,8 +131,8 @@ function allBlocks(sections: HomeSection[] | null, prefs: HomePrefs): Block[] {
 }
 
 /** The sections to show, in order, each with its layout. */
-export function arrange(sections: HomeSection[] | null, prefs: HomePrefs): Block[] {
-	const blocks = allBlocks(sections, prefs);
+export function arrange(sections: HomeSection[] | null, prefs: HomePrefs, shares: ReceivedShare[] = []): Block[] {
+	const blocks = allBlocks(sections, prefs, shares);
 	const order = learn(
 		prefs.order,
 		blocks.map((b) => b.key)
@@ -160,7 +166,8 @@ if (typeof window !== 'undefined') {
 /** [order] with the sections of [prefs]' pins in it, without those of pins that are gone. */
 export function withPins(order: string[], prefs: HomePrefs): string[] {
 	const keys = allBlocks(null, prefs).map((b) => b.key);
-	return learn(order, keys).filter((k) => !k.startsWith('ytmp:') || keys.includes(k));
+	// Friends' section keeps its place while nothing is shared with you.
+	return learn(order, keys).filter((k) => !k.startsWith('ytmp:') || k === FRIENDS || keys.includes(k));
 }
 
 const currentOrder = () => withPins(home.order, home);
@@ -169,15 +176,15 @@ const currentOrder = () => withPins(home.order, home);
 export function sectionList(): { key: string; title: string; pin?: Pin }[] {
 	return currentOrder().map((key) => {
 		const pin = home.pins.find((p) => pinKey(p) === key);
-		return { key, title: key === PINNED ? 'Pinned' : (pin?.title ?? key), pin };
+		return { key, title: key === PINNED ? 'Pinned' : key === FRIENDS ? FRIENDS_TITLE : (pin?.title ?? key), pin };
 	});
 }
 
-/** Home loaded these sections: new names are remembered, for Settings → Home. */
-export function seen(sections: HomeSection[]): void {
+/** Home loaded these sections (and [shares] from friends): new names are remembered, for Settings → Home. */
+export function seen(sections: HomeSection[], shares: ReceivedShare[] = []): void {
 	const order = learn(
 		currentOrder(),
-		allBlocks(sections, home).map((b) => b.key)
+		allBlocks(sections, home, shares).map((b) => b.key)
 	);
 	home.podcastSections = [...new Set([...home.podcastSections, ...sections.filter(isPodcasts).map((s) => s.title)])];
 	if (order.length === home.order.length && order.every((k, i) => home.order[i] === k)) return;

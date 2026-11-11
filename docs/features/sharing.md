@@ -26,7 +26,9 @@ against this one*; with NFC switched off on your phone it offers to switch it on
 
 **Share** in a song's menu (⋮, right-click or hold, also the player's ⋮) opens its Share sheet:
 the song, *Hold a phone against this one*, **Send…** (the phone's share sheet: a chat, mail,
-…) and **Copy link**. Music that's only on your device (your own files) can't be shared.
+…) and **Copy link**. With your YTMP account the sheet also lists your **groups and friends**:
+tick them and the song shows on their Home (see [friends](friends.md)). Music that's only on
+your device (your own files) can only go to friends.
 
 A shared song's link is its **YouTube Music link** (`https://music.youtube.com/watch?v=…`), so
 anyone can open it, with or without YTMP.

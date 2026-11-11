@@ -10,6 +10,7 @@
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
 	import HistoryView from '../../../lib/components/HistoryView.svelte';
+	import FriendsView from '../../../lib/components/FriendsView.svelte';
 	import ImportView from '../../../lib/components/ImportView.svelte';
 	import { listening } from '../../../lib/listening.svelte';
 	import LocalView from '../../../lib/components/LocalView.svelte';
@@ -840,6 +841,8 @@
 								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={openMenu} />
 							{:else if view.kind === 'history'}
 								<HistoryView {room} onToast={toast} onMenu={openMenu} />
+							{:else if view.kind === 'friends'}
+								<FriendsView onToast={toast} />
 							{:else if view.kind === 'import'}
 								{#key view.jobId}
 									<ImportView jobId={view.jobId} onToast={toast} onJob={(jobId) => show({ kind: 'import', jobId })} onPlaylist={(p) => openPlaylist(p, true)} onMenu={openMenu} />
@@ -875,6 +878,7 @@
 							<LibraryView
 								onToast={toast}
 								onHistory={() => show({ kind: 'history' })}
+								onFriends={() => show({ kind: 'friends' })}
 								onImport={() => show({ kind: 'import' })}
 								onSearch={searchFills(room) ? undefined : () => searchBox?.open()}
 								onArtist={openArtist}
@@ -895,6 +899,7 @@
 									onPlaylist={openPlaylist}
 									onPodcast={openPodcast}
 									onSettings={() => (sheet = { kind: 'settings', start: 'home' })}
+									onFriends={() => show({ kind: 'friends' })}
 								/>
 							{/key}
 						{/if}
@@ -971,7 +976,7 @@
 			onShare={(song) => (sheet = { kind: 'shareSong', song })}
 		/>
 	{:else if sheet?.kind === 'shareSong'}
-		<SongShareSheet song={sheet.song} onClose={() => close('shareSong')} onToast={toast} />
+		<SongShareSheet song={sheet.song} onClose={() => close('shareSong')} onToast={toast} onFriends={() => show({ kind: 'friends' })} />
 	{:else if sheet?.kind === 'shared'}
 		<SharedSong
 			songId={sheet.songId}
@@ -994,6 +999,7 @@
 			onClose={() => close('avatar')}
 			onSettings={(section) => (sheet = { kind: 'settings', start: section ?? null })}
 			onShare={() => (sheet = { kind: 'share' })}
+			onFriends={listening.available ? () => show({ kind: 'friends' }) : undefined}
 			onPlayOn={player ? () => (sheet = { kind: 'playOn' }) : undefined}
 			onClone={() => (sheet = { kind: 'clone' })}
 			onRoomSettings={room.can('change_settings') || room.can('edit_roles') || room.can('kick') || room.can('ban') ? () => (sheet = { kind: 'settings', start: null }) : undefined}

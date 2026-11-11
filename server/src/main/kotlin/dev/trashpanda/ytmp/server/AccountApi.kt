@@ -61,6 +61,10 @@ import dev.trashpanda.ytmp.protocol.PlayedSongs
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
 import dev.trashpanda.ytmp.protocol.RadioHints
 import dev.trashpanda.ytmp.protocol.RadioHintsRequest
+import dev.trashpanda.ytmp.protocol.FriendRequest
+import dev.trashpanda.ytmp.protocol.GroupRequest
+import dev.trashpanda.ytmp.protocol.ReceivedShares
+import dev.trashpanda.ytmp.protocol.ShareRequest
 import io.ktor.server.request.receiveStream
 import java.time.ZoneId
 import java.io.File
@@ -91,6 +95,8 @@ class AccountService(
     private val isOwnOrigin: (String) -> Boolean = { false },
     /** How far accounts got in podcast episodes. */
     private val episodes: Episodes? = null,
+    /** Friends, groups and shared songs. */
+    private val social: Social? = null,
 ) {
     private val throttle = LoginThrottle(clock)
 
@@ -480,6 +486,72 @@ class AccountService(
             }
         }
 
+        // Friends, groups and songs shared with them (Social): from every page that may read your
+        // history (CORS), like your preferences, so sharing works in rooms everywhere.
+        // (Each its own route with CORS: on "/account" itself it would also reach logging in.)
+        fun Route.everywhere() = install(CORS) {
+            anyHost()
+            allowHeader(HttpHeaders.Authorization)
+            allowHeader(HttpHeaders.ContentType)
+            allowMethod(HttpMethod.Put)
+            allowMethod(HttpMethod.Delete)
+        }
+        run {
+            route("/account/friends") {
+                everywhere()
+                get {
+                    val account = call.historyAccount()
+                    call.respond(socialCall { overview(account.id) })
+                }
+                post {
+                    val account = call.historyAccount()
+                    val username = call.receive<FriendRequest>().username
+                    socialCall { request(account.id, username) }
+                    call.respond(socialCall { overview(account.id) })
+                }
+                delete("/{username}") {
+                    val account = call.historyAccount()
+                    socialCall { remove(account.id, call.parameters["username"]!!) }
+                    call.respond(socialCall { overview(account.id) })
+                }
+            }
+            route("/account/groups") {
+                everywhere()
+                post {
+                    val account = call.historyAccount()
+                    val request = call.receive<GroupRequest>()
+                    call.respond(socialCall { createGroup(account.id, request.name, request.members) })
+                }
+                put("/{id}") {
+                    val account = call.historyAccount()
+                    val request = call.receive<GroupRequest>()
+                    call.respond(socialCall { updateGroup(account.id, call.parameters["id"]!!, request.name, request.members) })
+                }
+                delete("/{id}") {
+                    val account = call.historyAccount()
+                    socialCall { leaveGroup(account.id, call.parameters["id"]!!) }
+                    call.respond(HttpStatusCode.NoContent)
+                }
+            }
+            route("/account/shares") {
+                everywhere()
+                get {
+                    val account = call.historyAccount()
+                    call.respond(ReceivedShares(socialCall { received(account.id) }))
+                }
+                post {
+                    val account = call.historyAccount()
+                    val request = call.receive<ShareRequest>()
+                    call.respond(socialCall { share(account.id, request) })
+                }
+                delete("/{id}") {
+                    val account = call.historyAccount()
+                    socialCall { dismiss(account.id, call.parameters["id"]!!) }
+                    call.respond(HttpStatusCode.NoContent)
+                }
+            }
+        }
+
         // Your history. Reading it and deleting single songs also works from the pages of your
         // phone's app and of rooms on other hosts (CORS); the rest only here, logged in.
         route("/account/history") {
@@ -675,6 +747,16 @@ class AccountService(
         block()
     } catch (e: Accounts.AccountException) {
         throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, e.message ?: "Invalid")
+    }
+
+    /** [block] on the friends' store, in the background, its refusals as answers. */
+    private suspend fun <T> socialCall(block: Social.() -> T): T {
+        val social = social ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No friends on this server")
+        return try {
+            io { social.block() }
+        } catch (e: Social.SocialException) {
+            throw ApiException(if (e.notFound) HttpStatusCode.NotFound else HttpStatusCode.BadRequest, if (e.notFound) ErrorCode.NOT_FOUND else ErrorCode.INVALID, e.message ?: "Invalid")
+        }
     }
 
     private fun notLoggedIn() = ApiException(HttpStatusCode.Unauthorized, ErrorCode.PERMISSION_DENIED, "Not logged in")

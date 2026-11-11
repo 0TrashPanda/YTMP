@@ -18,12 +18,15 @@
 	let {
 		onToast,
 		onHistory,
+		onFriends,
 		onImport,
 		onSearch,
 		...open
 	}: {
 		onToast: (text: string) => void;
 		onHistory: () => void;
+		/** Your friends and groups. */
+		onFriends: () => void;
 		onImport: () => void;
 		/** Phones with only a search icon at the top: opens the search bar (a field here says what it searches). */
 		onSearch?: () => void;
@@ -69,6 +72,10 @@
 				<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={onHistory}>
 					<Icon name="history" size={20} />
 					History
+				</button>
+				<button class="flex items-center gap-2 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={onFriends}>
+					<Icon name="people" size={20} />
+					Friends
 				</button>
 			{/if}
 			{#if youtube.account}

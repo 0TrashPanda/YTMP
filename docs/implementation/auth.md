@@ -137,6 +137,11 @@ the page (`visibilitychange`, at most every 10 s) asks the account again, so a c
 another device shows up; what came in is announced with a `ytmp:settings` window event (the
 app's player and Home follow it).
 
+Friends, groups and shared songs ([friends](../features/friends.md)) work the same too
+(`/api/account/friends`, `/api/account/groups`, `/api/account/shares`, `Social.kt`), so sharing a
+song and *From your friends* on Home work in rooms everywhere. A host token for another host
+doesn't reach them.
+
 Settings (`frontend/src/lib/settings.svelte.ts`) are preferences with a device override: each
 `Setting` has its key in the preferences (the account's value), and a device that keeps its own
 has it in `localStorage['ytmp.deviceSettings']` instead (`keepHere`). Its value is this device's,

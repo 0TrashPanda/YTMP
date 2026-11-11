@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { arrange, isPodcasts, learn, loadPrefs, PINNED, withPins, type Pin } from './home.svelte';
-import type { HomeSection, SearchItem } from './protocol.gen';
+import { arrange, FRIENDS, isPodcasts, learn, loadPrefs, PINNED, withPins, type Pin } from './home.svelte';
+import type { HomeSection, ReceivedShare, SearchItem, Song } from './protocol.gen';
 
 const song = (id: string, podcast = false): SearchItem =>
 	({
@@ -85,6 +85,29 @@ describe('pinned sections', () => {
 
 	it('forgets the place of a pin that is gone', () => {
 		expect(withPins(['ytmp:pin:playlist:old', 'Quick picks'], { ...loadPrefs(null), pins: [pin('a')] })).toEqual([PINNED, 'Quick picks']);
+	});
+});
+
+describe('from your friends', () => {
+	const share = (id: string): ReceivedShare => ({
+		id,
+		song: (song(id) as Extract<SearchItem, { kind: 'song' }>).song as Song,
+		from: { username: 'bob', displayName: 'Bob' },
+		group: 'Hardcore',
+		note: '',
+		at: 0
+	});
+
+	it('shows above YTM’s sections when something is shared, and not when nothing is', () => {
+		const prefs = loadPrefs(null);
+		expect(arrange([section('Quick picks')], prefs, [share('s1')]).map((b) => b.key)).toEqual([FRIENDS, 'Quick picks']);
+		expect(arrange([section('Quick picks')], prefs, []).map((b) => b.key)).toEqual(['Quick picks']);
+	});
+
+	it('keeps its place while nothing is shared', () => {
+		const prefs = { ...loadPrefs(null), order: ['Quick picks', FRIENDS] };
+		expect(withPins(prefs.order, prefs)).toEqual(['Quick picks', FRIENDS]);
+		expect(arrange([section('Quick picks')], prefs, [share('s1')]).map((b) => b.key)).toEqual(['Quick picks', FRIENDS]);
 	});
 });
 

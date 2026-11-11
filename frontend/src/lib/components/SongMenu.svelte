@@ -70,7 +70,7 @@
 		onSleepTimer?: () => void;
 		/** The song graph around a song (with your YTMP account). */
 		onGraph?: (song: Song) => void;
-		/** Share the song: its link, or by holding phones together (SongShareSheet). */
+		/** Share the song: with friends and groups, its link, or by holding phones together (SongShareSheet). */
 		onShare?: (song: Song) => void;
 	}
 	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave, onSleepTimer, onGraph, onShare }: Props = $props();
@@ -402,7 +402,8 @@
 		if (ytmId) {
 			add('openYtm', { icon: 'open', label: 'Open in YouTube Music', href: `https://music.youtube.com/watch?v=${encodeURIComponent(ytmId)}`, run: onClose });
 		}
-		if (onShare && songLink(song)) {
+		// Its link (YouTube Music's songs), or with friends (your YTMP account).
+		if (onShare && (songLink(song) || listening.available)) {
 			const current = song;
 			add('share', { icon: 'share', label: 'Share', run: () => (onClose(), onShare(current)) });
 		}

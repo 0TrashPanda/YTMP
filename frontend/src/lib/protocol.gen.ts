@@ -1116,6 +1116,60 @@ export interface HistoryPage {
   more: boolean;
 }
 
+export interface Person {
+  username: string;
+  displayName: string;
+}
+
+export interface FriendGroup {
+  id: string;
+  name: string;
+  owner: Person;
+  members: Person[];
+}
+
+export interface FriendsOverview {
+  me: Person;
+  friends: Person[];
+  incoming: Person[];
+  outgoing: Person[];
+  groups: FriendGroup[];
+}
+
+export interface FriendRequest {
+  username: string;
+}
+
+export interface GroupRequest {
+  name: string;
+  members: string[];
+}
+
+export interface ShareRequest {
+  song: Song;
+  friends: string[];
+  groups: string[];
+  note: string;
+}
+
+export interface ShareResult {
+  id: string;
+  recipients: number;
+}
+
+export interface ReceivedShare {
+  id: string;
+  song: Song;
+  from: Person;
+  group: string | null;
+  note: string;
+  at: number;
+}
+
+export interface ReceivedShares {
+  shares: ReceivedShare[];
+}
+
 export interface EpisodeProgress {
   id: string;
   positionMs: number;

@@ -33,6 +33,9 @@ path = "/var/lib/ytmp/ytmp.db"     # sqlite
 | `room_copies` | Copies of accounts' rooms that live on another host (a phone): sync ID, account, where the room lives now (`home`), epoch, room JSON, last seen. See [room sync](room-sync.md) |
 | `songs`, `song_sources`, `song_edges` | The song graph, see [below](#song-graph) |
 | `episode_progress` | Per account and episode: where they stopped, the length, played; for resuming in any room and the played marks (`Episodes.kt`) |
+| `friends`, `friend_requests` | Friends (a row each way) and requests not answered yet (`Social.kt`) |
+| `friend_groups`, `friend_group_members` | Groups of friends: name, owner; who's in them |
+| `shares`, `share_recipients` | Songs shared (song as JSON, from, note, when) and who got each (through which group, put away or not) |
 
 On **Android**, the app has its own local **SQLite** database (`PhoneRoomStore`) with one
 table, `rooms`, so its rooms survive restarts; other settings are in SharedPreferences.
@@ -40,7 +43,8 @@ Planned there: the local copy of joined rooms (for cloning) and downloads. Rooms
 belong to an account are synced to the account's server (see [room sync](room-sync.md)).
 
 Stored on the server now: accounts, role templates, rooms (server-hosted, plus copies of
-accounts' phone rooms), listening history, the song graph and linked YouTube Music sign-ins.
+accounts' phone rooms), listening history, the song graph, linked YouTube Music sign-ins, and
+friends, groups and shared songs.
 Planned: room defaults and YTMP playlists.
 
 ## Rooms (implemented)
