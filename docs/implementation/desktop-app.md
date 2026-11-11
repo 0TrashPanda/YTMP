@@ -58,6 +58,10 @@ The web app asks the own module for:
   `lookUp`), with the server as fallback when the module fails; browsers with an own module
   get it too. How, and what the host still does per route:
   [playback-sync](playback-sync.md#search-and-pages-from-your-own-module).
+- ✅ Every module request goes through `moduleRequest()` (`ownModule.svelte.ts`): `fetch` with
+  the key, or, when the shell offers `window.YtmpDesktop.moduleRequest(path)` (a Promise of
+  `{ status, body }`), that instead: WebKitGTK won't let the https page fetch
+  `http://127.0.0.1`, so the shell forwards them over Tauri IPC (the shell's side is planned).
 - planned, with the app's own YouTube Music sign-in: the `/me/…` requests (library, likes,
   playlists, history, the account's own Home and search), with the sign-in in `X-Ytm-Cookie`.
   Until then they, and the Home and searches of a sign-in on the server, stay with the server.

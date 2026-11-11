@@ -167,3 +167,26 @@ describe('lyrics with your own module', () => {
 		expect(asked.at(-1)).not.toContain('from=lrclib');
 	});
 });
+
+describe('in the desktop app', () => {
+	it('every module request goes through its shell (stream links, the check, pages), with the same fallback', async () => {
+		const shell = vi.fn(async (path: string) => {
+			if (path === 'info') return { status: 200, body: JSON.stringify({ name: 'ytm', version: '2.0' }) };
+			if (path.endsWith('/stream')) return { status: 200, body: JSON.stringify({ url: 'https://youtube/song', expiresAt: Date.now() + 3_600_000 }) };
+			if (path.startsWith('albums/')) return { status: 503, body: JSON.stringify({ error: { code: 'blocked', message: 'bot check' } }) };
+			return { status: 200, body: JSON.stringify({ from: 'shell', path }) };
+		});
+		vi.stubGlobal('window', { YtmpDesktop: { moduleRequest: shell } });
+		try {
+			const { api, own } = await load();
+			expect(own.moduleStatus.text).toBe('ytm module 2.0');
+			expect(await own.ownStreamUrl('ytm:abc')).toBe('https://youtube/song');
+			expect(await api.getArtist('UCabc')).toMatchObject({ from: 'shell', path: 'artists/UCabc' });
+			expect(await api.getAlbum('MPREb_1')).toMatchObject({ from: 'host' });
+			expect(asked).toEqual(['host /api/albums/MPREb_1']);
+			expect(shell.mock.calls.map(([path]) => path)).toEqual(['info', 'songs/ytm%3Aabc/stream', 'artists/UCabc', 'albums/MPREb_1']);
+		} finally {
+			vi.stubGlobal('window', undefined);
+		}
+	});
+});

@@ -57,22 +57,60 @@ export const moduleUsable = (): boolean => activeModule() !== null && moduleStat
 
 const links = new Map<string, Promise<{ url: string; expiresAt: number }>>();
 
+/** What the module answered: its HTTP status and body (JSON text). */
+export interface ModuleAnswer {
+	status: number;
+	body: string;
+}
+
+declare global {
+	interface Window {
+		/**
+		 * The desktop app's shell (planned, docs/implementation/desktop-app.md): it forwards module
+		 * requests itself, since WebKitGTK won't let an https page fetch http://127.0.0.1.
+		 */
+		YtmpDesktop?: { moduleRequest?: (path: string) => Promise<ModuleAnswer> };
+	}
+}
+
+/**
+ * Every request to the module goes through here: [path] (like `search?q=…`), with the key.
+ * In the desktop app through its shell, else with fetch. Throws when it can't be reached.
+ */
+export async function moduleRequest(module: OwnModule, path: string, timeoutMs = LOOKUP_TIMEOUT_MS): Promise<ModuleAnswer> {
+	const desktop = typeof window !== 'undefined' ? window.YtmpDesktop?.moduleRequest : undefined;
+	if (desktop) {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const late = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('timeout')), timeoutMs)));
+		return Promise.race([desktop(path), late]).finally(() => clearTimeout(timer));
+	}
+	const response = await fetch(new URL(path, module.url.replace(/\/*$/, '/')), {
+		headers: { Authorization: `Bearer ${module.key}` },
+		signal: AbortSignal.timeout(timeoutMs)
+	});
+	return { status: response.status, body: await response.text() };
+}
+
 async function get<T>(module: OwnModule, path: string, timeoutMs = LOOKUP_TIMEOUT_MS): Promise<T> {
-	let response: Response;
+	let answer: ModuleAnswer;
 	try {
-		response = await fetch(new URL(path, module.url.replace(/\/*$/, '/')), {
-			headers: { Authorization: `Bearer ${module.key}` },
-			signal: AbortSignal.timeout(timeoutMs)
-		});
+		answer = await moduleRequest(module, path, timeoutMs);
 	} catch {
 		throw new ModuleDown(`can't reach your module at ${module.url}`);
 	}
-	if (!response.ok) {
-		const body = await response.json().catch(() => null);
-		if (response.status === 401) throw new ModuleDown('your module turned the key down');
-		throw new ModuleError(body?.error?.message ?? `your module answered ${response.status}`, response.status, body?.error?.code ?? null);
+	const parse = () => {
+		try {
+			return JSON.parse(answer.body);
+		} catch {
+			return null;
+		}
+	};
+	if (answer.status < 200 || answer.status > 299) {
+		const body = parse();
+		if (answer.status === 401) throw new ModuleDown('your module turned the key down');
+		throw new ModuleError(body?.error?.message ?? `your module answered ${answer.status}`, answer.status, body?.error?.code ?? null);
 	}
-	return response.json();
+	return JSON.parse(answer.body) as T;
 }
 
 /** After a lookup: it answered (so it works), or it can't be used at all (so it's down until it answers again). */
