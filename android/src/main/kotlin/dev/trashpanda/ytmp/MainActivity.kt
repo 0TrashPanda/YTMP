@@ -717,9 +717,13 @@ class MainActivity : ComponentActivity() {
             return app.sharedIdentity.also { app.sharedIdentity = null }
         }
 
-        /** This app's version, e.g. "0.5.2" (bridge version 5). */
+        /**
+         * This app's version, e.g. "0.5.2" (bridge version 5), for showing only: once the
+         * on-device module started, with its yt-dlp ("0.5.2 · yt-dlp 2026.11.5 (downloaded; …)").
+         */
         @JavascriptInterface
-        fun appVersion(): String = Updates.installedVersion(this@MainActivity)
+        fun appVersion(): String =
+            Updates.installedVersion(this@MainActivity) + (OnDeviceYtm.ytDlpVersion?.let { " · yt-dlp $it" } ?: "")
 
         /** Looks for a new version on GitHub; the app shows what it found (bridge version 5). */
         @JavascriptInterface

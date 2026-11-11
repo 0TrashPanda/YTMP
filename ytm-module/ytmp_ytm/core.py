@@ -26,7 +26,7 @@ from ytmusicapi.helpers import initialize_headers
 from ytmusicapi.navigation import NAVIGATION_BROWSE_ID, SECTION_LIST, SINGLE_COLUMN_TAB, TAB_CONTENT, TITLE, TWO_COLUMN_RENDERER, nav
 from ytmusicapi.parsers.playlists import parse_playlist_items
 
-from . import deno, keep, parse, pot
+from . import deno, keep, parse, pot, update
 from .parse import MODULE_ID
 
 deno.limit()
@@ -174,7 +174,9 @@ class YtmCore:
         # The signed-in YouTube Music account (the phone owner's), next to the anonymous one
         # that everything shared (search, rooms) keeps using.
         self._user: YTMusic | None = None
-        log.info("yt-dlp %s, ytmusicapi %s", yt_dlp.version.__version__, _version("ytmusicapi"))
+        for level, note in update.take_notes():
+            log.log(level, "%s", note)
+        log.info("yt-dlp %s, ytmusicapi %s", update.describe(), _version("ytmusicapi"))
 
     def warm_up(self) -> None:
         """Gets YouTube Music's visitor ID now, in the background: the first search or page needs
@@ -640,10 +642,13 @@ class YtmCore:
                 pause = self._bot_check.seen()
                 log.warning("stream %s: YouTube's bot check: no lookups for %d min", vid, pause // 60)
                 raise Blocked(f"{_BOT_CHECK} Try again in {pause // 60} min.") from e
+            update.lookup_failed()
             raise Unavailable(_clean_error(str(e))) from e
         except Exception:
             log.exception("stream %s: yt-dlp crashed after %.1f s\n%s", vid, time.monotonic() - started, steps.text())
+            update.lookup_failed()
             raise
+        update.lookup_ok()
 
         url = info["url"]
         query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)

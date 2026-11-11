@@ -115,9 +115,9 @@ so the mobile web player with its ad answers instead: 7–8 s per song.
 
 ## Android on-device variant ✅ (Chaquopy)
 
-Built: the app embeds the module with Chaquopy, see [android-app](android-app.md). Not built:
-updating yt-dlp at runtime (below); yt-dlp is only updated with app releases, and using the
-server's YTM service from the phone.
+Built: the app embeds the module with Chaquopy, see [android-app](android-app.md), and
+yt-dlp updates itself on the phone (below). Not built: using the server's YTM service from the
+phone.
 
 ### Constraint
 YouTube changes often, and **yt-dlp releases fixes very frequently**. If extraction
@@ -130,9 +130,38 @@ the on-device module will regularly be broken.
 - Run the **same Python module code** as the server service, so there is one
   implementation of the YTM logic.
 - `yt-dlp` and `ytmusicapi` are **pure Python**. The app ships a known-good version and
-  can **download newer yt-dlp releases at runtime** (from PyPI/GitHub), then load them
+  **downloads newer yt-dlp releases at runtime** ✅ (see above) (from PyPI/GitHub), then load them
   instead of the bundled one, with a fallback to the bundled version if the new one fails.
   This decouples yt-dlp fixes from app releases.
+
+### yt-dlp updating itself ✅
+
+`ytmp_ytm/update.py`, for the copies that only get the yt-dlp they were built with (the phone,
+the planned desktop app). Off on the server: its image is rebuilt nightly with the newest
+yt-dlp. On when the module gets a folder of its own: `update.activate(folder)` (the phone, from
+`OnDeviceYtm`) or `YTMP_YTM_UPDATE_DIR` (read in `ytmp_ytm/__init__.py`, so before anything
+imports yt-dlp; `ytmp-ytm` then also starts the checks).
+
+- **Checking** (`update.start()`): a minute after the start and then once a day, it asks
+  PyPI (`/pypi/yt-dlp/json`) for the newest release. Only a full release (no `.dev`) that's
+  newer than the yt-dlp in use and hasn't failed before is downloaded: its pure Python wheel,
+  checked against PyPI's sha256 (and no file outside its folder), unpacked into
+  `<folder>/yt-dlp/<version>/`. yt-dlp pins its `yt-dlp-ejs` (the challenge scripts, major and
+  minor version must match); when that's another version than the bundled one, its wheel goes
+  into the same folder. `<folder>/yt-dlp.json` keeps what's ready, what failed, what worked and
+  when PyPI was last asked. A failed check (no network) tries again in an hour.
+- **Loading** (`update.activate`): at the next start the ready version goes first on
+  `sys.path`, before the bundled one. A running yt-dlp isn't swapped: the module's PO token
+  and JavaScript providers are registered with it, and lookups in flight use it.
+- **Falling back:** to the bundled yt-dlp, and that version is never downloaded or tried again,
+  when it doesn't import (yt-dlp itself, its YouTube extractor and the module's code that uses
+  yt-dlp's internals: `core`, `jsc`) — then right away, in the same start — or when its first
+  3 stream lookups all fail (not counting YouTube's bot check) — then from the next start. One
+  that worked once is trusted from then on: a later failure is YouTube's doing. A bundled
+  yt-dlp that's newer than the download (an app update) wins, and the download is removed.
+- The log says which one is in use: `yt-dlp 2026.11.5 (downloaded; bundled 2026.10.26),
+  ytmusicapi …`, and why one was dropped. Tests: `tests/test_update.py`, against a fake PyPI on
+  localhost (no real downloads or lookups).
 
 Costs and risks:
 

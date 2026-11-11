@@ -79,6 +79,13 @@
   Python does one thing at a time, so **a stream lookup goes first** (`PlaybackFirst`): while
   one runs, everything else on Python (the radio, lyrics, pages, searches) waits for it, up
   to 8 s, so a song that has to start isn't slowed down by them.
+- **yt-dlp updates itself** on the phone, so a YouTube change doesn't have to wait for an app
+  release: `OnDeviceYtm` gives the module `noBackupFilesDir/ytm-module/` (not in backups)
+  before anything imports yt-dlp; once a day it looks for a newer one on PyPI and uses it from
+  the next start, falling back to the bundled one when it fails (see
+  [ytm-module](ytm-module.md#yt-dlp-updating-itself-)). The yt-dlp in use shows after the app's
+  version in *Settings → App* (the bridge's `appVersion` adds it once the module started) and
+  at the top of *Send logs*.
 - **yt-dlp's JavaScript** (`JsEngine`): yt-dlp has to run YouTube's player script to solve its
   challenges; without a JavaScript runtime it only gets a reduced set of formats (and warns).
   The phone can't start Deno as a program, so the app hands yt-dlp the **WebView's own
