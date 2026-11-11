@@ -46,6 +46,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [implementation/protocol.md](implementation/protocol.md) | Client ⇄ host protocol design, TS type generation |
 | [implementation/protocol-messages.md](implementation/protocol-messages.md) | Commands, events and room snapshot (draft) |
 | [implementation/module-api.md](implementation/module-api.md) | HTTP API for remote source modules (draft) |
+| [implementation/song-recognition-research.md](implementation/song-recognition-research.md) | Research: why YTMP can't reuse YouTube Music's own recognizer (keep Shazam) |
 | [implementation/storage.md](implementation/storage.md) | Database (SQLite/PostgreSQL), song graph storage, radio generation |
 | [implementation/android-app.md](implementation/android-app.md) | Android app structure, native audio playback, app updates |
 | [implementation/playlist-converter.md](implementation/playlist-converter.md) | Playlist converter: readers, matching, stored jobs, writers |
