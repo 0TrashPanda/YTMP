@@ -6,4 +6,5 @@
     <string name="widget_pause">Pause</string>
     <string name="widget_like">Like</string>
     <string name="widget_unlike">Remove like</string>
+    <string name="tap_share_description">Share a room or song by holding phones together</string>
 </resources>

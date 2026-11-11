@@ -21,6 +21,8 @@ export type ReduceMotion = 'system' | 'on' | 'off';
 export type ToastPlace = 'center' | 'left';
 /** Up next's ⋮ with nothing queued: on a line saying what plays ("Playing from …"), or at the end of the Radio from chips. */
 export type UpNextMenu = 'line' | 'chips';
+/** A song shared with you: a full page like YouTube Music's song page, or a sheet like the song menu. */
+export type SharedSongLook = 'page' | 'sheet';
 /** How many songs of one playlist may be added at most (Settings → Adding songs). */
 export const ADD_LIMITS = { min: 10, max: 5000 };
 /** At most this many choices when it asks how many. */
@@ -193,6 +195,7 @@ const closeRoom = oneOf<CloseRoom>('undo', 'ask');
 const reduceMotion = oneOf<ReduceMotion>('system', 'on', 'off');
 const toastPlace = oneOf<ToastPlace>('center', 'left');
 const upNextMenu = oneOf<UpNextMenu>('line', 'chips');
+const sharedSongLook = oneOf<SharedSongLook>('page', 'sheet');
 
 export const settings = {
 	// Playback
@@ -276,6 +279,12 @@ export const settings = {
 	bigTaps: new Setting('bigTaps', true, bool),
 	/** On a touch screen, songs show their ⋮ also where holding a song opens its menu (off: only holding does). */
 	songMoreButton: new Setting('songMoreButton', false, bool),
+
+	// Sharing
+	/** In the app, holding another phone against this one shares the room or song while its Share sheet is open (share.svelte.ts). */
+	tapToShare: new Setting('tapToShare', true, bool),
+	/** How a song shared with you shows. */
+	sharedSongLook: new Setting('sharedSongLook', 'page' as SharedSongLook, sharedSongLook),
 
 	// The rest keep their own shape (and check it where they're used).
 	/** Taps and swipes on songs in lists, in the queue and in Autoplay (gestures.svelte.ts). */

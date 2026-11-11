@@ -42,8 +42,12 @@
 	import GraphView from '../../../lib/components/GraphView.svelte';
 	import type { Link } from '../../../lib/links';
 	import ShareSheet from '../../../lib/components/ShareSheet.svelte';
+	import SongShareSheet from '../../../lib/components/SongShareSheet.svelte';
+	import SharedSong from '../../../lib/components/SharedSong.svelte';
+	import { onSharedSong, sharedFromUrl } from '../../../lib/share.svelte';
+	import { addToQueue as addSongToQueue, playNext as playSongNext, playNow as playSongNow, quoted, startRadio as startSongRadio } from '../../../lib/songActions';
 	import CloneSheet from '../../../lib/components/CloneSheet.svelte';
-	import { forgetHome, forgetLibrary, getHost, getRoom } from '../../../lib/api';
+	import { forgetHome, forgetLibrary, getHost, getRoom, getSong } from '../../../lib/api';
 	import type { HostInfo } from '../../../lib/protocol.gen';
 	import { createPlayer, pause, play, type RoomPlayer } from '../../../lib/player.svelte';
 	import { sleepTimer } from '../../../lib/sleepTimer.svelte';
@@ -100,6 +104,8 @@
 	type Sheet =
 		| { kind: 'menu'; target: MenuTarget }
 		| { kind: 'save'; song: Song }
+		| { kind: 'shareSong'; song: Song }
+		| { kind: 'shared'; songId: string }
 		| { kind: 'graph'; song: Song | null }
 		| { kind: 'settings'; start: SettingsSection | null }
 		| { kind: 'avatar' | 'share' | 'clone' | 'leave' | 'playOn' | 'partyScreen' | 'linkTv' | 'sleep' | 'listen' };
@@ -479,12 +485,43 @@
 		const onNearbyNotice = (text: string) => toast(text);
 		if (nativeBridge) window.__ytmpNative = { ...window.__ytmpNative, onBack, onNearbyNotice };
 		window.addEventListener('ytmp:settings', onSettings);
+		// A song another phone shared with this one (held against it, or Share → YTMP): its song screen.
+		const stopShared = onSharedSong((songId) => (sheet = { kind: 'shared', songId }));
 		return () => {
+			stopShared();
 			if (window.__ytmpNative?.onBack === onBack) window.__ytmpNative = { ...window.__ytmpNative, onBack: undefined };
 			if (window.__ytmpNative?.onNearbyNotice === onNearbyNotice) window.__ytmpNative = { ...window.__ytmpNative, onNearbyNotice: undefined };
 			window.removeEventListener('ytmp:settings', onSettings);
 		};
 	});
+
+	// A shared song played here from the room list ("Play it in", SharedSong.svelte): the room's
+	// link says what to do with it (?shared=…&do=…), once the room is open.
+	let sharedToDo = sharedFromUrl(new URL(location.href));
+	$effect(() => {
+		const todo = sharedToDo;
+		const r = room;
+		if (!todo || !r?.state || r.status !== 'connected') return;
+		sharedToDo = null;
+		untrack(() => {
+			const url = new URL(location.href);
+			url.searchParams.delete('shared');
+			url.searchParams.delete('do');
+			replaceState(url, page.state);
+			void doShared(r, todo.songId, todo.action);
+		});
+	});
+	async function doShared(r: RoomConnection, songId: string, action: 'play' | 'next' | 'end' | 'radio') {
+		try {
+			const song = await getSong(songId);
+			if (action === 'play') await playSongNow(r, song, toast);
+			else if (action === 'next') await playSongNext(r, [song], quoted(song), toast);
+			else if (action === 'end') await addSongToQueue(r, [song], quoted(song), toast);
+			else await startSongRadio(r, song, toast);
+		} catch (e) {
+			toast(e instanceof Error ? e.message : "Couldn't play the shared song");
+		}
+	}
 
 	// Phones: pull Home down to load new suggestions (Library: your playlists and podcasts again).
 	let homeVersion = $state(0);
@@ -931,6 +968,18 @@
 			onSave={youtube.account ? (song) => (sheet = { kind: 'save', song }) : undefined}
 			onSleepTimer={() => (sheet = { kind: 'sleep' })}
 			onGraph={(song) => (sheet = { kind: 'graph', song })}
+			onShare={(song) => (sheet = { kind: 'shareSong', song })}
+		/>
+	{:else if sheet?.kind === 'shareSong'}
+		<SongShareSheet song={sheet.song} onClose={() => close('shareSong')} onToast={toast} />
+	{:else if sheet?.kind === 'shared'}
+		<SharedSong
+			songId={sheet.songId}
+			{room}
+			onClose={() => close('shared')}
+			onToast={toast}
+			onSave={youtube.account ? (song) => (sheet = { kind: 'save', song }) : undefined}
+			onShare={(song) => (sheet = { kind: 'shareSong', song })}
 		/>
 	{:else if sheet?.kind === 'graph'}
 		<GraphView seed={sheet.song} onClose={() => close('graph')} onToast={toast} />

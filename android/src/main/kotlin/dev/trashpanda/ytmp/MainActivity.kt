@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.net.Uri
+import android.nfc.NfcAdapter
+import android.nfc.cardemulation.CardEmulation
 import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.Bundle
@@ -47,6 +49,10 @@ import dev.trashpanda.ytmp.host.SourceException
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.share.Shared
+import dev.trashpanda.ytmp.share.SharedLinks
+import dev.trashpanda.ytmp.share.TapShare
+import dev.trashpanda.ytmp.share.TapShareService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -246,6 +252,7 @@ class MainActivity : ComponentActivity() {
                 link?.let(::openLink)
             }
         }
+        if (savedInstanceState == null) takeShared(intent, started = true)
 
         // A new version: asked once per app start (not when the screen is only recreated).
         if (!app.checkedForUpdate) {
@@ -270,6 +277,78 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         roomLink(intent)?.let(::openLink)
+        takeShared(intent, started = false)
+    }
+
+    /**
+     * A room or song another phone shared (held against this one: an NFC tag with its link), or
+     * that another app shared to YTMP (Share → YTMP). A room opens like a scanned QR code; a song
+     * shows the page's song screen (frontend SharedSong.svelte), which takes it with `takeShared`.
+     * [started]: the app was opened for it.
+     */
+    private fun takeShared(intent: Intent?, started: Boolean) {
+        val tapped = intent?.action == NfcAdapter.ACTION_NDEF_DISCOVERED
+        val text = when (intent?.action) {
+            NfcAdapter.ACTION_NDEF_DISCOVERED -> intent.dataString
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+            else -> return
+        }
+        when (val shared = SharedLinks.parse(text)) {
+            is Shared.Room -> openLink(Uri.parse(shared.url))
+            is Shared.Song -> if (tapped && !openSharedSongs) {
+                // Settings → Sharing: songs go on to YouTube Music, as on a phone without YTMP.
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(shared.url)).addCategory(Intent.CATEGORY_BROWSABLE))
+                if (started) moveTaskToBack(true)
+            } else {
+                Log.i("YtmpTapShare", "Got a shared song: ${shared.songId}")
+                pendingShared = shared.songId
+                js("window.__ytmpNative && window.__ytmpNative.onShared && window.__ytmpNative.onShared()")
+            }
+            null -> if (!tapped) {
+                AlertDialog.Builder(this).setMessage("YTMP opens YouTube Music songs and YTMP room links. This wasn't one.").setPositiveButton("OK", null).show()
+            }
+        }
+    }
+
+    /** A song shared with this phone that the page hasn't shown yet (its YTMP song id). */
+    @Volatile private var pendingShared: String? = null
+
+    /** Settings → Sharing: a song held against this phone opens YTMP's song screen (else YouTube Music). */
+    private var openSharedSongs: Boolean
+        get() = prefs.getBoolean("openSharedSongs", true)
+        set(value) = prefs.edit().putBoolean("openSharedSongs", value).apply()
+
+    /** Whether this phone can share by holding phones together: "on", "off" (NFC is switched off) or "none". */
+    private fun tapShareState(): String {
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_NFC_HOST_CARD_EMULATION)) return "none"
+        val adapter = NfcAdapter.getDefaultAdapter(this) ?: return "none"
+        return if (adapter.isEnabled) "on" else "off"
+    }
+
+    /**
+     * While this screen shows and something is shared, the tag answers before any other app's
+     * (another app could also act as an NFC tag).
+     */
+    private fun preferTapShare(on: Boolean) {
+        if (tapShareState() == "none") return
+        val adapter = NfcAdapter.getDefaultAdapter(this) ?: return
+        val emulation = CardEmulation.getInstance(adapter)
+        runCatching {
+            if (on) emulation.setPreferredService(this, ComponentName(this, TapShareService::class.java))
+            else emulation.unsetPreferredService(this)
+        }.onFailure { Log.w("YtmpTapShare", "Couldn't prefer the share tag", it) }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        TapShare.onScreen = true
+        if (TapShare.link != null) preferTapShare(true)
+    }
+
+    override fun onPause() {
+        TapShare.onScreen = false
+        preferTapShare(false)
+        super.onPause()
     }
 
     /** A room link the browser handed over (`ytmp://open?url=…`, see frontend/src/lib/openInApp.ts), or null. */
@@ -431,6 +510,8 @@ class MainActivity : ComponentActivity() {
     private inner class Client : WebViewClient() {
         override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
             currentUrl = url?.let(Uri::parse)
+            // A page that's gone shares nothing anymore.
+            TapShare.link = null
         }
 
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
@@ -792,6 +873,52 @@ class MainActivity : ComponentActivity() {
             runCatching { json.decodeFromString(EqSettings.serializer(), settingsJson) }.getOrNull()?.let(Equalizers::set)
         }
 
+        /** Whether holding phones together can share (bridge version 18): "on", "off" (NFC is off) or "none". */
+        @JavascriptInterface
+        fun tapShare(): String = tapShareState()
+
+        /**
+         * What holding another phone against this one hands over (bridge version 18): a link (a
+         * room's, a song's), or null for nothing. Only while the app is on screen.
+         */
+        @JavascriptInterface
+        fun setTapShare(url: String?) = runOnUiThread {
+            if (currentUrl?.let(::isAppPage) != true) return@runOnUiThread
+            val link = url?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+            TapShare.link = link
+            if (TapShare.onScreen) preferTapShare(link != null)
+        }
+
+        /** Android's NFC settings, to switch NFC on (bridge version 18). */
+        @JavascriptInterface
+        fun openNfcSettings() = runOnUiThread {
+            runCatching { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }.onFailure { startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) }
+        }
+
+        /** Android's share sheet with a link (bridge version 18): the WebView has no navigator.share. */
+        @JavascriptInterface
+        fun shareLink(title: String, url: String) = runOnUiThread {
+            if (currentUrl?.let(::isAppPage) != true) return@runOnUiThread
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url).putExtra(Intent.EXTRA_SUBJECT, title)
+            startActivity(Intent.createChooser(send, title))
+        }
+
+        /** The song shared with this phone that wasn't shown yet (bridge version 18): its song id, once; null if none. */
+        @JavascriptInterface
+        fun takeShared(): String? {
+            if (currentUrl?.let(::isAppPage) != true) return null
+            return pendingShared.also { pendingShared = null }
+        }
+
+        /** Settings → Sharing (bridge version 18): a song held against this phone opens YTMP's song screen, or YouTube Music. */
+        @JavascriptInterface
+        fun openSharedSongs(): Boolean = openSharedSongs
+
+        @JavascriptInterface
+        fun setOpenSharedSongs(on: Boolean) {
+            if (currentUrl?.let(::isAppPage) == true) openSharedSongs = on
+        }
+
         @JavascriptInterface
         fun playback(targetJson: String) {
             val target = json.decodeFromString(PlaybackTarget.serializer(), targetJson)
@@ -810,7 +937,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 17
+        const val BRIDGE_VERSION = 18
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

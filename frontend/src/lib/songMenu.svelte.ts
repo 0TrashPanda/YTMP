@@ -23,6 +23,7 @@ export type MenuAction =
 	| 'goArtist'
 	| 'goAlbum'
 	| 'openYtm'
+	| 'share'
 	| 'markPlayed'
 	| 'removeListened'
 	| 'remove';
@@ -48,6 +49,7 @@ export const MENU_ACTIONS: Record<MenuAction, { name: string; icon: IconName; hi
 	goArtist: { name: 'Go to artist', icon: 'person' },
 	goAlbum: { name: 'Go to album', icon: 'album' },
 	openYtm: { name: 'Open in YouTube Music', icon: 'open' },
+	share: { name: 'Share', icon: 'share', hint: 'Send its link, or hold phones together' },
 	markPlayed: { name: 'Mark as played', icon: 'check', hint: 'Podcast episodes' },
 	removeListened: { name: 'Remove from your history', icon: 'remove', hint: 'Library → History' },
 	remove: { name: 'Remove from the queue', icon: 'remove', hint: 'Up next' }
@@ -75,6 +77,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
 	'goArtist',
 	'goAlbum',
 	'openYtm',
+	'share',
 	'markPlayed',
 	'divider',
 	'removeListened',

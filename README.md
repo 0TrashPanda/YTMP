@@ -37,6 +37,12 @@ Music, without Premium, and not tied to a single music service.
   nearby on the same Wi-Fi), and solo rooms just for you. Rooms survive restarts. A scanned
   QR code or a room link opens in the app on an Android phone that has it. Pick your own
   room code if you like (e.g. `PARTY`).
+- **Share by holding phones together** (Android with NFC): with a room's or song's Share
+  sheet open, hold another phone (Android or iPhone) against yours and it opens the room, or
+  the song. A song shared with you (or shared to YTMP from YouTube Music) gets a song screen
+  like YouTube Music's: Play now, Play next, Add to queue, Start radio, Like, Save to playlist;
+  with no room open it asks where (a new solo room, or a room of yours or nearby). Songs can be
+  sent with the share sheet too (*Share* in the song menu).
 - One shared queue: add, play next, drag to reorder, swipe to remove, jump to any song,
   remove everything above or below a song, clear, or clear the whole room (song, queue and autoplay), with Undo. Played songs stay above the current one until you remove them; autoplay songs below.
 - Shuffle and repeat (queue or one song), fair order (one song per person per round),

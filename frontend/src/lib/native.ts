@@ -100,6 +100,19 @@ export interface NativeBridge {
 	setLikes?(json: string | null): void;
 	/** A like the page knows or changed, so the home screen widget shows it too. */
 	likeChanged?(songId: string, liked: boolean): void;
+	/** Whether holding phones together can share (bridge version 18): "on", "off" (NFC is switched off) or "none" (no NFC). */
+	tapShare?(): 'on' | 'off' | 'none';
+	/** What holding another phone against this one hands over (bridge version 18): a link, or null for nothing. */
+	setTapShare?(url: string | null): void;
+	/** Android's NFC settings, to switch NFC on (bridge version 18). */
+	openNfcSettings?(): void;
+	/** Android's share sheet with a link (bridge version 18). */
+	shareLink?(title: string, url: string): void;
+	/** A song another phone or app shared with this one, not shown yet (bridge version 18): its song id, once. */
+	takeShared?(): string | null;
+	/** Settings → Sharing (bridge version 18): a song held against this phone opens YTMP's song screen (else YouTube Music). */
+	openSharedSongs?(): boolean;
+	setOpenSharedSongs?(on: boolean): void;
 }
 
 /** Callbacks the app calls on the page. */
@@ -147,6 +160,8 @@ export interface NativeCallbacks {
 	onDownloaded?(songId: string, error: string | null): void;
 	/** A like changed from the home screen widget. */
 	onLiked?(songId: string, liked: boolean): void;
+	/** A song was shared with this phone (held against another phone, or Share → YTMP): takeShared() has it. */
+	onShared?(): void;
 }
 
 /** Speakers and TVs on the phone's own network (android/.../MainActivity.kt), for a room on another host. */

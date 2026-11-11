@@ -21,6 +21,7 @@
 		| 'storage'
 		| 'module'
 		| 'app'
+		| 'sharing'
 		| 'server';
 </script>
 
@@ -40,7 +41,8 @@
 	import { preferences } from '../../preferences.svelte';
 	import type { AccountInfo, AuthServerInfo, HostInfo } from '../../protocol.gen';
 	import type { RoomConnection } from '../../room.svelte';
-	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type CloseRoom, type PlaylistPick, type ReduceMotion, type ToastPlace, type UpNextMenu, type Setting } from '../../settings.svelte';
+	import { ADD_LIMITS, BUSY_DELAYS, MAX_ASK_COUNTS, load as loadSettings, onAccount, settings, type CloseRoom, type PlaylistPick, type ReduceMotion, type ToastPlace, type UpNextMenu, type SharedSongLook, type Setting } from '../../settings.svelte';
+	import { canTapShare } from '../../share.svelte';
 	import { PAGE_SIZES, saved, type BackLimit, type DislikeButton, type HeadphonesAction, type ImageQuality, type SmallFirst, type SwipeOpens, type TabOrder, type TallPlayer, type VideoArt, type ClearRoomBy } from '../../storage';
 	import { fold, LABELS, mark, matches, rowsOf, searchWords } from '../../settingsSearch';
 	import { youtube } from '../../youtube.svelte';
@@ -119,6 +121,7 @@
 	/** On the phone's own pages (its room list and rooms), which keep the phone's song cache. */
 	const onThisPhone = $derived(inApp && host?.kind === 'phone' && ['127.0.0.1', 'localhost'].includes(location.hostname));
 	const inRoom = $derived(!!room?.state);
+	let openSharedSongs = $state(nativeBridge?.openSharedSongs?.() ?? true);
 
 	type Page = [SettingsSection, string, IconName, boolean];
 	const groups = $derived(
@@ -173,6 +176,7 @@
 					'App',
 					[
 						['app', 'App', 'phone', !!nativeBridge?.appVersion],
+						['sharing', 'Sharing', 'share', !!nativeBridge?.takeShared],
 						['server', 'Server admin', 'server', !!account?.isAdmin && !!info]
 					]
 				]
@@ -833,6 +837,37 @@
 		{/if}
 	{:else if id === 'module'}
 		<OwnModuleSection {onToast} />
+	{:else if id === 'sharing' && nativeBridge?.takeShared}
+		{#if canTapShare()}
+			<Toggle
+				label="Share by holding phones together"
+				hint="While a room's or song's Share sheet is open, holding another phone against this one hands over the link (NFC). Their phone opens it in YTMP, or else in the browser or YouTube Music. iPhones (XS and newer) can read it too."
+				setting={settings.tapToShare}
+			/>
+		{:else}
+			<div>
+				<p class="text-sm font-medium">Share by holding phones together</p>
+				<p class="text-xs text-muted">This phone has no NFC, so it can't share this way. It can still get rooms and songs from other phones.</p>
+			</div>
+		{/if}
+		<Toggle
+			label="Open shared songs in YTMP"
+			hint="A song another phone hands over (or that you share to YTMP) shows here, with Play now, Add to queue and more. Off: songs from another phone open in YouTube Music instead."
+			checked={openSharedSongs}
+			onchange={(on) => {
+				openSharedSongs = on;
+				nativeBridge?.setOpenSharedSongs?.(on);
+			}}
+		/>
+		<Choice
+			label="Shared songs show as"
+			hint="A full page like YouTube Music's song page, or a sheet over the room like the song menu."
+			setting={settings.sharedSongLook}
+			options={[
+				['page', 'Full page'],
+				['sheet', 'Sheet']
+			] as [SharedSongLook, string][]}
+		/>
 	{:else if id === 'app' && nativeBridge?.appVersion}
 		<div class="flex items-center gap-3">
 			<div class="flex-1">

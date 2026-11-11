@@ -22,6 +22,10 @@
     <!-- The WebView's getUserMedia refuses audio without this one too (no question to the user). -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Sharing a room or song by holding phones together: the phone acts as an NFC tag. Phones without NFC can install the app too. -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
 
     <!-- Cleartext is needed for servers and phone hosts on the local network (http://). -->
     <application
@@ -51,6 +55,29 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="ytmp" android:host="open" />
             </intent-filter>
+            <!-- Held against a phone (or an NFC tag) sharing a room: its link opens here, not in the browser. -->
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="*" />
+                <data android:pathPattern="/room/.*" />
+            </intent-filter>
+            <!-- ... or a song: its YouTube Music link opens YTMP's song screen (Settings → Sharing can send it on to YouTube Music). -->
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="https" />
+                <data android:host="music.youtube.com" />
+                <data android:path="/watch" />
+            </intent-filter>
+            <!-- Share → YTMP from YouTube Music (or any app): a song or room link. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -69,6 +96,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Sharing by holding phones together: answers as an NFC tag while a Share sheet is open. -->
+        <service
+            android:name=".share.TapShareService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NFC_SERVICE">
+            <intent-filter>
+                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.cardemulation.host_apdu_service"
+                android:resource="@xml/tap_share" />
+        </service>
 
         <!-- Learning radios overnight, while the phone charges on Wi-Fi. -->
         <service

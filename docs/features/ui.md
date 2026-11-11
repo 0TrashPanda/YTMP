@@ -395,7 +395,7 @@ song's menu on an album's or artist's page has no *Go to* that same page.
 > the start), Start radio, Autoplay from here, Find similar, Go to artist / album / podcast
 > (their pages; a search when the source gives no ID), Like and Save to playlist (with a
 > linked YouTube Music account), Open in YouTube Music, and Remove (from the queue, the
-> history or the autoplay queue; in *Library → History*: from your listening history). Download ✅ (YouTube Music songs and episodes). Planned: YTMP playlists and Share. The
+> history or the autoplay queue; in *Library → History*: from your listening history). Download ✅ (YouTube Music songs and episodes), Share ✅ ([sharing.md](sharing.md)). Planned: YTMP playlists. The
 > menu is customisable ✅ (below). The current song has the menu too: right-click
 > the album art in the full player or the player bar, or its ⋮.
 >
@@ -438,7 +438,7 @@ song's menu on an album's or artist's page has no *Go to* that same page.
 | Go to album | |
 | Sleep timer ✅ | Only for the song that's playing: see [sleep timer](playback-and-outputs.md#sleep-timer) |
 | Download ✅ | Save the song as a plain music file (.m4a with its title, artist, album and cover). In a browser: a normal download. In the app: in the phone's *Music/YTMP* folder, so it shows in Local → *Music on this phone* and in other music apps. Not for local music. |
-| Share (planned) | A YTM link or a YTMP link (you choose) |
+| Share ✅ | Its YouTube Music link: send it, copy it, or hold another phone against yours ([sharing.md](sharing.md)) |
 | Open in YouTube Music | For YTM songs |
 
 - In *Up next*, **hold** a song (or right-click it) for its menu; with a mouse a ⋮ also shows

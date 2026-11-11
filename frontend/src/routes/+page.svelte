@@ -12,6 +12,12 @@
 	import type { HostInfo, RoomInfo, RoomOpenMode, RoomVisibility, SyncedRoom } from '../lib/protocol.gen';
 	import { settings } from '../lib/settings.svelte';
 	import { saved } from '../lib/storage';
+	import SharedSong from '../lib/components/SharedSong.svelte';
+	import SongShareSheet from '../lib/components/SongShareSheet.svelte';
+	import SaveSheet from '../lib/components/SaveSheet.svelte';
+	import PlayItIn, { type RoomChoice } from '../lib/components/PlayItIn.svelte';
+	import { onSharedSong, roomLinkWith, type SharedAction } from '../lib/share.svelte';
+	import type { Song } from '../lib/protocol.gen';
 
 	let name = $state(saved.displayName);
 	let code = $state('');
@@ -40,6 +46,47 @@
 	let settingsAt = $state<SettingsSection | null | undefined>(undefined);
 	let settingsScreen = $state<SettingsScreen>();
 	let toastText = $state<string | null>(null);
+	function showToast(text: string) {
+		toastText = text;
+		setTimeout(() => toastText === text && (toastText = null), 3000);
+	}
+
+	// A song another phone shared with this one (held against it, or Share → YTMP) while no room
+	// is open: its song screen; playing it asks where first (Play it in).
+	let shared = $state<
+		{ kind: 'song'; songId: string } | { kind: 'pick'; song: Song; action: SharedAction } | { kind: 'share'; song: Song } | { kind: 'save'; song: Song } | null
+	>(null);
+	let stopShared = () => {};
+	const PICK_TITLES: Record<SharedAction, string> = { play: 'Play it in', next: 'Play it next in', end: 'Add it to the queue in', radio: 'Start its radio in' };
+	const roomChoices = $derived.by((): RoomChoice[] => {
+		const pick = shared?.kind === 'pick' ? shared : null;
+		if (!pick) return [];
+		const go = (path: string) => () => {
+			shared = null;
+			saved.displayName = name.trim() || saved.displayName;
+			void goto(roomLinkWith(path, pick.song.id, pick.action));
+		};
+		return [
+			...myRooms.map((r) => ({ key: `mine:${r.code}`, name: r.name, where: onThisPhone ? 'On this phone' : `On ${location.host}`, open: go(`/room/${r.code}`) })),
+			...nearby.map((r) => ({
+				key: `near:${r.url}:${r.code}`,
+				name: r.name,
+				where: 'Nearby',
+				open: () => {
+					shared = null;
+					location.href = roomLinkWith(`${r.url}/room/${r.code}`, pick.song.id, pick.action);
+				}
+			}))
+		];
+	});
+	async function newSoloRoom(song: Song, action: SharedAction) {
+		shared = null;
+		await attempt(async () => {
+			const created = await createRoom(name.trim() ? defaultRoomName : 'Solo room', 'private', me?.token ?? null, null, null);
+			saved.setOwnerToken(created.code, created.ownerToken);
+			await goto(roomLinkWith(`/room/${created.code}`, song.id, action));
+		});
+	}
 	$effect(() => {
 		saved.hideFromHistory = hideFromHistory;
 	});
@@ -51,6 +98,8 @@
 
 	onMount(async () => {
 		if (await reopen()) return;
+		// Not when the app went back into a room: that room shows it.
+		stopShared = onSharedSong((songId) => (shared = { kind: 'song', songId }));
 		try {
 			host = await getHost();
 			me = await logInOnce(host);
@@ -94,7 +143,8 @@
 
 	// The phone's Back button: settings go back a step, then close; then the avatar menu.
 	function onBack(): 'handled' | 'exit' {
-		if (settingsAt !== undefined) {
+		if (shared) shared = null;
+		else if (settingsAt !== undefined) {
 			if (!settingsScreen?.back()) closeSettings();
 		} else if (profileOpen) profileOpen = false;
 		else return 'exit';
@@ -103,6 +153,7 @@
 
 	onDestroy(() => {
 		finishClosing();
+		stopShared();
 		if (window.__ytmpNative) window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: undefined, onBack: undefined };
 	});
 
@@ -331,11 +382,26 @@
 		bind:this={settingsScreen}
 		start={settingsAt}
 		onClose={closeSettings}
-		onToast={(text) => {
-			toastText = text;
-			setTimeout(() => toastText === text && (toastText = null), 3000);
-		}}
+		onToast={showToast}
 	/>
+{/if}
+{#if shared?.kind === 'song'}
+	<SharedSong
+		songId={shared.songId}
+		room={null}
+		onClose={() => (shared = null)}
+		onToast={showToast}
+		onPickRoom={(song, action) => (shared = { kind: 'pick', song, action })}
+		onSave={youtube.account ? (song) => (shared = { kind: 'save', song }) : undefined}
+		onShare={(song) => (shared = { kind: 'share', song })}
+	/>
+{:else if shared?.kind === 'pick'}
+	{@const pick = shared}
+	<PlayItIn title={PICK_TITLES[pick.action]} rooms={roomChoices} onNew={() => newSoloRoom(pick.song, pick.action)} onClose={() => (shared = null)} />
+{:else if shared?.kind === 'share'}
+	<SongShareSheet song={shared.song} onClose={() => (shared = null)} onToast={showToast} />
+{:else if shared?.kind === 'save'}
+	<SaveSheet song={shared.song} onClose={() => (shared = null)} onToast={showToast} />
 {/if}
 {#if askingClose}
 	{@const room = askingClose}

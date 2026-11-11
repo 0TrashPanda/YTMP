@@ -18,6 +18,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [features/overview.md](features/overview.md) | Vision, core concepts, glossary |
 | [features/rooms-and-roles.md](features/rooms-and-roles.md) | Host / client / solo, rooms, joining, visibility |
 | [features/joining.md](features/joining.md) | Room codes, finding hosts on the LAN (auto, QR, IP) |
+| [features/sharing.md](features/sharing.md) | Sharing rooms and songs: links, holding phones together (NFC), the song screen |
 | [features/platforms.md](features/platforms.md) | What each device type can do, Android app features |
 | [features/room-lifecycle.md](features/room-lifecycle.md) | Admin leaving, changing the owner, cloning, migration, transfer, multiple solo rooms |
 | [features/room-sync.md](features/room-sync.md) | Your rooms on all your devices: one home, moving between phone and server |
@@ -57,4 +58,5 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [implementation/local-music.md](implementation/local-music.md) | Local music: a Raspberry Pi's music folder (MPD), the music on the phone, the Local tab's API |
 | [implementation/zones.md](implementation/zones.md) | Amplifier zones: the zones file and its building blocks, setting up the Pi |
 | [implementation/room-sync.md](implementation/room-sync.md) | Room sync: hub on the server, copies, epochs, moving |
+| [implementation/tap-to-share.md](implementation/tap-to-share.md) | Holding phones together: the NFC tag (host card emulation), the bridge, the song screen |
 | [implementation/networking.md](implementation/networking.md) | LAN discovery, QR, room code generation, transport security, default timeouts |

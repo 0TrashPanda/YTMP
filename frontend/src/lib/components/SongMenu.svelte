@@ -50,6 +50,7 @@
 	import { sleepTimer } from '../sleepTimer.svelte';
 	import { arrange, holds, shownChoices, songMenuLayout, type MenuAction } from '../songMenu.svelte';
 	import { artistNames } from '../format';
+	import { songLink } from '../share.svelte';
 	import Art from './Art.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 
@@ -69,8 +70,10 @@
 		onSleepTimer?: () => void;
 		/** The song graph around a song (with your YTMP account). */
 		onGraph?: (song: Song) => void;
+		/** Share the song: its link, or by holding phones together (SongShareSheet). */
+		onShare?: (song: Song) => void;
 	}
-	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave, onSleepTimer, onGraph }: Props = $props();
+	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave, onSleepTimer, onGraph, onShare }: Props = $props();
 
 	const song = $derived(target.song);
 	const item = $derived(target.item);
@@ -398,6 +401,10 @@
 		}
 		if (ytmId) {
 			add('openYtm', { icon: 'open', label: 'Open in YouTube Music', href: `https://music.youtube.com/watch?v=${encodeURIComponent(ytmId)}`, run: onClose });
+		}
+		if (onShare && songLink(song)) {
+			const current = song;
+			add('share', { icon: 'share', label: 'Share', run: () => (onClose(), onShare(current)) });
 		}
 		if (target.episode) {
 			const { played, onMarked } = target.episode;

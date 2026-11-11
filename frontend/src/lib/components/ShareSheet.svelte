@@ -6,6 +6,7 @@
 	import Icon from './Icon.svelte';
 	import { setSoloHidden } from '../soloLook.svelte';
 	import { getHost } from '../api';
+	import TapShareHint from './TapShareHint.svelte';
 
 	let {
 		room,
@@ -120,6 +121,7 @@
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- SVG generated locally from the link -->
 			<div class="w-56 overflow-hidden rounded-xl">{@html qr}</div>
 			<p class="text-center text-sm text-muted">Scan with a phone camera, or open the link in a browser.</p>
+			<TapShareHint url={link} what="this room" />
 			<button class="w-full truncate rounded-lg bg-raised px-3 py-2 font-mono text-sm" onclick={() => copy(link, 'Link')}>{link}</button>
 			<button class="flex items-center gap-2 font-mono text-3xl tracking-[0.3em]" onclick={() => copy(info?.code ?? '', 'Room code')}>
 				{info?.code}
