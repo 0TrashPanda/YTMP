@@ -29,12 +29,17 @@ server; every YouTube request comes from the computer. Nothing here is built yet
 - **The module is the browser's [own module](playback-sync.md#known-risk-ip-bound-stream-urls)**,
   set up by the app: the shell starts `ytmp-ytm` on `127.0.0.1` with a free port and a new
   random key on every start (`YTMP_YTM_PORT`, `YTMP_MODULE_KEY`), and stops it with the app.
-  The page learns where it is from an **initialization script** that the shell runs on every
-  page (`window.YtmpDesktop = { version, module: { url, key } }`), so no IPC is needed for
-  that. `ownModule.svelte.ts` uses it instead of `saved.ownModule` and shows it in *Settings →
-  Where songs play from* as *This app* (can be switched off, not removed). The module already
-  answers other origins when it has a key (CORS and Chrome's private network preflight, see
-  [module API](module-api.md)).
+- **The page reaches the module through the shell**, not with `fetch`: WebKitGTK blocks an
+  https page from fetching `http://127.0.0.1` (mixed content; "Load failed", the request
+  never leaves; seen in the Linux check below), and Chrome's loopback exception doesn't
+  exist there. An **initialization script** the shell runs on every page sets
+  `window.YtmpDesktop = { version, moduleRequest(path) }`; `moduleRequest` is a Tauri command
+  that forwards the request to the module with its key and answers `{ status, body }`. The
+  page never sees the module's port or key. The server's origin gets a Tauri capability for
+  the command at runtime (it's the address entered at the first start). Same on Windows, so
+  there's one way. `ownModule.svelte.ts` sends every module request through one function that
+  uses `moduleRequest` when it's there, and shows the module in *Settings → Where songs play
+  from* as *This app* (can be switched off, not removed).
 
 ## Why Tauri
 
@@ -87,9 +92,10 @@ How:
   takes ~250 MB for a few seconds per lookup; the next song is looked up while one plays, so
   that's mostly once per song.
 - **PO tokens** ([bot check](ytm-module.md)): like the phone, BotGuard runs in a hidden window
-  of the app (`android/…/assets/botguard.html`, shared), and `ytmp_ytm/pot.py` asks the shell
-  for it over the loopback. If BotGuard doesn't run in WebKitGTK, Linux uses bgutil's provider
-  in script mode with the bundled Deno instead.
+  of the app on `https://www.youtube.com/robots.txt` (YouTube's origin, a tiny page), with
+  `android/…/assets/botguard.html`'s script as an initialization script and its answers sent
+  back over IPC; `ytmp_ytm/pot.py` asks the shell for it over the loopback (with a key). Runs
+  in WebKitGTK (Linux check below).
 - **yt-dlp updates itself** (the plan the phone has too, see
   [ytm-module.md](ytm-module.md#plan-embed-python-with-chaquopy-and-update-yt-dlp-at-runtime)):
   the module checks PyPI once a day, puts a newer yt-dlp in the app's data folder and loads it
@@ -101,9 +107,10 @@ How:
 The web app already sets the Media Session API (title, art, play/pause/next/previous).
 
 - **Windows**: WebView2 passes it to Windows' media controls.
-- **Linux**: WebKitGTK's own MPRIS support depends on its version. If it isn't there or not
-  good enough, the shell does MPRIS itself (the `souvlaki` crate, which also covers Windows),
-  fed by the page over Tauri's IPC.
+- **Linux**: WebKitGTK does MPRIS itself (checked with 2.54): title, artist, album and
+  length show in the desktop's media widget, and Pause, Play and Next over MPRIS reach the
+  page's Media Session handlers. Still to check with the AppImage's own (older) WebKitGTK; if
+  that lacks it, the shell does MPRIS itself (the `souvlaki` crate), fed by the page over IPC.
 
 ## Packaging, updates and releases
 
@@ -133,12 +140,28 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
 | Deno | during a song lookup, a few seconds | ~250 MB |
 | BotGuard window | while lookups happen, closes after 10 min without | ~20 MB |
 
+## Linux check ✅ (2026-11-11)
+
+A throwaway Tauri 2 window (Arch, WebKitGTK 2.54, GStreamer 1.28 with good/bad/libav) on a
+local YTMP server and module:
+
+| What | Result |
+|---|---|
+| The web app (join page) | Renders and works as in Chrome |
+| Audio formats | `canPlayType` "probably" for Opus/WebM and AAC/M4A; MediaSource there |
+| Playing a song | The module's direct YouTube link (M4A) plays, time runs on |
+| Module from an `http://` page | `fetch` to `http://127.0.0.1` works |
+| Module from an `https://` page | **Blocked** (mixed content), never reaches the module; through a Tauri command it works, so the shell forwards them (see Shape) |
+| Media keys | MPRIS player with the Media Session's title/artist/album/length; Pause, Play, Next reach the page |
+| BotGuard | In a hidden window on `https://www.youtube.com/robots.txt` (YouTube's origin, a tiny page) with `botguard.html`'s script: snapshot in 0.27 s, Google gave an integrity token (12 h), minter started and made a 128-character token. Not yet tried in a real lookup |
+| Tauri IPC from a server page | Needs the origin in a capability and the app's commands in an app manifest (`tauri_build::AppManifest`) |
+
+Not covered: Windows (WebView2), the AppImage's bundled WebKitGTK, and the web app's room
+pages beyond the join page.
+
 ## Order of work
 
-1. **Check the risky parts on Linux first** (a throwaway Tauri window on the real server):
-   songs play in WebKitGTK (Opus/WebM and M4A), the page may fetch from `http://127.0.0.1`
-   while it's on `https`, media keys reach MPRIS, BotGuard runs. Whatever fails decides the
-   fallbacks above before anything else is built.
+1. ~~Check the risky parts on Linux first~~ ✅, see above.
 2. `desktop/`: the shell, the setup page, the window on the server, the initialization script.
 3. The module in the app: PyInstaller builds, Deno, starting and stopping it, the web app
    using *This app* as its own module.
