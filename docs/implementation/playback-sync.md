@@ -100,6 +100,31 @@ for that device.
 
 Local files, media server songs and cached songs are always served by the host.
 
+### Search and pages from your own module
+
+✅ With your own module usable (`moduleUsable()`: set up, on, not known to be down),
+`api.ts` asks it for the catalog as well: `fromOwnModule()` decides per request, `lookUp()`
+asks the module (`askOwnModule`, 12 s timeout) and on any failure (unreachable, wrong key,
+`blocked`, timeout, another error) asks the host's `/api/…` route instead. A `not_found`
+answer is passed on as the host's 404 would be, without asking the host again. Unreachable
+or a refused key marks the module down (`moduleStatus`), so the next requests go straight to
+the host until the minute's check finds it again; `blocked` and other errors only fall back
+for that request. Per route:
+
+| What | Module | What the host adds, and where it went |
+|------|--------|---------------------------------------|
+| Search, suggestions | `/search?…&limit=20`, `/search/suggestions` | Its 30 min cache: the page's own cache (`cached`, 30 min) does that. Same `SearchPage`; *In your library* was already the page's own (`librarySearch`). With your sign-in on this host and *personalize* on, or your server's account ([`useYoutubeFrom`](../features/accounts.md)), searches stay with the host (`/api/search`, `/api/me/search`): the sign-in lives there |
+| Home | `/home` | Its 30 min shared cache: the page keeps Home anyway (`sinceLast`, *Settings → Home*). Signed in to YouTube Music here (Home is then yours) or through your server: stays with the host |
+| Artist, album, playlist (and its parts), podcast, song (a pasted link) | `/artists/…`, `/albums/…`, `/playlists/…?more=`, `/podcasts/…`, `/songs/…` | Nothing for YouTube Music's IDs. The host's own music (`local:` IDs: local libraries, the song cache) stays with the host |
+| Lyrics | `/songs/{id}/lyrics` | LRCLIB isn't YouTube, so the host still looks there: `/api/lyrics?…&from=lrclib` (only LRCLIB, kept apart in `LyricsLookup`'s cache). Timed lyrics win as on the host: LRCLIB's timed ones, else the module's timed ones, else LRCLIB's plain ones, else the module's. Podcast episodes and other sources: the host as before |
+
+Stays with the host: Find similar, radio and autoplay (the host's radio mixes in the song
+graph and picks the room's songs), *Recognize a song*'s lookup (`/api/recognize/song`, the
+host's import matcher), everything under `/api/me/…` (the sign-in is on the server), the
+room's own links, the song cache, imports and anything that changes the room. Pasted links
+are read in the page (`links.ts`) and opened as the pages above; the module's planned
+`/resolve` isn't needed.
+
 ### Equalizer in a browser
 
 ✅ `WebPlayer` sends the audio element through Web Audio (`createMediaElementSource`, a

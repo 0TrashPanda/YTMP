@@ -86,7 +86,8 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
             durationMs = query["durationMs"]?.toLongOrNull() ?: 0,
             thumbnails = emptyList(),
         )
-        call.respond(sources.lyrics?.lyrics(song) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No lyrics for this song"))
+        // from=lrclib: only LRCLIB; the page asks YouTube Music itself (its own module).
+        call.respond(sources.lyrics?.lyrics(song, lrclibOnly = query["from"] == "lrclib") ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No lyrics for this song"))
     }
     get("/artists/{id}") { call.respond(catalog("artist").artist(call.parameters["id"]!!)) }
     get("/albums/{id}") { call.respond(catalog("album").album(call.parameters["id"]!!)) }

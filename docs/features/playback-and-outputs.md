@@ -93,7 +93,14 @@ permissions say otherwise (permission: *Play audio locally*).
   - **The order** ✅: in a browser, *Settings → Where songs play from* sets which way is
     tried first: the room's link, your own module or through the server (for example your
     module first). When one doesn't work for a song, the next one is tried; through the
-    server is always the last try. Search and pages always come from the room's server.
+    server is always the last try.
+  - **Search and pages from your own module** ✅: with your own module on, search (and
+    the suggestions while typing), Home, artist, album, playlist and podcast pages, pasted
+    links and YouTube Music's lyrics come from it too, so YouTube sees your computer rather
+    than the room's server. When it doesn't answer (or YouTube stops it for a while), they
+    come from the room's server as before. What's yours stays with your YouTube Music
+    sign-in on the server: your library, your Home, and your searches when *Use your account
+    for search* is on. Radio and autoplay always come from the room.
   - When YouTube won't send a song for a while, the app tries it again a few times and the
     player says so, instead of staying quiet.
 

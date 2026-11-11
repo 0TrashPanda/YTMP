@@ -67,6 +67,7 @@ import type {
 } from './protocol.gen';
 
 import { identity } from './account';
+import { askOwnModule, moduleUsable, ModuleError } from './ownModule.svelte';
 import { settings } from './settings.svelte';
 import { read, saved, write } from './storage';
 
@@ -252,18 +253,62 @@ function abortable<T>(value: Promise<T>, signal?: AbortSignal): Promise<T> {
  */
 const viaYourServer = () => !!youtubeFrom?.personalize;
 
+// --- your own module first (docs/implementation/playback-sync.md#search-and-pages-from-your-own-module) ---
+
+/**
+ * Your YouTube Music sign-in on this host (not from your server, see [useYoutubeFrom]): Home is
+ * then yours, and with [personalize] searches go through it too. Those stay with the host.
+ */
+let signedInHere = { home: false, search: false };
+export function useYoutubeHere(signedIn: boolean, personalize: boolean): void {
+	signedInHere = { home: signedIn, search: signedIn && personalize };
+}
+
+/** What asks YouTube Music: a search (or suggestions), Home, or a page or song by its ID (artist, album, playlist, podcast, lyrics). */
+type Lookup = 'search' | 'home' | 'page';
+
+/**
+ * Whether [what] goes to your own module first (set up, on and not known to be down): the
+ * one place that decides it. Not what's personal (your sign-in is on a server), and not the
+ * host's own music (local libraries and the song cache: `local:` IDs).
+ */
+export function fromOwnModule(what: Lookup, id?: string): boolean {
+	if (!moduleUsable()) return false;
+	if (id?.startsWith('local:')) return false;
+	if (what === 'search') return !viaYourServer() && !signedInHere.search;
+	if (what === 'home') return !youtubeFrom && !signedInHere.home;
+	return true;
+}
+
+/**
+ * [path] from your own module when [fromOwnModule], else (or when it fails: down, YouTube's bot
+ * check, too slow, an error) [fromHost]. Something it doesn't know is a 404, like the host's.
+ */
+async function lookUp<T>(what: Lookup, id: string | undefined, path: string, fromHost: () => Promise<T>): Promise<T> {
+	if (!fromOwnModule(what, id)) return fromHost();
+	try {
+		return await askOwnModule<T>(path);
+	} catch (e) {
+		if (e instanceof ModuleError && e.code === 'not_found') throw new ApiRequestError(e.message, 404);
+		return fromHost();
+	}
+}
+
 export function search(query: string, type: SearchType, signal?: AbortSignal): Promise<SearchPage> {
 	const q = query.trim().toLowerCase();
 	const base = viaYourServer() ? '/api/me/search' : '/api/search';
 	return abortable(
-		cached(`${viaYourServer() ? 'me:' : ''}search:${type}:${q}`, () => request<SearchPage>(`${base}?q=${encodeURIComponent(q)}&type=${type}`)),
+		cached(`${viaYourServer() ? 'me:' : ''}search:${type}:${q}`, () =>
+			lookUp('search', undefined, `search?q=${encodeURIComponent(q)}&type=${type}&limit=20`, () => request<SearchPage>(`${base}?q=${encodeURIComponent(q)}&type=${type}`))
+		),
 		signal
 	);
 }
 
 /** One song by its ID (a link to it was pasted in the search box). */
 export function getSong(id: string, signal?: AbortSignal): Promise<Song> {
-	return abortable(cached(`song:${id}`, () => request<Song>(`/api/songs/${encodeURIComponent(id)}`)), signal);
+	const path = `songs/${encodeURIComponent(id)}`;
+	return abortable(cached(`song:${id}`, () => lookUp('page', id, path, () => request<Song>(`/api/${path}`))), signal);
 }
 
 /** What to search for, while typing. Empty when the host has no suggestions. */
@@ -271,7 +316,10 @@ export function suggestions(query: string, signal?: AbortSignal): Promise<string
 	const q = query.toLowerCase();
 	const base = viaYourServer() ? '/api/me/search/suggestions' : '/api/search/suggestions';
 	return abortable(
-		cached(`${viaYourServer() ? 'me:' : ''}suggest:${q}`, async () => (await request<SuggestionsResponse>(`${base}?q=${encodeURIComponent(q)}`)).items),
+		cached(`${viaYourServer() ? 'me:' : ''}suggest:${q}`, async () => {
+			const query = `?q=${encodeURIComponent(q)}`;
+			return (await lookUp('search', undefined, `search/suggestions${query}`, () => request<SuggestionsResponse>(base + query))).items;
+		}),
 		signal
 	);
 }
@@ -338,8 +386,13 @@ export async function yourRadio(songId: string): Promise<Song[] | null> {
 	}
 }
 
+/** A page by its ID ([path]: `artists/…`), from your own module or the host. */
+function page<T>(id: string, path: string): Promise<T> {
+	return lookUp('page', id, path, () => request<T>(`/api/${path}`));
+}
+
 export function getArtist(id: string): Promise<ArtistPage> {
-	return cached(`artist:${id}`, () => request(`/api/artists/${encodeURIComponent(id)}`));
+	return cached(`artist:${id}`, () => page(id, `artists/${encodeURIComponent(id)}`));
 }
 
 /** An artist's top 20 songs: from their songs playlist (the page itself has the first 5). */
@@ -354,20 +407,21 @@ export async function topSongs(artist: ArtistPage): Promise<Song[]> {
 const TOP_SONGS = 20;
 
 export function getAlbum(id: string): Promise<AlbumPage> {
-	return cached(`album:${id}`, () => request(`/api/albums/${encodeURIComponent(id)}`));
+	return cached(`album:${id}`, () => page(id, `albums/${encodeURIComponent(id)}`));
 }
 
 /** [personal]: one of your own (from your library, e.g. Liked music "LM"), through your YouTube Music sign-in. */
 export function getPlaylist(id: string, personal = false): Promise<PlaylistPage> {
 	return personal
 		? cached(`me:playlist:${id}`, () => request(`/api/me/playlists/${encodeURIComponent(id)}`))
-		: cached(`playlist:${id}`, () => request(`/api/playlists/${encodeURIComponent(id)}`));
+		: cached(`playlist:${id}`, () => page(id, `playlists/${encodeURIComponent(id)}`));
 }
 
 /** The next songs of a playlist, after the part(s) loaded ([PlaylistPage.more]); [personal]: one of yours. */
 export function getPlaylistPart(id: string, more: string, personal = false): Promise<PlaylistPage> {
-	const base = personal ? '/api/me/playlists' : '/api/playlists';
-	return cached(`${personal ? 'me:' : ''}playlist:${id}:${more}`, () => request(`${base}/${encodeURIComponent(id)}?more=${encodeURIComponent(more)}`));
+	const part = `${encodeURIComponent(id)}?more=${encodeURIComponent(more)}`;
+	if (personal) return cached(`me:playlist:${id}:${more}`, () => request(`/api/me/playlists/${part}`));
+	return cached(`playlist:${id}:${more}`, () => page(id, `playlists/${part}`));
 }
 
 /** The song's lyrics (LRCLIB, or its source's own), or null when nobody has them. */
@@ -379,16 +433,30 @@ export function getLyrics(song: Song): Promise<Lyrics | null> {
 		album: song.album?.name ?? '',
 		durationMs: String(song.durationMs)
 	});
-	return cached(`lyrics:${song.id}`, () =>
-		request<Lyrics>(`/api/lyrics?${query}`).catch((e: unknown) => {
+	const fromHost = (extra = '') =>
+		request<Lyrics>(`/api/lyrics?${query}${extra}`).catch((e: unknown) => {
 			if (e instanceof ApiRequestError && e.status === 404) return null;
 			throw e;
-		})
-	);
+		});
+	return cached(`lyrics:${song.id}`, async () => {
+		// The host looks on LRCLIB (not YouTube) and then asks YouTube Music; with your own module
+		// that second part is asked here. Timed lyrics win, as on the host (LyricsLookup.kt).
+		if (song.podcast || !song.id.startsWith('ytm:') || !fromOwnModule('page', song.id)) return fromHost();
+		const lrclib = await fromHost('&from=lrclib').catch(() => null);
+		if (lrclib?.synced) return lrclib;
+		let own: Lyrics | null;
+		try {
+			own = await askOwnModule<Lyrics>(`songs/${encodeURIComponent(song.id)}/lyrics`);
+		} catch (e) {
+			if (!(e instanceof ModuleError && e.code === 'not_found')) return fromHost();
+			own = null;
+		}
+		return own?.synced ? own : (lrclib ?? own);
+	});
 }
 
 export function getPodcast(id: string): Promise<PodcastPage> {
-	return cached(`podcast:${id}`, () => request(`/api/podcasts/${encodeURIComponent(id)}`));
+	return cached(`podcast:${id}`, () => page(id, `podcasts/${encodeURIComponent(id)}`));
 }
 
 /** A podcast as you (your YouTube Music): whether you're subscribed ([PodcastPage.saved]). */
@@ -406,7 +474,8 @@ export async function setPodcastSaved(id: string, saved: boolean): Promise<void>
 export function getHome(): Promise<HomePage> {
 	const path = youtubeFrom ? '/api/me/home' : `/api/home${refreshHome ? '?fresh=1' : ''}`;
 	const forced = refreshHome;
-	return cached('home', () => sinceLast('home', forced, () => request<HomePage>(path).finally(() => (refreshHome = false))));
+	// Your own module keeps no Home of its own: always a new one, kept here as set in Settings → Home.
+	return cached('home', () => sinceLast('home', forced, () => lookUp('home', undefined, 'home', () => request<HomePage>(path)).finally(() => (refreshHome = false))));
 }
 
 // The last Home and library are kept in this browser: they show right away, and new ones are
