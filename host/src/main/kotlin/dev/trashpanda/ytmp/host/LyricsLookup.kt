@@ -38,10 +38,14 @@ class LyricsLookup(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, Lyrics?>>) = size > CACHE_SIZE
     }
 
-    /** Null when nobody has lyrics for it (or it's a podcast episode). */
-    suspend fun lyrics(song: Song): Lyrics? {
+    /**
+     * Null when nobody has lyrics for it (or it's a podcast episode). [lrclibOnly]: not the
+     * song's own source (a listener's own module asks YouTube Music itself, from their computer).
+     */
+    suspend fun lyrics(song: Song, lrclibOnly: Boolean = false): Lyrics? {
         if (song.podcast != null) return null
-        synchronized(cache) { cache[song.id]?.takeIf { clock() - it.first < CACHE_MS } }?.let { return it.second }
+        val key = if (lrclibOnly) "lrclib\n${song.id}" else song.id
+        synchronized(cache) { cache[key]?.takeIf { clock() - it.first < CACHE_MS } }?.let { return it.second }
         var failed = false
         suspend fun from(source: LyricsSource?): Lyrics? = try {
             source?.lyrics(song)
@@ -53,9 +57,9 @@ class LyricsLookup(
             null
         }
         val fromLrclib = from(lrclib)
-        val found = fromLrclib?.takeIf { it.synced != null } ?: from(fallback).let { own -> own?.takeIf { it.synced != null } ?: fromLrclib ?: own }
+        val found = if (lrclibOnly) fromLrclib else fromLrclib?.takeIf { it.synced != null } ?: from(fallback).let { own -> own?.takeIf { it.synced != null } ?: fromLrclib ?: own }
         // Not found because a lookup failed (no internet): ask again next time.
-        if (found != null || !failed) synchronized(cache) { cache[song.id] = clock() to found }
+        if (found != null || !failed) synchronized(cache) { cache[key] = clock() to found }
         return found
     }
 

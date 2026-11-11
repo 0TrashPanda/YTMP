@@ -111,7 +111,8 @@
 			<h3 class="font-bold">Your own YouTube Music module</h3>
 			<p class="text-xs text-muted">
 				YouTube’s links only work on the internet connection that asked for them. A YouTube Music module on your computer gets them from your own connection, so
-				the music comes straight from YouTube instead of through the server.
+				the music comes straight from YouTube instead of through the server. Search, Home and the pages come from it too (from the server when it doesn’t
+				answer).
 			</p>
 		</div>
 		{#if module}

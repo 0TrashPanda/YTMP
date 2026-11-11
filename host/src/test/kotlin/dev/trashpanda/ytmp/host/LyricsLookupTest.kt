@@ -45,6 +45,16 @@ class LyricsLookupTest {
     }
 
     @Test
+    fun `only LRCLIB, for a page that asks YouTube Music itself, is kept apart`() = runBlocking {
+        val fallback = Counting { own }
+        val lookup = LyricsLookup(fallback, { plain })
+        assertEquals(plain, lookup.lyrics(song, lrclibOnly = true))
+        assertEquals(0, fallback.calls)
+        assertEquals(own, lookup.lyrics(song))
+        assertEquals(1, fallback.calls)
+    }
+
+    @Test
     fun `none found is remembered, but not when a lookup failed`() = runBlocking {
         val none = Counting { null }
         val lookup = LyricsLookup(null, none)

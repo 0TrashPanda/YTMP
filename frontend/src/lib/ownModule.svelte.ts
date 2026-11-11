@@ -1,7 +1,8 @@
 // Your own YouTube Music module (ytm-module/), running on this computer. YouTube's stream
 // links only work from the internet connection that asked for them, so the player can ask this
 // module instead of using the room's link or streaming through the host, in the order chosen
-// in the settings (docs/implementation/playback-sync.md).
+// in the settings (docs/implementation/playback-sync.md). Search and the pages ask it first too
+// ([askOwnModule], used by api.ts), so YouTube sees this computer rather than the room's server.
 //
 // Whether it answers is checked when the page opens and then every minute while it doesn't, so
 // the player skips it meanwhile instead of waiting on it for every song, and the room says so.
@@ -18,8 +19,22 @@ const EXPIRY_MARGIN_MS = 10 * 60_000;
 /** While it doesn't answer, asked again this often (ms). */
 export const RETRY_MS = 60_000;
 
+/** Search and pages: give up sooner, the room's server can answer instead. */
+const CATALOG_TIMEOUT_MS = 12_000;
+
 /** The module can't be used at all (not reachable, or it turns the key down), as opposed to one song failing. */
 class ModuleDown extends Error {}
+
+/** The module answered with an error: its HTTP [status] and error [code] (`not_found`, `blocked`, …). */
+export class ModuleError extends Error {
+	constructor(
+		message: string,
+		readonly status: number,
+		readonly code: string | null
+	) {
+		super(message);
+	}
+}
 
 /**
  * Off: none, or switched off. Checking: asked, no answer yet. Works: it answered (`text` says
@@ -42,22 +57,83 @@ export const moduleUsable = (): boolean => activeModule() !== null && moduleStat
 
 const links = new Map<string, Promise<{ url: string; expiresAt: number }>>();
 
-async function get<T>(module: OwnModule, path: string): Promise<T> {
-	let response: Response;
+/** What the module answered: its HTTP status and body (JSON text). */
+export interface ModuleAnswer {
+	status: number;
+	body: string;
+}
+
+declare global {
+	interface Window {
+		/**
+		 * The desktop app's shell (planned, docs/implementation/desktop-app.md): it forwards module
+		 * requests itself, since WebKitGTK won't let an https page fetch http://127.0.0.1.
+		 */
+		YtmpDesktop?: { moduleRequest?: (path: string) => Promise<ModuleAnswer> };
+	}
+}
+
+/**
+ * Every request to the module goes through here: [path] (like `search?q=…`), with the key.
+ * In the desktop app through its shell, else with fetch. Throws when it can't be reached.
+ */
+export async function moduleRequest(module: OwnModule, path: string, timeoutMs = LOOKUP_TIMEOUT_MS): Promise<ModuleAnswer> {
+	const desktop = typeof window !== 'undefined' ? window.YtmpDesktop?.moduleRequest : undefined;
+	if (desktop) {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const late = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('timeout')), timeoutMs)));
+		return Promise.race([desktop(path), late]).finally(() => clearTimeout(timer));
+	}
+	const response = await fetch(new URL(path, module.url.replace(/\/*$/, '/')), {
+		headers: { Authorization: `Bearer ${module.key}` },
+		signal: AbortSignal.timeout(timeoutMs)
+	});
+	return { status: response.status, body: await response.text() };
+}
+
+async function get<T>(module: OwnModule, path: string, timeoutMs = LOOKUP_TIMEOUT_MS): Promise<T> {
+	let answer: ModuleAnswer;
 	try {
-		response = await fetch(new URL(path, module.url.replace(/\/*$/, '/')), {
-			headers: { Authorization: `Bearer ${module.key}` },
-			signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS)
-		});
+		answer = await moduleRequest(module, path, timeoutMs);
 	} catch {
 		throw new ModuleDown(`can't reach your module at ${module.url}`);
 	}
-	if (!response.ok) {
-		const body = await response.json().catch(() => null);
-		if (response.status === 401) throw new ModuleDown('your module turned the key down');
-		throw new Error(body?.error?.message ?? `your module answered ${response.status}`);
+	const parse = () => {
+		try {
+			return JSON.parse(answer.body);
+		} catch {
+			return null;
+		}
+	};
+	if (answer.status < 200 || answer.status > 299) {
+		const body = parse();
+		if (answer.status === 401) throw new ModuleDown('your module turned the key down');
+		throw new ModuleError(body?.error?.message ?? `your module answered ${answer.status}`, answer.status, body?.error?.code ?? null);
 	}
-	return response.json();
+	return JSON.parse(answer.body) as T;
+}
+
+/** After a lookup: it answered (so it works), or it can't be used at all (so it's down until it answers again). */
+function noted<T>(lookup: Promise<T>): Promise<T> {
+	lookup.then(
+		() => {
+			if (moduleStatus.state !== 'works') void checkOwnModule();
+		},
+		(e) => {
+			if (e instanceof ModuleDown) down(e.message);
+		}
+	);
+	return lookup;
+}
+
+/**
+ * Asks your own module for [path] (a search, a page, lyrics: `docs/implementation/module-api.md`);
+ * throws a [ModuleError] when it answers with an error, or another error when it can't be used.
+ */
+export function askOwnModule<T>(path: string): Promise<T> {
+	const module = activeModule();
+	if (!module) return Promise.reject(new Error('no module of your own switched on'));
+	return noted(get<T>(module, path, CATALOG_TIMEOUT_MS));
 }
 
 function down(text: string): void {
@@ -106,17 +182,9 @@ export async function ownStreamUrl(songId: string): Promise<string> {
 		if (link && link.expiresAt - Date.now() > EXPIRY_MARGIN_MS) return link.url;
 		if (links.get(songId) === cached) links.delete(songId);
 	}
-	const lookup = get<{ url: string; expiresAt: number }>(module, `songs/${encodeURIComponent(songId)}/stream`);
+	const lookup = noted(get<{ url: string; expiresAt: number }>(module, `songs/${encodeURIComponent(songId)}/stream`));
 	links.set(songId, lookup);
-	lookup.then(
-		() => {
-			if (moduleStatus.state !== 'works') void checkOwnModule();
-		},
-		(e) => {
-			links.delete(songId);
-			if (e instanceof ModuleDown) down(e.message);
-		}
-	);
+	lookup.catch(() => links.delete(songId));
 	return (await lookup).url;
 }
 

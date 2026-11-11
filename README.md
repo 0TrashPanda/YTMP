@@ -161,7 +161,8 @@ Music, without Premium, and not tied to a single music service.
   looks songs up itself, and a browser can use a YouTube Music module on your own computer
   (*Settings → Where songs play from*), instead of streaming through the server. In a
   browser you choose the order (for example your own module first), and the room says so
-  while your module doesn't answer.
+  while your module doesn't answer. With your own module, search, Home and the pages come
+  from it too (the server answers when it can't).
 - A *Local* tab with your own music: a Raspberry Pi's music folder (shared with MPD) and the
   music on your phone, with albums, artists, songs, genres, folders, search and Shuffle all.
   It remembers where you were.

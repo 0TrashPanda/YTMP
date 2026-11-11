@@ -202,7 +202,9 @@ Host side (`host/.../LyricsLookup.kt`): `GET /api/lyrics?id&title&artist&album&d
 album, length in seconds), else `/api/search` by title (without "(Official Video)" and the
 like) and artist, taking one within 3 s of the length, timed ones first. Then the source's
 lyrics (`ytm:` songs: the module's `/songs/{id}/lyrics`, on a phone through Chaquopy). Timed
-lyrics win; results (also "none") are kept 6 hours, unless a lookup failed.
+lyrics win; results (also "none") are kept 6 hours, unless a lookup failed. `&from=lrclib`: only
+LRCLIB, for a page that asks YouTube Music itself through the listener's own module
+([playback-sync](playback-sync.md#search-and-pages-from-your-own-module)).
 
 ### Recognize a song
 

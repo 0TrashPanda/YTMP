@@ -56,25 +56,23 @@ matters. The Linux risk is handled by bundling GStreamer in the AppImage
 
 ## Every YouTube request on the computer
 
-Today the own module is only used for **stream links** (`ownStreamUrl`). For the desktop app
-the web app also asks it for:
+The web app asks the own module for:
 
-- search and suggestions (`/search`, `/search/suggestions`), Home (`/home`), artist, album,
-  playlist, podcast and song pages, pasted links (`/resolve`), lyrics;
-- with a YouTube Music sign-in: the `/me/…` requests (library, likes, playlists, history,
-  the account's own Home and search), with the sign-in in `X-Ytm-Cookie`.
+- ✅ stream links (`ownStreamUrl`), and search and suggestions, Home, artist, album, playlist,
+  podcast and song pages (pasted links), lyrics: one place in `api.ts` (`fromOwnModule`,
+  `lookUp`), with the server as fallback when the module fails; browsers with an own module
+  get it too. How, and what the host still does per route:
+  [playback-sync](playback-sync.md#search-and-pages-from-your-own-module).
+- ✅ Every module request goes through `moduleRequest()` (`ownModule.svelte.ts`): `fetch` with
+  the key, or, when the shell offers `window.YtmpDesktop.moduleRequest(path)` (a Promise of
+  `{ status, body }`), that instead: WebKitGTK won't let the https page fetch
+  `http://127.0.0.1`, so the shell forwards them over Tauri IPC (the shell's side is planned).
+- planned, with the app's own YouTube Music sign-in: the `/me/…` requests (library, likes,
+  playlists, history, the account's own Home and search), with the sign-in in `X-Ytm-Cookie`.
+  Until then they, and the Home and searches of a sign-in on the server, stay with the server.
 
 How:
 
-- One place in the frontend picks where a catalog request goes (own module when it's usable,
-  else the server's `/api/…`), so the pages don't each decide. Where the host adds something to
-  the module's answer (Home's 30-minute cache, the *In your library* section of search, the
-  shape of `SearchResponse` vs. the module's `SearchPage`), that part moves to the frontend
-  or stays on the host's route and is skipped for local answers; checked per route when
-  building.
-- When the module fails (down, blocked by the bot check, timeout), that request goes to the
-  server instead, and `moduleStatus` already makes the next ones skip the module for a while.
-- Browsers with an own module get the same (it's the same code), not only the app.
 - **Stays on the server**, because the room needs it there: radio and autoplay (the host
   picks the songs), the room's own link for a song (other listeners use it), the song cache,
   playlist imports and anything that changes the room.
@@ -166,7 +164,7 @@ pages beyond the join page.
 3. The module in the app: PyInstaller builds, Deno, starting and stopping it, the web app
    using *This app* as its own module.
 4. PO tokens and yt-dlp updating itself.
-5. Search, Home and pages through the own module (frontend), with the server as fallback.
+5. ✅ Search, Home and pages through the own module (frontend), with the server as fallback.
 6. The YouTube Music sign-in in the app.
 7. Media keys (if WebKitGTK/WebView2 don't do it), updater, release workflow, README.
 
