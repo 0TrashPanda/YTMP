@@ -46,7 +46,9 @@ export async function listen(signal: AbortSignal, ask: (signature: Signature) =>
 	let stream: MediaStream;
 	try {
 		stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
-	} catch {
+	} catch (e) {
+		// In the app's log files too: "may not" isn't always the reason (no microphone, in use).
+		console.warn('Recognize a song: no microphone', e);
 		return { kind: 'error', message: 'YTMP may not use the microphone. Allow it in the browser (or Android) settings.' };
 	}
 	const context = new AudioContext();

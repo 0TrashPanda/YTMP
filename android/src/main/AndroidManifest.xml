@@ -19,6 +19,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <!-- Recognize a song: a few seconds from the microphone, only when you tap it. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- The WebView's getUserMedia refuses audio without this one too (no question to the user). -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <!-- Cleartext is needed for servers and phone hosts on the local network (http://). -->
