@@ -10,7 +10,7 @@
 	import HomeView from '../../../lib/components/HomeView.svelte';
 	import LibraryView from '../../../lib/components/LibraryView.svelte';
 	import HistoryView from '../../../lib/components/HistoryView.svelte';
-	import FriendsView from '../../../lib/components/FriendsView.svelte';
+	import FriendPage from '../../../lib/components/FriendPage.svelte';
 	import ImportView from '../../../lib/components/ImportView.svelte';
 	import { listening } from '../../../lib/listening.svelte';
 	import LocalView from '../../../lib/components/LocalView.svelte';
@@ -116,6 +116,8 @@
 		if (sheet?.kind === kind) sheet = null;
 	}
 	const openMenu = (target: MenuTarget) => (sheet = { kind: 'menu', target });
+	/** Settings → Friends (Home's "From your friends" and the share sheet open it too). */
+	const openFriends = () => (sheet = { kind: 'settings', start: 'friends' });
 
 	// The pages you opened, in order, and Back through them (lib/pageStack.svelte.ts).
 	const stack = new PageStack({
@@ -841,8 +843,10 @@
 								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={openMenu} />
 							{:else if view.kind === 'history'}
 								<HistoryView {room} onToast={toast} onMenu={openMenu} />
-							{:else if view.kind === 'friends'}
-								<FriendsView onToast={toast} />
+							{:else if view.kind === 'friend'}
+								{#key view.target}
+									<FriendPage {room} target={view.target} onToast={toast} onMenu={openMenu} />
+								{/key}
 							{:else if view.kind === 'import'}
 								{#key view.jobId}
 									<ImportView jobId={view.jobId} onToast={toast} onJob={(jobId) => show({ kind: 'import', jobId })} onPlaylist={(p) => openPlaylist(p, true)} onMenu={openMenu} />
@@ -878,7 +882,6 @@
 							<LibraryView
 								onToast={toast}
 								onHistory={() => show({ kind: 'history' })}
-								onFriends={() => show({ kind: 'friends' })}
 								onImport={() => show({ kind: 'import' })}
 								onSearch={searchFills(room) ? undefined : () => searchBox?.open()}
 								onArtist={openArtist}
@@ -899,7 +902,7 @@
 									onPlaylist={openPlaylist}
 									onPodcast={openPodcast}
 									onSettings={() => (sheet = { kind: 'settings', start: 'home' })}
-									onFriends={() => show({ kind: 'friends' })}
+									onFriends={openFriends}
 								/>
 							{/key}
 						{/if}
@@ -976,7 +979,7 @@
 			onShare={(song) => (sheet = { kind: 'shareSong', song })}
 		/>
 	{:else if sheet?.kind === 'shareSong'}
-		<SongShareSheet song={sheet.song} onClose={() => close('shareSong')} onToast={toast} onFriends={() => show({ kind: 'friends' })} />
+		<SongShareSheet song={sheet.song} onClose={() => close('shareSong')} onToast={toast} onFriends={openFriends} />
 	{:else if sheet?.kind === 'shared'}
 		<SharedSong
 			songId={sheet.songId}
@@ -999,7 +1002,6 @@
 			onClose={() => close('avatar')}
 			onSettings={(section) => (sheet = { kind: 'settings', start: section ?? null })}
 			onShare={() => (sheet = { kind: 'share' })}
-			onFriends={listening.available ? () => show({ kind: 'friends' }) : undefined}
 			onPlayOn={player ? () => (sheet = { kind: 'playOn' }) : undefined}
 			onClone={() => (sheet = { kind: 'clone' })}
 			onRoomSettings={room.can('change_settings') || room.can('edit_roles') || room.can('kick') || room.can('ban') ? () => (sheet = { kind: 'settings', start: null }) : undefined}
@@ -1008,7 +1010,7 @@
 			onLeave={() => (sheet = { kind: 'leave' })}
 		/>
 	{:else if sheet?.kind === 'settings'}
-		<SettingsScreen bind:this={settingsScreen} start={sheet.start} {room} roomHost={host} onClone={() => (sheet = { kind: 'clone' })} onGraph={() => (sheet = { kind: 'graph', song: null })} onClose={() => close('settings')} onToast={toast} />
+		<SettingsScreen bind:this={settingsScreen} start={sheet.start} {room} roomHost={host} onClone={() => (sheet = { kind: 'clone' })} onGraph={() => (sheet = { kind: 'graph', song: null })} onFriend={(target) => (close('settings'), show({ kind: 'friend', target }))} onClose={() => close('settings')} onToast={toast} />
 	{:else if sheet?.kind === 'leave' && room.state}
 		<LeaveRoomDialog {room} onClose={() => close('leave')} />
 	{:else if sheet?.kind === 'linkTv'}

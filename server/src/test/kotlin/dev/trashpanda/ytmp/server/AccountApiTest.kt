@@ -34,6 +34,7 @@ import dev.trashpanda.ytmp.protocol.Person
 import dev.trashpanda.ytmp.protocol.ReceivedShares
 import dev.trashpanda.ytmp.protocol.ShareRequest
 import dev.trashpanda.ytmp.protocol.ShareResult
+import dev.trashpanda.ytmp.protocol.ShowOnHome
 import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import dev.trashpanda.ytmp.protocol.EpisodeProgressList
 import dev.trashpanda.ytmp.protocol.EpisodeProgressReport
@@ -441,6 +442,49 @@ class AccountApiTest {
         assertEquals(FriendsOverview(Person("anna", "Anna"), emptyList(), emptyList(), emptyList(), emptyList()), overview(anna).copy(groups = emptyList()))
         assertEquals(listOf("Gabber"), overview(anna).groups.map { it.name })
         assertTrue(shares(anna).isEmpty())
+    }
+
+    @Test
+    fun `a friend's and a group's page keep what they shared, Undo puts one back, and they can be kept off Home`() = testApplication {
+        setup(SignupMode.OPEN)
+        val client = jsonClient()
+        fun signup(name: String) = kotlinx.coroutines.runBlocking { client.postJson("/api/account/signup", SignupRequest(name, "password123", name.replaceFirstChar { it.uppercase() })).body<SessionResponse>().sessionToken }
+        val anna = signup("anna")
+        val bob = signup("bob")
+        client.postJson("/api/account/friends", FriendRequest("bob"), anna)
+        client.postJson("/api/account/friends", FriendRequest("anna"), bob)
+        val group = client.postJson("/api/account/groups", GroupRequest("Hardcore", listOf("bob")), anna).body<FriendGroup>()
+        suspend fun shares(query: String = "") = client.get("/api/account/shares$query") { bearerAuth(anna) }.body<ReceivedShares>().shares.map { it.song.id }
+        suspend fun overview() = client.get("/api/account/friends") { bearerAuth(anna) }.body<FriendsOverview>()
+        suspend fun show(path: String, show: Boolean) = client.put("/api/account/$path/home") { bearerAuth(anna); contentType(ContentType.Application.Json); setBody(ShowOnHome(show)) }
+        fun song(id: String) = Song("ytm:$id", id, listOf(ArtistRef(null, "Someone")), null, 200_000, emptyList())
+
+        val direct = client.postJson("/api/account/shares", ShareRequest(song("a"), friends = listOf("anna")), bob).body<ShareResult>()
+        client.postJson("/api/account/shares", ShareRequest(song("b"), groups = listOf(group.id)), bob)
+        assertEquals(listOf("ytm:b", "ytm:a"), shares())
+
+        // Taken off Home: still on Bob's page; Undo puts it back.
+        client.delete("/api/account/shares/${direct.id}") { bearerAuth(anna) }
+        assertEquals(listOf("ytm:b"), shares())
+        assertEquals(listOf("ytm:b", "ytm:a"), shares("?from=bob"))
+        assertEquals(listOf("ytm:b"), shares("?group=${group.id}"))
+        assertEquals(HttpStatusCode.NoContent, client.post("/api/account/shares/${direct.id}/restore") { bearerAuth(anna) }.status)
+        assertEquals(listOf("ytm:b", "ytm:a"), shares())
+        assertEquals(HttpStatusCode.NotFound, client.post("/api/account/shares/${direct.id}/restore") { bearerAuth(bob) }.status)
+
+        // The group off Home: only what came through it goes; Bob off Home: all of his.
+        assertEquals(listOf(group.id), show("groups/${group.id}", false).body<FriendsOverview>().hiddenGroups)
+        assertEquals(listOf("ytm:a"), shares())
+        show("friends/bob", false)
+        assertEquals(listOf("bob"), overview().hiddenFriends)
+        assertTrue(shares().isEmpty())
+        assertEquals(listOf("ytm:b", "ytm:a"), shares("?from=bob"))
+        show("friends/bob", true)
+        show("groups/${group.id}", true)
+        assertEquals(listOf("ytm:b", "ytm:a"), shares())
+        assertTrue(overview().hiddenFriends.isEmpty() && overview().hiddenGroups.isEmpty())
+        assertEquals(HttpStatusCode.NotFound, show("friends/nobody", false).status)
+        assertEquals(HttpStatusCode.NotFound, show("groups/nope", false).status)
     }
 
     @Test

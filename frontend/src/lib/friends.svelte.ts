@@ -2,7 +2,10 @@
 // on your account's server, reached like your listening history (listening.svelte.ts), so it
 // works in rooms everywhere you're logged in with your YTMP account.
 import { listening } from './listening.svelte';
-import type { FriendGroup, FriendRequest, FriendsOverview, GroupRequest, ReceivedShare, ReceivedShares, ShareRequest, ShareResult, Song } from './protocol.gen';
+import type { FriendGroup, FriendRequest, FriendsOverview, GroupRequest, ReceivedShare, ReceivedShares, ShareRequest, ShareResult, ShowOnHome, Song } from './protocol.gen';
+
+/** A friend's or a group's page: what they shared with you, and whether that shows on Home. */
+export type FriendTarget = { kind: 'friend'; username: string; name: string } | { kind: 'group'; id: string; name: string };
 
 class Friends {
 	/** Your friends, requests and groups; null until loaded. */
@@ -68,6 +71,32 @@ class Friends {
 	async dismiss(id: string): Promise<void> {
 		this.shares = this.shares?.filter((s) => s.id !== id) ?? null;
 		await listening.call<null>(`/api/account/shares/${encodeURIComponent(id)}`, 'DELETE');
+	}
+
+	/** Undo of [dismiss]: the song is back on Home, where it was. */
+	async restore(share: ReceivedShare): Promise<void> {
+		await listening.call<null>(`/api/account/shares/${encodeURIComponent(share.id)}/restore`, 'POST');
+		if (this.shares && !this.shares.some((s) => s.id === share.id)) this.shares = [...this.shares, share].sort((a, b) => b.at - a.at);
+	}
+
+	/** Everything [target] shared with you, newest first, also what you took off Home. */
+	async history(target: FriendTarget): Promise<ReceivedShare[]> {
+		const query = target.kind === 'friend' ? `from=${encodeURIComponent(target.username)}` : `group=${encodeURIComponent(target.id)}`;
+		return (await listening.call<ReceivedShares>(`/api/account/shares?${query}`)).shares;
+	}
+
+	/** Whether what [target] shares with you shows on your Home. */
+	onHome(target: FriendTarget): boolean {
+		const o = this.overview;
+		if (!o) return true;
+		return target.kind === 'friend' ? !o.hiddenFriends.includes(target.username) : !o.hiddenGroups.includes(target.id);
+	}
+
+	/** Shows what [target] shares on your Home or not (Home's songs are loaded again). */
+	async showOnHome(target: FriendTarget, show: boolean): Promise<void> {
+		const path = target.kind === 'friend' ? `friends/${encodeURIComponent(target.username)}` : `groups/${encodeURIComponent(target.id)}`;
+		this.overview = await listening.call<FriendsOverview>(`/api/account/${path}/home`, 'PUT', { show } satisfies ShowOnHome);
+		void this.loadShares();
 	}
 }
 

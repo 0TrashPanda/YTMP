@@ -36,7 +36,19 @@ data class FriendsOverview(
     /** People you asked, who haven't said yes yet. */
     val outgoing: List<Person>,
     val groups: List<FriendGroup>,
+    /** Friends (usernames) whose shares don't show on your Home; still on their page. */
+    val hiddenFriends: List<String> = emptyList(),
+    /** Groups (ids) whose shares don't show on your Home; still on its page. */
+    val hiddenGroups: List<String> = emptyList(),
 )
+
+/**
+ * `PUT /api/account/friends/{username}/home` and `PUT /api/account/groups/{id}/home`: whether what
+ * that friend (or that group) shares with you shows on your Home. The answer is the [FriendsOverview].
+ */
+@Serializable
+@SerialName("ShowOnHome")
+data class ShowOnHome(val show: Boolean)
 
 /** `POST /api/account/friends`: ask [username] to be friends (or say yes when they asked you). */
 @Serializable
@@ -84,7 +96,11 @@ data class ReceivedShare(
     val at: Long,
 )
 
-/** `GET /api/account/shares`: what friends shared with you, newest first. */
+/**
+ * `GET /api/account/shares`: what friends shared with you for your Home, newest first. With
+ * `?from={username}` or `?group={id}`: everything that friend (or that group) ever shared with
+ * you, also what you took off Home.
+ */
 @Serializable
 @SerialName("ReceivedShares")
 data class ReceivedShares(val shares: List<ReceivedShare>)

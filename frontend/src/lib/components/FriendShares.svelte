@@ -1,11 +1,12 @@
 <script lang="ts">
 	// Home's "From your friends" (docs/features/friends.md): the songs friends shared with you,
 	// newest first, each with who shared it (and in which group) and their note. Tap and ⋮ like
-	// Home's other songs; × takes it off your Home.
+	// Home's other songs; × takes it off your Home (with Undo). A friend's or group's page lists
+	// everything they shared with it too ([removable] off; without a room, only to look at).
 	import { ACTION_NAMES, gestures } from '../gestures.svelte';
 	import { friends, sharedBy } from '../friends.svelte';
 	import { artistNames } from '../format';
-	import { menuAt, tapSong } from '../songActions';
+	import { menuAt, tapSong, type Toast } from '../songActions';
 	import type { ReceivedShare } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -13,19 +14,42 @@
 	import PageDots from './PageDots.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 
-	let { room, shares, list, onToast, onMenu }: { room: RoomConnection; shares: ReceivedShare[]; list: boolean; onToast: (text: string) => void; onMenu: (target: MenuTarget) => void } = $props();
+	let {
+		room,
+		shares,
+		list,
+		removable = true,
+		label = sharedBy,
+		onToast,
+		onMenu
+	}: {
+		/** Null (Settings outside a room): the songs only show. */
+		room: RoomConnection | null;
+		shares: ReceivedShare[];
+		list: boolean;
+		/** × takes one off Home. */
+		removable?: boolean;
+		/** Who shared it (and through which group). */
+		label?: (share: ReceivedShare) => string;
+		onToast: Toast;
+		onMenu?: (target: MenuTarget) => void;
+	} = $props();
 
 	let scroller = $state<HTMLElement>();
 
 	function menu(event: MouseEvent, share: ReceivedShare, atPointer: boolean) {
 		event.preventDefault();
 		event.stopPropagation();
-		onMenu({ song: share.song, place: 'search', ...menuAt(event.currentTarget as HTMLElement, event, atPointer) });
+		onMenu?.({ song: share.song, place: 'search', ...menuAt(event.currentTarget as HTMLElement, event, atPointer) });
 	}
 
 	async function putAway(share: ReceivedShare) {
 		try {
 			await friends.dismiss(share.id);
+			onToast('Removed from Home', {
+				label: 'Undo',
+				run: () => void friends.restore(share).catch((e) => onToast(e instanceof Error ? e.message : "Couldn't put it back"))
+			});
 		} catch (e) {
 			onToast(e instanceof Error ? e.message : "Couldn't remove it");
 		}
@@ -37,7 +61,9 @@
 		const hours = Math.round(minutes / 60);
 		if (hours < 24) return `${hours} h ago`;
 		const days = Math.round(hours / 24);
-		return days === 1 ? 'yesterday' : `${days} days ago`;
+		if (days < 30) return days === 1 ? 'yesterday' : `${days} days ago`;
+		// Longer ago (a friend's page): the date.
+		return new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: days > 300 ? 'numeric' : undefined });
 	}
 </script>
 
@@ -50,23 +76,32 @@
 >
 	{#each shares as share (share.id)}
 		{@const song = share.song}
-		<div class="flex min-w-0 snap-start items-center gap-1 rounded-md hover:bg-raised" role="listitem" oncontextmenu={(e) => menu(e, share, true)}>
-			<button class="flex min-w-0 flex-1 items-center gap-3 px-2 py-1.5 text-left" title={ACTION_NAMES[gestures.list.tap]} onclick={(e) => tapSong(room, song, onToast, () => menu(e, share, false))}>
+		<div class="flex min-w-0 snap-start items-center gap-1 rounded-md {room ? 'hover:bg-raised' : ''}" role="listitem" oncontextmenu={(e) => room && menu(e, share, true)}>
+			<button
+				class="flex min-w-0 flex-1 items-center gap-3 px-2 py-1.5 text-left disabled:cursor-default"
+				disabled={!room}
+				title={room ? ACTION_NAMES[gestures.list.tap] : undefined}
+				onclick={(e) => room && tapSong(room, song, onToast, () => menu(e, share, false))}
+			>
 				<Art {song} size={96} class="h-12 w-12" />
 				<div class="min-w-0 flex-1">
 					<div class="truncate font-medium">{song.title}</div>
 					<div class="truncate text-sm text-muted">{artistNames(song)}</div>
 					<div class="truncate text-xs text-muted">
-						<span class="font-medium text-white/80">{sharedBy(share)}</span> · {ago(share.at)}{#if share.note}: “{share.note}”{/if}
+						{#if label(share)}<span class="font-medium text-white/80">{label(share)}</span> · {/if}{ago(share.at)}{#if share.note}: “{share.note}”{/if}
 					</div>
 				</div>
 			</button>
-			<button class="shrink-0 rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="More for {song.title}" onclick={(e) => menu(e, share, false)}>
-				<Icon name="more" size={20} />
-			</button>
-			<button class="shrink-0 rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="Remove {song.title} from Home" title="Remove from Home" onclick={() => putAway(share)}>
-				<Icon name="close" size={18} />
-			</button>
+			{#if room && onMenu}
+				<button class="shrink-0 rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="More for {song.title}" onclick={(e) => menu(e, share, false)}>
+					<Icon name="more" size={20} />
+				</button>
+			{/if}
+			{#if removable}
+				<button class="shrink-0 rounded-full p-2 text-muted hover:bg-line hover:text-white" aria-label="Remove {song.title} from Home" title="Remove from Home" onclick={() => putAway(share)}>
+					<Icon name="close" size={18} />
+				</button>
+			{/if}
 		</div>
 	{/each}
 </div>

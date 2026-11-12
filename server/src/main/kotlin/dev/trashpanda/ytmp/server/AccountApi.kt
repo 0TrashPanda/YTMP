@@ -65,6 +65,7 @@ import dev.trashpanda.ytmp.protocol.FriendRequest
 import dev.trashpanda.ytmp.protocol.GroupRequest
 import dev.trashpanda.ytmp.protocol.ReceivedShares
 import dev.trashpanda.ytmp.protocol.ShareRequest
+import dev.trashpanda.ytmp.protocol.ShowOnHome
 import io.ktor.server.request.receiveStream
 import java.time.ZoneId
 import java.io.File
@@ -514,6 +515,12 @@ class AccountService(
                     socialCall { remove(account.id, call.parameters["username"]!!) }
                     call.respond(socialCall { overview(account.id) })
                 }
+                put("/{username}/home") {
+                    val account = call.historyAccount()
+                    val show = call.receive<ShowOnHome>().show
+                    socialCall { showFriendOnHome(account.id, call.parameters["username"]!!, show) }
+                    call.respond(socialCall { overview(account.id) })
+                }
             }
             route("/account/groups") {
                 everywhere()
@@ -532,12 +539,30 @@ class AccountService(
                     socialCall { leaveGroup(account.id, call.parameters["id"]!!) }
                     call.respond(HttpStatusCode.NoContent)
                 }
+                put("/{id}/home") {
+                    val account = call.historyAccount()
+                    val show = call.receive<ShowOnHome>().show
+                    socialCall { showGroupOnHome(account.id, call.parameters["id"]!!, show) }
+                    call.respond(socialCall { overview(account.id) })
+                }
             }
             route("/account/shares") {
                 everywhere()
                 get {
                     val account = call.historyAccount()
-                    call.respond(ReceivedShares(socialCall { received(account.id) }))
+                    val from = call.request.queryParameters["from"]
+                    val group = call.request.queryParameters["group"]
+                    call.respond(
+                        ReceivedShares(
+                            socialCall {
+                                when {
+                                    from != null -> receivedFrom(account.id, from)
+                                    group != null -> receivedThrough(account.id, group)
+                                    else -> received(account.id)
+                                }
+                            },
+                        ),
+                    )
                 }
                 post {
                     val account = call.historyAccount()
@@ -547,6 +572,12 @@ class AccountService(
                 delete("/{id}") {
                     val account = call.historyAccount()
                     socialCall { dismiss(account.id, call.parameters["id"]!!) }
+                    call.respond(HttpStatusCode.NoContent)
+                }
+                // Undo of putting one away.
+                post("/{id}/restore") {
+                    val account = call.historyAccount()
+                    socialCall { restore(account.id, call.parameters["id"]!!) }
                     call.respond(HttpStatusCode.NoContent)
                 }
             }

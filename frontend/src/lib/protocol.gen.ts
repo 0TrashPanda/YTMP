@@ -1134,6 +1134,8 @@ export interface FriendsOverview {
   incoming: Person[];
   outgoing: Person[];
   groups: FriendGroup[];
+  hiddenFriends: string[];
+  hiddenGroups: string[];
 }
 
 export interface FriendRequest {
@@ -1168,6 +1170,10 @@ export interface ReceivedShare {
 
 export interface ReceivedShares {
   shares: ReceivedShare[];
+}
+
+export interface ShowOnHome {
+  show: boolean;
 }
 
 export interface EpisodeProgress {

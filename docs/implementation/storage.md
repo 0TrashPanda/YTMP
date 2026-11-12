@@ -36,6 +36,7 @@ path = "/var/lib/ytmp/ytmp.db"     # sqlite
 | `friends`, `friend_requests` | Friends (a row each way) and requests not answered yet (`Social.kt`) |
 | `friend_groups`, `friend_group_members` | Groups of friends: name, owner; who's in them |
 | `shares`, `share_recipients` | Songs shared (song as JSON, from, note, when) and who got each (through which group, put away or not) |
+| `share_home_hidden` | Friends and groups whose shares someone keeps off their Home (*Show on Home* off) |
 
 On **Android**, the app has its own local **SQLite** database (`PhoneRoomStore`) with one
 table, `rooms`, so its rooms survive restarts; other settings are in SharedPreferences.

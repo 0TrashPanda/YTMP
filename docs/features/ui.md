@@ -484,7 +484,8 @@ song's menu on an album's or artist's page has no *Go to* that same page.
     **Queue** (fair order, vote to skip, limits) and **People** (members, roles and bans),
     then *Clone room* and *Leave room*. A room's changes wait for **Save**.
   - **You**: **Account** (logging in; on your server: listening history, your rooms on other
-    devices, your roles, password, log out; on other hosts: who you're logged in as there) and
+    devices, your roles, password, log out; on other hosts: who you're logged in as there),
+    **Friends** (your friends and groups, each with their own page, see [friends](friends.md)) and
     **YouTube Music** (sign-in, history, search and radio with your account; *Sign out* at the
     bottom).
   - **Playing**: **Playback** (next while paused, start radio, asking before interrupting a
