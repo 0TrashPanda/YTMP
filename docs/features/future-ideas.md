@@ -109,3 +109,12 @@ into YTMP:
 - Speakers and devices run a **Snapcast client** (snapclient), and Snapcast keeps them in sync
   to within about a millisecond, including each device's own output delay.
 - YTMP keeps doing what it's good at (the shared queue); Snapcast does the precise playback.
+
+## Holding phones together: one link for everyone
+
+Today the Share sheet's *Open in YTMP on their phone* switch is a manual choice: on, a phone
+with YTMP opens the song in YTMP, but an Android phone without it gets a store page; off, it
+always goes to YouTube Music (see [sharing](sharing.md#holding-phones-together-)). To look
+into: doing the right thing on its own, for example a YTMP link (the server's, or an app link
+YTMP verifies) that opens YTMP where it's installed and sends anyone else on to YouTube Music,
+or knowing whether the other phone has YTMP before it reads the tag.
