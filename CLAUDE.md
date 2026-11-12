@@ -19,8 +19,11 @@ what's planned is marked there.
 - Tests: `./gradlew test`, `cd ytm-module && .venv/bin/python -m pytest -q` and `cd frontend && pnpm test`.
 - Where a new feature goes: `docs/implementation/architecture.md#where-things-are-in-the-code`.
 - Web app: `cd frontend && pnpm check && pnpm build` (the Android build bundles `frontend/build`).
-- Chrome 90 (older Chromecasts showing the party screen): `pnpm build` checks the built-ins;
-  after web app changes also run `node tools/chrome90-test.mjs` (real Chromium 90, own server).
+- Chrome 90 (older Chromecasts showing the party screen): `pnpm build` checks the built-ins
+  every time. Run `node tools/chrome90-test.mjs` (real Chromium 90, own server) only when a
+  change touches what the Chromecast shows: the party/TV/cast screens, shared components,
+  styles (`app.css`, Tailwind config), polyfills, or updated dependencies (Svelte, Vite,
+  Tailwind); and once before a release. Skip it for screens the Chromecast never shows.
 - Android: `./gradlew :android:assembleDebug`; release lint: `./gradlew :android:lintRelease`.
 - Desktop app: `python desktop/scripts/bundle_module.py` (the module and Deno, once), then
   `cd desktop && pnpm install && pnpm tauri dev`; an AppImage: `pnpm tauri build --bundles appimage`.
