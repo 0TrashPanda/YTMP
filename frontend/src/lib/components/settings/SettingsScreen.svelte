@@ -4,6 +4,7 @@
 		| 'room-queue'
 		| 'room-people'
 		| 'account'
+		| 'friends'
 		| 'youtube'
 		| 'playback'
 		| 'radio'
@@ -68,6 +69,9 @@
 	import SongMenuSection from './SongMenuSection.svelte';
 	import Toggle from './Toggle.svelte';
 	import YoutubeSection from './YoutubeSection.svelte';
+	import FriendsView from '../FriendsView.svelte';
+	import FriendPage from '../FriendPage.svelte';
+	import type { FriendTarget } from '../../friends.svelte';
 	import RadioSection from './RadioSection.svelte';
 	import SearchSection from './SearchSection.svelte';
 	import ArtistSection from './ArtistSection.svelte';
@@ -79,6 +83,7 @@
 		roomHost = null,
 		onClone,
 		onGraph,
+		onFriend,
 		onClose,
 		onToast
 	}: {
@@ -94,6 +99,8 @@
 		onClone?: () => void;
 		/** Opens the song graph (your most played songs). */
 		onGraph?: () => void;
+		/** In a room: opens a friend's or group's page there (playable songs). Without it the page shows here. */
+		onFriend?: (target: FriendTarget) => void;
 		onClose: () => void;
 		onToast: (text: string) => void;
 	} = $props();
@@ -142,6 +149,7 @@
 					'You',
 					[
 						['account', 'Account', 'person', true],
+						['friends', 'Friends', 'people', true],
 						['youtube', 'YouTube Music', 'library', true]
 					]
 				],
@@ -197,6 +205,8 @@
 	/** Phones: a page (true) or the list. */
 	// svelte-ignore state_referenced_locally
 	let showingSection = $state(start !== null);
+	/** Settings → Friends outside a room: a friend's or group's page shown here. */
+	let friendPage = $state<FriendTarget | null>(null);
 	const title = $derived(pages.find(([id]) => id === section)?.[1] ?? 'Settings');
 	/** Pages that are one setting as a whole: the phone icon is next to their title. */
 	const pageSettings: Partial<Record<SettingsSection, Setting<unknown>>> = { home: settings.home, menu: settings.songMenu, solo: settings.soloHidden };
@@ -221,6 +231,10 @@
 			return true;
 		}
 		if (section.startsWith('room-') && roomSections?.back()) return true;
+		if (section === 'friends' && friendPage) {
+			friendPage = null;
+			return true;
+		}
 		// Wide screens show the list next to the page.
 		if (!showingSection || !cameFromList || matchMedia('(min-width: 768px)').matches) return false;
 		showingSection = false;
@@ -229,6 +243,7 @@
 
 	function open(id: SettingsSection) {
 		section = id;
+		friendPage = null;
 		showingSection = true;
 	}
 
@@ -331,6 +346,7 @@
 		if (event.key !== 'Escape') return;
 		if (leaving) leaving = false;
 		else if (searching) closeSearch();
+		else if (section === 'friends' && friendPage) friendPage = null;
 		else if (!(section.startsWith('room-') && roomSections?.back())) onClose();
 	}
 	onMount(() => window.addEventListener('keydown', onKey));
@@ -449,7 +465,11 @@
 	<div class="{showingSection ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col overflow-y-auto">
 		<div data-settings-page class="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 pb-12 md:p-8">
 			<div class="flex items-center gap-2">
-				<button class="rounded-full p-1.5 hover:bg-raised md:hidden" aria-label="Back to settings" onclick={() => ((showingSection = false), (cameFromList = true))}><Icon name="back" /></button>
+				{#if section === 'friends' && friendPage}
+					<button class="rounded-full p-1.5 hover:bg-raised" aria-label="Back to friends" onclick={() => (friendPage = null)}><Icon name="back" /></button>
+				{:else}
+					<button class="rounded-full p-1.5 hover:bg-raised md:hidden" aria-label="Back to settings" onclick={() => ((showingSection = false), (cameFromList = true))}><Icon name="back" /></button>
+				{/if}
 				<h2 class="min-w-0 flex-1 truncate text-xl font-bold">{title}</h2>
 				{#if pageSetting}<DeviceToggle setting={pageSetting} label={title} />{/if}
 				<button class="hidden rounded-full p-1.5 text-muted hover:bg-raised hover:text-white md:block" aria-label="Close settings" onclick={onClose}>
@@ -490,6 +510,12 @@
 		<RoomSections bind:this={roomSections} room={room!} host={roomHost} section="people" />
 	{:else if id === 'account'}
 		<AccountSection {host} {info} {account} {invite} onAccount={(a) => (account = a)} {onToast} />
+	{:else if id === 'friends'}
+		{#if friendPage && !searching}
+			<FriendPage target={friendPage} {onToast} />
+		{:else}
+			<FriendsView {onToast} onOpen={(target) => (onFriend ? onFriend(target) : (friendPage = target))} />
+		{/if}
 	{:else if id === 'youtube'}
 		<YoutubeSection {onToast} />
 	{:else if id === 'playback'}

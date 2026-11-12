@@ -1,13 +1,14 @@
 <script lang="ts">
-	// Your friends and groups (docs/features/friends.md), from Library, the avatar menu or Home's
-	// "From your friends": add a friend by their username, say yes to requests, and make groups to
-	// share songs with (like a hardcore group). Friends are people with an account on your server.
+	// Settings → Friends (docs/features/friends.md), also from Home's "From your friends" and the
+	// share sheet: add a friend by their username, say yes to requests, and make groups to share
+	// songs with (like a hardcore group). Friends are people with an account on your server. A
+	// friend or group opens their page (FriendPage): what they shared with you, and Show on Home.
 	import { listening } from '../listening.svelte';
-	import { friends } from '../friends.svelte';
+	import { friends, type FriendTarget } from '../friends.svelte';
 	import type { FriendGroup, Person } from '../protocol.gen';
 	import Icon from './Icon.svelte';
 
-	let { onToast }: { onToast: (text: string) => void } = $props();
+	let { onToast, onOpen }: { onToast: (text: string) => void; /** Opens a friend's or group's page. */ onOpen: (target: FriendTarget) => void } = $props();
 
 	let error = $state<string | null>(null);
 	let username = $state('');
@@ -78,9 +79,18 @@
 	<span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-raised text-muted"><Icon name={icon} size={22} /></span>
 {/snippet}
 
-<div class="flex flex-col gap-6 pb-4">
-	<h1 class="px-2 text-2xl font-bold sm:text-3xl">Friends</h1>
+{#snippet opens(target: FriendTarget, icon: 'person' | 'people', title: string, detail: string)}
+	{@const hidden = !friends.onHome(target)}
+	<button class="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 text-left" onclick={() => onOpen(target)}>
+		{@render avatar(icon)}
+		<span class="min-w-0 flex-1">
+			<span class="block truncate font-medium">{title}</span>
+			<span class="block truncate text-xs text-muted">{detail}{hidden ? ' · Not on Home' : ''}</span>
+		</span>
+	</button>
+{/snippet}
 
+<div class="flex flex-col gap-6 pb-4">
 	{#if !listening.available}
 		<p class="px-2 text-muted">Log in with your YTMP account to add friends and share songs with them.</p>
 	{:else if !overview}
@@ -147,12 +157,8 @@
 			{/if}
 			{#each overview.groups as group (group.id)}
 				{@const mine = group.owner.username === me}
-				<div class="flex items-center gap-3 px-2 py-2">
-					{@render avatar('people')}
-					<span class="min-w-0 flex-1">
-						<span class="block truncate font-medium">{group.name}</span>
-						<span class="block truncate text-xs text-muted">{group.members.map((m) => m.displayName).join(', ')}</span>
-					</span>
+				<div class="flex items-center gap-3 rounded-lg px-2 py-1 hover:bg-raised/60">
+					{@render opens({ kind: 'group', id: group.id, name: group.name }, 'people', group.name, group.members.map((m) => m.displayName).join(', '))}
 					{#if mine}
 						<button class="rounded-full px-3 py-1.5 text-sm text-muted hover:bg-raised" onclick={() => startGroup(group)}>Edit</button>
 					{/if}
@@ -172,9 +178,8 @@
 		<section class="flex flex-col">
 			<h2 class="px-2 pb-1 text-lg font-bold">Friends</h2>
 			{#each overview.friends as person (person.username)}
-				<div class="flex items-center gap-3 px-2 py-2">
-					{@render avatar('person')}
-					<span class="min-w-0 flex-1"><span class="block truncate font-medium">{person.displayName}</span><span class="block truncate text-xs text-muted">{person.username}</span></span>
+				<div class="flex items-center gap-3 rounded-lg px-2 py-1 hover:bg-raised/60">
+					{@render opens({ kind: 'friend', username: person.username, name: person.displayName }, 'person', person.displayName, person.username)}
 					<button class="rounded-full px-3 py-1.5 text-sm text-muted hover:bg-raised disabled:opacity-40" disabled={busy} onclick={() => confirm(`Remove ${person.displayName} as a friend?`) && act(() => friends.remove(person.username))}>Remove</button>
 				</div>
 			{:else}

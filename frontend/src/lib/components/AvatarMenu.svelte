@@ -15,7 +15,6 @@
 		onClose,
 		onSettings,
 		onShare,
-		onFriends,
 		onPlayOn,
 		onClone,
 		onRoomSettings,
@@ -30,8 +29,6 @@
 		/** Opens Settings (at the Account section when [account]). */
 		onSettings: (section?: 'account' | 'youtube') => void;
 		onShare?: () => void;
-		/** Your friends and groups (with your YTMP account). */
-		onFriends?: () => void;
 		onPlayOn?: () => void;
 		onClone?: () => void;
 		/** Only when you may change the room's settings. */
@@ -103,7 +100,6 @@
 		{/if}
 
 		<div class="my-1 h-px bg-line"></div>
-		{@render item('people', 'Friends', onFriends)}
 		{@render item('settings', 'Settings', () => onSettings())}
 	</div>
 </div>

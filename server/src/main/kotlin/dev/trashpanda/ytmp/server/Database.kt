@@ -308,6 +308,11 @@ class Database private constructor(private val url: String, private val user: St
                 "CREATE TABLE share_recipients (share_id VARCHAR(32) NOT NULL, account_id VARCHAR(32) NOT NULL, group_id VARCHAR(32) NOT NULL, dismissed BOOLEAN NOT NULL, PRIMARY KEY (share_id, account_id))",
                 "CREATE INDEX share_recipients_account ON share_recipients (account_id)",
             ),
+            // 15: friends and groups whose shares don't show on your Home (kind 'friend': an
+            // account id, 'group': a group id), see Social
+            listOf(
+                "CREATE TABLE share_home_hidden (account_id VARCHAR(32) NOT NULL, kind VARCHAR(8) NOT NULL, target_id VARCHAR(32) NOT NULL, PRIMARY KEY (account_id, kind, target_id))",
+            ),
         )
 
         /** Migration 11 freed a lot of space: compact the file once after it. */

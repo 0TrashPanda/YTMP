@@ -26,6 +26,11 @@ class Social(private val db: Database, private val clock: () -> Long = System::c
             incoming = c.people("SELECT a.username, a.display_name FROM friend_requests r JOIN accounts a ON a.id = r.from_id WHERE r.to_id = ? ORDER BY r.at DESC", accountId),
             outgoing = c.people("SELECT a.username, a.display_name FROM friend_requests r JOIN accounts a ON a.id = r.to_id WHERE r.from_id = ? ORDER BY r.at DESC", accountId),
             groups = c.groupIds(accountId).mapNotNull { c.group(it) }.sortedBy { it.name.lowercase() },
+            hiddenFriends = c.people(
+                "SELECT a.username, a.display_name FROM share_home_hidden h JOIN accounts a ON a.id = h.target_id WHERE h.account_id = ? AND h.kind = 'friend'",
+                accountId,
+            ).map { it.username }.sorted(),
+            hiddenGroups = c.ids("SELECT target_id FROM share_home_hidden WHERE account_id = ? AND kind = 'group'", accountId).sorted(),
         ).let { it.copy(friends = it.friends.sortedBy { p -> p.displayName.lowercase() }) }
     }
 
@@ -57,6 +62,19 @@ class Social(private val db: Database, private val clock: () -> Long = System::c
         val other = c.accountId(username) ?: throw SocialException("There's no $username on this server", notFound = true)
         c.update("DELETE FROM friends WHERE (account_id = ? AND friend_id = ?) OR (account_id = ? AND friend_id = ?)", accountId, other, other, accountId)
         c.update("DELETE FROM friend_requests WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)", accountId, other, other, accountId)
+        c.update("DELETE FROM share_home_hidden WHERE kind = 'friend' AND ((account_id = ? AND target_id = ?) OR (account_id = ? AND target_id = ?))", accountId, other, other, accountId)
+    }
+
+    /** Whether what friend [username] shares with [accountId] shows on their Home (it stays on the friend's page). */
+    fun showFriendOnHome(accountId: String, username: String, show: Boolean) = db.transaction { c ->
+        val other = c.accountId(username)?.takeIf { it in c.friendIds(accountId) } ?: throw SocialException("$username isn't your friend", notFound = true)
+        c.setHidden(accountId, "friend", other, !show)
+    }
+
+    /** Whether what's shared through [groupId] shows on [accountId]'s Home (it stays on the group's page). */
+    fun showGroupOnHome(accountId: String, groupId: String, show: Boolean) = db.transaction { c ->
+        if (groupId !in c.groupIds(accountId)) throw SocialException("You're not in that group", notFound = true)
+        c.setHidden(accountId, "group", groupId, !show)
     }
 
     /** A new group of [accountId] with some of their friends ([members], usernames). */
@@ -92,7 +110,10 @@ class Social(private val db: Database, private val clock: () -> Long = System::c
         val owner = c.owner(groupId) ?: throw SocialException("That group is gone", notFound = true)
         if (owner == accountId) c.deleteGroup(groupId)
         else if (!c.exists("SELECT 1 FROM friend_group_members WHERE group_id = ? AND account_id = ?", groupId, accountId)) throw SocialException("You're not in that group", notFound = true)
-        else c.update("DELETE FROM friend_group_members WHERE group_id = ? AND account_id = ?", groupId, accountId)
+        else {
+            c.update("DELETE FROM friend_group_members WHERE group_id = ? AND account_id = ?", groupId, accountId)
+            c.update("DELETE FROM share_home_hidden WHERE account_id = ? AND kind = 'group' AND target_id = ?", accountId, groupId)
+        }
     }
 
     /** [accountId] shares a song with some of their friends and groups they're in. */
@@ -130,16 +151,49 @@ class Social(private val db: Database, private val clock: () -> Long = System::c
         ShareResult(id, recipients.size)
     }
 
-    /** Songs shared with [accountId] that they haven't put away, newest first. */
+    /**
+     * Songs shared with [accountId] for their Home, newest first: not put away, and not from a
+     * friend or through a group they took off Home.
+     */
     fun received(accountId: String, limit: Int = 50): List<ReceivedShare> = db.use { c ->
-        c.prepareStatement(
+        c.shares(
+            """r.dismissed = FALSE
+               AND NOT EXISTS (SELECT 1 FROM share_home_hidden h WHERE h.account_id = r.account_id AND h.kind = 'friend' AND h.target_id = s.from_id)
+               AND NOT EXISTS (SELECT 1 FROM share_home_hidden h WHERE h.account_id = r.account_id AND h.kind = 'group' AND h.target_id = r.group_id)""",
+            accountId, null, limit,
+        )
+    }
+
+    /** Everything friend [username] shared with [accountId] (directly and through groups), also what they put away, newest first. */
+    fun receivedFrom(accountId: String, username: String, limit: Int = MAX_HISTORY): List<ReceivedShare> = db.use { c ->
+        val other = c.accountId(username) ?: throw SocialException("There's no $username on this server", notFound = true)
+        c.shares("s.from_id = ?", accountId, other, limit)
+    }
+
+    /** Everything shared with [accountId] through [groupId], also what they put away, newest first. */
+    fun receivedThrough(accountId: String, groupId: String, limit: Int = MAX_HISTORY): List<ReceivedShare> = db.use { c ->
+        c.shares("r.group_id = ?", accountId, groupId, limit)
+    }
+
+    /** A song [accountId] put away is back on their Home (Undo). */
+    fun restore(accountId: String, shareId: String) = db.transaction { c ->
+        if (c.update("UPDATE share_recipients SET dismissed = FALSE WHERE share_id = ? AND account_id = ?", shareId, accountId) == 0) {
+            throw SocialException("That song isn't shared with you", notFound = true)
+        }
+    }
+
+    /** Songs shared with [accountId] matching [where] (with [arg] for its one `?`, if any), newest first. */
+    private fun Connection.shares(where: String, accountId: String, arg: String?, limit: Int): List<ReceivedShare> =
+        prepareStatement(
             """SELECT s.id, s.song, a.username, a.display_name, g.name, s.note, s.at
                FROM share_recipients r JOIN shares s ON s.id = r.share_id JOIN accounts a ON a.id = s.from_id
                LEFT JOIN friend_groups g ON g.id = r.group_id
-               WHERE r.account_id = ? AND r.dismissed = FALSE ORDER BY s.at DESC LIMIT ?""",
+               WHERE r.account_id = ? AND ($where) ORDER BY s.at DESC LIMIT ?""",
         ).use {
-            it.setString(1, accountId)
-            it.setInt(2, limit)
+            var i = 1
+            it.setString(i++, accountId)
+            if (arg != null) it.setString(i++, arg)
+            it.setInt(i, limit)
             it.executeQuery().use { rows ->
                 buildList {
                     while (rows.next()) {
@@ -149,6 +203,10 @@ class Social(private val db: Database, private val clock: () -> Long = System::c
                 }
             }
         }
+
+    private fun Connection.setHidden(accountId: String, kind: String, targetId: String, hidden: Boolean) {
+        update("DELETE FROM share_home_hidden WHERE account_id = ? AND kind = ? AND target_id = ?", accountId, kind, targetId)
+        if (hidden) update("INSERT INTO share_home_hidden (account_id, kind, target_id) VALUES (?, ?, ?)", accountId, kind, targetId)
     }
 
     /** A song shared with [accountId] is put away; one they shared is taken back from everyone. */
@@ -221,6 +279,8 @@ class Social(private val db: Database, private val clock: () -> Long = System::c
         const val MAX_MEMBERS = 100
         const val MAX_GROUPS = 50
         const val MAX_REQUESTS = 200
+        /** Songs on a friend's or group's page. */
+        const val MAX_HISTORY = 200
 
         /** Everything of [accountId] (an account being deleted): friends, requests, groups it made or is in, shares both ways. */
         fun forget(c: Connection, accountId: String) {
@@ -230,12 +290,14 @@ class Social(private val db: Database, private val clock: () -> Long = System::c
             c.update("DELETE FROM friend_group_members WHERE account_id = ?", accountId)
             c.update("DELETE FROM share_recipients WHERE account_id = ? OR share_id IN (SELECT id FROM shares WHERE from_id = ?)", accountId, accountId)
             c.update("DELETE FROM shares WHERE from_id = ?", accountId)
+            c.update("DELETE FROM share_home_hidden WHERE account_id = ? OR (kind = 'friend' AND target_id = ?)", accountId, accountId)
         }
 
         /** The group and who's in it; songs shared through it stay, without its name. */
         private fun Connection.deleteGroup(groupId: String) {
             update("DELETE FROM friend_group_members WHERE group_id = ?", groupId)
             update("DELETE FROM friend_groups WHERE id = ?", groupId)
+            update("DELETE FROM share_home_hidden WHERE kind = 'group' AND target_id = ?", groupId)
         }
 
         private fun Connection.update(sql: String, vararg args: String): Int = prepareStatement(sql).use { s ->

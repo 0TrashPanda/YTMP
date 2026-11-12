@@ -58,6 +58,7 @@ import dev.trashpanda.ytmp.protocol.GroupRequest
 import dev.trashpanda.ytmp.protocol.ShareRequest
 import dev.trashpanda.ytmp.protocol.ShareResult
 import dev.trashpanda.ytmp.protocol.ReceivedShares
+import dev.trashpanda.ytmp.protocol.ShowOnHome
 import dev.trashpanda.ytmp.protocol.EpisodeProgressList
 import dev.trashpanda.ytmp.protocol.MarkEpisodeRequest
 import dev.trashpanda.ytmp.protocol.AccountSettings
@@ -255,6 +256,7 @@ fun main(args: Array<String>) {
     generator.addRoot(ShareRequest.serializer().descriptor)
     generator.addRoot(ShareResult.serializer().descriptor)
     generator.addRoot(ReceivedShares.serializer().descriptor)
+    generator.addRoot(ShowOnHome.serializer().descriptor)
     generator.addRoot(EpisodeProgressList.serializer().descriptor)
     generator.addRoot(MarkEpisodeRequest.serializer().descriptor)
     generator.addRoot(AccountSettings.serializer().descriptor)

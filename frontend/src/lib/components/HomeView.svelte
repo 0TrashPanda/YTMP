@@ -24,6 +24,7 @@
 	import SongList from './SongList.svelte';
 	import SpeedDial from './SpeedDial.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
+	import type { Toast } from '../songActions';
 
 	let {
 		room,
@@ -34,11 +35,11 @@
 		...open
 	}: {
 		room: RoomConnection;
-		onToast: (text: string) => void;
+		onToast: Toast;
 		onMenu: (target: MenuTarget) => void;
 		/** Opens Settings → Home. */
 		onSettings: () => void;
-		/** Opens your friends and groups. */
+		/** Opens your friends and groups (Settings → Friends). */
 		onFriends: () => void;
 	} & PageHandlers = $props();
 
