@@ -95,7 +95,7 @@
 	<div>
 		<h3 class="font-bold">Where songs play from</h3>
 		<p class="text-xs text-muted">
-			In this browser, songs are tried in this order. When one way doesn’t work for a song, the next one is tried; Through the server always comes last if
+			In this {inDesktop ? 'app' : 'browser'}, songs are tried in this order. When one way doesn’t work for a song, the next one is tried; Through the server always comes last if
 			nothing else worked.
 		</p>
 	</div>

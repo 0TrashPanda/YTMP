@@ -78,6 +78,8 @@ export interface DesktopApp {
 	moduleRequest?: (path: string) => Promise<ModuleAnswer>;
 	/** Back to the app's page that asks for the server's address. */
 	changeServer?: () => Promise<void>;
+	/** This build looks for new versions when it starts (absent before 0.45: those didn't). */
+	updates?: boolean;
 }
 
 declare global {

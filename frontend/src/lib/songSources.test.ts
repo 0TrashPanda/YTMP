@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { pickSource, type SourceChoice } from './songSources';
 import type { SongSource } from './storage';
 
@@ -36,5 +36,19 @@ describe('pickSource', () => {
 
 	it('ends with the host when the others can’t be used', () => {
 		expect(pickSource(['direct', 'own', 'host'], choice({ tried: new Set(['direct']), moduleUsable: false }))).toBe('host');
+	});
+});
+
+describe('the default order', () => {
+	it('puts the app’s own module first in the desktop app, the room’s link first elsewhere', async () => {
+		const { saved } = await import('./storage');
+		vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+		vi.stubGlobal('window', {});
+		expect(saved.songSources).toEqual(['direct', 'own', 'host']);
+		vi.stubGlobal('window', { YtmpDesktop: { version: '0.45.0', platform: 'windows', moduleRequest: async () => ({ status: 200, body: '' }) } });
+		expect(saved.songSources).toEqual(['own', 'direct', 'host']);
+		vi.stubGlobal('localStorage', { getItem: () => '["host","own","direct"]', setItem: () => {}, removeItem: () => {} });
+		expect(saved.songSources).toEqual(['host', 'own', 'direct']);
+		vi.unstubAllGlobals();
 	});
 });

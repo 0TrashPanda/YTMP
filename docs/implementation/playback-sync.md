@@ -77,7 +77,7 @@ song whose own link fails too. Songs that aren't YouTube's (`ytm:` IDs) keep the
   address, key and on/off). `moduleStatus` checks it with `GET /info` when the page opens and
   every minute while it doesn't answer (or a lookup can't reach it); meanwhile it's skipped
   and the room shows a line until it answers or is switched off. The player tries the ways in
-  `saved.songSources` (default: room's link, own module, host) with `pickSource`, once each per
+  `saved.songSources` (default: room's link, own module, host; in the desktop app own module first) with `pickSource`, once each per
   song; a room link from YouTube that failed is skipped for the next songs too, until nothing
   worked for a song. The player calls `GET /songs/{id}/stream` there and prefetches the next
   song. The module answers pages from any origin only when it has a key (CORS, including

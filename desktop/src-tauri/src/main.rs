@@ -3,6 +3,8 @@
 // YouTube request comes from here. A setup page (desktop/setup/) asks for the server first.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(windows)]
+mod media;
 mod module;
 
 use std::collections::HashSet;
@@ -74,7 +76,8 @@ fn open_server(app: &AppHandle, url: &Url) {
             .local(false)
             .window("main")
             .permission("allow-module-request")
-            .permission("allow-change-server");
+            .permission("allow-change-server")
+            .permission("allow-media-update");
         if let Err(e) = app.add_capability(capability) {
             eprintln!("can't allow {origin}: {e}");
         }
@@ -132,10 +135,32 @@ fn change_server(window: WebviewWindow) {
     let _ = window.navigate(Url::parse(setup).unwrap());
 }
 
-/// window.YtmpDesktop for the web app (frontend/src/lib/ownModule.svelte.ts, native.ts).
+/// The page's Media Session changed: on Windows the app shows it (media.rs); elsewhere the web view does that itself.
+#[tauri::command]
+fn media_update(app: AppHandle, update: serde_json::Value) {
+    #[cfg(windows)]
+    if let Ok(update) = serde_json::from_value(update) {
+        media::update(&app, update);
+    }
+    #[cfg(not(windows))]
+    let _ = (app, update);
+}
+
+/// Builds with the updater key look for new versions (and the web app says so).
+fn updates_on() -> bool {
+    option_env!("YTMP_UPDATER_PUBKEY").is_some_and(|k| !k.is_empty())
+}
+
+/// window.YtmpDesktop for the web app (frontend/src/lib/ownModule.svelte.ts, native.ts), and on
+/// Windows the Media Session passed to the app (media.rs).
 fn bridge_script(app: &AppHandle) -> String {
     let version = app.package_info().version.to_string();
     let platform = if cfg!(windows) { "windows" } else { "linux" };
+    let updates = updates_on();
+    #[cfg(windows)]
+    let media = media::SCRIPT;
+    #[cfg(not(windows))]
+    let media = "";
     format!(
         r#"(() => {{
   if (!/^https?:$/.test(location.protocol)) return;
@@ -145,7 +170,9 @@ fn bridge_script(app: &AppHandle) -> String {
     platform: {platform:?},
     moduleRequest: (path) => invoke('module_request', {{ path }}),
     changeServer: () => invoke('change_server'),
+    updates: {updates},
   }});
+  {media}
 }})();"#
     )
 }
@@ -207,10 +234,20 @@ async fn check_for_update(app: AppHandle) {
         }
         _ => return,
     }
-    match update.download_and_install(|_, _| {}, || {}).await {
+    let installed = match update.download(|_, _| {}, || {}).await {
+        Ok(bytes) => {
+            // The installer replaces the module's files: it mustn't be running then.
+            app.state::<Module>().stop();
+            update.install(bytes)
+        }
+        Err(e) => Err(e),
+    };
+    match installed {
         Ok(()) => app.restart(),
         Err(e) => {
             app.dialog().message(format!("The update didn't install: {e}")).title("Update YTMP").blocking_show();
+            // The module was stopped for it: start over as this version.
+            app.restart();
         }
     }
 }
@@ -235,7 +272,7 @@ fn main() {
     }
     let app = builder
         .manage(Module::new())
-        .invoke_handler(tauri::generate_handler![open_saved, connect, change_server, module::module_request])
+        .invoke_handler(tauri::generate_handler![open_saved, connect, change_server, media_update, module::module_request])
         .setup(|app| {
             let handle = app.handle().clone();
             let settings: Settings = std::fs::read_to_string(settings_file(&handle))
@@ -246,7 +283,7 @@ fn main() {
             Module::start(&handle);
 
             let opener = handle.clone();
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("YTMP")
                 .inner_size(1280.0, 820.0)
                 .min_inner_size(360.0, 560.0)
@@ -255,9 +292,19 @@ fn main() {
                 .on_new_window(move |url, _| {
                     let _ = opener.opener().open_url(url.as_str(), None::<&str>);
                     NewWindowResponse::Deny
-                })
-                .build()?;
-            if option_env!("YTMP_UPDATER_PUBKEY").is_some_and(|k| !k.is_empty()) {
+                });
+            // WebView2's own media controls would show as "msedgewebview2.exe": the app shows them
+            // instead (media.rs). The first three are Tauri's defaults, which this replaces.
+            #[cfg(windows)]
+            let window = window.additional_browser_args(
+                "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,HardwareMediaKeyHandling",
+            );
+            let window = window.build()?;
+            #[cfg(windows)]
+            media::setup(&handle, &window);
+            #[cfg(not(windows))]
+            let _ = window;
+            if updates_on() {
                 tauri::async_runtime::spawn(check_for_update(handle));
             }
             Ok(())

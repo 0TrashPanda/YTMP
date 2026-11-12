@@ -60,14 +60,15 @@ server, like in a browser; **everything YouTube** happens on your own computer:
 
 - **Songs play straight from YouTube on your computer**: it looks them up itself, so the
   server doesn't have to stream them to you and its links never fail because you're on
-  another network.
+  another network. (*Settings → Where songs play from* can change the order, as in a browser.)
 - **Search, Home and the pages** (artists, albums, playlists, podcasts, lyrics) come from
   your computer too, so they work the same when the server's YouTube is having a bad moment
   (or is blocked for a while). When your computer's lookups don't work, the server's are used.
 - **Your YouTube Music sign-in**: sign in in the app, or take the one from your account on
   the server (one confirm), like the Android app. It stays on your computer.
 - **Media keys and the system's media controls** (Windows' media overlay, the Linux
-  desktop's media widget) play, pause and skip, also when the window is in the background.
+  desktop's media widget) show the song as YTMP and play, pause and skip, also when the
+  window is in the background.
 - **The first start** asks for your server's address, like the Android app.
 - **Updates itself**: like the Android app, it finds new releases on GitHub and offers to
   install them (with the release notes). Its YouTube part updates itself more often,

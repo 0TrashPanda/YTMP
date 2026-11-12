@@ -875,7 +875,7 @@
 		<div class="flex items-center gap-3">
 			<div class="flex-1">
 				<p class="text-sm font-medium">Version</p>
-				<p class="text-xs text-muted">YTMP {desktop.version} for {desktop.platform === 'windows' ? 'Windows' : 'Linux'}. New versions are offered when the app starts.</p>
+				<p class="text-xs text-muted">YTMP {desktop.version} for {desktop.platform === 'windows' ? 'Windows' : 'Linux'}.{desktop.updates ? ' New versions are offered when the app starts.' : ''}</p>
 			</div>
 		</div>
 		<div class="flex items-center gap-3">

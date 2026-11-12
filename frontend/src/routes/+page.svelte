@@ -705,7 +705,7 @@
 							>
 								<Icon name="headphones" />
 								<span class="font-medium">Solo</span>
-								<span class="text-xs text-muted">{me ? 'Just you, on all your devices' : 'Just you, in this browser'}</span>
+								<span class="text-xs text-muted">{me ? 'Just you, on all your devices' : `Just you, in this ${window.YtmpDesktop ? 'app' : 'browser'}`}</span>
 							</button>
 							<button
 								class="flex flex-col items-center gap-1 rounded-xl bg-accent-strong p-3 disabled:opacity-40"

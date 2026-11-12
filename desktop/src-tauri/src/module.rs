@@ -19,6 +19,8 @@ pub struct Module {
     ready: AtomicBool,
     stopping: AtomicBool,
     child: Mutex<Option<Child>>,
+    #[cfg(windows)]
+    job: Option<job::Job>,
 }
 
 #[derive(serde::Serialize)]
@@ -33,7 +35,15 @@ impl Module {
         let mut bytes = [0u8; 24];
         getrandom::fill(&mut bytes).expect("random key");
         let key = bytes.iter().map(|b| format!("{b:02x}")).collect();
-        Module { port, key, ready: AtomicBool::new(false), stopping: AtomicBool::new(false), child: Mutex::new(None) }
+        Module {
+            port,
+            key,
+            ready: AtomicBool::new(false),
+            stopping: AtomicBool::new(false),
+            child: Mutex::new(None),
+            #[cfg(windows)]
+            job: job::Job::new(),
+        }
     }
 
     /// Starts it, and keeps it running (in a thread of its own) until [stop].
@@ -49,7 +59,15 @@ impl Module {
             while !module.stopping.load(Ordering::SeqCst) {
                 let started = Instant::now();
                 match module.spawn(&app, &log) {
-                    Ok(child) => *module.child.lock().unwrap() = Some(child),
+                    Ok(child) => {
+                        #[cfg(windows)]
+                        if let Some(job) = &module.job {
+                            if !job.add(&child) {
+                                eprintln!("YTM module: can't tie it to the app; it may outlive a crash");
+                            }
+                        }
+                        *module.child.lock().unwrap() = Some(child);
+                    }
                     Err(e) => eprintln!("YTM module: can't start it: {e}"),
                 }
                 module.wait_ready();
@@ -171,6 +189,50 @@ fn runtime(app: &AppHandle) -> (PathBuf, Option<PathBuf>) {
     let dev = std::env::var_os("YTMP_DESKTOP_PYTHON").map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../ytm-module/.venv/bin/python")));
     (dev, None)
+}
+
+/// Windows has no PR_SET_PDEATHSIG: the module (and the Deno it starts) goes in a job that
+/// Windows ends when its last handle closes. The app never closes it, so that happens when the
+/// app ends, also when it crashes or is ended in Task Manager.
+#[cfg(windows)]
+mod job {
+    use std::os::windows::io::AsRawHandle;
+    use std::process::Child;
+
+    use windows_sys::Win32::Foundation::HANDLE;
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+
+    pub struct Job(HANDLE);
+
+    // A job handle can be used from any thread.
+    unsafe impl Send for Job {}
+    unsafe impl Sync for Job {}
+
+    impl Job {
+        pub fn new() -> Option<Job> {
+            unsafe {
+                let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+                if job.is_null() {
+                    return None;
+                }
+                let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+                info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                let size = std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32;
+                if SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info as *const _ as *const _, size) == 0 {
+                    return None;
+                }
+                Some(Job(job))
+            }
+        }
+
+        /// Puts [child] in the job (right after it started: what it starts itself joins too).
+        pub fn add(&self, child: &Child) -> bool {
+            unsafe { AssignProcessToJobObject(self.0, child.as_raw_handle() as HANDLE) != 0 }
+        }
+    }
 }
 
 /// A GET to the module for the page: `path` like `search?q=…`; answers its status and body.

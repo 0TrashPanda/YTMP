@@ -221,10 +221,16 @@ Music, without Premium, and not tied to a single music service.
   YouTube blocks anyway, the room pauses on the song and YTMP waits a few minutes before
   asking again.
 
+**The desktop app** (Windows and Linux)
+- YTMP in its own window, on your server: it looks songs, search, Home and pages up on your
+  own computer, so they come straight from YouTube on your connection (the server's when
+  that fails).
+- Media keys and Windows' media controls show the song as YTMP.
+
 ## What's next
 
-- A desktop app for Windows and Linux that does its own YouTube Music lookups: being built
-  ([status](docs/implementation/desktop-app.md)), not released yet
+- The desktop app: your YouTube Music sign-in in the app, and the bot-check token
+  ([status](docs/implementation/desktop-app.md)); updates itself once releases are signed for it
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
 - Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists
@@ -246,10 +252,14 @@ Music, without Premium, and not tied to a single music service.
 | Linux server (Docker) | ✅ Hosts rooms, serves the web app, accounts, listening history and YouTube Music sign-ins |
 | Android 11+ | ✅ Join rooms with native playback, lock screen controls and a home screen widget; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music; updates itself |
 | Web browser | ✅ Join rooms, or host through a server |
-| Windows, desktop Linux | Through the browser; a desktop app is planned |
+| Windows, desktop Linux | ✅ The desktop app (installer, AppImage), or the browser |
 | iOS | Not supported (the web app may work, but background playback won't) |
 
 ## Download
+
+**Windows and Linux:** the desktop app's `…-windows-x64-setup.exe` or `…-linux-x86_64.AppImage`
+from the [latest release](https://github.com/0TrashPanda/YTMP/releases). Windows warns once
+that it doesn't know the installer (*More info → Run anyway*).
 
 **Android:** get the APK from the [latest release](https://github.com/0TrashPanda/YTMP/releases)
 and open it on your phone (allow installing apps from your browser or file manager when

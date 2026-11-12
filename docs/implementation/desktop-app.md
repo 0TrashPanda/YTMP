@@ -5,8 +5,8 @@ Feature description: [features/platforms.md](../features/platforms.md#desktop-ap
 A **client** for Windows and Linux: the web app in a native window, with the YouTube Music
 module running on the same computer. The room, accounts and room sync stay on the YTMP
 server; every YouTube request comes from the computer. The app is in `desktop/`: ✅ marks
-what's built; not released yet (no release has had the desktop jobs, and Windows hasn't been
-tried).
+what's built. First released in 0.44.0; tried on Windows 10 with that release (see the
+Windows check below).
 
 ## Shape
 
@@ -36,20 +36,28 @@ tried).
   set up by the app (`desktop/src-tauri/src/module.rs`): the shell starts it
   (`python -m ytmp_ytm.http`) on `127.0.0.1` with a free port and a new random key on every
   start (`YTMP_YTM_PORT`, `YTMP_MODULE_KEY`), waits for `/health`, starts it again when it
-  stops (1 s, then longer up to 30 s), and stops it with the app (on Linux also when the app
-  is killed: `PR_SET_PDEATHSIG`). Its output goes to `module.log` in the app's log folder.
+  stops (1 s, then longer up to 30 s), and stops it with the app, also when the app is killed
+  or crashes: on Linux with `PR_SET_PDEATHSIG`, on Windows by putting it in a job object with
+  *kill on job close* (the app holds the job's only handle, so Windows ends the module, and
+  the Deno it starts, when the app ends however it ends). Its output goes to `module.log` in
+  the app's log folder.
 - ✅ **The page reaches the module through the shell**, not with `fetch`: WebKitGTK blocks an
   https page from fetching `http://127.0.0.1` (mixed content; "Load failed", the request
   never leaves; seen in the Linux check below), and Chrome's loopback exception doesn't
   exist there. An **initialization script** the shell runs on every page sets
-  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer() }`; `moduleRequest` is a Tauri command
+  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates }`
+  (`updates`: the build looks for new versions, so *Settings → App* says so; missing before
+  0.45); `moduleRequest` is a Tauri command
   that forwards the request to the module with its key and answers `{ status, body }`. The
   page never sees the module's port or key. The server's origin gets a Tauri capability for
   the command at runtime (it's the address entered at the first start). Same on Windows, so
   there's one way. `ownModule.svelte.ts` sends every module request through one function that
   uses `moduleRequest` when it's there. In the app, `activeModule()` is the app's own module
   (a browser's saved one doesn't count there), shown in *Settings → Where songs play from* as
-  *This app's YouTube Music*, with a switch (`ytmp.desktopModule`) and its state.
+  *This app's YouTube Music*, with a switch (`ytmp.desktopModule`) and its state. In the app
+  the default order of *Where songs play from* puts it first (`DESKTOP_SONG_SOURCES`: own
+  module, the room's link, through the server), so songs come from this computer unless
+  you change the order; browsers keep the room's link first.
 
 ## Why Tauri
 
@@ -121,7 +129,16 @@ How:
 
 The web app already sets the Media Session API (title, art, play/pause/next/previous).
 
-- **Windows**: WebView2 passes it to Windows' media controls.
+- ✅ **Windows**: WebView2 passes the Media Session to Windows' media controls itself, but
+  Windows then names the player *msedgewebview2.exe* and leaves the album out (seen in the
+  Windows check). So WebView2's own is off (`--disable-features=…,HardwareMediaKeyHandling`,
+  next to Tauri's default flags it replaces), the initialization script passes the page's
+  Media Session (metadata, `playbackState`, `setPositionState`, only when they change) to the
+  app's `media_update` command, and the app shows it in Windows' media controls as itself
+  (`desktop/src-tauri/src/media.rs`, the `souvlaki` crate on the window's HWND). Play, Pause,
+  Next, Previous and seeking there call the page's Media Session handlers
+  (`window.__ytmpMediaAction`). The web app doesn't know; it uses the Media Session API as
+  in a browser.
 - **Linux**: WebKitGTK does MPRIS itself (checked with 2.54): title, artist, album and
   length show in the desktop's media widget, and Pause, Play and Next over MPRIS reach the
   page's Media Session handlers. Still to check with the AppImage's own (older) WebKitGTK; if
@@ -146,7 +163,8 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
   list of releases (like the Android app: 0.x releases are pre-releases, which
   `/releases/latest` skips) for the newest with a `latest.json`, checks it, and offers the
   version with that release's notes as they are now (*Update* / *Later* / *Skip this
-  version*). *Update* downloads, installs (Windows: the installer, passive) and restarts.
+  version*). *Update* downloads, stops the module (the installer replaces its files, which
+  Windows won't do while they run), installs (Windows: the installer, passive) and restarts.
   Updates are signed with an updater key of their own (separate from the APK's): the public
   key in `desktop/updater.pub`, built in through `YTMP_UPDATER_PUBKEY`; the private key and
   its password in the secrets `TAURI_SIGNING_PRIVATE_KEY` / `…_PASSWORD`. Builds without the
@@ -161,7 +179,12 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
 - **Code**: `desktop/` (Tauri project: `src-tauri/`, `setup/`, `scripts/`); the module and the
   web app stay where they are. Development: `python desktop/scripts/bundle_module.py` once
   (or without it the app uses `ytm-module/.venv` and no Deno), then `cd desktop && pnpm
-  install && pnpm tauri dev`.
+  install && pnpm tauri dev`. On Windows without Visual Studio, Rust's GNU toolchain works
+  for trying things (`rustup` with `--default-host x86_64-pc-windows-gnu`) with a full
+  MinGW-w64 on `PATH` (WinLibs, the *msvcrt* one; Rust's own bundled MinGW lacks `as` and
+  `windres`); its linker warns "multiple non-default manifests". Releases are built with
+  MSVC on GitHub. `resources/` must exist for `cargo build` (copy it from an installed app,
+  or run `bundle_module.py`).
 
 ## Memory, roughly
 
@@ -197,6 +220,27 @@ local YTMP server and module:
 Not covered: Windows (WebView2), the AppImage's bundled WebKitGTK, and the web app's room
 pages beyond the join page.
 
+## Windows check ✅ (2026-11-12)
+
+The 0.44.0 installer on Windows 10 (WebView2 157), on a local YTMP server:
+
+| What | Result |
+|---|---|
+| Install | Per user, no admin, 162 MB (Python 60, Deno 94); unsigned |
+| Setup page, Change server, a wrong address | Works; the server is remembered and opens in ~1 s next time |
+| `YtmpDesktop` and module requests over IPC | Work; Home, albums and playlists from the app's module |
+| Playing a song | Through the room's link and through the app's module (Python + Deno, 8.5 s for the link) |
+| One app at a time; closing the window | Second start brings the first up; closing stops the module |
+| Killing the app | **The module kept running** → fixed (job object, see Shape) |
+| Default order | **The room's link first**, so the server looked songs up → fixed (own module first in the app) |
+| *Settings → App* | **Said updates are offered**, but 0.44.0 has no updater key → fixed (`updates`) |
+| Media keys | Pause and Next work, but **named *msedgewebview2.exe*, no album** → fixed (the app's own, see Media keys) |
+| Memory | App ~29 MB, module ~96 MB, WebView2 ~450 MB |
+
+The fixes were checked with a debug build (GNU toolchain): one media session, as the app,
+with title, artist, album and cover; Pause, Play and Next from Windows; killing the app ends
+the module.
+
 ## Order of work
 
 1. ✅ Check the risky parts on Linux first, see above.
@@ -206,7 +250,7 @@ pages beyond the join page.
 4. ✅ Search, Home and pages through the own module (frontend), with the server as fallback.
 5. ✅ Updater and release workflow (waiting for the owner's updater key); README.
 6. Next: PO tokens (BotGuard in a hidden window) and the YouTube Music sign-in in the app.
-7. Trying it on Windows, and the first release with it.
+7. ✅ Trying it on Windows, and the first release with it (0.44.0).
 
 ## Open questions
 

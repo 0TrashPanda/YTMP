@@ -28,3 +28,7 @@ strip = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects"] }
+souvlaki = { version = "=0.9.3", default-features = false }

@@ -55,6 +55,9 @@ export type OwnModule = { url: string; key: string; on: boolean };
 /** Where a browser plays a song from: the room's link, your own module, or through the host. */
 export type SongSource = 'direct' | 'own' | 'host';
 export const SONG_SOURCES: readonly SongSource[] = ['direct', 'own', 'host'];
+/** In the desktop app its own module comes first: that's what it's for (every YouTube request from this computer). */
+export const DESKTOP_SONG_SOURCES: readonly SongSource[] = ['own', 'direct', 'host'];
+const inDesktopApp = () => typeof window !== 'undefined' && !!window.YtmpDesktop?.moduleRequest;
 
 function pick<T extends string>(key: string, options: readonly T[], fallback: T): T {
 	const value = read(key);
@@ -185,7 +188,7 @@ export const saved = {
 	set desktopModuleOn(on: boolean) {
 		write('ytmp.desktopModule', on ? 'on' : 'off');
 	},
-	/** The order this browser tries the ways to play a song in; each one once. */
+	/** The order this browser tries the ways to play a song in; each one once. Not chosen: [SONG_SOURCES], in the desktop app [DESKTOP_SONG_SOURCES]. */
 	get songSources(): SongSource[] {
 		try {
 			const value = JSON.parse(read('ytmp.songSources') ?? 'null');
@@ -193,7 +196,7 @@ export const saved = {
 		} catch {
 			// The default below.
 		}
-		return [...SONG_SOURCES];
+		return [...(inDesktopApp() ? DESKTOP_SONG_SOURCES : SONG_SOURCES)];
 	},
 	set songSources(order: SongSource[]) {
 		write('ytmp.songSources', JSON.stringify(order));
