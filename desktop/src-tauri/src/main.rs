@@ -56,13 +56,25 @@ fn normalize(input: &str) -> Result<Url, String> {
     Ok(url)
 }
 
-/// The server answers (any page, even an error page, means it's there).
-fn reachable(url: &Url) -> Result<(), String> {
+/// The server answers (any page, even an error page, means it's there). Answers its address
+/// after redirects: a server behind Caddy sends http:// to https://, and the page that ends up
+/// there is the one that needs the app's commands.
+fn reachable(url: &Url) -> Result<Url, String> {
     let host = url.host_str().unwrap_or_default().to_string();
-    match ureq::get(url.as_str()).timeout(Duration::from_secs(8)).call() {
-        Ok(_) | Err(ureq::Error::Status(_, _)) => Ok(()),
-        Err(_) => Err(format!("Can't reach {host}. Is the address right, and is the server on?")),
+    let landed = match ureq::get(url.as_str()).timeout(Duration::from_secs(8)).call() {
+        Ok(response) | Err(ureq::Error::Status(_, response)) => response.get_url().to_string(),
+        Err(_) => return Err(format!("Can't reach {host}. Is the address right, and is the server on?")),
+    };
+    Ok(Url::parse(&landed).map(|landed| same_path_at(url, &landed)).unwrap_or_else(|_| url.clone()))
+}
+
+/// [url]'s path on [landed]'s scheme, host and port (a redirect may also have gone to a page).
+fn same_path_at(url: &Url, landed: &Url) -> Url {
+    let mut moved = url.clone();
+    if moved.set_scheme(landed.scheme()).is_err() || moved.set_host(landed.host_str()).is_err() || moved.set_port(landed.port()).is_err() {
+        return url.clone();
     }
+    moved
 }
 
 /// Lets this server's pages use the app's commands, then opens it.
@@ -107,8 +119,8 @@ async fn open_saved(app: AppHandle, change: bool) -> SetupState {
         Err(error) => return SetupState { address: saved, error },
     };
     let checked = url.clone();
-    match tauri::async_runtime::spawn_blocking(move || reachable(&checked)).await.unwrap_or(Ok(())) {
-        Ok(()) => {
+    match tauri::async_runtime::spawn_blocking(move || reachable(&checked)).await.unwrap_or(Ok(url)) {
+        Ok(url) => {
             open_server(&app, &url);
             SetupState { address: saved, error: String::new() }
         }
@@ -120,8 +132,7 @@ async fn open_saved(app: AppHandle, change: bool) -> SetupState {
 #[tauri::command]
 async fn connect(app: AppHandle, address: String) -> Result<(), String> {
     let url = normalize(&address)?;
-    let checked = url.clone();
-    tauri::async_runtime::spawn_blocking(move || reachable(&checked)).await.map_err(|e| e.to_string())??;
+    let url = tauri::async_runtime::spawn_blocking(move || reachable(&url)).await.map_err(|e| e.to_string())??;
     app.state::<State>().settings.lock().unwrap().server = Some(url.as_str().trim_end_matches('/').to_string());
     save(&app);
     open_server(&app, &url);
@@ -316,4 +327,18 @@ fn main() {
             app.state::<Module>().stop();
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_redirect_moves_the_address_but_keeps_its_path() {
+        let typed = normalize("ytmp.example.com/sub").unwrap();
+        let landed = Url::parse("https://ytmp.example.com/sub/login").unwrap();
+        assert_eq!(same_path_at(&typed, &landed).as_str(), "https://ytmp.example.com/sub");
+        let other_port = Url::parse("http://10.0.0.5:8443/").unwrap();
+        assert_eq!(same_path_at(&normalize("10.0.0.5:8080").unwrap(), &other_port).as_str(), "http://10.0.0.5:8443/");
+    }
 }
