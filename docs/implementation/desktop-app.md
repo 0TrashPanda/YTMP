@@ -50,7 +50,10 @@ Windows check below).
   0.45); `moduleRequest` is a Tauri command
   that forwards the request to the module with its key and answers `{ status, body }`. The
   page never sees the module's port or key. The server's origin gets a Tauri capability for
-  the command at runtime (it's the address entered at the first start). Same on Windows, so
+  the command at runtime: the origin the entered address ends up on after redirects, and
+  that address is the one kept. (A server behind Caddy sends `http://` to `https://`; up to
+  0.45.0 only the typed `http://` origin was allowed, so the page couldn't reach the module:
+  "this app's YouTube Music module doesn't answer".) Same on Windows, so
   there's one way. `ownModule.svelte.ts` sends every module request through one function that
   uses `moduleRequest` when it's there. In the app, `activeModule()` is the app's own module
   (a browser's saved one doesn't count there), shown in *Settings → Where songs play from* as
