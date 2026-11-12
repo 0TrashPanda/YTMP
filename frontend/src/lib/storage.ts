@@ -182,6 +182,13 @@ export const saved = {
 		write('ytmp.ownModule', JSON.stringify(value));
 	},
 	/** In the desktop app: whether its own YouTube Music module is used (on unless switched off). */
+	/** Holding phones together: the tag names YTMP, so their phone opens it in YTMP (else where the link goes). */
+	get tapShareInApp(): boolean {
+		return read('ytmp.tapShareInApp') !== 'off';
+	},
+	set tapShareInApp(on: boolean) {
+		write('ytmp.tapShareInApp', on ? 'on' : 'off');
+	},
 	get desktopModuleOn(): boolean {
 		return read('ytmp.desktopModule') !== 'off';
 	},

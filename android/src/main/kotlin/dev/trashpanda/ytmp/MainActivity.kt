@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp
 
 import android.Manifest
 import android.app.AlertDialog
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -276,6 +277,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (catchingTags && intent.action in TAG_ACTIONS) {
+            // Read from the other phone while sharing (see preferTapShare): not for us.
+            Log.i("YtmpTapShare", "Ignored a tag read while sharing")
+            return
+        }
         roomLink(intent)?.let(::openLink)
         takeShared(intent, started = false)
     }
@@ -327,7 +333,9 @@ class MainActivity : ComponentActivity() {
 
     /**
      * While this screen shows and something is shared, the tag answers before any other app's
-     * (another app could also act as an NFC tag).
+     * (another app could also act as an NFC tag). And whatever this phone reads from the other
+     * one comes here and is dropped: two phones held together read each other, and Android's
+     * own tap sharing (a Pixel's contact card) would otherwise take over this screen.
      */
     private fun preferTapShare(on: Boolean) {
         if (tapShareState() == "none") return
@@ -337,7 +345,20 @@ class MainActivity : ComponentActivity() {
             if (on) emulation.setPreferredService(this, ComponentName(this, TapShareService::class.java))
             else emulation.unsetPreferredService(this)
         }.onFailure { Log.w("YtmpTapShare", "Couldn't prefer the share tag", it) }
+        if (on == catchingTags) return
+        runCatching {
+            if (on) {
+                val back = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                adapter.enableForegroundDispatch(this, PendingIntent.getActivity(this, 0, back, PendingIntent.FLAG_MUTABLE), null, null)
+            } else {
+                adapter.disableForegroundDispatch(this)
+            }
+            catchingTags = on
+        }.onFailure { Log.w("YtmpTapShare", "Couldn't catch tags while sharing", it) }
     }
+
+    /** Tags read by this phone come to this screen (while sharing, see [preferTapShare]). */
+    private var catchingTags = false
 
     override fun onResume() {
         super.onResume()
@@ -886,7 +907,16 @@ class MainActivity : ComponentActivity() {
          * room's, a song's), or null for nothing. Only while the app is on screen.
          */
         @JavascriptInterface
-        fun setTapShare(url: String?) = runOnUiThread {
+        fun setTapShare(url: String?) = setTapShareFor(url, true)
+
+        /**
+         * [setTapShare], and whether the tag names YTMP (bridge version 19): a phone with YTMP
+         * then always opens it there, but an Android phone without it gets a store page instead
+         * of YouTube Music or the browser.
+         */
+        @JavascriptInterface
+        fun setTapShareFor(url: String?, openInApp: Boolean) = runOnUiThread {
+            TapShare.openInApp = openInApp
             if (currentUrl?.let(::isAppPage) != true) return@runOnUiThread
             val link = url?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
             TapShare.link = link
@@ -941,7 +971,10 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 18
+        const val BRIDGE_VERSION = 19
+
+        /** What reading a tag starts (foreground dispatch, [preferTapShare]). */
+        private val TAG_ACTIONS = setOf(NfcAdapter.ACTION_NDEF_DISCOVERED, NfcAdapter.ACTION_TECH_DISCOVERED, NfcAdapter.ACTION_TAG_DISCOVERED)
         private const val ERROR_NOT_HERE = "{\"error\": \"Not from this page\"}"
     }
 }

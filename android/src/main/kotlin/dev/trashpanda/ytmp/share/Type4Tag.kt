@@ -8,8 +8,10 @@ package dev.trashpanda.ytmp.share
  *
  * [link] gives what's shared right now (null: nothing, and the reader finds no tag here). It's
  * read once when the reader selects the application, so the file can't change halfway a read.
+ * [app]: a package the tag names after the link (an Android Application Record), so an Android
+ * phone with that app opens it there, whoever else claims the link; null for a plain link.
  */
-class Type4Tag(private val link: () -> String?) {
+class Type4Tag(private val app: () -> String? = { null }, private val link: () -> String?) {
     private var ndefFile: ByteArray? = null
     private var selected: ByteArray? = null
 
@@ -42,7 +44,7 @@ class Type4Tag(private val link: () -> String?) {
         val data = commandData(apdu) ?: return WRONG_LENGTH
         if (!data.contentEquals(NDEF_AID)) return NOT_FOUND
         val url = link() ?: return NOT_FOUND.also { reset() }
-        ndefFile = ndefFile(url)
+        ndefFile = ndefFile(url, app())
         selected = null
         return OK
     }
@@ -109,8 +111,8 @@ class Type4Tag(private val link: () -> String?) {
         )
 
         /** The NDEF file: the message's length (2 bytes), then the message. */
-        fun ndefFile(url: String): ByteArray {
-            val message = Ndef.uriMessage(url)
+        fun ndefFile(url: String, app: String? = null): ByteArray {
+            val message = Ndef.uriMessage(url, app)
             return bytes(message.size shr 8, message.size and 0xFF) + message
         }
 
@@ -118,7 +120,7 @@ class Type4Tag(private val link: () -> String?) {
     }
 }
 
-/** NDEF messages (NFC Forum): here only one with a single URI record. */
+/** NDEF messages (NFC Forum): here one with a URI record, and maybe an Android Application Record. */
 object Ndef {
     /** The URI record's abbreviations: a code byte stands for the start of the link. */
     private val PREFIXES = listOf(
@@ -128,16 +130,28 @@ object Ndef {
         "https://" to 0x04,
     )
 
-    /** One well-known URI record ("U") holding [url]. */
-    fun uriMessage(url: String): ByteArray {
+    /**
+     * A well-known URI record ("U") holding [url]; with [app], then an Android Application Record
+     * naming that package. Android opens such a tag in that app (or, without it, its store page);
+     * an iPhone only reads the link.
+     */
+    fun uriMessage(url: String, app: String? = null): ByteArray {
         val (prefix, code) = PREFIXES.firstOrNull { url.startsWith(it.first) } ?: ("" to 0x00)
         val payload = byteArrayOf(code.toByte()) + url.removePrefix(prefix).toByteArray(Charsets.UTF_8)
-        val type = "U".toByteArray(Charsets.US_ASCII)
-        // Message begin + message end, well-known type; a short record when the payload fits in a byte.
+        val uri = record(WELL_KNOWN, "U", payload, first = true, last = app == null)
+        return if (app == null) uri else uri + record(EXTERNAL, "android.com:pkg", app.toByteArray(Charsets.US_ASCII), first = false, last = true)
+    }
+
+    private const val WELL_KNOWN = 0x01
+    private const val EXTERNAL = 0x04
+
+    /** One record: message begin/end flags, a short record when the payload fits in a byte. */
+    private fun record(tnf: Int, type: String, payload: ByteArray, first: Boolean, last: Boolean): ByteArray {
+        val typeBytes = type.toByteArray(Charsets.US_ASCII)
         val short = payload.size < 256
-        val header = (0x80 or 0x40 or (if (short) 0x10 else 0x00) or 0x01).toByte()
+        val header = ((if (first) 0x80 else 0) or (if (last) 0x40 else 0) or (if (short) 0x10 else 0x00) or tnf).toByte()
         val length = if (short) byteArrayOf(payload.size.toByte())
         else byteArrayOf((payload.size ushr 24).toByte(), (payload.size ushr 16).toByte(), (payload.size ushr 8).toByte(), payload.size.toByte())
-        return byteArrayOf(header, type.size.toByte()) + length + type + payload
+        return byteArrayOf(header, typeBytes.size.toByte()) + length + typeBytes + payload
     }
 }

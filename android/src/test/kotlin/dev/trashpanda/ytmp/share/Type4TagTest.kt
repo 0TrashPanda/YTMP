@@ -101,4 +101,16 @@ class Type4TagTest {
         tag.reset()
         assertContentEquals(Type4Tag.NOT_FOUND, tag.respond(selectNdef))
     }
+
+    @Test
+    fun `names the app after the link when asked`() {
+        val plain = Ndef.uriMessage("https://music.youtube.com/watch?v=abc")
+        val message = Ndef.uriMessage("https://music.youtube.com/watch?v=abc", "dev.trashpanda.ytmp")
+        // The link's record no longer ends the message (ME off), then the app record ends it.
+        assertEquals((plain[0].toInt() and 0xBF).toByte(), message[0])
+        val aar = message.copyOfRange(plain.size, message.size)
+        assertEquals(0x54.toByte(), aar[0]) // ME, short record, external type
+        assertEquals("android.com:pkg", String(aar, 3, aar[1].toInt(), Charsets.US_ASCII))
+        assertEquals("dev.trashpanda.ytmp", String(aar, 3 + aar[1], aar[2].toInt(), Charsets.US_ASCII))
+    }
 }

@@ -104,6 +104,8 @@ export interface NativeBridge {
 	tapShare?(): 'on' | 'off' | 'none';
 	/** What holding another phone against this one hands over (bridge version 18): a link, or null for nothing. */
 	setTapShare?(url: string | null): void;
+	/** [setTapShare], and whether the tag names YTMP, so a phone with it opens the link there (bridge version 19). */
+	setTapShareFor?(url: string | null, openInApp: boolean): void;
 	/** Android's NFC settings, to switch NFC on (bridge version 18). */
 	openNfcSettings?(): void;
 	/** Android's share sheet with a link (bridge version 18). */

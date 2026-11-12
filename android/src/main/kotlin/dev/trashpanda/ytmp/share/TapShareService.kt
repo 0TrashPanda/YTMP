@@ -11,6 +11,8 @@ import dev.trashpanda.ytmp.Log
  */
 object TapShare {
     @Volatile var link: String? = null
+    /** The tag names this app, so a phone with YTMP opens the link in it (the Share sheet's choice). */
+    @Volatile var openInApp = true
     @Volatile var onScreen = false
 
     fun current(): String? = link?.takeIf { onScreen }
@@ -18,7 +20,7 @@ object TapShare {
 
 /** Answers as an NFC tag with [TapShare]'s link (Android's host card emulation). */
 class TapShareService : HostApduService() {
-    private val tag = Type4Tag(TapShare::current)
+    private val tag = Type4Tag(app = { packageName.takeIf { TapShare.openInApp } }, link = TapShare::current)
 
     override fun processCommandApdu(commandApdu: ByteArray, extras: Bundle?): ByteArray {
         val answer = tag.respond(commandApdu)

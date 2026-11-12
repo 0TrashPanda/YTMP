@@ -17,6 +17,15 @@ against this one*; with NFC switched off on your phone it offers to switch it on
     otherwise in the browser, which can join the room too;
   - a **song**: YTMP's song screen when the app is installed (see below), otherwise the song in
     YouTube Music (app or website).
+- **Open in YTMP on their phone** (a switch under *Hold a phone against this one*, on by
+  default, remembered): the link says it's for YTMP, so a phone with YTMP always opens it there,
+  even though YouTube Music also claims song links (Android otherwise gives a song link to
+  YouTube Music). The catch: an Android phone *without* YTMP then gets a store page instead of
+  YouTube Music or the browser. Switched off, the plain link goes where it goes, also on
+  phones with YTMP.
+- **Your phone ignores the other phone** while sharing: two phones held together read each
+  other, and Android's own tap sharing (a Pixel's contact card) would otherwise take over the
+  screen.
 - **iPhones** (XS and newer) read it too, without an app: a notification opens the link (the
   room in Safari, the song in YouTube Music).
 - Phones without NFC install and work as before; they just can't share or get things this

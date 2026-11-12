@@ -22,16 +22,26 @@ link, in the background.
   - The link is taken when the reader selects the application, so it can't change halfway a
     read; `onDeactivated` forgets it.
 - `Ndef.uriMessage` makes one well-known URI record (`U`) with the usual prefix codes
-  (`https://` = 4, …), a short record when the payload fits in a byte.
+  (`https://` = 4, …), a short record when the payload fits in a byte; with *Open in YTMP on
+  their phone* (`TapShare.openInApp`) an **Android Application Record** follows
+  (`android.com:pkg` = the app's package). Why: Android's NFC dispatch shows an http(s) link
+  through its "open link" step, which hands it to the app that owns the link (YouTube Music
+  for `music.youtube.com`, a verified app link) before our `NDEF_DISCOVERED` filter counts. An
+  AAR makes it start that package's matching activity; without the package installed, Android
+  opens its store page. iPhones ignore it.
 - `TapShare` holds the link and whether the app is on screen (`onResume`/`onPause`). It
   answers only when both are set. While sharing on screen, `MainActivity` makes the service
   the **preferred** one (`CardEmulation.setPreferredService`), in case another app also
-  answers as an NDEF tag. A new page clears the link.
+  answers as an NDEF tag, and turns on **foreground dispatch** for every tag: two phones held
+  together also read each other, and what this phone reads (a Pixel's own tap-to-share contact
+  card, the other phone's YTMP tag) comes to `onNewIntent` and is dropped instead of opening
+  something over the Share sheet. A new page clears the link.
 
-## The bridge (version 18)
+## The bridge (version 18, 19)
 
 - `tapShare()`: `"on"`, `"off"` (NFC switched off) or `"none"` (no NFC or no HCE).
-- `setTapShare(url | null)`: what the tag hands over. The web app's `TapShareHint.svelte` (in
+- `setTapShare(url | null)`: what the tag hands over; version 19 `setTapShareFor(url, openInApp)`
+  also says whether the tag names YTMP (`TapShareHint.svelte`'s switch, `saved.tapShareInApp`). The web app's `TapShareHint.svelte` (in
   `ShareSheet.svelte` and `SongShareSheet.svelte`) sets it while the sheet shows and clears it
   when it closes (`share.svelte.ts` `shareByTap`). Only from the app's own pages.
 - `openNfcSettings()`, `shareLink(title, url)` (Android's share sheet; the WebView has no

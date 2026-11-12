@@ -26,9 +26,10 @@ export const canTapShare = () => !!nativeBridge?.tapShare && nativeBridge.tapSha
  * While a Share sheet is open: holding another phone against this one hands over [url]. Returns
  * how to stop (when the sheet closes). Only one at a time: the newest wins.
  */
-export function shareByTap(url: string): () => void {
+export function shareByTap(url: string, openInApp = true): () => void {
 	if (!tapShareState()) return () => {};
-	nativeBridge?.setTapShare?.(url);
+	if (nativeBridge?.setTapShareFor) nativeBridge.setTapShareFor(url, openInApp);
+	else nativeBridge?.setTapShare?.(url);
 	return () => nativeBridge?.setTapShare?.(null);
 }
 
