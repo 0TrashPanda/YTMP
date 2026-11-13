@@ -382,7 +382,7 @@ Albums, playlists, artists and podcasts shown as cards (Home, search, artist pag
 tiles of a speed dial and what's pinned on Home) have a menu,
 like YouTube Music's: **hold** the card on a touch screen, **right-click** it, or its **⋮**,
 which shows on the picture when you point at it with a mouse. A sheet from the bottom on a
-phone, a menu at the card on a computer.
+phone (swipe it down to close it, like the song menu), a menu at the card on a computer.
 
 - **Album or playlist**: Play, Shuffle play, Play next, Add to queue (a playlist: Add to
   autoplay, as on its page), Start radio (from its first song). These use the same limits as the

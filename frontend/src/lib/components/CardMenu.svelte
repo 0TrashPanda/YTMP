@@ -12,6 +12,7 @@
 	import { keepInView } from '../keepInView';
 	import { modal } from '../modal';
 	import { motionMs } from '../motion.svelte';
+	import { swipeDown } from '../swipeDown';
 	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import { addToQueue, playNow, startRadio } from '../songActions';
@@ -204,6 +205,7 @@
 			tabindex="-1"
 			aria-label="{kindName[t.kind]} {t.title}"
 			use:modal={close}
+			use:swipeDown={close}
 			transition:fly|global={{ y: 500, duration: motionMs(200), opacity: 1 }}
 		>
 			<span class="mx-auto mt-2 mb-1 h-1 w-10 shrink-0 rounded-full bg-white/30"></span>
@@ -216,7 +218,7 @@
 					<p class="truncate text-sm text-muted">{t.subtitle || kindName[t.kind]}</p>
 				</div>
 			</div>
-			<div class="min-h-0 flex-1 overflow-y-auto py-2">{@render items(true)}</div>
+			<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain py-2">{@render items(true)}</div>
 		</div>
 	{:else}
 		<!-- Click anywhere else (or right-click) to close. -->

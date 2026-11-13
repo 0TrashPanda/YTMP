@@ -27,6 +27,7 @@
 <script lang="ts">
 	import { motionMs } from '../motion.svelte';
 	import { modal } from '../modal';
+	import { swipeDown } from '../swipeDown';
 	// The song menu (docs/features/ui.md#song-menu): right-click a song, or its ⋮ button. Laid out
 	// as set in Settings → Song menu (songMenu.svelte.ts). Phones get a sheet from the bottom, like
 	// YouTube Music's, with big buttons at the top; wider screens a menu where it was opened.
@@ -492,25 +493,6 @@
 
 	// Opened at the pointer, and kept on screen (moved left, or above it) by keepInView.
 	const at = $derived({ top: target.y, bottom: target.y, left: target.x, right: target.x });
-
-	// The sheet follows the finger down, and closes when let go far enough (from the top of its list).
-	let list = $state<HTMLElement>();
-	let swipe: { y: number; ok: boolean } | null = null;
-	let dragY = $state(0);
-	function touchStart(e: TouchEvent) {
-		swipe = { y: e.touches[0].clientY, ok: !list || list.scrollTop <= 0 || !list.contains(e.target as Node) };
-	}
-	function touchMove(e: TouchEvent) {
-		if (!swipe?.ok) return;
-		const dy = e.touches[0].clientY - swipe.y;
-		if (dragY === 0 && dy < 0) swipe.ok = false;
-		else dragY = Math.max(0, dy);
-	}
-	function touchEnd() {
-		if (dragY > 80) onClose();
-		else dragY = 0;
-		swipe = null;
-	}
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onClose()} onresize={() => !phone.current && onClose()} />
@@ -565,16 +547,12 @@
 {#if phone.current}
 	<div class="fixed inset-0 z-[55] bg-black/60" role="presentation" transition:fade|global={{ duration: motionMs(150) }} onclick={onClose}></div>
 	<div
-		class="fixed inset-x-0 bottom-0 z-[56] flex max-h-screen-85 flex-col rounded-t-2xl bg-raised pb-[env(safe-area-inset-bottom)] shadow-2xl {dragY ? '' : 'transition-transform'}"
-		style:transform="translateY({dragY}px)"
+		class="fixed inset-x-0 bottom-0 z-[56] flex max-h-screen-85 flex-col rounded-t-2xl bg-raised pb-[env(safe-area-inset-bottom)] shadow-2xl"
 		role="menu"
 		tabindex="-1"
 		use:modal
+		use:swipeDown={onClose}
 		transition:fly|global={{ y: 500, duration: motionMs(200), opacity: 1 }}
-		ontouchstart={touchStart}
-		ontouchmove={touchMove}
-		ontouchend={touchEnd}
-		ontouchcancel={touchEnd}
 	>
 		<div class="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-white/30"></div>
 		{#if sub}
@@ -604,7 +582,7 @@
 				{/each}
 			</div>
 		{/if}
-		<div bind:this={list} class="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-line py-2">
+		<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-line py-2">
 			{#each layout.list as entry, i (i)}
 				{#if entry === null}
 					<div class="mx-5 my-1 h-px bg-line"></div>
