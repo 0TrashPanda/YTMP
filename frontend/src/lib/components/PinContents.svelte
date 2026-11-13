@@ -16,8 +16,9 @@
 		pin,
 		layout,
 		onToast,
-		onMenu
-	}: { room: RoomConnection; pin: Pin; layout: Layout; onToast: (text: string) => void; onMenu: (target: MenuTarget) => void } = $props();
+		onMenu,
+		onScrolls
+	}: { room: RoomConnection; pin: Pin; layout: Layout; onToast: (text: string) => void; onMenu: (target: MenuTarget) => void; onScrolls?: (scrolls: boolean) => void } = $props();
 
 	/** A carousel holds five pages of four, a speed dial two of nine; a list stays short (More shows the rest). */
 	const SHOWN: Record<Layout, number> = { carousel: 20, list: 10, dial: 18 };
@@ -61,5 +62,5 @@
 {:else if layout === 'list'}
 	<SongList {room} songs={songs.slice(0, SHOWN.list)} {onToast} {onMenu} />
 {:else}
-	<SongCarousel {room} songs={songs.slice(0, SHOWN.carousel)} {onToast} {onMenu} />
+	<SongCarousel {room} songs={songs.slice(0, SHOWN.carousel)} {onToast} {onMenu} {onScrolls} />
 {/if}

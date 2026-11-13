@@ -50,6 +50,8 @@
 	let error = $state<string | null>(null);
 
 	const sections = $derived(arrange(home?.sections ?? null, prefs, friends.shares ?? []));
+	/** Which sections' rows scroll sideways (`<key>:songs`, `<key>:cards`): ‹ › show only for those. */
+	const scrolling = $state<Record<string, boolean>>({});
 	/** The section whose ⋮ menu is open (its key). */
 	let sectionMenu = $state<string | null>(null);
 
@@ -144,7 +146,7 @@
 	<div class="relative flex items-center gap-2 px-2">
 		<h2 class="min-w-0 flex-1 truncate text-xl font-bold sm:text-2xl">{block.title}</h2>
 		<!-- With a mouse, like YTM: ‹ › scroll the row a screen's width (phones swipe it). -->
-		{#if block.layout === 'carousel' && (block.kind === 'ytm' || block.kind === 'pin')}
+		{#if block.layout === 'carousel' && (block.kind === 'ytm' || block.kind === 'pin') && (scrolling[`${block.key}:songs`] || scrolling[`${block.key}:cards`])}
 			<div class="hidden shrink-0 gap-2 pointer-fine:flex">
 				<button class="grid h-9 w-9 place-items-center rounded-full border border-line hover:bg-raised" aria-label="Back in {block.title}" onclick={(e) => slide(e, -1)}>
 					<Icon name="chevron" size={22} class="rotate-180" />
@@ -216,6 +218,7 @@
 						open: () => openPin(pin),
 						menu: (e: MouseEvent) => pinMenu(pin, e)
 					}))}
+					all
 				/>
 			{:else if block.kind === 'pinned'}
 				<div class={block.layout === 'list' ? 'flex flex-col' : 'grid grid-cols-2 gap-2 px-2 sm:grid-cols-3 lg:grid-cols-4'}>
@@ -224,7 +227,7 @@
 					{/each}
 				</div>
 			{:else if block.kind === 'pin'}
-				<PinContents {room} pin={block.pin} layout={block.layout} {onToast} {onMenu} />
+				<PinContents {room} pin={block.pin} layout={block.layout} {onToast} {onMenu} onScrolls={(s) => (scrolling[`${block.key}:songs`] = s)} />
 			{:else if block.kind === 'friends' && block.layout === 'dial'}
 				<SpeedDial tiles={songTiles(block.shares.map((s) => s.song), room, onToast, onMenu)} />
 			{:else if block.kind === 'friends'}
@@ -237,10 +240,10 @@
 				{:else if list.length && block.layout === 'list'}
 					<SongList {room} songs={list} {onToast} {onMenu} />
 				{:else if list.length}
-					<SongCarousel {room} songs={list} {onToast} {onMenu} />
+					<SongCarousel {room} songs={list} {onToast} {onMenu} onScrolls={(s) => (scrolling[`${block.key}:songs`] = s)} />
 				{/if}
 				{#if others.length && block.layout !== 'dial'}
-					<CardGrid cards={others} row={block.layout === 'carousel'} list={block.layout === 'list'} />
+					<CardGrid cards={others} row={block.layout === 'carousel'} list={block.layout === 'list'} onScrolls={(s) => (scrolling[`${block.key}:cards`] = s)} />
 				{/if}
 			{/if}
 		</section>

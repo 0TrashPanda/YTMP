@@ -61,13 +61,14 @@ Like YTM:
   sections* hides YTM's sections of podcasts and episodes. A section's **⋮** on Home does the
   same in place. YTM picks and names its sections, so they're known by name; a new one shows
   where YTM puts it.
-- **Home on a computer** (planned, [how](../implementation/home-layout.md)): the sections fit
-  what they have instead of fixed pages. A **speed dial** shows all its tiles at once in as many
-  columns as fit (20 songs: two rows of 10; six playlists: one row); on a phone it keeps 3×3
-  pages, split evenly (no last page of 2). **Quick picks** are four rows across the whole
-  width (20 songs: 4 × 5). A row with **few playlists or albums** gets bigger cards that fill
-  the row. Each section has what YouTube Music's Home sends at once (quick picks 20, playlist
-  rows 3 to 6, new releases 10).
+- **Home fits what each section has** ✅ ([how](../implementation/home-layout.md)). On a
+  **phone**, a speed dial of suggestions shows only full 3×3 pages: 18 tiles (two pages), or 9
+  when there are fewer than 18; your own pins in *Pinned* all show. On a **computer**, a speed
+  dial shows all its tiles at once in even rows that fill the width (20: 7 · 7 · 6 at 1440 px),
+  **quick picks** sit across the whole width without scrolling (20 songs: 4 columns of 5, or 5
+  of 4 on a wider screen), and a row of **playlists or albums** shows whole cards, never one
+  cut off at the edge; a row with few gets bigger cards that fill it. The ‹ › buttons only
+  show when a row scrolls.
 - **Library** ✅ (with a linked YouTube Music account): your playlists and podcasts. The
   search bar at the top searches only your library here ([search](#search); *Settings →
   Search*). With that setting off, a search field on the page finds them by name or author as

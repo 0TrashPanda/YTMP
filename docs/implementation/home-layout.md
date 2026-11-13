@@ -1,6 +1,7 @@
 # Home on a computer: layouts that fit the count
 
-> Status: **planned** (decided 2026-11-13, option A of three mockups). Feature:
+> Status: **built** ✅ (decided 2026-11-13, option A of three mockups; built the same day, with
+> phones' speed dials changed to full pages only, see below). Feature:
 > [Home on a computer](../features/ui.md#home--explore).
 
 ## Why
@@ -20,7 +21,22 @@ What looks off on a wide screen now:
 - **Card rows** (`CardGrid.svelte` with `row`): cards `sm:auto-cols-[11rem]` whatever the
   count, so a row of 3 playlists fills a third of the width.
 
-## What to build (option A)
+## What was built
+
+- `SpeedDial.svelte`: phones (`screen.wide` false, `screen.svelte.ts`: `min-width: 640px`):
+  pages of 9; suggestions show only full pages (≥18 tiles: 18, ≥9: 9, fewer: all on one page);
+  `all` (the *Pinned* section) shows every pin. Computers: one grid, as many columns as fit at
+  120 px, then fewer so the rows are even, `1fr` each; fewer tiles than fit: at most 176 px.
+- `SongCarousel.svelte`: on a computer, no scrolling when the songs fit in at most 5 rows of
+  columns ≥ 256 px (20 at 1440 px: 4 columns of 5; at 1024 px, 2 fit, so they scroll); otherwise
+  4 rows that scroll, columns sized so whole columns fill a screen. Phones as before.
+- `CardGrid.svelte` (`row`): on a computer, cards that fit at 11rem grow to fill (each at most
+  16rem); otherwise whole cards a screen (about 11rem each).
+- Both tell `HomeView` whether they scroll (`onScrolls`); ‹ › only show then.
+- Checked in the browser at 1440×900, 1024×768 and 375×812 with an anonymous Home that day:
+  quick picks 20, playlist rows 5 to 10, new releases 10.
+
+## The plan (option A)
 
 Wide screens (`sm:` and up, the desktop layout with the left side); phones keep what they have,
 except that speed dial pages are split evenly.

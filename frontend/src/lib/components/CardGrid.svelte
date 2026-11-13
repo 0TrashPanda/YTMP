@@ -25,12 +25,23 @@
 	import Icon from './Icon.svelte';
 	import Picture from './Picture.svelte';
 	import PageDots from './PageDots.svelte';
+	import { screen } from '../screen.svelte';
 
-	/** [row]: one row that scrolls sideways (the home page), instead of a grid; [list]: one card under the other. */
-	let { cards, row = false, list = false }: { cards: Card[]; row?: boolean; list?: boolean } = $props();
+	/** [row]: one row that scrolls sideways (the home page), instead of a grid; [list]: one card under the
+	 * other. [onScrolls]: whether the row scrolls sideways (Home shows ‹ › only then). */
+	let { cards, row = false, list = false, onScrolls }: { cards: Card[]; row?: boolean; list?: boolean; onScrolls?: (scrolls: boolean) => void } = $props();
 	// YouTube Music can list the same album or playlist twice: show it once.
 	const unique = $derived(cards.filter((c, i) => cards.findIndex((d) => d.key === c.key) === i));
 	let scroller = $state<HTMLElement>();
+	let width = $state(0);
+	/** On a computer, a row whose cards fit at their usual size (11rem, 1rem apart) grows to fill
+	 * the width, each at most 16rem; more cards than fit scroll sideways. */
+	const grows = $derived(row && screen.wide && unique.length * 176 + (unique.length - 1) * 16 + 16 <= width);
+	/** More than fit: whole cards a screen (about 11rem each), none cut off at the edge. */
+	const perScreen = $derived(Math.max(1, Math.floor(width / (176 + 16))));
+	$effect(() => {
+		onScrolls?.(row && !grows);
+	});
 
 	/** Hold or right-click a card ([atPointer]: the menu at the pointer), or its ⋮: its menu. */
 	function menu(event: MouseEvent, card: Card, atPointer: boolean) {
@@ -70,7 +81,10 @@
 {:else}
 <div
 	bind:this={scroller}
+	bind:clientWidth={width}
 	data-carousel={row ? '' : undefined}
+	style:grid-template-columns={grows ? `repeat(${unique.length}, minmax(0, 16rem))` : undefined}
+	style:grid-auto-columns={row && screen.wide && !grows && width ? `${(width - 16 - (perScreen - 1) * 16) / perScreen}px` : undefined}
 	class={row
 		? 'grid snap-x auto-cols-[9.5rem] grid-flow-col gap-4 overflow-x-auto scroll-px-2 px-2 pb-2 [scrollbar-width:none] sm:auto-cols-[11rem] [&::-webkit-scrollbar]:hidden'
 		: 'grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4 px-2'}

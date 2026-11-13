@@ -66,7 +66,9 @@ Music, without Premium, and not tied to a single music service.
 
 **Finding music** (through YouTube Music, no Premium needed)
 - Home with YouTube Music's suggestions (quick picks, new releases, mixes), made your own:
-  pins (as tiles, or with their songs), sections hidden, moved, or shown as a list.
+  pins (as tiles, or with their songs), sections hidden, moved, or shown as a list or speed
+  dial. On a computer the sections fill the width (quick picks without scrolling, even speed
+  dial rows); on a phone a speed dial shows full 3×3 pages.
 - Search with suggestions while typing and YouTube Music's chips: songs, videos, albums,
   artists, playlists, podcasts, episodes. Put its sections in the order you like, with a
   section for what matches in your own library (liked songs, playlists, podcasts); on the
@@ -242,7 +244,6 @@ Music, without Premium, and not tied to a single music service.
 - Recaps from your listening history ("you listened 12 hours with Sam")
 - Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists
 - YTMP playlists, explore page
-- Home on a computer: sections that fit what they have (a speed dial of 20 as two rows of 10, quick picks across the full width)
 
 ## Known problems
 
