@@ -169,15 +169,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           pnpm install --frozen-lockfile
-          updates=false
+          config="{\"version\":\"$VERSION\"}"
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && [ -f updater.pub ]; then
-            updates=true
             export YTMP_UPDATER_PUBKEY="$(cat updater.pub)"
+            # The bundler signs the update files and wants the public key in the config too.
+            config="{\"version\":\"$VERSION\",\"bundle\":{\"createUpdaterArtifacts\":true},\"plugins\":{\"updater\":{\"pubkey\":\"$YTMP_UPDATER_PUBKEY\"}}}"
           else
             echo "::warning::No updater key: this build won't update itself"
           fi
-          pnpm tauri build --bundles "$BUNDLE" \
-            --config "{\"version\":\"$VERSION\",\"bundle\":{\"createUpdaterArtifacts\":$updates}}"
+          pnpm tauri build --bundles "$BUNDLE" --config "$config"
           mkdir -p ../out
           if [ "$BUNDLE" = appimage ]; then
             file="ytmp-$VERSION-linux-x86_64.AppImage"
