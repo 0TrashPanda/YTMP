@@ -239,11 +239,13 @@ Music, without Premium, and not tied to a single music service.
   network (*Play on → Near this computer*), also when your server can't reach them.
 - Copies the songs your phone keeps to the computer over Wi-Fi: *Copy from my phone* (YTMP
   open on the phone), or *Send songs to my computer* on the phone, also when the server is down.
+- Updates itself: a new version is offered when it starts, or right away with *Settings → App
+  → Check for updates*.
 
 ## What's next
 
 - The desktop app: your YouTube Music sign-in in the app, and the bot-check token
-  ([status](docs/implementation/desktop-app.md)); updates itself once releases are signed for it
+  ([status](docs/implementation/desktop-app.md))
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
 - Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists

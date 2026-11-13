@@ -46,7 +46,7 @@ Windows check below).
   https page from fetching `http://127.0.0.1` (mixed content; "Load failed", the request
   never leaves; seen in the Linux check below), and Chrome's loopback exception doesn't
   exist there. An **initialization script** the shell runs on every page sets
-  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates }`
+  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates, checkUpdates() }`
   (`updates`: the build looks for new versions, so *Settings → App* says so; missing before
   0.45); `moduleRequest` is a Tauri command
   that forwards the request to the module with its key and answers `{ status, body }`. The
@@ -308,7 +308,12 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
   list of releases (like the Android app: 0.x releases are pre-releases, which
   `/releases/latest` skips) for the newest with a `latest.json`, checks it, and offers the
   version with that release's notes as they are now (*Update* / *Later* / *Skip this
-  version*). *Update* downloads, stops the module (the installer replaces its files, which
+  version*). GitHub's API allows only 60 requests an hour per network without signing in;
+  when it says no, the app reads the releases feed (`releases.atom`) instead and takes the
+  newest release whose `latest.json` is there. *Settings → App → Check for updates*
+  (`checkUpdates()` in `window.YtmpDesktop`, the `check_updates` command, from 0.47) looks
+  right away, also offers a version you skipped, and says when you have the newest or why it
+  couldn't look; one check runs at a time. *Update* downloads, stops the module (the installer replaces its files, which
   Windows won't do while they run), installs (Windows: the installer, passive) and restarts.
   Updates are signed with an updater key of their own (separate from the APK's): the public
   key in `desktop/updater.pub`, built in through `YTMP_UPDATER_PUBKEY`; the private key and

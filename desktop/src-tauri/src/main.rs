@@ -127,7 +127,8 @@ fn open_server(app: &AppHandle, url: &Url) {
             .permission("allow-module-request")
             .permission("allow-change-server")
             .permission("allow-media-update")
-            .permission("allow-pick-folder");
+            .permission("allow-pick-folder")
+            .permission("allow-check-updates");
         if let Err(e) = app.add_capability(capability) {
             eprintln!("can't allow {origin}: {e}");
         }
@@ -261,24 +262,38 @@ fn bridge_script(app: &AppHandle) -> String {
     host: {host:?},
     device: Object.freeze({{ id: {device_id:?}, secret: {device_secret:?} }}),
     pickFolder: () => invoke('pick_folder'),
+    checkUpdates: () => invoke('check_updates'),
   }});
   {media}
 }})();"#
     )
 }
 
+const RELEASES: &str = "https://github.com/0TrashPanda/YTMP/releases";
+
 /// The newest release with a desktop update (its latest.json) and its notes. From GitHub's
 /// list of releases, like the Android app (Updates.kt): 0.x releases are pre-releases, which
-/// GitHub's /releases/latest skips.
+/// GitHub's /releases/latest skips. GitHub's API allows 60 requests an hour per network without
+/// signing in, shared by everything on it; past that, the releases feed.
 fn newest_release() -> Result<(Url, String), String> {
-    let releases: serde_json::Value = ureq::get("https://api.github.com/repos/0TrashPanda/YTMP/releases?per_page=10")
+    newest_release_from_api().or_else(|api| {
+        newest_release_from_feed().map_err(|feed| format!("GitHub didn't answer ({api}; {feed})"))
+    })
+}
+
+fn get_text(url: &str) -> Result<String, String> {
+    ureq::get(url)
         .set("User-Agent", "YTMP desktop")
         .timeout(Duration::from_secs(15))
         .call()
         .map_err(|e| e.to_string())?
         .into_string()
         .map_err(|e| e.to_string())
-        .and_then(|text| serde_json::from_str(&text).map_err(|e| e.to_string()))?;
+}
+
+fn newest_release_from_api() -> Result<(Url, String), String> {
+    let text = get_text("https://api.github.com/repos/0TrashPanda/YTMP/releases?per_page=10")?;
+    let releases: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     for release in releases.as_array().into_iter().flatten().filter(|r| r["draft"] != true) {
         let assets = release["assets"].as_array().into_iter().flatten();
         if let Some(asset) = assets.into_iter().find(|a| a["name"] == "latest.json") {
@@ -289,22 +304,92 @@ fn newest_release() -> Result<(Url, String), String> {
     Err("no release with a desktop update".into())
 }
 
-/// Looks for a new release a moment after starting, and offers it with its release notes.
-async fn check_for_update(app: AppHandle) {
-    tokio_sleep(Duration::from_secs(8)).await;
-    let (endpoint, notes) = match tauri::async_runtime::spawn_blocking(newest_release).await {
-        Ok(Ok(found)) => found,
-        Ok(Err(e)) => return eprintln!("update check: {e}"),
-        Err(_) => return,
-    };
-    let Ok(updater) = app.updater_builder().endpoints(vec![endpoint]).and_then(|b| b.build()) else { return };
-    let update = match updater.check().await {
-        Ok(Some(update)) => update,
-        Ok(None) => return,
-        Err(e) => return eprintln!("update check: {e}"),
-    };
-    if app.state::<State>().settings.lock().unwrap().skipped_version.as_deref() == Some(update.version.as_str()) {
-        return;
+/// The same from github.com/…/releases.atom (newest first, drafts left out): the first
+/// release whose latest.json is there.
+fn newest_release_from_feed() -> Result<(Url, String), String> {
+    let feed = get_text(&format!("{RELEASES}.atom"))?;
+    for entry in feed.split("<entry>").skip(1).take(10) {
+        let Some(tag) = between(entry, "/releases/tag/", "\"") else { continue };
+        let url = format!("{RELEASES}/download/{tag}/latest.json");
+        let there = matches!(ureq::head(&url).set("User-Agent", "YTMP desktop").timeout(Duration::from_secs(15)).call(), Ok(r) if r.status() == 200);
+        if there {
+            let notes = between(entry, "<content type=\"html\">", "</content>").map(|html| html_to_text(&unescape(html))).unwrap_or_default();
+            return Ok((url.parse().map_err(|_| "bad URL".to_string())?, notes));
+        }
+    }
+    Err("no release with a desktop update".into())
+}
+
+fn between<'a>(text: &'a str, start: &str, end: &str) -> Option<&'a str> {
+    let from = text.find(start)? + start.len();
+    let length = text[from..].find(end)?;
+    Some(&text[from..from + length])
+}
+
+fn unescape(text: &str) -> String {
+    text.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
+}
+
+/// Release notes from the feed's HTML as plain text for the dialog: headings and list items on
+/// lines of their own.
+fn html_to_text(html: &str) -> String {
+    let html = html.replace("<li>", "• ").replace('\n', " ");
+    let mut text = String::new();
+    let mut rest = html.as_str();
+    while let Some(open) = rest.find('<') {
+        text.push_str(&rest[..open]);
+        let Some(close) = rest[open..].find('>') else { break };
+        let tag = &rest[open + 1..open + close];
+        if matches!(tag, "/li" | "/p" | "/ul" | "/ol" | "br" | "br/" | "br /") || tag.starts_with("/h") {
+            text.push('\n');
+        }
+        if tag.starts_with("/h") || tag == "/p" || tag == "/ul" {
+            text.push('\n');
+        }
+        rest = &rest[open + close + 1..];
+    }
+    text.push_str(rest);
+    let text = unescape(&text);
+    let mut lines: Vec<&str> = Vec::new();
+    for line in text.lines().map(str::trim) {
+        // At most one empty line in a row.
+        if !(line.is_empty() && lines.last().is_some_and(|l| l.is_empty())) {
+            lines.push(line);
+        }
+    }
+    lines.join("\n").trim().to_string()
+}
+
+/// One check at a time (the one at the start and *Check for updates*).
+static CHECKING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// *Settings → App → Check for updates*: looks now, also for a version you skipped. True when it
+/// offered one (the dialog has been answered by then), false when this is the newest.
+#[tauri::command]
+async fn check_updates(app: AppHandle) -> Result<bool, String> {
+    if !updates_on() {
+        return Err("This build doesn't update itself.".into());
+    }
+    check_for_update(app, true).await
+}
+
+/// Looks for a new release and offers it with its release notes. True when it offered one.
+async fn check_for_update(app: AppHandle, by_hand: bool) -> Result<bool, String> {
+    use std::sync::atomic::Ordering;
+    if CHECKING.swap(true, Ordering::SeqCst) {
+        return Err("It's already looking.".into());
+    }
+    let result = offer_update(app, by_hand).await;
+    CHECKING.store(false, Ordering::SeqCst);
+    result
+}
+
+async fn offer_update(app: AppHandle, by_hand: bool) -> Result<bool, String> {
+    let (endpoint, notes) = tauri::async_runtime::spawn_blocking(newest_release).await.map_err(|e| e.to_string())??;
+    let updater = app.updater_builder().endpoints(vec![endpoint]).and_then(|b| b.build()).map_err(|e| e.to_string())?;
+    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else { return Ok(false) };
+    if !by_hand && app.state::<State>().settings.lock().unwrap().skipped_version.as_deref() == Some(update.version.as_str()) {
+        return Ok(false);
     }
     // The release's notes as they are now (edited after the release, see CLAUDE.md).
     let notes = notes.replace("\r\n", "\n");
@@ -320,9 +405,9 @@ async fn check_for_update(app: AppHandle) {
         MessageDialogResult::Custom(label) if label == "Skip this version" => {
             app.state::<State>().settings.lock().unwrap().skipped_version = Some(update.version.clone());
             save(&app);
-            return;
+            return Ok(true);
         }
-        _ => return,
+        _ => return Ok(true),
     }
     let installed = match update.download(|_, _| {}, || {}).await {
         Ok(bytes) => {
@@ -339,6 +424,14 @@ async fn check_for_update(app: AppHandle) {
             // The module was stopped for it: start over as this version.
             app.restart();
         }
+    }
+}
+
+/// A moment after starting: offers a new version, unless you skipped it.
+async fn check_at_start(app: AppHandle) {
+    tokio_sleep(Duration::from_secs(8)).await;
+    if let Err(e) = check_for_update(app, false).await {
+        eprintln!("update check: {e}");
     }
 }
 
@@ -362,7 +455,7 @@ fn main() {
     }
     let app = builder
         .manage(Sidecars::new())
-        .invoke_handler(tauri::generate_handler![open_saved, connect, change_server, media_update, pick_folder, module::module_request])
+        .invoke_handler(tauri::generate_handler![open_saved, connect, change_server, media_update, pick_folder, check_updates, module::module_request])
         .register_asynchronous_uri_scheme_protocol("ytmphost", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             std::thread::spawn(move || responder.respond(host_request(&app, request)));
@@ -400,7 +493,7 @@ fn main() {
             #[cfg(not(windows))]
             let _ = window;
             if updates_on() {
-                tauri::async_runtime::spawn(check_for_update(handle));
+                tauri::async_runtime::spawn(check_at_start(handle));
             }
             Ok(())
         })

@@ -128,6 +128,21 @@
 	const inApp = !!nativeBridge;
 	/** The desktop app (desktop/), or null. */
 	const desktop = desktopApp();
+	/** *Check for updates* in the desktop app: busy, and what it found. */
+	let checkingUpdates = $state(false);
+	let updateCheck = $state('');
+	async function checkDesktopUpdates() {
+		checkingUpdates = true;
+		updateCheck = '';
+		try {
+			const offered = await desktop?.checkUpdates?.();
+			if (offered === false) updateCheck = 'You have the newest version.';
+		} catch (e) {
+			updateCheck = `Couldn't look for updates. ${e instanceof Error ? e.message : String(e)}`;
+		} finally {
+			checkingUpdates = false;
+		}
+	}
 	const here = inApp ? 'phone' : 'device';
 	/** On the phone's own pages (its room list and rooms), which keep the phone's song cache. */
 	const onThisPhone = $derived(inApp && host?.kind === 'phone' && ['127.0.0.1', 'localhost'].includes(location.hostname));
@@ -907,7 +922,11 @@
 			<div class="flex-1">
 				<p class="text-sm font-medium">Version</p>
 				<p class="text-xs text-muted">YTMP {desktop.version} for {desktop.platform === 'windows' ? 'Windows' : 'Linux'}.{desktop.updates ? ' New versions are offered when the app starts.' : ''}</p>
+				{#if updateCheck}<p class="text-xs text-muted" aria-live="polite">{updateCheck}</p>{/if}
 			</div>
+			{#if desktop.updates && desktop.checkUpdates}
+				<button class="shrink-0 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line disabled:opacity-50" disabled={checkingUpdates} onclick={checkDesktopUpdates}>{checkingUpdates ? 'Looking…' : 'Check for updates'}</button>
+			{/if}
 		</div>
 		<div class="flex items-center gap-3">
 			<div class="flex-1">

@@ -89,6 +89,12 @@ export interface DesktopApp {
 	device?: { id: string; secret: string };
 	/** The system's folder picker: the folder's path, or null. */
 	pickFolder?: () => Promise<string | null>;
+	/**
+	 * Looks for a new version now (also one you skipped): true when it offered one (its dialog
+	 * answered by then), false when this is the newest; rejects with why it couldn't look.
+	 * Absent before 0.47.
+	 */
+	checkUpdates?: () => Promise<boolean>;
 }
 
 declare global {
