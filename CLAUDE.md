@@ -42,6 +42,9 @@ what's planned is marked there.
 - The app's update dialog shows the release notes: replace GitHub's generated notes with short
   plain ones (`gh release edit --notes-file`), keeping an *Install* section at the end.
 - New features that change behaviour bump the minor version; fixes the patch version.
+- Before picking the number, look at what's already out: other sessions release too.
+  `git fetch --tags && gh release list --limit 3`, then count up from the newest, and write
+  the notes from `git log <newest tag>..main` (only what that release didn't have).
 
 ## How the owner likes to work
 
