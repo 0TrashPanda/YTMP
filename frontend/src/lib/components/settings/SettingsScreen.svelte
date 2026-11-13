@@ -74,6 +74,7 @@
 	import type { FriendTarget } from '../../friends.svelte';
 	import RadioSection from './RadioSection.svelte';
 	import SearchSection from './SearchSection.svelte';
+	import ComputerCacheSection from './ComputerCacheSection.svelte';
 	import ArtistSection from './ArtistSection.svelte';
 
 	let {
@@ -179,7 +180,7 @@
 					'Music and storage',
 					[
 						['local', 'Local music', 'local', true],
-						['storage', 'Song cache and downloads', 'download', inApp],
+						['storage', desktop?.files ? 'Song cache' : 'Song cache and downloads', 'download', inApp || !!desktop?.files],
 						['module', 'Where songs play from', 'server', !inApp]
 					]
 				],
@@ -860,7 +861,9 @@
 	{:else if id === 'local'}
 		<LocalSection {onToast} />
 	{:else if id === 'storage'}
-		{#if onThisPhone}
+		{#if desktop?.files}
+			<ComputerCacheSection {onToast} />
+		{:else if onThisPhone}
 			<DownloadsSection {onToast} />
 			<CacheSection load={getSongCache} clear={clearSongCache} change={setSongCache} {onToast} />
 		{:else}

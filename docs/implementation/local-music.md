@@ -97,9 +97,17 @@ Settings → Local music → *Music on this phone* (bridge version 10: `phoneMus
 `setPhoneMusic`, answered with `onPhoneMusic`) asks Android once for `READ_MEDIA_AUDIO`
 (`READ_EXTERNAL_STORAGE` before Android 13). It's in rooms on the phone only.
 
+## The music on a computer (desktop app)
+
+Not a host library: the desktop app's own module reads it and the web app shows it as a
+library of kind `computer`, next to the host's. The server only knows its songs' IDs
+(`local:dev-<device>:s:<key>`) and asks for a file when another player needs one. See
+[desktop-app.md](desktop-app.md#music-and-songs-on-this-computer).
+
 ## Not yet
 
-- The phone's music in a room on a server (the phone would send each song to the server).
+- The phone's music in a room on a server (the phone would send each song to the server, as
+  the desktop app does).
 - Playlists from MPD or the phone; sorting choices in the Local tab.
 - Local music in the main search.
 

@@ -1,3 +1,4 @@
+import { computerAlbum, computerArtist, computerLibraryPage, isComputerLibrary, isMine } from './computer.svelte';
 import type {
 	DownloadItems,
 	LocalLinkRequest,
@@ -392,6 +393,7 @@ function page<T>(id: string, path: string): Promise<T> {
 }
 
 export function getArtist(id: string): Promise<ArtistPage> {
+	if (isMine(id)) return computerArtist(id);
 	return cached(`artist:${id}`, () => page(id, `artists/${encodeURIComponent(id)}`));
 }
 
@@ -407,6 +409,7 @@ export async function topSongs(artist: ArtistPage): Promise<Song[]> {
 const TOP_SONGS = 20;
 
 export function getAlbum(id: string): Promise<AlbumPage> {
+	if (isMine(id)) return computerAlbum(id);
 	return cached(`album:${id}`, () => page(id, `albums/${encodeURIComponent(id)}`));
 }
 
@@ -576,6 +579,8 @@ export function getLocalLibraries(fresh = false): Promise<LocalLibraries> {
 
 /** One local library, whole: its albums, artists and songs. */
 export function getLocalLibrary(id: string): Promise<LocalLibraryPage> {
+	// The music on this computer (the desktop app): from the app's module, never through a host.
+	if (isComputerLibrary(id)) return computerLibraryPage();
 	const load = () => request<LocalLibraryPage>(`/api/local/${encodeURIComponent(id)}`);
 	// "Cached on this phone" changes as songs come in and go (and its playlists with them): always as it is now.
 	return id === 'cache' ? load() : cached(`local:${id}`, load);

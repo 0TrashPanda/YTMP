@@ -69,6 +69,9 @@ server, like in a browser; **everything YouTube** happens on your own computer:
 - **Media keys and the system's media controls** (Windows' media overlay, the Linux
   desktop's media widget) show the song as YTMP and play, pause and skip, also when the
   window is in the background.
+- **Your music files and a song cache** on the computer, both off by default, see
+  [sources](sources.md#local-music-): they play from your own disk.
+- **Opens the room you were in** when it starts (*Settings → App*), like the Android app.
 - **The first start** asks for your server's address, like the Android app.
 - **Updates itself**: like the Android app, it finds new releases on GitHub and offers to
   install them (with the release notes). Its YouTube part updates itself more often,

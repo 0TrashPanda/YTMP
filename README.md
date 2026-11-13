@@ -228,6 +228,11 @@ Music, without Premium, and not tied to a single music service.
   own computer, so they come straight from YouTube on your connection (the server's when
   that fails).
 - Media keys and Windows' media controls show the song as YTMP.
+- Your own music files (*Settings → Local music → Music on this computer*, off by default)
+  in the Local tab, and a song cache (*Settings → Song cache*, off by default): both play from
+  your disk. Alone, nothing leaves your computer; a song goes to the server only when
+  someone else in the room plays along.
+- Opens the room you were in, like the Android app.
 
 ## What's next
 

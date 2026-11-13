@@ -20,11 +20,48 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
-/// What the app keeps: the server, and a release you chose to skip.
+/// What the app keeps: the server, a release you chose to skip, and this computer's id and
+/// secret for the server (it asks for a song of this computer's music with them).
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 struct Settings {
     server: Option<String>,
     skipped_version: Option<String>,
+    #[serde(default)]
+    device_id: Option<String>,
+    #[serde(default)]
+    device_secret: Option<String>,
+}
+
+/// Where the window reaches this computer's music and song cache (the `ytmpfiles` protocol).
+#[cfg(windows)]
+pub(crate) const FILES_BASE: &str = "http://ytmpfiles.localhost/";
+#[cfg(not(windows))]
+pub(crate) const FILES_BASE: &str = "ytmpfiles://localhost/";
+
+fn random_hex(bytes: usize) -> String {
+    let mut buffer = vec![0u8; bytes];
+    getrandom::fill(&mut buffer).expect("random bytes");
+    buffer.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// This computer's id (in the IDs of its songs) and its secret, made once.
+pub(crate) fn device(app: &AppHandle) -> (String, String) {
+    let state = app.state::<State>();
+    let made = {
+        let mut settings = state.settings.lock().unwrap();
+        if settings.device_id.is_none() || settings.device_secret.is_none() {
+            settings.device_id = Some(random_hex(8));
+            settings.device_secret = Some(random_hex(24));
+            true
+        } else {
+            false
+        }
+    };
+    if made {
+        save(app);
+    }
+    let settings = state.settings.lock().unwrap();
+    (settings.device_id.clone().unwrap(), settings.device_secret.clone().unwrap())
 }
 
 struct State {
@@ -89,7 +126,8 @@ fn open_server(app: &AppHandle, url: &Url) {
             .window("main")
             .permission("allow-module-request")
             .permission("allow-change-server")
-            .permission("allow-media-update");
+            .permission("allow-media-update")
+            .permission("allow-pick-folder");
         if let Err(e) = app.add_capability(capability) {
             eprintln!("can't allow {origin}: {e}");
         }
@@ -157,6 +195,33 @@ fn media_update(app: AppHandle, update: serde_json::Value) {
     let _ = (app, update);
 }
 
+/// *Add folder* for the music on this computer: the system's folder picker.
+#[tauri::command]
+async fn pick_folder(app: AppHandle) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder())
+        .await
+        .ok()
+        .flatten()
+        .and_then(|path| path.into_path().ok())
+        .map(|path| path.to_string_lossy().into_owned())
+}
+
+/// `ytmpfiles://localhost/audio/<song>` (Windows: `http://ytmpfiles.localhost/…`): a piece of
+/// a song of this computer's music or song cache, or (`art/<song>`) its cover, from the
+/// module. Pages of the window may play them (it only shows the server you chose).
+fn files(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
+    let range = request.headers().get("range").and_then(|v| v.to_str().ok());
+    let (status, headers, body) = app.state::<module::Module>().file(request.uri().path(), range);
+    let mut response = tauri::http::Response::builder()
+        .status(status)
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges");
+    for (name, value) in headers {
+        response = response.header(name, value);
+    }
+    response.body(body).unwrap_or_default()
+}
+
 /// Builds with the updater key look for new versions (and the web app says so).
 fn updates_on() -> bool {
     option_env!("YTMP_UPDATER_PUBKEY").is_some_and(|k| !k.is_empty())
@@ -168,6 +233,8 @@ fn bridge_script(app: &AppHandle) -> String {
     let version = app.package_info().version.to_string();
     let platform = if cfg!(windows) { "windows" } else { "linux" };
     let updates = updates_on();
+    let (device_id, device_secret) = device(app);
+    let files = FILES_BASE;
     #[cfg(windows)]
     let media = media::SCRIPT;
     #[cfg(not(windows))]
@@ -179,9 +246,12 @@ fn bridge_script(app: &AppHandle) -> String {
   window.YtmpDesktop = Object.freeze({{
     version: {version:?},
     platform: {platform:?},
-    moduleRequest: (path) => invoke('module_request', {{ path }}),
+    moduleRequest: (path, method, body) => invoke('module_request', {{ path, method, body }}),
     changeServer: () => invoke('change_server'),
     updates: {updates},
+    files: {files:?},
+    device: Object.freeze({{ id: {device_id:?}, secret: {device_secret:?} }}),
+    pickFolder: () => invoke('pick_folder'),
   }});
   {media}
 }})();"#
@@ -283,7 +353,11 @@ fn main() {
     }
     let app = builder
         .manage(Module::new())
-        .invoke_handler(tauri::generate_handler![open_saved, connect, change_server, media_update, module::module_request])
+        .invoke_handler(tauri::generate_handler![open_saved, connect, change_server, media_update, pick_folder, module::module_request])
+        .register_asynchronous_uri_scheme_protocol("ytmpfiles", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            std::thread::spawn(move || responder.respond(files(&app, request)));
+        })
         .setup(|app| {
             let handle = app.handle().clone();
             let settings: Settings = std::fs::read_to_string(settings_file(&handle))

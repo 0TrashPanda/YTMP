@@ -4,6 +4,7 @@
 //! http://127.0.0.1), so it never sees the port or the key.
 
 use std::fs::File;
+use std::io::Read;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -113,6 +114,10 @@ impl Module {
             .env("YTMP_YTM_HOST", "127.0.0.1")
             .env("YTMP_YTM_PORT", self.port.to_string())
             .env("YTMP_YTM_UPDATE_DIR", data.join("ytm-updates"))
+            // This computer's music and song cache (ytmp_ytm/desktop.py), played through ytmpfiles://.
+            .env("YTMP_YTM_DESKTOP_DIR", data.join("on-this-computer"))
+            .env("YTMP_YTM_DEVICE", crate::device(app).0)
+            .env("YTMP_YTM_FILES_BASE", crate::FILES_BASE)
             // The AppImage's AppRun sets these for its own folder; the bundled Python finds its own.
             .env_remove("PYTHONHOME")
             .env_remove("PYTHONPATH")
@@ -159,7 +164,7 @@ impl Module {
         }
     }
 
-    fn get(&self, path: &str) -> Result<Answer, String> {
+    fn wait(&self) -> Result<(), String> {
         let until = Instant::now() + Duration::from_secs(30);
         while !self.ready.load(Ordering::SeqCst) {
             if Instant::now() > until {
@@ -167,13 +172,51 @@ impl Module {
             }
             std::thread::sleep(Duration::from_millis(200));
         }
+        Ok(())
+    }
+
+    fn request(&self, method: &str, path: &str) -> ureq::Request {
         let url = format!("http://127.0.0.1:{}/{}", self.port, path.trim_start_matches('/'));
-        let request = ureq::get(&url).set("Authorization", &format!("Bearer {}", self.key)).timeout(Duration::from_secs(90));
-        match request.call() {
+        ureq::request(method, &url).set("Authorization", &format!("Bearer {}", self.key)).timeout(Duration::from_secs(90))
+    }
+
+    /// [method] to the module, with a JSON [body] if any.
+    fn call(&self, method: &str, path: &str, body: Option<&str>) -> Result<Answer, String> {
+        self.wait()?;
+        let request = self.request(method, path);
+        let answer = match body {
+            Some(body) => request.set("Content-Type", "application/json").send_string(body),
+            None => request.call(),
+        };
+        match answer {
             Ok(r) => Ok(Answer { status: r.status(), body: r.into_string().map_err(|e| e.to_string())? }),
             Err(ureq::Error::Status(status, r)) => Ok(Answer { status, body: r.into_string().unwrap_or_default() }),
             Err(e) => Err(e.to_string()),
         }
+    }
+
+    /// A piece of a song or a cover for the window (`ytmpfiles://`, [path] as the page wrote
+    /// it, `audio/<song>`): status, headers, bytes. The module answers at most a few MB at a time.
+    pub fn file(&self, path: &str, range: Option<&str>) -> (u16, Vec<(String, String)>, Vec<u8>) {
+        if let Err(e) = self.wait() {
+            return (503, vec![], e.into_bytes());
+        }
+        let mut request = self.request("GET", &format!("desktop/files/{}", path.trim_start_matches('/')));
+        if let Some(range) = range {
+            request = request.set("Range", range);
+        }
+        let response = match request.call() {
+            Ok(r) | Err(ureq::Error::Status(_, r)) => r,
+            Err(e) => return (502, vec![], e.to_string().into_bytes()),
+        };
+        let status = response.status();
+        let headers = ["Content-Type", "Content-Range", "Accept-Ranges", "Cache-Control"]
+            .iter()
+            .filter_map(|name| response.header(name).map(|v| (name.to_string(), v.to_string())))
+            .collect();
+        let mut bytes = Vec::new();
+        let _ = response.into_reader().take(64 * 1024 * 1024).read_to_end(&mut bytes);
+        (status, headers, bytes)
     }
 }
 
@@ -235,10 +278,12 @@ mod job {
     }
 }
 
-/// A GET to the module for the page: `path` like `search?q=…`; answers its status and body.
+/// A request to the module for the page: `path` like `search?q=…`, GET unless [method] says
+/// otherwise, with a JSON [body]; answers its status and body.
 #[tauri::command]
-pub async fn module_request(app: AppHandle, path: String) -> Result<Answer, String> {
-    tauri::async_runtime::spawn_blocking(move || app.state::<Module>().get(&path))
+pub async fn module_request(app: AppHandle, path: String, method: Option<String>, body: Option<String>) -> Result<Answer, String> {
+    let method = method.filter(|m| ["GET", "POST", "PUT", "DELETE"].contains(&m.as_str())).unwrap_or_else(|| "GET".into());
+    tauri::async_runtime::spawn_blocking(move || app.state::<Module>().call(&method, &path, body.as_deref()))
         .await
         .map_err(|e| e.to_string())?
 }

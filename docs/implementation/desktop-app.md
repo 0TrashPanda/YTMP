@@ -62,6 +62,52 @@ Windows check below).
   module, the room's link, through the server), so songs come from this computer unless
   you change the order; browsers keep the room's link first.
 
+## Music and songs on this computer ✅
+
+The music files on the computer and a song cache, both off by default (features:
+[sources](../features/sources.md#local-music-)). Tried in a debug build on Windows 10 against a
+local server: the Local tab with three MP3s (tags, covers, albums, folders), one playing in a
+solo room from the computer with the server asking for nothing; the same song in a party room
+with a second listener (the browser), where the server asked the app once and the app sent
+5 MB; a YouTube song kept by the cache while the one before it played, then played from the disk
+without another lookup.
+
+- **The module does the work** (`ytmp_ytm/desktop.py`, only with `YTMP_YTM_DESKTOP_DIR` = the
+  app's data folder `on-this-computer/`): settings in `desktop.json` (`cacheMb`, `music`,
+  `folders`), the music index in `music-index.json` (tags read once per file with mutagen, by its
+  modified time and size), the cache in `song-cache/` with its `index.json`. Routes under
+  `/desktop/…` (status, settings, library, albums, artists, files, upload), with the key like the
+  rest.
+- **The window plays from the computer** through a protocol of the app's own, `ytmpfiles`
+  (`http://ytmpfiles.localhost/` on Windows, `ytmpfiles://localhost/` on Linux; `FILES_BASE`):
+  `audio/<song>` and `art/<song>`. The app passes each request (with its `Range`) to the
+  module's `/desktop/files/…` with the key and answers with CORS open, so the equalizer can use
+  it too. The module answers at most 2 MB per request (`PIECE`) and the player asks on.
+- **IDs**: this computer's id and secret are made once and kept in the app's `settings.json`
+  (`device_id`, `device_secret`). Songs `local:dev-<id>:s:<key>` (key: SHA-1 of the path), albums
+  `…:a:…`, artists `…:r:…`. The web app sends album and artist pages of its own device to the
+  module (`computer.svelte.ts`, `isMine`); the Local tab's library (`kind: computer`) comes from
+  the module too, never through a host.
+- **Playing**: the web player (`player.svelte.ts`) plays from `ytmpfiles` when the song is this
+  computer's, or when the cache is on and it's a YouTube Music song (not a podcast, at most an
+  hour): `computerAudio`. If that fails it plays the usual way. The badge says *This computer*.
+- **The cache** (`Desktop.file` → `_from_fill`): a song not kept yet is fetched once, in 1 MB
+  ranges like yt-dlp, into a `.part` file that the player reads as it comes in (a seek far
+  ahead is fetched from YouTube directly meanwhile). Complete and under an hour: kept. Over the
+  size: the lowest keep score goes first (last played, plus a week per extra play in 90 days),
+  like the phone's. The player asks for the next song's start while one plays, so it's fetched
+  ahead.
+- **Sent only when needed** (`DeviceSongs` in `host/`, on the server): the room's stream link
+  for these songs is the server's `/api/audio/<song>`. Nobody asks for it while the computer
+  plays alone (its player plays from `ytmpfiles`). When another player or a speaker does, the
+  server marks the song wanted and waits up to 60 s. The app's web page waits at
+  `GET /api/devices/<id>/wanted` (25 s at a time, `X-Device-Secret`; the first secret a device
+  comes with is its own until the server restarts), and on an answer has the module `PUT` that
+  file to `/api/devices/<id>/songs/<song>`. The server keeps it in `device-songs/` next to the
+  database: at most 2 GB, a day unused, emptied when it starts, 500 MB a file at most.
+- **Not yet**: radio and autoplay from these songs (the server can't read them); their covers
+  for others in the room (the cover link is the computer's own, so others see the placeholder).
+
 ## Why Tauri
 
 | | Tauri | Electron |
@@ -254,6 +300,7 @@ the module.
 5. ✅ Updater and release workflow (waiting for the owner's updater key); README.
 6. Next: PO tokens (BotGuard in a hidden window) and the YouTube Music sign-in in the app.
 7. ✅ Trying it on Windows, and the first release with it (0.44.0).
+8. ✅ The music on the computer and a song cache (see above).
 
 ## Open questions
 

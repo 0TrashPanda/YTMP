@@ -25,6 +25,7 @@
 
 	const shown = $derived.by(() => {
 		if (source === 'youtube') return { icon: 'play', label: 'YouTube', title: 'Streams from YouTube' } as const;
+		if (source === 'device' && window.YtmpDesktop) return { icon: 'computer', label: 'This computer', title: 'Plays from this computer: its song cache, or its own music' } as const;
 		if (source === 'device') return { icon: 'phone', label: 'This phone', title: 'Plays from this phone: saved on it, or its own music' } as const;
 		if (source === 'host') {
 			const label = hostKind === 'phone' ? 'Host phone' : 'Server';

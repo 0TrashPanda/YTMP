@@ -1,5 +1,6 @@
 // The Local tab's settings, and whether it has anything to show.
 import { getLocalLibraries } from './api';
+import { computerLibrary } from './computer.svelte';
 import { nativeBridge } from './native';
 import type { LocalGroup, LocalLibrarySummary } from './protocol.gen';
 import { settings } from './settings.svelte';
@@ -96,9 +97,10 @@ export function setPhoneMusic(on: boolean): Promise<string | null> {
 /** Asks the host which local music it has (the bottom bar shows Local when there's some). */
 export async function loadLocal(fresh = false): Promise<void> {
 	try {
-		const all = (await getLocalLibraries(fresh)).libraries;
-		// The phone's own music and its cached songs always; music on the network when that's on.
-		local.libraries = all.filter((l) => (l.kind === 'mpd' ? settings.localNetwork.value : true));
+		const [all, mine] = await Promise.all([getLocalLibraries(fresh).then((l) => l.libraries, () => []), computerLibrary()]);
+		// The phone's own music and its cached songs always; music on the network when that's on;
+		// the music on this computer (the desktop app) first.
+		local.libraries = [...(mine?.songCount ? [mine] : []), ...all.filter((l) => (l.kind === 'mpd' ? settings.localNetwork.value : true))];
 	} catch {
 		local.libraries = [];
 	}

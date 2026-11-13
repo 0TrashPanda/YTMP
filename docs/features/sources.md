@@ -88,6 +88,14 @@ computer: the left side). It shows when there's local music:
   folder*): pick a folder with Android's folder picker (no permission needed) and its songs show
   with the rest of the phone's music. *Use Android's music scan* can be switched off to use only
   the picked folders. A song that is in both shows once.
+- **Music on this computer** (the desktop app, off by default): *Settings → Local music →
+  Music on this computer*, then *Add a folder* with the system's folder picker. Its songs,
+  albums, artists, genres and folders show in the Local tab (first), with the covers in the
+  files. They go in rooms on the server like any song and play from the computer itself.
+  Listening alone, nothing leaves the computer. Only when someone else in the room plays
+  along, or a speaker does, does the app send that one song to the server for them (it keeps
+  it a day at most). New files are found when the Local tab opens (at most every 10 minutes)
+  or with *Look again*. ([implementation](../implementation/desktop-app.md#music-and-songs-on-this-computer))
 
 The tab is like YouTube Music's library: **Playlists** (first, in *Cached on this phone*, when
 playlists are all on the phone: [playlists offline](#playlists-offline)), **Albums** (the default, with covers), **Artists**,
@@ -150,6 +158,11 @@ Implementation details: [implementation/ytm-module.md](../implementation/ytm-mod
 
 Songs you play are kept, so they start at once next time, need no YouTube lookup, and play
 without internet on the phone. It works by itself: there is nothing to pick.
+
+**The desktop app** has one of its own, off by default (*Settings → Song cache*: Off, 500 MB
+up to 10 GB, *Clear cache*): YouTube Music songs the computer plays are kept on its disk as
+they play (one download, nothing extra), and the next song in the queue is fetched into it
+while the current one plays. Only music, nothing over an hour.
 
 - **Songs are saved when that costs nothing extra**: a song the phone plays itself, or that
   the server or phone already streams (to speakers, or to players that stream through it),

@@ -10,6 +10,8 @@ dependencies = [
     "fastapi>=0.142",
     "uvicorn>=0.54",
     "httpx>=0.28",
+    # Tags of the music on the desktop app's computer (yt-dlp[default] brings it too).
+    "mutagen>=1.47",
 ]
 
 [project.optional-dependencies]

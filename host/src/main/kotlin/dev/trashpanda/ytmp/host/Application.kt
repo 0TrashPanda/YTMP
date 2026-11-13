@@ -227,7 +227,7 @@ interface CacheSettings {
 
 /** What works without an account on an accounts-only host: what's needed to log in, and audio (speakers can't log in). */
 // A TV becoming a party screen has no account (/api/screens); linking it needs someone in the room.
-private val OPEN_WITHOUT_ACCOUNT = listOf("/api/host", "/api/auth/", "/api/account", "/api/admin/", "/api/audio/", "/api/screens")
+private val OPEN_WITHOUT_ACCOUNT = listOf("/api/host", "/api/auth/", "/api/account", "/api/admin/", "/api/audio/", "/api/screens", "/api/devices/")
 
 fun isLoopback(call: ApplicationCall): Boolean {
     val address = call.request.origin.remoteAddress

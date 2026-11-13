@@ -74,12 +74,21 @@ export interface ModuleAnswer {
 export interface DesktopApp {
 	version: string;
 	platform: 'linux' | 'windows';
-	/** A GET to the app's module; the app forwards it, since WebKitGTK won't let an https page fetch http://127.0.0.1. */
-	moduleRequest?: (path: string) => Promise<ModuleAnswer>;
+	/**
+	 * A request to the app's module (GET unless [method] says otherwise, [body] JSON); the app
+	 * forwards it, since WebKitGTK won't let an https page fetch http://127.0.0.1. Older apps only GET.
+	 */
+	moduleRequest?: (path: string, method?: string, body?: string) => Promise<ModuleAnswer>;
 	/** Back to the app's page that asks for the server's address. */
 	changeServer?: () => Promise<void>;
 	/** This build looks for new versions when it starts (absent before 0.45: those didn't). */
 	updates?: boolean;
+	/** Where the window plays this computer's music and song cache (`audio/<song>`, `art/<song>`); absent in older apps. */
+	files?: string;
+	/** This computer's id (in its songs' IDs) and secret, for the server's requests for a song. */
+	device?: { id: string; secret: string };
+	/** The system's folder picker: the folder's path, or null. */
+	pickFolder?: () => Promise<string | null>;
 }
 
 declare global {

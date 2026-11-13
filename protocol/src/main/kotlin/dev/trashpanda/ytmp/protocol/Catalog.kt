@@ -308,6 +308,12 @@ enum class LocalLibraryKind {
      * songs that keep their own IDs, so they play without internet (docs/implementation/song-cache.md).
      */
     @SerialName("cache") CACHE,
+
+    /**
+     * The music on this computer (the desktop app): the web app gets it from the app's own
+     * module, never from a host (docs/implementation/desktop-app.md#music-and-songs-on-this-computer).
+     */
+    @SerialName("computer") COMPUTER,
 }
 
 @Serializable

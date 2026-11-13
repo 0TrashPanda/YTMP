@@ -15,7 +15,9 @@ import dev.trashpanda.ytmp.host.songCacheRoutes
 import dev.trashpanda.ytmp.host.songsInUse
 import dev.trashpanda.ytmp.host.MpdOutputs
 import dev.trashpanda.ytmp.host.SonosOutputs
+import dev.trashpanda.ytmp.host.DeviceSongs
 import dev.trashpanda.ytmp.host.LocalMusic
+import dev.trashpanda.ytmp.host.deviceSongRoutes
 import dev.trashpanda.ytmp.host.ZoneOutputs
 import dev.trashpanda.ytmp.host.OutputDrivers
 import dev.trashpanda.ytmp.host.AccountBookmarks
@@ -172,8 +174,10 @@ fun main(args: Array<String>) {
         // Importing playlists into accounts' YouTube Music, kept next to the database (docs/features/importing-playlists.md).
         val importsDir = if (config.database.type == "sqlite") File(File(config.database.path).absoluteFile.parentFile, "imports") else File("imports")
         val converter = PlaylistConverter(importsDir, cached, personalOf = youtube::of, scope = this).also { it.start() }
+        // Songs from the music on listeners' computers (the desktop app), sent here only when another player needs one.
+        val deviceSongs = DeviceSongs(File(importsDir.parentFile, "device-songs"))
         val rooms = RoomManager(
-            local.streams(songCache.streams), this, live.codeStyle(), live.roomCodeLength, outputs = outputs.devices, store = JdbcRoomStore(db),
+            deviceSongs.streams(local.streams(songCache.streams)), this, live.codeStyle(), live.roomCodeLength, outputs = outputs.devices, store = JdbcRoomStore(db),
             // Guests' solo rooms only open in the browser that made them: drop them once unused for a while.
             // Party rooms whose admins are all gone for 5 minutes tell the others they can clone them.
             timeouts = RoomTimeouts(guestSoloRoom = 30.days, adminless = 5.minutes),
@@ -236,7 +240,7 @@ fun main(args: Array<String>) {
                 similar = local.radio(cached),
                 catalog = local.catalog(cached),
                 lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
-                audio = local.audio(songCache.audio(ytm)),
+                audio = deviceSongs.audio(local.audio(songCache.audio(ytm))),
                 downloads = SongFiles(songCache.files(ytm)),
                 cache = songCache,
                 local = local,
@@ -283,6 +287,7 @@ fun main(args: Array<String>) {
                 service.routes(this)
                 admin.routes(this)
                 hub.routes(this)
+                deviceSongRoutes(deviceSongs)
                 youtube.routes(this) { call -> service.sessionAccount(call)?.id }
                 // Settings → Server admin: how full the song cache is, Clear cache.
                 songCacheRoutes("/admin/cache", songCache, settings = null) { call -> service.sessionAccount(call)?.isAdmin == true }

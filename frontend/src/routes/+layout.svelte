@@ -7,6 +7,7 @@
 	import { dev } from '$app/env';
 	import { nativeBridge } from '../lib/native';
 	import { checkOwnModule } from '../lib/ownModule.svelte';
+	import { loadComputer } from '../lib/computer.svelte';
 	import { appLink, webLink } from '../lib/openInApp';
 	import { settings } from '../lib/settings.svelte';
 
@@ -40,6 +41,8 @@
 
 	// Your own module, if you set one up: does it answer? (Then every minute while it doesn't.)
 	if (!nativeBridge && !location.pathname.startsWith('/tv')) void checkOwnModule();
+	// The desktop app: its song cache and music (the player plays from them), and the server's requests for a song.
+	void loadComputer();
 
 	// The host has a newer version of this page (the server was updated): reload to get it.
 	reloadOnUpdate();

@@ -11,6 +11,7 @@ import type { RoomConnection } from './room.svelte';
 import { settings } from './settings.svelte';
 import { saved, type SongSource } from './storage';
 import { pickSource, SOURCE_NAMES } from './songSources';
+import { computerAudio } from './computer.svelte';
 import { correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
 
 /** Plays the room's audio on this device. */
@@ -150,6 +151,10 @@ class WebPlayer implements RoomPlayer {
 	private directFails = false;
 	/** Where the loaded song comes from. */
 	private source = $state<Source>('direct');
+	/** The song loaded plays from this computer itself (the desktop app: its music, or its song cache). */
+	private fromComputer = $state(false);
+	/** The song that didn't play from this computer: it plays the usual way now. */
+	private computerFailed: string | null = null;
 	/** The ways already tried for this item (the next one in the order comes after a failure). */
 	private tried: { itemId: string | null; sources: Set<Source> } = { itemId: null, sources: new Set() };
 	/** Counts loads, so a lookup that finishes after the song changed is ignored. */
@@ -204,6 +209,7 @@ class WebPlayer implements RoomPlayer {
 	get audioSource(): AudioSource | null {
 		const now = this.room.state?.nowPlaying;
 		if (!this.enabled || !now?.streamUrl) return null;
+		if (this.fromComputer) return 'device';
 		if (this.source === 'host') return 'host';
 		if (this.source === 'own') return 'youtube';
 		// The room's link: YouTube's, or the host's own (`/api/audio/…`: saved there, music files).
@@ -424,8 +430,17 @@ class WebPlayer implements RoomPlayer {
 	private load(now: NowPlaying, streamUrl: string): void {
 		const load = ++this.loads;
 		const songId = now.item.song.id;
-		this.source = this.sourceFor(now);
 		this.audio.playbackRate = 1;
+		// The desktop app: from this computer when it has the song (its music, or the song cache,
+		// which keeps a YouTube song as it plays). Nothing goes through the server then.
+		const here = this.computerFailed === now.item.itemId ? null : computerAudio(now.item.song);
+		this.fromComputer = !!here;
+		if (here) {
+			this.audio.src = here;
+			this.lookUpNext();
+			return;
+		}
+		this.source = this.sourceFor(now);
 		if (this.source !== 'own') {
 			this.audio.src = this.source === 'host' ? proxiedAudioUrl(songId) : streamUrl;
 			return;
@@ -458,12 +473,19 @@ class WebPlayer implements RoomPlayer {
 	 * when it's added (or autoplay finds it) later, so it starts without waiting. Once per song.
 	 */
 	private lookUpNext(): void {
-		if (this.source !== 'own') return;
 		const state = this.room.state;
-		const next = (state?.queue[0] ?? state?.autoplay[0])?.song.id;
-		if (!next || next === this.lookedUpNext) return;
-		this.lookedUpNext = next;
-		prefetchOwnStream(next);
+		const song = (state?.queue[0] ?? state?.autoplay[0])?.song;
+		if (!song || song.id === this.lookedUpNext) return;
+		// From this computer's song cache: asking for its start has the cache fetch it now.
+		const here = computerAudio(song);
+		if (here) {
+			this.lookedUpNext = song.id;
+			if (song.id.startsWith('ytm:')) fetch(here).catch(() => {});
+			return;
+		}
+		if (this.source !== 'own' || this.fromComputer) return;
+		this.lookedUpNext = song.id;
+		prefetchOwnStream(song.id);
 	}
 
 	/**
@@ -592,6 +614,15 @@ class WebPlayer implements RoomPlayer {
 		if (!this.enabled || !now) return;
 		const error = this.audio.error;
 		const songId = now.item.song.id;
+		if (this.fromComputer) {
+			// Not on this computer after all (a file gone), or the cache can't get it: the usual way.
+			reportProblem(`browser can't play ${songId} from this computer: ${MEDIA_ERRORS[error?.code ?? 0] ?? 'unknown error'}`, this.room.roomCode);
+			this.computerFailed = now.item.itemId;
+			this.fromComputer = false;
+			this.loadedItemId = null;
+			this.sync();
+			return;
+		}
 		const from = this.source;
 		this.triedFor(now.item.itemId).add(from);
 		// The room's YouTube link is probably tied to the host's internet connection: the next

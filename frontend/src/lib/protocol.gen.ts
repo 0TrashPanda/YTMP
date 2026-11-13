@@ -1456,7 +1456,7 @@ export interface HomePage {
   sections: HomeSection[];
 }
 
-export type LocalLibraryKind = "mpd" | "phone" | "cache";
+export type LocalLibraryKind = "mpd" | "phone" | "cache" | "computer";
 
 export interface LocalLibrarySummary {
   id: string;
