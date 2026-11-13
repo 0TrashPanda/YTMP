@@ -186,7 +186,14 @@ jobs:
           else
             echo "::warning::No updater key: this build won't update itself"
           fi
-          pnpm tauri build --bundles "$BUNDLE" --config "$config"
+          if [ "$BUNDLE" = appimage ]; then
+            # linuxdeploy looks for every library the files in the AppImage need: the Java
+            # runtime's own (libjava.so needs libjvm.so, in lib/server) are only found like this.
+            java="$PWD/src-tauri/resources/java/lib"
+            export LD_LIBRARY_PATH="$java/server:$java${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          fi
+          # --verbose: linuxdeploy's output, when an AppImage fails.
+          pnpm tauri build --verbose --bundles "$BUNDLE" --config "$config"
           mkdir -p ../out
           if [ "$BUNDLE" = appimage ]; then
             file="ytmp-$VERSION-linux-x86_64.AppImage"
