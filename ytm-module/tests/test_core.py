@@ -320,6 +320,8 @@ def test_home_items_of_each_kind():
     playlist = parse.home_item({"playlistId": "RDCLAK5uy_x", "title": "Pop Gold", "description": "Alicia Keys, Ed Sheeran"})
     assert playlist == {"kind": "playlist", "id": "RDCLAK5uy_x", "title": "Pop Gold", "author": "Alicia Keys, Ed Sheeran", "itemCount": None, "thumbnails": []}
     assert parse.home_item({"title": "Nothing to open"}) is None
+    # A card ytmusicapi doesn't know is None in its row; Home goes on without it.
+    assert parse.home_item(None) is None
 
 
 def test_signing_in_needs_youtube_music_cookies():

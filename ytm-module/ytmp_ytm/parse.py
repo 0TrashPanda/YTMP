@@ -102,7 +102,11 @@ def search_item(r: dict) -> dict | None:
 
 
 def home_item(c: dict) -> dict | None:
-    """One item of a home section as a SearchItem: songs and videos lack a length (the stream has it)."""
+    """One item of a home section as a SearchItem: songs and videos lack a length (the stream has it).
+
+    None for what it can't show, also a None item: ytmusicapi's place for a card it doesn't know."""
+    if not isinstance(c, dict):
+        return None
     if c.get("videoId"):
         song = song_from_search(c)
         return {"kind": "song", "song": song, "video": c.get("videoType") != "MUSIC_VIDEO_TYPE_ATV"} if song else None
