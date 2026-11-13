@@ -8,7 +8,7 @@
 	// Your pins: tiles in the Pinned section (a speed dial),
 	// or each its own section with its songs. They show at once: nothing to wait for.
 	import { keepInView } from '../keepInView';
-	import { getHome, lastSeen } from '../api';
+	import { getHome, homeRefreshAsked, lastSeen } from '../api';
 	import { itemCard, type PageHandlers } from '../cards';
 	import { cardTiles, songTiles } from '../dial';
 	import { hideIfBroken } from '../pictures';
@@ -25,6 +25,8 @@
 	import SpeedDial from './SpeedDial.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import type { Toast } from '../songActions';
+	import { menuAt } from '../songActions';
+	import { openCardMenu } from '../cardMenu.svelte';
 
 	let {
 		room,
@@ -52,15 +54,28 @@
 	let sectionMenu = $state<string | null>(null);
 
 	let loadingAgain = $state(false);
+	/** How long the bar shows at least when you asked for new suggestions. */
+	const SHOWN_AT_LEAST_MS = 700;
+	/** New suggestions are on their way (pulled down, the logo, or old ones): the bar at the top runs. */
+	let loading = $state(false);
 	function load() {
 		error = null;
+		// Asked for (the logo, pulling down): the bar shows at once and stays a moment, so you see
+		// it happened even when they come fast. By itself: only when it takes a while.
+		const asked = homeRefreshAsked();
+		const since = Date.now();
+		const shown = asked ? ((loading = true), undefined) : setTimeout(() => (loading = true), 150);
 		getHome()
 			.then((h) => {
 				home = h;
 				seen(h.sections, friends.shares ?? []);
 			})
 			.catch((e) => (error = e instanceof Error ? e.message : 'Could not load suggestions'))
-			.finally(() => (loadingAgain = false));
+			.finally(() => {
+				clearTimeout(shown);
+				loadingAgain = false;
+				setTimeout(() => (loading = false), asked ? Math.max(0, SHOWN_AT_LEAST_MS - (Date.now() - since)) : 0);
+			});
 	}
 	load();
 	// What friends shared with you: each time Home shows.
@@ -73,6 +88,12 @@
 	function slide(event: MouseEvent, way: -1 | 1) {
 		const row = (event.currentTarget as HTMLElement).closest('section')?.querySelector<HTMLElement>('[data-carousel]');
 		row?.scrollBy({ left: way * row.clientWidth * 0.9, behavior: scrollBehavior() });
+	}
+
+	/** Right-click a pinned album, playlist, artist or podcast: its menu (as on a card). */
+	function pinMenu(pin: Pin, event: MouseEvent) {
+		event.preventDefault();
+		openCardMenu({ kind: pin.kind, id: pin.id, title: pin.title, subtitle: '', art: pin.art }, menuAt(event.currentTarget as HTMLElement, event, true));
 	}
 
 	function openPin(pin: Pin) {
@@ -164,6 +185,7 @@
 	<button
 		class="flex min-w-0 items-center gap-3 overflow-hidden rounded-md text-left {list ? 'px-2 py-1.5 hover:bg-raised' : 'bg-raised hover:bg-line'}"
 		onclick={() => openPin(pin)}
+		oncontextmenu={(e) => pinMenu(pin, e)}
 	>
 		<div class="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden bg-line text-muted {list ? `rounded ${round}` : round}">
 			<Icon name={pin.kind === 'artist' ? 'person' : pin.kind === 'podcast' ? 'podcast' : 'note'} size={24} class="absolute" />
@@ -175,6 +197,11 @@
 	</button>
 {/snippet}
 
+{#if loading}
+	<div class="pointer-events-none sticky top-0 z-20 -mb-[3px] h-[3px] overflow-hidden bg-accent/20" role="progressbar" aria-label="Loading new suggestions">
+		<div class="loading-run h-full w-2/5 bg-accent"></div>
+	</div>
+{/if}
 <div class="flex flex-col gap-8 pb-4">
 	{#each sections as block, i (block.key)}
 		<section class="flex flex-col gap-3">
@@ -186,7 +213,8 @@
 						title: pin.title,
 						art: pin.art,
 						icon: pin.kind === 'artist' ? 'person' : pin.kind === 'podcast' ? 'podcast' : 'note',
-						open: () => openPin(pin)
+						open: () => openPin(pin),
+						menu: (e: MouseEvent) => pinMenu(pin, e)
 					}))}
 				/>
 			{:else if block.kind === 'pinned'}

@@ -26,6 +26,7 @@ export type MenuAction =
 	| 'share'
 	| 'markPlayed'
 	| 'removeListened'
+	| 'toAutoplay'
 	| 'remove';
 export type MenuItem = MenuAction | 'divider';
 
@@ -52,6 +53,7 @@ export const MENU_ACTIONS: Record<MenuAction, { name: string; icon: IconName; hi
 	share: { name: 'Share', icon: 'share', hint: 'With friends and groups, its link, or hold phones together' },
 	markPlayed: { name: 'Mark as played', icon: 'check', hint: 'Podcast episodes' },
 	removeListened: { name: 'Remove from your history', icon: 'remove', hint: 'Library → History' },
+	toAutoplay: { name: 'Move to autoplay', icon: 'autoplay', hint: 'Up next: this song and the ones after it' },
 	remove: { name: 'Remove from the queue', icon: 'remove', hint: 'Up next' }
 };
 
@@ -82,6 +84,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
 	'divider',
 	'removeListened',
 	'divider',
+	'toAutoplay',
 	'remove'
 ];
 

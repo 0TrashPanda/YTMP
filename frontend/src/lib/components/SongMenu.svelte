@@ -443,6 +443,15 @@
 				}
 			});
 		}
+		if (item && place === 'queue' && room.can('reorder')) {
+			const queue = room.state?.queue ?? [];
+			const after = Math.max(0, queue.length - 1 - queue.findIndex((i) => i.itemId === item.itemId));
+			add('toAutoplay', {
+				icon: 'autoplay',
+				label: after ? `Move to autoplay (with the ${after} after it)` : 'Move to autoplay',
+				run: () => command({ kind: 'MoveToAutoplay', itemId: item.itemId }, after ? `Moved ${after + 1} songs to autoplay` : `Moved "${song.title}" to autoplay`)
+			});
+		}
 		if (item && room.can(item.addedBy === room.participantId ? 'remove_own' : 'remove_others')) {
 				add('remove', {
 				icon: 'remove',

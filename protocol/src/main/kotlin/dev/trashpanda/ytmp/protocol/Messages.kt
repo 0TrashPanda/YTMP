@@ -117,6 +117,15 @@ sealed interface Command {
     data class MoveItem(val itemId: String, val list: ItemList, val toIndex: Int) : Command
 
     /**
+     * "Move to autoplay": the queued song [itemId] and every song after it in the queue go to
+     * the start of autoplay, in their order (they still play, after what's left in the queue,
+     * like YTM's autoplay songs). Needs *Reorder*.
+     */
+    @Serializable
+    @SerialName("MoveToAutoplay")
+    data class MoveToAutoplay(val itemId: String) : Command
+
+    /**
      * Clears the queue, and plays [song] and then its radio (the autoplay queue becomes the
      * radio). The song starts right away; the radio follows while it plays.
      */

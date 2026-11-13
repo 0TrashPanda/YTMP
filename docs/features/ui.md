@@ -367,7 +367,8 @@ says "Added … in your next turn"), unless you have the *Reorder* permission.
 
 ## Card menu ✅
 
-Albums, playlists, artists and podcasts shown as cards (Home, search, artist pages) have a menu,
+Albums, playlists, artists and podcasts shown as cards (Home, search, artist pages, also the
+tiles of a speed dial and what's pinned on Home) have a menu,
 like YouTube Music's: **hold** the card on a touch screen, **right-click** it, or its **⋮**,
 which shows on the picture when you point at it with a mouse. A sheet from the bottom on a
 phone, a menu at the card on a computer.
@@ -539,7 +540,9 @@ song's menu on an album's or artist's page has no *Go to* that same page.
 - **Home and Library** show what they had right away (also after the app was closed) and only
   load new ones from YouTube Music once they're **6 hours** old (*Settings → Home*: 30 min to a
   week, or only by hand). **Pull Home or Library down** (or tap the logo on Home) to load new
-  ones now (only a pull down: swiping a row sideways never refreshes). Your own changes (a new
+  ones now (only a pull down: swiping a row sideways never refreshes). A **thin bar** runs along
+  the top of Home while new suggestions load: when you asked for them always (at least a moment,
+  so you see it happened), by itself only when it takes a while. Your own changes (a new
   playlist, renaming) show right away. Rows that scroll sideways have **page dots**.
 - **Back where you were**: opening the app (Android or desktop) goes straight back into the
   solo room you were in when you closed it (*Settings → App*, on by default); the same for

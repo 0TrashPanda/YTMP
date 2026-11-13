@@ -7,6 +7,7 @@ import { smallUrl, thumbUrl } from './images.svelte';
 import type { Song } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 import { menuAt, tapSong } from './songActions';
+import { openCardMenu } from './cardMenu.svelte';
 
 /** A third of the widest page (30rem), sharp on high-density screens. */
 const TILE = 320;
@@ -27,4 +28,19 @@ export function songTiles(songs: Song[], room: RoomConnection, onToast: (text: s
 }
 
 export const cardTiles = (cards: Card[]): DialTile[] =>
-	cards.map((card) => ({ key: card.key, title: card.title, art: card.art, small: card.small, icon: card.round ? 'person' : 'note', open: card.open, prefetch: card.prefetch }));
+	cards.map((card) => ({
+		key: card.key,
+		title: card.title,
+		art: card.art,
+		small: card.small,
+		icon: card.round ? 'person' : 'note',
+		open: card.open,
+		prefetch: card.prefetch,
+		// Right-click: the album's, playlist's or artist's own menu, as on a card (not the browser's image menu).
+		menu: card.menu
+			? (event: MouseEvent) => {
+					event.preventDefault();
+					openCardMenu({ ...card.menu!, subtitle: card.menu!.subtitle || card.subtitle }, menuAt(event.currentTarget as HTMLElement, event, true));
+				}
+			: undefined
+	}));

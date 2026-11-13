@@ -23,6 +23,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
@@ -78,6 +79,28 @@ class QueueTest {
     }
 
     // --- fair order ---
+
+    @Test
+    fun `move to autoplay takes that song and every one after it to the start of autoplay`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        room.run(owner, Command.PlayNow(song(1)))
+        room.run(owner, Command.AddSongs((2..5).map(::song), QueuePosition.END))
+        room.run(owner, Command.AutoplaySongs(listOf(song(9))))
+        var state = room.state(owner)
+        val third = state.queue[1].itemId
+
+        assertNull(room.run(owner, Command.MoveToAutoplay(third)))
+        state = room.state(owner)
+        assertEquals(listOf("ytm:2"), state.queue.map { it.song.id })
+        assertEquals(listOf("ytm:3", "ytm:4", "ytm:5", "ytm:9"), state.autoplay.map { it.song.id }.take(4))
+
+        // Only queued songs; and it needs Reorder.
+        assertNotNull(room.run(owner, Command.MoveToAutoplay(state.autoplay.first().itemId)))
+        val guest = room.connect("Guest")
+        room.run(owner, Command.AddSongs(listOf(song(6)), QueuePosition.END))
+        assertNotNull(room.run(guest, Command.MoveToAutoplay(room.state(owner).queue.last().itemId)))
+    }
 
     @Test
     fun `fair order spreads songs out per person, as in the docs' example`() = runTest {

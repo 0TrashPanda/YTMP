@@ -39,6 +39,10 @@ seconds. Undo puts the songs back where they were (they count as added by whoeve
 it, and need the same *add songs* permission). Removing one song from the history or
 autoplay can't be undone.
 
+**Move to autoplay** ✅ (the song menu of a queued song, with *Reorder*): that song and every
+song after it in the queue go to the start of autoplay, in their order. They still play, after
+what's left in the queue, and the radio goes on after them.
+
 Removing several songs at once (*Remove above*, *Remove below*, the songs by an artist or
 added by someone: hold *Remove* in the [song menu](ui.md#song-menu)) and *Remove played
 songs* also show **Undo**, for the queue, the history and autoplay alike. Those songs come

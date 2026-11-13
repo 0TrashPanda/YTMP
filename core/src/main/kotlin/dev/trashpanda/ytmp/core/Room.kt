@@ -887,6 +887,16 @@ class Room(
             Command.ClearHistory -> return clearHistory(member)
             Command.UndoRemoveItems -> return undoRemoveItems(member)
             is Command.MoveItem -> return moveItem(member, command)
+            is Command.MoveToAutoplay -> {
+                need(member, Permission.REORDER)?.let { return it }
+                val from = queue.indexOfFirst { it.itemId == command.itemId }
+                if (from < 0) return notFound()
+                val moved = queue.subList(from, queue.size).toList()
+                queue.subList(from, queue.size).clear()
+                autoplay.items.addAll(0, moved.map { it.copy(result = null) })
+                emit(Event.QueueReplaced(queue.toList()))
+                emit(autoplay.changed())
+            }
             Command.ClearQueue -> {
                 if (queue.isEmpty()) return null
                 need(member, if (queue.all { it.addedBy == member.id }) Permission.REMOVE_OWN else Permission.REMOVE_OTHERS)?.let { return it }

@@ -14,7 +14,9 @@
 			art: thumbUrl(album.thumbnails, 400),
 			small: smallUrl(album.thumbnails, 400),
 			open: () => onOpen(album),
-			prefetch: () => prefetch('album', album.id)
+			prefetch: () => prefetch('album', album.id),
+			// Right-click or hold: the album's menu, like everywhere else.
+			menu: { kind: 'album' as const, id: album.id, title: album.title, subtitle: [album.kind, album.year].filter(Boolean).join(' • '), art: thumbUrl(album.thumbnails, 120) }
 		}))
 	);
 </script>

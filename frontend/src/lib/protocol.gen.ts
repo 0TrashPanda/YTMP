@@ -166,6 +166,11 @@ export interface CommandMoveRole {
   toIndex: number;
 }
 
+export interface CommandMoveToAutoplay {
+  kind: "MoveToAutoplay";
+  itemId: string;
+}
+
 export interface CommandPause {
   kind: "Pause";
 }
@@ -412,6 +417,7 @@ export type Command =
   | CommandMoveItem
   | CommandMoveQueueItem
   | CommandMoveRole
+  | CommandMoveToAutoplay
   | CommandPause
   | CommandPlay
   | CommandPlayNow

@@ -725,6 +725,9 @@ export function forgetHome(): void {
 	refreshHome = true;
 }
 
+/** You asked for new suggestions (pulled down, the logo) and they haven't been asked for yet. */
+export const homeRefreshAsked = (): boolean => refreshHome;
+
 /** After signing in or out: the home page, your library and (with your account) search results change. */
 export function forgetPersonal(): void {
 	for (const key of [...cache.keys()]) {
