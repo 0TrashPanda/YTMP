@@ -88,7 +88,7 @@ data class HostSources(
     val audio: AudioProxy? = null,
     /** Songs made into tagged files to keep (Download in the song menu); local music isn't offered. */
     val downloads: SongFiles? = null,
-    /** Songs kept so they start at once and need no lookup (docs/implementation/song-cache.md); [audio] and the rooms' streams go through it. */
+    /** Songs kept so they start at once and need no lookup (docs/implementation/sources/song-cache.md); [audio] and the rooms' streams go through it. */
     val cache: SongCache? = null,
     /** Local music (the Local tab): a Raspberry Pi's music folder, the music on the hosting phone. */
     val local: LocalMusic? = null,
@@ -107,7 +107,7 @@ data class HostSources(
     val personalFor: ((ApplicationCall) -> PersonalCatalog?)? = null,
     /** Whose that YouTube Music is (the account's ID), for what's kept per person (imports); null: the device's own ([personal]). */
     val personalId: ((ApplicationCall) -> String?)? = null,
-    /** Importing playlists into your YouTube Music (docs/features/importing-playlists.md). */
+    /** Importing playlists into your YouTube Music (docs/features/music/importing-playlists.md). */
     val converter: PlaylistConverter? = null,
     /**
      * Songs that go with a song in the song graph, for whoever asks (their account's listening,

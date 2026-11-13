@@ -1,4 +1,4 @@
-// Playlists kept offline on the phone (docs/features/sources.md#playlists-offline): Keep offline on
+// Playlists kept offline on the phone (docs/features/music/sources.md#playlists-offline): Keep offline on
 // a playlist's page, and the list in Settings → Song cache and downloads. Only on the phone's own
 // pages, where its song cache is.
 

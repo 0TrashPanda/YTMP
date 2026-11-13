@@ -24,7 +24,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** A new song waits for the players to load it, then starts for everyone together (docs/implementation/playback-sync.md). */
+/** A new song waits for the players to load it, then starts for everyone together (docs/implementation/outputs/playback-sync.md). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class StartTogetherTest {
     private fun song(n: Int) = Song("ytm:$n", "Song $n", listOf(ArtistRef(null, "Artist")), null, 180_000L, emptyList())

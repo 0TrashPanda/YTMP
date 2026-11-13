@@ -1,6 +1,6 @@
 """Turning what YouTube Music answers (ytmusicapi's results) into YTMP's songs, pages and cards.
 
-Plain functions without YouTube or HTTP, used by core.py. See docs/implementation/module-api.md.
+Plain functions without YouTube or HTTP, used by core.py. See docs/implementation/sources/module-api.md.
 """
 
 from __future__ import annotations

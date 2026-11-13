@@ -1,5 +1,5 @@
 // What a command will most likely do, shown before the host answers
-// (docs/implementation/protocol.md#commands-show-right-away). The page applies it to its copy of
+// (docs/implementation/protocol/protocol.md#commands-show-right-away-). The page applies it to its copy of
 // the room as soon as the command is sent; the host's own events take over once it answered.
 // Like Room.execute in core/.../Room.kt, for the commands whose outcome the page can tell.
 import type { Command, Permission, QueueItem, RoomState, Song } from './protocol.gen';

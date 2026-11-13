@@ -122,7 +122,7 @@
 	/** Null: the host leaves it as it is. */
 	const unchangedQueueSettings = { fairOrder: null, voteSkip: null, voteSkipPercent: null, maxSongsPerPerson: null, maxSongMinutes: null, noRepeatMinutes: null, noDuplicates: null };
 
-	// --- queue: fair order, vote to skip, limits (docs/features/queue.md) ---
+	// --- queue: fair order, vote to skip, limits (docs/features/rooms/queue.md) ---
 	let fairOrder = $state(false);
 	let voteSkip = $state(false);
 	let voteSkipPercent = $state(50);
@@ -324,7 +324,7 @@
 			)}
 		{/if}
 		{#if me?.isOwner && me.accountId}
-			<!-- Rooms of an account live on one of its hosts and can move (docs/features/room-sync.md). -->
+			<!-- Rooms of an account live on one of its hosts and can move (docs/features/rooms/room-sync.md). -->
 			<label class="block">
 				<span class={label}>Opening it on your other device</span>
 				<select

@@ -40,7 +40,7 @@ import kotlin.math.min
 data class WidgetNow(val item: TargetItem?, val playing: Boolean)
 
 /**
- * The home screen widget, like YouTube Music's (docs/features/android-app.md#home-screen-widget):
+ * The home screen widget, like YouTube Music's (docs/features/platforms.md#android-app):
  * the song's art in a circle, play/pause and the thumbs up. What it shows comes from [Widget].
  */
 class NowPlayingWidget : AppWidgetProvider() {

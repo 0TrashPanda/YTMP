@@ -20,7 +20,7 @@ private const val SCREEN_WAIT_MS = 25_000L
 private val screenCodeLimit = PerMinuteLimit(perMinute = 10)
 
 /**
- * Party screens on a TV (docs/features/ui.md#party-screen): it shows a code, someone in a room
+ * Party screens on a TV (docs/features/ui/party-screen.md): it shows a code, someone in a room
  * enters it ([ScreenPairings]); or the app shows one on a TV on its own network.
  */
 internal fun Route.screenRoutes(host: HostContext) = with(host) {

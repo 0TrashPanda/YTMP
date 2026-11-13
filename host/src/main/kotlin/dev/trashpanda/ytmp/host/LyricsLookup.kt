@@ -24,7 +24,7 @@ import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /**
- * Lyrics for any song (docs/features/ui.md#lyrics): [LRCLIB](https://lrclib.net) first (free,
+ * Lyrics for any song (docs/features/ui/player.md#lyrics): [LRCLIB](https://lrclib.net) first (free,
  * often timed), looked up by title, artist, album and length; then the song's own source
  * ([fallback], YouTube Music's). Timed lyrics win over plain ones. Kept for a while, also
  * when a song has none.

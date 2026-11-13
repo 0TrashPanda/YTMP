@@ -1,4 +1,4 @@
-// Recognize a song (docs/features/ui.md): the microphone records, and after 2.5, 4, 6 and 10
+// Recognize a song (docs/features/ui/README.md): the microphone records, and after 2.5, 4, 6 and 10
 // seconds this device makes Shazam's signature of what it has (shazamSignature.ts) and the host
 // asks Shazam (POST /api/recognize). The first answer ends it; the page then shows it and finds
 // the song on YouTube Music (GET /api/recognize/song). Measured with real lookups: 2 seconds was

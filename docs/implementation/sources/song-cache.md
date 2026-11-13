@@ -1,0 +1,292 @@
+# Song cache
+
+> Status: **built** on the server and the phone (`SongCache` in `host/`). Verified on a Galaxy
+> A20e (Android 11) with a local server and the real module: kept as the phone plays (its own
+> solo room and a server room, from YouTube's link and from the server's), played again from the
+> phone without a lookup, offline in a solo room with *Cached on this phone*, a download found by
+> its ID tag and played from the Music folder, the server's fetch from the 2nd play and its link
+> after, *Clear cache*, the size setting. Not verified: moving to an SD card (the A20e has none),
+> Chromecast with a cached song, `proxy = "lan"` redirects outside the network (unit-tested).
+
+Feature: [song cache](../../features/music/sources.md#song-cache).
+
+## Where it lives
+
+In the **host** (`host/.../SongCache.kt`), shared by the server and the phone, in front of
+the YouTube Music source and the audio route, next to [downloads](downloads.md). Not in the
+module: the phone has no module process of its own, and the host already sees every song that
+is played and serves the audio for speakers and proxied players.
+
+| | Folder | Default size | Set in |
+|---|---|---|---|
+| Server | `[cache] dir` in `ytmp.toml` (`YTMP_CACHE_DIR`); default `cache/` next to the SQLite database, so in Docker the existing data volume | 5 GB | `[cache] size = "5GB"` (`YTMP_CACHE_SIZE`; `"0"` turns it off), or the admin page |
+| Phone | *Settings → Song cache and downloads*: the app's own storage (`files/song-cache`, default) or its folder on the SD card (`getExternalFilesDirs`, no permission needed). Not the Music folder: these aren't the user's files | 1 GB | *Settings → Playback* (prefs `ytmp.cache`) |
+
+Changing the place moves what's cached, in the background (the settings show *Moving…*);
+when the SD card is gone the phone uses its own storage and starts empty. The phone's cache is
+left out of Android backups (`backup_rules.xml`, `data_extraction_rules.xml`).
+
+### Identifying a cached song
+
+The cache is keyed by the **song ID** (`ytm:<video id>`), the same ID the song has
+everywhere. A cached song isn't a different song or source: it stays a YouTube Music song
+(likes, radio, lyrics, history, the song graph), and only its audio comes from the cache.
+So nothing outside the audio path needs to know about the cache.
+
+Each cached song is one file named after its ID (`ytm_<video id>.m4a`: no `:`, which SD cards
+refuse), the audio as YouTube sent it, and its cover (`ytm_<video id>.jpg`, 544 px, for
+offline). What belongs to them is in `index.json` in the same folder: the song (title,
+artists, album, length), its file, type and size, when it was saved and last played. The
+index is in the folder rather than the host's database, so moving the folder moves everything,
+and the server and the phone keep it the same way. The cache only ever deletes files it made
+(`ytm_…`), whatever else is in the folder.
+
+### Play counts
+
+The index also keeps when each song was played in the last 90 days, also songs that aren't
+cached. A song counts as played when a room starts it (`RoomHooks.onSongStarted`); when it's
+skipped within 30 s the play is taken back (`FinishedPlay`, like YouTube's own count). The
+phone's player counts songs it plays in rooms elsewhere itself. The counts decide when a song
+is worth an extra download and which songs stay.
+
+## Filling it
+
+- Only **music**: podcast episodes (`Song.podcast` set), local music and "songs" over an hour
+  (mixes, whole concerts) are never cached.
+- **Free copies, always**:
+  - **The host's audio route** (speakers, proxied players): a song a room started (so the
+    cache knows what it is) is fetched **once** with `AudioFiles`, written to a file, and every
+    request for it is answered from that file as it comes in, any range, several at once
+    (`Fill`). When it's all in, it's kept. When nobody listens any more before that (a skip),
+    it goes on only if the song is worth an extra download (below).
+  - **The phone's own player** keeps what it reads: Media3's `TeeDataSource` hands the bytes
+    to the cache (`CacheSink` → `SongCache.Copy`), in pieces at whatever place they are
+    (seeks, a restart at the beginning). Once the pieces cover the whole file it's kept. When
+    the player moves on to another song with pieces missing, they're dropped, and the song is
+    fetched whole in the background if it's worth it.
+- **Extra downloads, from the 2nd play in 30 days**: when a room starts a song that was played
+  before in the last 30 days and isn't cached, the host fetches it in the background 30 s later
+  (it may come in for free meanwhile, or be skipped), like a [download](downloads.md)
+  (`AudioFiles`), one at a time. One-off radio and autoplay songs cost no extra YouTube traffic.
+- A song that is already cached isn't fetched again. A fetch that fails leaves nothing behind
+  (written to `….part`, renamed when complete).
+- The phone caches in rooms it hosts **and** in rooms on a server it listens to: there the
+  app's own player (`PlaybackService`) is the one playing, and fetches go through the phone's
+  own YouTube lookup.
+
+## From your YouTube Music
+
+Phone only, with the owner's account (`PhoneYoutubeAccount`). `CachePrefill` (`host/`) looks at
+the account when a setting changes, at app start and every 6 hours (after an error 30 minutes):
+
+- **Recent likes** (pref `keepLiked`, 0–5000; `SongCacheSettings.keepLiked`): the first X songs
+  of Liked music (`LM`, newest liked first), read in parts (`PhoneYoutubeAccount.recentLikes`).
+- **History** (pref `fromHistory`): `YtmCore.history()` (ytmusicapi `get_history`), each song with
+  about how many days ago (`parse.days_ago` from the day group's title: Today, Yesterday, a
+  weekday, This week, Last week, a month; another language: unknown, counted as 31 days ago). Each
+  becomes a play at noon that day in the index's play counts (`SongCache.importPlays`), unless
+  the song already has a play that day: plays here go into that history too
+  ([`addToHistory`](../../features/accounts/accounts.md)), and the history is read again. Every song in it
+  is fetched, newest first: YouTube Music lists a song once (its last play) and only about 200,
+  so it can't tell what was played often (a [Takeout import](#from-a-google-takeout-history)
+  can). The imported plays count in the keep score and toward [worth an extra download](#filling-it).
+
+Both go through `SongCache.fetch` (one song at a time, together with the background fetches),
+20 s apart, behind `fetchGate` (*Keep songs in the background*). They're ordinary entries: no
+pinning. To not push songs out for songs nobody played here, it only fills free room
+(`SongCache.hasRoom`: a song of the cache's average size, 4 MB when it's empty, still fits under
+90 %), else it stops the round and says `full`. The status has `keepLiked`, `likedOf`,
+`likedCached` (of the liked songs that can be cached, how many are here, downloads included),
+`fromHistory` and `fromYoutubeWaiting` (`Wi-Fi`, `full`, `signed out`, `error`).
+
+## From a Google Takeout history
+
+Phone only; no sign-in needed. *Choose Takeout export* in the settings sends the file
+(`<input type="file">`; in the app `MainActivity` answers the WebView's file chooser with
+Android's document picker) to `POST /api/cache/takeout` as is. `Takeout.read` (`host/`,
+`TakeoutHistory.kt`) takes the zip (any `watch-history.html` or `.json` in it, streamed) or one of
+those files, and keeps the plays with the product *YouTube Music* or a `music.youtube.com` link:
+
+- **HTML** (Takeout's default, 50 MB and more): read a cell (`outer-cell`) at a time. The
+  first link is the song (its video ID), the second its channel (`… - Topic` is the artist),
+  the last line the date, written in the account's language: `TakeoutDates` reads English,
+  Dutch, German, French, Spanish and Italian month names, US order with AM/PM, and numeric
+  dates, at the phone's time zone (the zone name is ignored). Entries without a readable date
+  are left out; when none can be read, the error asks for the JSON export.
+- **JSON**: `titleUrl`, `title` (without `Watched `), `subtitles[0].name`, `time` (ISO).
+
+A zip that ends early (`EOFException`/`ZipException` while reading), or a file that isn't a zip's
+start and isn't text (the back part of a zip: a download saved in two files, seen from Discord),
+is refused with one message, `Takeout.INCOMPLETE`: download it again. Nothing is kept from it.
+The settings show why an export was refused under its button until the next one is chosen.
+
+`TakeoutHistory` keeps the result in `takeout-history.json` in the app's files (per song: ID,
+title, artist, the play times; about 1.5 MB for 31,000 plays) and replaces it on the next
+import; `DELETE /api/cache/takeout` removes it and switches the setting off.
+`TakeoutHistory.pick(rules, now)` gives the songs that fit any `TakeoutRule(days, minPlays)` (at
+least `minPlays` plays in the last `days` days, 0: all), each once, by their plays (in the rule
+that counts the most of them), then the last play. `POST /api/cache/takeout/preview` takes
+`rules` (an older web app sends one `days` and `minPlays`). It
+(`TakeoutPreviewRequest` → `TakeoutPreview`) answers that count for the settings while you
+choose, with how many are here and about how much room they take (`SongCache.usualSongBytes`:
+the cached songs' average, 4 MB when empty).
+
+`CachePrefill` does the rest in its round, after likes and history (prefs `fromTakeout`,
+`takeoutRules`, JSON, `CachePrefill.cleanRules`: days 0–3650, plays 1–1000, each rule once, at
+most 6, default one rule of 365 days and 5 plays; from before, `takeoutDays` and
+`takeoutMinPlays` as that one rule): every Takeout play goes into
+`SongCache.importPlays` (the last 90 days count, once a day), and each picked song that's wanted
+is looked up first (`songInfo`: `ytm.song`, for its title, length and cover; the Takeout entry
+has only an ID and title), then fetched like the others: 20 s apart, only into free room. A
+song that turns out not to be kept (an episode, too long) or can't be looked up is left out
+until the app restarts. Old histories have many songs YouTube no longer plays ("Video
+unavailable"), so after three failed lookups in a row it looks up a song YouTube answered for
+(this round, or one already cached): if that works the three were gone songs and it goes on;
+otherwise YouTube itself fails (a bot check, no internet) and the round stops (`error`, again in
+30 minutes). The status has `takeout` (`TakeoutSummary`), `fromTakeout`, `takeoutRules`
+(and its first as `takeoutDays` and `takeoutMinPlays`, for an older web app), `takeoutOf`, `takeoutCached` and `takeoutGone` (skipped as gone), and for
+all of it `fromYoutubeWaiting` (why not now), `fromYoutubeBusy`, `fromYoutubeError` and
+`fromYoutubeNextAt` (when it looks again by itself); saving the settings (*Retry now*) looks at
+once.
+
+## Playlists offline
+
+Phone only. `KeptPlaylists` (`host/`) keeps `offline-playlists.json` in the app's files: the
+playlists it knows (ID, title, author, cover, songs, when read, the library's song count then,
+`tooLong` over 1000 songs, `inLibrary`) and the IDs kept by hand. Feature:
+[playlists offline](../../features/music/sources.md#playlists-offline).
+
+- **Reading**: each round (at start, every 6 hours, after 30 minutes on an error, at once on a
+  change) it reads the account's library (`youtube.library()`, its *Playlists*; signed out:
+  skipped) and reads a playlist whole (`part`, in parts, 3 s apart) when it's new, its library count
+  changed, it was marked changed, or it's a day old. Kept playlists outside the library are read
+  as anyone (`cached.playlist`). Playlists gone from the library are forgotten unless kept.
+  `PhoneYoutubeAccount` tells it about changes made in the app (`onPlaylistChanged`: add, remove,
+  move, rename, delete; Liked music on a like, read at the next round unless kept) and about a
+  playlist shown whole (`onPlaylistRead`, a first part without `more`: `seen`).
+- **Most played** (`pickMostPlayed`, pref `mostPlayedPlaylists`, 0–20): library playlists (not
+  `LM`, not `tooLong`) by the plays of their songs in the last 30 days (`SongCache.recentPlays`),
+  most first, each only when the songs of the kept and picked playlists still fit in 90 % of the
+  cache (cached songs at their size, missing ones at `usualSongBytes`, downloads free).
+- **Fetching**: the kept, then the picked playlists' missing songs (`SongCache.wanted`), through
+  `SongCache.fetch`, 10 s apart, behind `hold` (*Keep songs in the background*: Wi-Fi) and
+  `fetchGate`. Before each: the kept songs (`keptSongs`) plus one song must fit in 90 % of the size,
+  else `waiting = "full"` with the playlist's name. Three failed fetches in a row end the round.
+- **Keeping**: `SongCache.kept` is `keptSongs`: `trim` removes them last (after every other song),
+  `clear` leaves them (turning the cache off removes them too).
+- **Complete**: a playlist read, not too long, with every song `SongCache.here` (cached, or in
+  `DownloadedSongs`: downloads and matched phone songs). `SongCache.playlists` hands them to the
+  *Cached on this phone* library (`LocalLibrary.playlists`), and `LocalMusic.page` lists them as
+  `LocalLibraryPage.playlists` (`LocalPlaylist`: the songs as places in the page, the cover of the
+  first song, so it shows offline). The Local tab loads that page without the page cache, and the
+  list of libraries fresh each time it opens.
+- **API** (`songCacheRoutes`, phone only): `GET /api/cache/playlists` (`OfflinePlaylists`: the kept,
+  picked and complete ones with `songs`, `here`, `notKept` (not cacheable and not downloaded),
+  `tooLong`, `read`; `waiting`, `full`, `busy`, `error`), `POST /api/cache/playlists/keep`
+  (`KeepPlaylistRequest`; refused while the cache is off). The most played count is in
+  `SongCacheSettings`/`SongCacheStatus.mostPlayedPlaylists`.
+
+## Using it
+
+- **The host's audio route** (`/api/audio/{songId}`) answers from the cache when it has the
+  song (with `Range`), before asking YouTube. So speakers and proxied players use it without
+  changes. A download (`POST /api/download`) of a cached song is made from its file too.
+- **No lookup**: for a cached song the room's `StreamResolver` (`SongCache.streams`) answers
+  the host's own path, `/api/audio/ytm%3A…`, without a `stream` call to the module or yt-dlp.
+  The exact length comes from the index. A song kept without one (a listing left it out,
+  `durationMs` 0) gets it from one `stream` call, remembered in the index, and plays from the
+  cache all the same: without a length the room can't end the song.
+- **All listeners in a server room**: that path is the song's stream link
+  (`NowPlaying.streamUrl` may be a path on the room's host). Browsers play it as it is; the
+  app adds the room's host. A device that may not stream through the host (`[audio] proxy =
+  "lan"`, outside the network) gets a redirect to YouTube's link instead, looked up then (and
+  remembered half an hour), so it plays as it would without the cache. Chromecasts take the
+  path as their proxy link.
+- **The app** (`PlaybackService`) plays a song from the phone first: a download, then the
+  cached file (`SongCache.localUri`, Media3 reads it directly). Only if that fails does it
+  use the room's link.
+- **Offline on the phone**: a solo room on the phone plays cached songs without internet (no
+  lookup, the file on the phone). The Local tab has a library **Cached on this phone**
+  (`SongCache.library`, kind `cache`): the cached and downloaded songs, keeping their own IDs
+  (`LocalTrack.song`), with albums and artists of their own that work offline, and folders
+  *Downloaded* and *Cached*. It shows once it has a song.
+
+## Downloaded songs
+
+On the phone, songs [downloaded](downloads.md) to the Music folder show in the cache too. A
+download carries its song ID in its tags (a freeform iTunes item `----:dev.trashpanda.ytmp:id`,
+written by `M4aTags`), so the app finds them in the media store (`PhoneDownloads` reads the
+ID from the start of each of its files in `Music/YTMP`, once per file) and knows which song
+each one is. They:
+
+- are listed with the cached songs, in the folder *Downloaded* of *Cached on this phone*,
+  with what the app knew of the song when it downloaded it (kept in the index),
+- play from the Music folder instead of streaming (checked before the cache), also through
+  the phone's audio route for speakers and friends,
+- don't count toward the cache size and are never removed by it (the user deletes them).
+
+A song that is downloaded isn't also cached: its cached copy goes when the download is
+saved. Downloads made before the ID tag existed just stay plain local music.
+
+On a server this doesn't apply: downloads go to the browser.
+
+## Songs from this phone
+
+With the setting on (`ytmp.cache` pref `localSongs`; `SongCacheSettings.localSongs`), `LocalMatcher`
+(`host/`) goes through the phone's music (`PhoneLibrary.tracks()`, without `Music/YTMP`, under
+an hour, with a title and artist) and searches YouTube Music songs for "artist title", one
+search every 4 s per worker (`LocalMatcher.parallel`, 1–8 workers, the setting *Lookups at once*, pref `localParallel`). Before that, a YouTube video ID in the file's name (`[id]` at the end, or `-id`; `LocalMatcher.idInName`) or in a YouTube link in the file's tags (a `PURL`/comment tag in any encoding; `idInBytes`), read whole by `TagArea` (the ID3v2 tag of an MP3, the `moov` box of an M4A wherever it is, else the first 1 MB, at most 16 MB: a big cover often comes before the link) is looked up as a song (`ytm.song`); if its length is within 10 s of the file's it is the match, else the search below runs. A search result is a match when its normalised title (no accents, brackets or
+punctuation) is the same, one of its artists is in the file's artist or album artist, and the
+length differs by at most 3 s. The answer, also "no match", is kept per file in the cache's
+`index.json` (`local`: media store ID → `LocalMatch(title|artist|length, song?)`), so it moves with
+the cache folder and survives *Clear cache*; a changed file is looked up again, a removed one forgotten.
+The signature starts with a version (`v3`). Answers from `v2` (tags read only in the first 128 KB) are kept as they are, except a "no match" whose tags now give an ID: that file is looked up again (`LocalMatcher.upgrade`).
+A failed search (bot check, no internet) stops the round and tries again in 10 minutes; it looks at the media
+store every 5 minutes.
+
+`PhoneMatchedSongs` serves the matches as `DownloadedSongs` (`local = true`), combined with
+`PhoneDownloads` in `CombinedDownloads`, so they play and are listed like downloads, in the folder
+*On this phone*. The status says how many (`local`) and how many are still to look up (`checking`).
+
+Each check keeps why a file has no match (`LocalMatch.why`) and whether the owner decided it
+(`manual`, from `POST /api/cache/local/link`: a link or ID, looked up without the length check;
+empty: skipped). `GET /api/cache/local/unmatched` lists the files without a match,
+`POST …/recheck` forgets the automatic "no match" answers and `POST …/forget` all automatic
+answers; both wake the matcher at once. `DataRules` (android) holds the Wi-Fi/charging settings
+(prefs `ytmp.cache`): the matcher's `hold` pauses lookups, `SongCache.fetchGate` the background
+fetches, `PhoneDownloads`' gate the downloads (the page hears `onDownloadWaiting`). Wi-Fi means a
+network without `NET_CAPABILITY_NOT_METERED`.
+
+## Removing songs
+
+When saving a song would take the cache over its size, songs are removed until it is back
+under **90 %** of it (so it doesn't clean up on every song).
+
+The order: lowest **keep score** first, where
+
+    keep score = last played (as a time) + 7 days × (plays in the last 90 days − 1)
+
+So it's mostly *least recently played first*, but each extra recent play counts as a week
+more recent: a song played ten times last month outlives one played once yesterday. Songs
+playing now or next in a room, the song the phone's own player plays, and songs coming in are
+never removed, and downloads aren't in the cache to remove.
+
+Songs of [playlists kept offline](#playlists-offline) go last: only when nothing else is left.
+
+*Clear cache* removes everything that isn't playing or in a playlist kept offline. A smaller size removes songs right away
+by the same rule; *Off* (`0`) empties it.
+
+## Settings
+
+- **Phone**: *Settings → Song cache and downloads*, on the phone's own pages (the room list and
+  rooms on the phone): how full it is, *Size* (Off, 500 MB, 1 GB, 2 GB, 5 GB, or typed in GB), *Kept on*
+  (this phone or the SD card, with their free space), *Clear cache*. `GET/PUT /api/cache`,
+  `POST /api/cache/clear`, only from the phone itself (`HostOptions.cacheSettings`).
+- **Server**: *Settings → Server admin → Settings* for the server admin: how full it is,
+  *Clear cache* (`/api/admin/cache`) and its size (`/api/admin/settings`, over `ytmp.toml`);
+  its folder in `ytmp.toml`.
+
+## Open points
+
+- The 2-plays-in-30-days rule and the keep score are first guesses: tune them once there's
+  real use (like the [song graph weights](../../open-questions.md)).

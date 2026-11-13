@@ -79,10 +79,10 @@ import org.json.JSONObject
  * Songs play from the host's direct stream URL. When that doesn't work here (YouTube's links
  * are tied to the host's internet connection), the phone looks songs up itself with its own
  * YouTube Music module for the rest of the room, and streams through the host only when that
- * fails too (see docs/implementation/playback-sync.md).
+ * fails too (see docs/implementation/outputs/playback-sync.md).
  *
  * Before all that, a song downloaded or cached on this phone plays from here; what plays from
- * elsewhere goes into the song cache as it passes ([CacheSink], docs/implementation/song-cache.md).
+ * elsewhere goes into the song cache as it passes ([CacheSink], docs/implementation/sources/song-cache.md).
  */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {

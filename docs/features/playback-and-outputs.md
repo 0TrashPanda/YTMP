@@ -33,7 +33,7 @@ permissions say otherwise (permission: *Play audio locally*).
   pause*; without it Next only skips. (`Skip` with `play`; an older host just skips.)
 - **Start radio** ✅ (*Settings → Playback*): **Keep played songs** (default) or
   **Clear played songs**: Start radio also clears the history above the current song, like
-  YouTube Music (see [queue](queue.md#autoplay-queue)).
+  YouTube Music (see [queue](rooms/queue.md#autoplay-queue)).
 - **Headphones disconnected** (unplugged, Bluetooth gone) is a setting in the app (profile
   menu): **Pause** (default; pauses the room like YTM when you're the only one listening,
   otherwise stops playing here), **Stop here**, or **Keep playing** on the speaker.
@@ -91,7 +91,7 @@ permissions say otherwise (permission: *Play audio locally*).
     switched off (kept for later) or removed. It's checked when the page opens and every
     minute while it doesn't answer; meanwhile the room says so and songs play another way;
   - otherwise, or when that fails, the host streams the song to you (if the server allows
-    that on your network, see [server admin](server-admin.md)).
+    that on your network, see [server admin](accounts/server-admin.md)).
   - **The order** ✅: in a browser, *Settings → Where songs play from* sets which way is
     tried first: the room's link, your own module or through the server (for example your
     module first). When one doesn't work for a song, the next one is tried; through the
@@ -136,11 +136,11 @@ The host can also send audio to **output modules**. Outputs are **modular**.
 | Output | Description |
 |--------|-------------|
 | Local device | The host's own speakers. On a phone host the phone plays as a client (*this device*); a server's own speakers: planned |
-| Sonos ✅ | Streams to Sonos speakers over HTTP (see [implementation](../implementation/sonos.md)) |
-| Chromecast ✅ | Casts to Chromecast / Google Cast devices: TVs, Nest speakers, speaker groups (see [implementation](../implementation/chromecast.md)). A TV or display can show the [party screen](ui.md#party-screen) while it plays |
-| MPD ✅ | Plays on MPD (Music Player Daemon), e.g. a Raspberry Pi on a speaker or an amplifier, wired or over Bluetooth (see [implementation](../implementation/mpd.md)) |
-| Amplifier zones ✅ | The rooms of a multi-room amplifier, each a speaker of its own, with a player (an MPD) on one of its inputs (see below and [implementation](../implementation/zones.md)) |
-| TV with the YouTube app ✅ | TVs and projectors without Chromecast that phones cast to from the YouTube app: the room plays there in the TV's own YouTube app, with the video (YouTube songs only; see [implementation](../implementation/youtube-tv.md)) |
+| Sonos ✅ | Streams to Sonos speakers over HTTP (see [implementation](../implementation/outputs/sonos.md)) |
+| Chromecast ✅ | Casts to Chromecast / Google Cast devices: TVs, Nest speakers, speaker groups (see [implementation](../implementation/outputs/chromecast.md)). A TV or display can show the [party screen](ui/party-screen.md) while it plays |
+| MPD ✅ | Plays on MPD (Music Player Daemon), e.g. a Raspberry Pi on a speaker or an amplifier, wired or over Bluetooth (see [implementation](../implementation/outputs/mpd.md)) |
+| Amplifier zones ✅ | The rooms of a multi-room amplifier, each a speaker of its own, with a player (an MPD) on one of its inputs (see below and [implementation](../implementation/outputs/zones.md)) |
+| TV with the YouTube app ✅ | TVs and projectors without Chromecast that phones cast to from the YouTube app: the room plays there in the TV's own YouTube app, with the video (YouTube songs only; see [implementation](../implementation/outputs/youtube-tv.md)) |
 | Snapcast | Future idea: precise multi-room sync through a Snapcast server (see [future ideas](future-ideas.md#snapcast-output)) |
 | Discord bot | Future idea: plays into a Discord voice channel (see [future ideas](future-ideas.md#discord-bot-output)) |
 | … | Future output modules |
@@ -157,7 +157,7 @@ also lists the Sonos speakers, Chromecasts, MPDs, amplifier zones and YouTube TV
 offer itself, under *Near this phone*. Switched on, the phone plays the room there: it
 follows the room, looks the songs up itself and serves them to the speaker, so it works
 wherever the server is. They have their own volume slider, and a Chromecast TV can show the
-[party screen](ui.md#party-screen) instead. It needs *play on your own device*; the room
+[party screen](ui/party-screen.md) instead. It needs *play on your own device*; the room
 keeps playing while they play, and everyone sees *plays on Woonkamer* next to your name.
 The phone must stay on that Wi-Fi with the app running (it shows a notification, like
 hosting); when it goes away, so do its speakers.
@@ -183,14 +183,14 @@ a room on another phone. Either way, when the last one is done the amp's rooms g
 what they had before the first. A room can be left out of *Play on* (say the amp's
 headphones).
 
-Changing host outputs is a permission (see [room management](room-management.md#permissions)).
+Changing host outputs is a permission (see [room management](rooms/room-management.md#permissions)).
 
 When **another app takes a speaker or TV** (someone plays Spotify on the Sonos, or casts to
 the TV), the room lets go of it: it's switched off in the room, everyone sees *"Kitchen is
 playing something else now"*, and the room doesn't take it back at the next song (it also
 doesn't stop the other app). Switching it on again in *Play on* takes it back.
 
-Implementation: [implementation/playback-sync.md](../implementation/playback-sync.md).
+Implementation: [implementation/playback-sync.md](../implementation/outputs/playback-sync.md).
 
 ## Audio
 
@@ -218,7 +218,7 @@ playing with other apps* (in the app, off by default) lets both play at the same
   as always. Music and podcasts are treated the same.
 - Other apps' sounds, like a navigation voice, don't make the music quieter either.
 
-Implementation: [implementation/android-app.md](../implementation/android-app.md).
+Implementation: [implementation/android-app.md](../implementation/apps/android-app.md).
 
 ## Equalizer ✅
 
@@ -236,7 +236,7 @@ Changes the sound of **your own device's playback**, like a phone's or a car's e
 - It doesn't change the room or anyone else's sound, and not the speakers and TVs under
   *Play on* (Sonos, Chromecast, MPD, zones): only what plays on this device.
 - In a browser, with the equalizer on, songs whose own link doesn't allow it come from your
-  own module or through the host instead (see [implementation](../implementation/playback-sync.md#equalizer-in-a-browser)).
+  own module or through the host instead (see [implementation](../implementation/outputs/playback-sync.md#equalizer-in-a-browser)).
 
 ## Buffering ✅
 
@@ -251,7 +251,7 @@ slow one catches up, as before.
 parts of an episode. Only while you're the only one listening: the room's position follows
 your phone, as it does when your phone starts a song a moment late. With others listening,
 or music playing, nothing is skipped. Not tried on a phone yet (see
-[playback sync](../implementation/playback-sync.md)).
+[playback sync](../implementation/outputs/playback-sync.md)).
 
 ## Sleep timer ✅
 
@@ -294,4 +294,4 @@ Without changing Windows: in Firefox, `about:config` → `media.hardwaremediakey
 `false`. Firefox then doesn't freeze, but loses media keys and the Windows media overlay, and
 Windows' own taskbar can still get stuck.
 
-How it was found: [implementation/playback-sync.md](../implementation/playback-sync.md#known-problem-windows-media-controls-freeze-firefox).
+How it was found: [implementation/playback-sync.md](../implementation/outputs/playback-sync.md#known-problem-windows-media-controls-freeze-firefox).

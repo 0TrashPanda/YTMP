@@ -11,7 +11,7 @@ import java.nio.ByteBuffer
 
 /**
  * Writes iTunes-style tags (title, artist, album, cover) into an .m4a file, where music players
- * read them: `moov/udta/meta/ilst` (docs/implementation/downloads.md). The audio is copied as it
+ * read them: `moov/udta/meta/ilst` (docs/implementation/sources/downloads.md). The audio is copied as it
  * is. A bigger `moov` moves what comes after it, so absolute offsets into that move along
  * (`stco`/`co64` chunk offsets, a `tfhd` base offset, `tfra` entries); YouTube's files are
  * fragments whose offsets count from their own `moof`, so they have none.

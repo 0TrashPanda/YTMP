@@ -2,7 +2,7 @@
 	// Share a song (the song menu's Share): hold another phone against this one, or send its link
 	// with the phone's share sheet, or copy it. The link is the song's YouTube Music link
 	// (share.svelte.ts): a friend with YTMP gets its song screen, one without it YouTube Music.
-	// With your YTMP account also your groups and friends (docs/features/friends.md): ticked, it
+	// With your YTMP account also your groups and friends (docs/features/accounts/friends.md): ticked, it
 	// shows on their Home under "From your friends", with a note if you like.
 	import { modal } from '../modal';
 	import { artistNames } from '../format';

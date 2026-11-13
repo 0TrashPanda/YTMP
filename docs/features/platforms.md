@@ -17,7 +17,7 @@ The Android app needs **Android 11 or newer**.
 - **Hosting/joining from almost anywhere**: any device with a browser can create or
   join a room on a YTMP server.
 - **Serverless use**: an Android phone can host on its own, including fetching music
-  through an [on-device source module](sources.md), so YTMP works without a
+  through an [on-device source module](music/sources.md), so YTMP works without a
   server.
 - **Local network**: when a phone hosts, other devices on the same network can join it.
 - **Accounts on phone hosts**: a phone host can use a YTMP server for authentication.
@@ -72,7 +72,7 @@ server, like in a browser; **everything YouTube** happens on your own computer:
   desktop's media widget) show the song as YTMP and play, pause and skip, also when the
   window is in the background.
 - **Your music files and a song cache** on the computer, both off by default, see
-  [sources](sources.md#local-music-): they play from your own disk.
+  [sources](music/sources.md#local-music-): they play from your own disk.
 - **Opens the room you were in** when it starts (*Settings → App*), like the Android app.
 - **Speakers near this computer**: *Play on → Near this computer* lists the Chromecasts,
   Sonos speakers, MPDs and TVs on the computer's network, also when your server can't reach

@@ -25,7 +25,7 @@ class SonosException(message: String) : Exception(message)
 /**
  * Controls one Sonos speaker with UPnP (SOAP over HTTP on port 1400), the same calls the
  * Sonos apps use: set a song URL, play, pause, seek, volume. The speaker fetches the audio
- * itself. See docs/implementation/sonos.md.
+ * itself. See docs/implementation/outputs/sonos.md.
  */
 class SonosPlayer(val host: String, private val port: Int = 1400) {
     /** This machine's address as the speaker sees it, so it can reach our audio URLs. */

@@ -3,7 +3,7 @@ package dev.trashpanda.ytmp.protocol
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Friends, groups and songs shared with them, see docs/features/friends.md. Kept on the
+// Friends, groups and songs shared with them, see docs/features/accounts/friends.md. Kept on the
 // accounts' server; reached like the listening history (your own devices' pages, or a token
 // for it on other hosts' pages).
 

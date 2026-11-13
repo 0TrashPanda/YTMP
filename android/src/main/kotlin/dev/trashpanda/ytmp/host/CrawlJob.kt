@@ -12,7 +12,7 @@ import android.util.Log
 import dev.trashpanda.ytmp.YtmpApp
 
 /**
- * Learning radios overnight (*Settings → Radio → Learn radios*, docs/features/history-and-recommendations.md#learning-from-youtube-music):
+ * Learning radios overnight (*Settings → Radio → Learn radios*, docs/features/music/history-and-recommendations.md#learning-from-youtube-music):
  * without it, the crawl only runs while the app is awake. Android runs this job while the phone
  * charges on Wi-Fi, every 15 minutes, and lets it run up to 10; for that long the app stays
  * awake and the crawl ([RadioCrawl], woken with [RadioCrawl.nudge]) goes on at its own pace.

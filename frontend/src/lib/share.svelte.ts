@@ -1,4 +1,4 @@
-// Sharing a room or a song (docs/features/sharing.md): by holding another phone against this
+// Sharing a room or a song (docs/features/rooms/sharing.md): by holding another phone against this
 // one (the app answers as an NFC tag with the link, android/.../share/TapShareService.kt), and
 // through the normal share sheet. A song's link is its YouTube Music link, so a friend without
 // YTMP gets it in YouTube Music; with YTMP it opens the song screen (SharedSong.svelte).

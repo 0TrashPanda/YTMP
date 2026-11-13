@@ -28,7 +28,7 @@
 	import { motionMs } from '../motion.svelte';
 	import { modal } from '../modal';
 	import { swipeDown } from '../swipeDown';
-	// The song menu (docs/features/ui.md#song-menu): right-click a song, or its ⋮ button. Laid out
+	// The song menu (docs/features/ui/menus.md#song-menu): right-click a song, or its ⋮ button. Laid out
 	// as set in Settings → Song menu (songMenu.svelte.ts). Phones get a sheet from the bottom, like
 	// YouTube Music's, with big buttons at the top; wider screens a menu where it was opened.
 	import { keepInView } from '../keepInView';

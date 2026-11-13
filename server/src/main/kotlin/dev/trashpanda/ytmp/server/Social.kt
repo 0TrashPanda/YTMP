@@ -11,7 +11,7 @@ import dev.trashpanda.ytmp.protocol.Song
 import java.sql.Connection
 
 /**
- * Friends, groups of friends and the songs shared with them (docs/features/friends.md), between
+ * Friends, groups of friends and the songs shared with them (docs/features/accounts/friends.md), between
  * accounts of this server. Friends are both ways: one asks, the other says yes. A group has an
  * owner who picks its people from their friends; anyone in it shares with all of it. A shared song
  * shows on Home of everyone it went to, until they put it away.

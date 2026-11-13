@@ -32,7 +32,7 @@ class MpdException(message: String) : Exception(message)
 /**
  * Controls one MPD (Music Player Daemon) with its text protocol on port 6600: a song URL in its
  * queue, play, pause, seek, volume. MPD fetches the audio itself. One short connection per call.
- * See docs/implementation/mpd.md.
+ * See docs/implementation/outputs/mpd.md.
  */
 class MpdPlayer(val host: String, private val port: Int = DEFAULT_PORT) {
     /** This machine's address as MPD sees it, so it can reach our audio URLs. */

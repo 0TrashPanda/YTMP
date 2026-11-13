@@ -1,7 +1,7 @@
 """YouTube Music logic as plain functions, with no HTTP.
 
 The server wraps this in http.py; on Android, Chaquopy will call it directly.
-See docs/implementation/module-api.md.
+See docs/implementation/sources/module-api.md.
 """
 
 from __future__ import annotations

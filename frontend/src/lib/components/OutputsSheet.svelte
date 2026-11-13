@@ -338,7 +338,7 @@
 					/>
 				</label>
 				{#if output.kind === 'chromecast'}
-					<!-- TVs and displays: the party screen, which plays the music too (docs/features/ui.md#party-screen). -->
+					<!-- TVs and displays: the party screen, which plays the music too (docs/features/ui/party-screen.md). -->
 					<label class="flex items-center gap-3 pl-8 text-sm">
 						<span class="min-w-0 flex-1 {output.screen ? 'text-white' : 'text-muted'}">Show the party screen (TVs and displays)</span>
 						<input

@@ -39,7 +39,7 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * YouTube Music sign-ins of this server's accounts: each account can connect its own, and
  * then gets its Home, Library, likes, playlists and history in every browser
- * (docs/features/accounts.md). The cookies are stored encrypted with a key from [secret]
+ * (docs/features/accounts/accounts.md). The cookies are stored encrypted with a key from [secret]
  * (the module key, which lives outside the database), and only ever sent to the YTM module.
  */
 class YoutubeLinks(

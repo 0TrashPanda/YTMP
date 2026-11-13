@@ -65,7 +65,7 @@ private val log = LoggerFactory.getLogger(RemoteSourceModule::class.java)
 
 /**
  * Talks to a source module that runs as a separate program, over the module HTTP API
- * (docs/implementation/module-api.md).
+ * (docs/implementation/sources/module-api.md).
  */
 class RemoteSourceModule(
     private val client: HttpClient,

@@ -1,4 +1,4 @@
-"""YouTube pages this module couldn't read, kept to turn into tests (docs/implementation/module-api.md#unreadable-pages).
+"""YouTube pages this module couldn't read, kept to turn into tests (docs/implementation/sources/module-api.md#unreadable-pages).
 
 YouTube sometimes sends some visitors another layout, which ytmusicapi can't read. This keeps
 YouTube's answers to the last few requests of each call (per thread), and when the call fails

@@ -9,7 +9,7 @@ import kotlin.math.abs
 /**
  * One room playing on one MPD: keeps its song, play/pause, position and volume in step with
  * the room. Used by [MpdOutputs] (an MPD as a speaker) and [ZoneOutputs] (an MPD that feeds
- * amplifier zones). See docs/implementation/mpd.md.
+ * amplifier zones). See docs/implementation/outputs/mpd.md.
  */
 internal class MpdSession(
     private val name: String,

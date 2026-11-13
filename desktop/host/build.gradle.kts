@@ -8,7 +8,7 @@ kotlin {
     jvmToolchain(21)
 }
 
-// The desktop app's own host (docs/implementation/desktop-app.md#this-computers-host): the
+// The desktop app's own host (docs/implementation/apps/desktop-app.md#this-computers-host-): the
 // shared host code for this computer's music, song cache and speakers, on 127.0.0.1 only. The
 // app (desktop/src-tauri) starts it with a Java runtime of its own (desktop/scripts/bundle_host.py).
 application {

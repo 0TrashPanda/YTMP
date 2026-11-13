@@ -31,7 +31,7 @@ data class SonosAddress(val id: String, val name: String, val host: String, val 
  * Sonos speakers the room plays on in step with it. The room is in charge: song changes,
  * play/pause, seeking when it's clearly off, and volume. A speaker fetches the audio from the
  * host's `/api/audio/…`, so [audioBaseUrl] must be an address it can reach.
- * See docs/implementation/sonos.md.
+ * See docs/implementation/outputs/sonos.md.
  */
 class SonosOutputs(
     scope: CoroutineScope,

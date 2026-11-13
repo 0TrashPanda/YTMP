@@ -1,4 +1,4 @@
-// The desktop app's music and song cache on this computer (docs/implementation/desktop-app.md#music-and-songs-on-this-computer).
+// The desktop app's music and song cache on this computer (docs/implementation/apps/desktop-app.md#music-and-songs-on-this-computer-).
 // The app's own host keeps them (desktop/host/: the same host code as the phone's, without
 // rooms); the window reaches it at the app's `ytmphost` address and plays from there, so they
 // never go through the server, unless the server asks for a song another player in the room

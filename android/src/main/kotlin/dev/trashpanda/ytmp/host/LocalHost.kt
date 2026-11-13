@@ -311,7 +311,7 @@ class LocalHost(private val context: Context) {
     }
     private val cacheLibrary = cache.library { lanUrl() ?: LOCAL_URL }
 
-    /** Importing playlists into the owner's YouTube Music (docs/features/importing-playlists.md), while the app runs. */
+    /** Importing playlists into the owner's YouTube Music (docs/features/music/importing-playlists.md), while the app runs. */
     private val converter by lazy { PlaylistConverter(File(context.filesDir, "imports"), cached, personalOf = { youtube }, scope = scope) }
 
     /** YTM lookups, remembered for a while. Lambdas, so Python still starts on first use. */
@@ -461,7 +461,7 @@ class LocalHost(private val context: Context) {
     /** "Cached on this phone" in the Local tab (it shows once there's a song in it). */
     private fun showCacheLibrary() = local.add(cacheLibrary)
 
-    /** Your rooms here and on your server (docs/features/room-sync.md). */
+    /** Your rooms here and on your server (docs/features/rooms/room-sync.md). */
     private val sync: RoomSync by lazy { RoomSync(context, authLink, { rooms }, ::lanUrl, scope) }
     /** Songs from your phone: the owner's computer copies this phone's songs (PhoneCopyLink). */
     val phoneCopy: PhoneCopyLink by lazy { PhoneCopyLink(context, authLink, sync, ::lanUrl, scope) }

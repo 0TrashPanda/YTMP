@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Your listening history: search, delete, export, import from Google Takeout, and the song
-	// graph it makes. See docs/features/history-and-recommendations.md.
+	// graph it makes. See docs/features/music/history-and-recommendations.md.
 	import { onMount } from 'svelte';
 	import { authServer, session } from '../../../lib/account';
 	import Art from '../../../lib/components/Art.svelte';

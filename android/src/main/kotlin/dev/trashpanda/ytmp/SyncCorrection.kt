@@ -10,7 +10,7 @@ import kotlin.math.abs
  * seek. This needs the real position, read from the audio output ([AudioClock]), and the
  * speed set on the AudioTrack itself, which changes what you hear at once. (ExoPlayer's own
  * `currentPosition` moves in ~250 ms steps, which looked like jumps after every speed change
- * and made this class seek all the time; see docs/implementation/playback-sync.md.)
+ * and made this class seek all the time; see docs/implementation/outputs/playback-sync.md.)
  */
 class SyncCorrection {
     /** What to do: play at [speed], and seek to [seekTo] first if it isn't null. */

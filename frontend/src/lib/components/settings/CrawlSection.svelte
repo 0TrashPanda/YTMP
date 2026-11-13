@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Learning YouTube Music's radios of the songs here, slowly, for the song graph: on the phone
 	// (its music and saved songs, kept on your server) and on the server's admin page (its local
-	// music and song cache). See docs/features/history-and-recommendations.md#learning-from-youtube-music.
+	// music and song cache). See docs/features/music/history-and-recommendations.md#learning-from-youtube-music.
 	import { onDestroy, onMount } from 'svelte';
 	import type { RadioCrawlStatus } from '../../protocol.gen';
 	import Choice from './Choice.svelte';

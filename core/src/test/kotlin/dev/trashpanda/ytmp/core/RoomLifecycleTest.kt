@@ -28,7 +28,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Changing the owner, leaving, cloning and moving people to a clone (docs/features/room-lifecycle.md). */
+/** Changing the owner, leaving, cloning and moving people to a clone (docs/features/rooms/room-lifecycle.md). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RoomLifecycleTest {
     private fun song(n: Int) = Song("ytm:song$n", "Song $n", listOf(ArtistRef(null, "Artist")), null, 60_000, emptyList())

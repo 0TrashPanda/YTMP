@@ -1,7 +1,7 @@
 // Your own YouTube Music module (ytm-module/), running on this computer. YouTube's stream
 // links only work from the internet connection that asked for them, so the player can ask this
 // module instead of using the room's link or streaming through the host, in the order chosen
-// in the settings (docs/implementation/playback-sync.md). Search and the pages ask it first too
+// in the settings (docs/implementation/outputs/playback-sync.md). Search and the pages ask it first too
 // ([askOwnModule], used by api.ts), so YouTube sees this computer rather than the room's server.
 //
 // Whether it answers is checked when the page opens and then every minute while it doesn't, so
@@ -46,7 +46,7 @@ let retry: ReturnType<typeof setTimeout> | undefined;
 /** Counts checks, so one that answers after the settings changed is ignored. */
 let checks = 0;
 
-/** The desktop app (desktop/, docs/implementation/desktop-app.md), or null in a browser or the Android app. */
+/** The desktop app (desktop/, docs/implementation/apps/desktop-app.md), or null in a browser or the Android app. */
 export const desktopApp = (): DesktopApp | null => (typeof window !== 'undefined' ? (window.YtmpDesktop ?? null) : null);
 
 /** In the desktop app: its own module, reached through the app (no address or key). */
@@ -158,7 +158,7 @@ function noted<T>(lookup: Promise<T>): Promise<T> {
 }
 
 /**
- * Asks your own module for [path] (a search, a page, lyrics: `docs/implementation/module-api.md`);
+ * Asks your own module for [path] (a search, a page, lyrics: `docs/implementation/sources/module-api.md`);
  * throws a [ModuleError] when it answers with an error, or another error when it can't be used.
  */
 export function askOwnModule<T>(path: string): Promise<T> {

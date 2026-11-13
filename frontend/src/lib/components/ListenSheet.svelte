@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { modal } from '../modal';
-	// Recognize a song (docs/features/ui.md), like YouTube Music's song search: the microphone
+	// Recognize a song (docs/features/ui/README.md), like YouTube Music's song search: the microphone
 	// listens (listen.ts). Shazam's answer shows at once (its cover, title and artist), and the
 	// buttons come when the song is found on YouTube Music (Play, Play next, Add to queue);
 	// not there: a search for it. Closing stops the microphone.

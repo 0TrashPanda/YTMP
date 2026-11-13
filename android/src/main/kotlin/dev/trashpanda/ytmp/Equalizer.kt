@@ -7,7 +7,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * The equalizer's setting for one output (docs/features/playback-and-outputs.md#equalizer), as
+ * The equalizer's setting for one output (docs/features/playback-and-outputs.md#equalizer-), as
  * the web app makes it (equalizer.svelte.ts): [gains] in dB per band of [Equalizer.BANDS],
  * [preset] the preset they come from (null: your own).
  */

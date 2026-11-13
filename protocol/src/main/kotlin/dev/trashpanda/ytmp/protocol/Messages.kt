@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonClassDiscriminator
 
-// Wire format, see docs/implementation/protocol-messages.md.
+// Wire format, see docs/implementation/protocol/protocol-messages.md.
 // Messages use "type" (lowercase names), commands and events use "kind".
 
 /** Client → host. */

@@ -1,5 +1,5 @@
 // The room after an event: how the page keeps its copy of the room up to date between
-// snapshots (docs/implementation/protocol.md). The same as RoomState.apply in
+// snapshots (docs/implementation/protocol/protocol.md). The same as RoomState.apply in
 // protocol/.../RoomEvents.kt; roomEvents.test.ts checks that both get the same room.
 import type { Event, RoomState } from './protocol.gen';
 

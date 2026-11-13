@@ -1,4 +1,4 @@
-// YTMP for Windows and Linux (docs/implementation/desktop-app.md): the web app from your YTMP
+// YTMP for Windows and Linux (docs/implementation/apps/desktop-app.md): the web app from your YTMP
 // server in a window, with the YouTube Music module running on this computer, so every
 // YouTube request comes from here. A setup page (desktop/setup/) asks for the server first.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]

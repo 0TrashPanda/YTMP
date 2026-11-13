@@ -3,8 +3,8 @@ package dev.trashpanda.ytmp.protocol
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Importing playlists (`/api/me/convert/…`), see docs/features/importing-playlists.md and
-// docs/implementation/playlist-converter.md.
+// Importing playlists (`/api/me/convert/…`), see docs/features/music/importing-playlists.md and
+// docs/implementation/sources/playlist-converter.md.
 
 @Serializable
 @SerialName("ConvertListKind")

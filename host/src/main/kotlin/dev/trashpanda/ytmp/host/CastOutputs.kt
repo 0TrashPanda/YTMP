@@ -38,7 +38,7 @@ data class CastDeviceAddress(val id: String, val name: String, val host: String,
  * of the session. So [audioBaseUrl] must be an address the device can reach.
  *
  * A TV or display can show the party screen instead ([RoomView.screens]): DashCast opens the
- * host's `/tv` page there, which plays the music itself (docs/features/ui.md#party-screen).
+ * host's `/tv` page there, which plays the music itself (docs/features/ui/party-screen.md).
  */
 class CastOutputs(
     scope: CoroutineScope,

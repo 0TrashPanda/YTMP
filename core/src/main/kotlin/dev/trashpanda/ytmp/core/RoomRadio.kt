@@ -13,7 +13,7 @@ import kotlin.math.abs
  * room's [RadioOptions] say: YouTube Music's ([shared], or the room owner's own account's,
  * [owner]), the song graph ([hints]), or both mixed; only what plays here without internet
  * ([onDevice]). A local file with a YouTube Music ID ([ytmIdOf]) gets that song's radio.
- * See docs/features/history-and-recommendations.md#radio--mix.
+ * See docs/features/music/history-and-recommendations.md#radio--mix.
  */
 class RoomRadio(
     /** YTM's radio, without an account. */

@@ -76,7 +76,7 @@ kotlin {
 }
 
 // The on-device YTM module: the same Python code as ytm-module/ (minus its HTTP layer),
-// run with Chaquopy. See docs/implementation/ytm-module.md.
+// run with Chaquopy. See docs/implementation/sources/ytm-module.md.
 val copyYtmModule by tasks.registering(Sync::class) {
     from(rootProject.layout.projectDirectory.dir("ytm-module/ytmp_ytm")) {
         include("*.py")

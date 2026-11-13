@@ -36,7 +36,7 @@ import java.net.URLEncoder
  * speaker. The house describes them in a file on its network ([ZoneConfig], found with mDNS or
  * set in the server's config): switching a zone on in a room switches it to the player on the
  * amp, and the player plays the room once, however many of its zones are on. Switching it off
- * puts back what the zone had. See docs/implementation/zones.md.
+ * puts back what the zone had. See docs/implementation/outputs/zones.md.
  */
 class ZoneOutputs(
     scope: CoroutineScope,

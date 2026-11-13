@@ -51,7 +51,7 @@ tools/          smoke-test.py (checks a running phone or server), chrome90-test.
 - **Built-in modules** (shipped inside the app and server) live **in this repo**: YTM/YT
   (`ytm-module/`), Chromecast (`cast/` + `host/.../CastOutputs.kt`), Sonos (`host/`), and later
   local files and media servers. They change together with the host and
-  the [module API](module-api.md), in the same commit.
+  the [module API](sources/module-api.md), in the same commit.
 - **External modules** (separate programs that only talk to YTMP over the module API,
   for example a future Discord bot, or modules written by others) get **their own repo**.
 - The **YTM module** still gets its **own Docker image and version** (`ytmp-ytm`), so it can
@@ -66,7 +66,7 @@ tools/          smoke-test.py (checks a running phone or server), chrome90-test.
 | Server (Kotlin, JDK 21 is downloaded by Gradle) | `server/`, `core/`, `protocol/` | `YTMP_MODULE_KEY=dev ./gradlew :server:run` |
 | Web app (Svelte, pnpm) | `frontend/` | `pnpm install && pnpm dev`, then open http://localhost:5173 |
 | Android app | `android/` | `./gradlew :android:installDebug`, then for the emulator: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080` |
-| Desktop app (Tauri; JDK 21 for its host) | `desktop/` | `python desktop/scripts/bundle_module.py` (once) and `python desktop/scripts/bundle_host.py` (after changing `host/` or `desktop/host/`), then `cd desktop && pnpm install && pnpm tauri dev`; see [desktop app](desktop-app.md#packaging-updates-and-releases) |
+| Desktop app (Tauri; JDK 21 for its host) | `desktop/` | `python desktop/scripts/bundle_module.py` (once) and `python desktop/scripts/bundle_host.py` (after changing `host/` or `desktop/host/`), then `cd desktop && pnpm install && pnpm tauri dev`; see [desktop app](apps/desktop-app.md#packaging-updates-and-releases) |
 
 - Tests: `./gradlew test`, `cd ytm-module && .venv/bin/pytest` and `cd frontend && pnpm test`.
 - Smoke test of a running phone or server (search, pages, radio, streaming; read-only):
@@ -101,9 +101,9 @@ tools/          smoke-test.py (checks a running phone or server), chrome90-test.
 | Passwords | PBKDF2-HMAC-SHA256, 600 000 iterations (JDK only, no extra library) |
 | YouTube cookies | Encrypted with a secret key from the server config |
 | YTM region | Server settings `language` and `location`. Default: **English**, **Belgium** (`language = "en"`, `location = "BE"`). |
-| Song cache | Server 5 GB, phone 1 GB by default, configurable. See [song-cache](song-cache.md) |
+| Song cache | Server 5 GB, phone 1 GB by default, configurable. See [song-cache](sources/song-cache.md) |
 | Phone hosting | A foreground service with a "YTMP is hosting" notification, so Android doesn't kill the host |
-| Logging | Plain log files with limits (server: 14 days / 100 MB, app: 7 days / 20 MB), no external crash reporting. See [server admin](../features/server-admin.md#logs-) and [Android app](android-app.md#logs-) |
+| Logging | Plain log files with limits (server: 14 days / 100 MB, app: 7 days / 20 MB), no external crash reporting. See [server admin](../features/accounts/server-admin.md#logs-) and [Android app](apps/android-app.md#logs-) |
 
 ## Releases
 

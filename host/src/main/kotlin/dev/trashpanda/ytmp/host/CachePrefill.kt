@@ -17,7 +17,7 @@ import java.time.ZoneId
 
 /**
  * Fills the song cache from the owner's YouTube Music account, not only from what plays here
- * (docs/implementation/song-cache.md#from-your-youtube-music): the [liked] most recently liked
+ * (docs/implementation/sources/song-cache.md#from-your-youtube-music): the [liked] most recently liked
  * songs, the songs in its history (about the last 200; their plays count as plays here too:
  * [SongCache.importPlays]), and the songs a Google Takeout export ([takeout]) says were played
  * most. They're ordinary cached songs: they go like any other

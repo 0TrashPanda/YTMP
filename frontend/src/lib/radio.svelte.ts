@@ -1,4 +1,4 @@
-// How radios are made (docs/features/history-and-recommendations.md#radio--mix): the defaults of
+// How radios are made (docs/features/music/history-and-recommendations.md#radio--mix): the defaults of
 // Settings → Radio, which the hold sheet of Start radio, Autoplay this and Find similar changes
 // for one radio. One of your settings (settings.svelte.ts), so the same on all your devices.
 import { settings } from './settings.svelte';

@@ -1,6 +1,6 @@
 # Room sync
 
-Feature: [features/room-sync.md](../features/room-sync.md).
+Feature: [features/room-sync.md](../features/rooms/room-sync.md).
 
 - Every room with an owner account has a **sync ID** and an **epoch** (`Room.syncId`,
   `Room.epoch`, also in `SavedRoom`). The epoch goes up by one each time the room moves.

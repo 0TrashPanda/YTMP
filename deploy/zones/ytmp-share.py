@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""What the Raspberry Pi next to an amp shares with YTMP, on one port (see docs/implementation/zones.md):
+"""What the Raspberry Pi next to an amp shares with YTMP, on one port (see docs/implementation/outputs/zones.md):
 
     /ytmp-zones.json      the zones file (and any other file in --dir)
     /music/<path>         MPD's music folder, with ranges (so players can seek)

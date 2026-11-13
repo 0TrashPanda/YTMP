@@ -29,11 +29,11 @@ enum class DownloadState(val wire: String) { WAITING("waiting"), DOWNLOADING("do
 
 /**
  * Download in the song menu, in the app: the song as a tagged file in the phone's Music/YTMP
- * folder (docs/implementation/downloads.md), where music players find it, and the Local tab
+ * folder (docs/implementation/sources/downloads.md), where music players find it, and the Local tab
  * too (Music on this phone). Saving there needs no permission.
  *
  * The downloads carry their song ID, so the song cache lists them and plays them from there
- * ([DownloadedSongs], docs/implementation/song-cache.md#downloaded-songs). [media] serves the files.
+ * ([DownloadedSongs], docs/implementation/sources/song-cache.md#downloaded-songs). [media] serves the files.
  */
 class PhoneDownloads(
     private val context: Context,

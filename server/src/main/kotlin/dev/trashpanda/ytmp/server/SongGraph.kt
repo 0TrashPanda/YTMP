@@ -35,7 +35,7 @@ import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
 /**
- * The song graph (docs/features/history-and-recommendations.md#song-graph): which songs are
+ * The song graph (docs/features/music/history-and-recommendations.md#song-graph): which songs are
  * played after which, learned from the accounts' listening history (also imported from Google
  * Takeout), and which songs YouTube Music's radios put together. What it learns from is kept raw
  * (the `plays`, and every radio fetched in `radio_fetches`: when, how, as whom); the edges are

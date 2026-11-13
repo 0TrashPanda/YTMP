@@ -68,7 +68,7 @@ data class DownloadedSong(val song: Song, val uri: String, val local: Boolean = 
 data class LocalMatch(val sig: String, val song: Song? = null, val why: String? = null, val manual: Boolean = false)
 
 /**
- * The song cache (docs/implementation/song-cache.md): YouTube Music songs kept as files in
+ * The song cache (docs/implementation/sources/song-cache.md): YouTube Music songs kept as files in
  * [dir], so they start at once, need no YouTube lookup, and on a phone play without internet.
  * A cached song stays the same song (its ID): only its audio comes from here, through
  * [streams] (rooms get a link to the host's `/api/audio/…` instead of YouTube's) and [audio]

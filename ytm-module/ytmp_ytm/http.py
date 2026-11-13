@@ -1,4 +1,4 @@
-"""HTTP layer for the YTM module (docs/implementation/module-api.md)."""
+"""HTTP layer for the YTM module (docs/implementation/sources/module-api.md)."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
 
     if key:
         # A listener's web app may use a module on their own computer, so stream links are
-        # resolved from their own IP address (docs/implementation/playback-sync.md). Any page
+        # resolved from their own IP address (docs/implementation/outputs/playback-sync.md). Any page
         # may ask, but only with the key, which a page can't get by itself.
         @app.middleware("http")
         async def cors(request: Request, call_next):

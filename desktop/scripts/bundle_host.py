@@ -1,4 +1,4 @@
-"""Puts this computer's host in the desktop app (docs/implementation/desktop-app.md#this-computers-host):
+"""Puts this computer's host in the desktop app (docs/implementation/apps/desktop-app.md#this-computers-host-):
 the host's libraries (desktop/host, built with Gradle) and a Java runtime made for them with
 jlink, in src-tauri/resources/host/lib and src-tauri/resources/java.
 

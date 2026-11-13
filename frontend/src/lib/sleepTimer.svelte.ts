@@ -1,4 +1,4 @@
-// The sleep timer (docs/features/playback-and-outputs.md#sleep-timer): after some minutes, or
+// The sleep timer (docs/features/playback-and-outputs.md#sleep-timer-): after some minutes, or
 // at the end of the song, the sound fades out; then a solo room pauses, and in a shared room
 // this device stops playing (the room plays on for the others). One timer per device, like
 // YouTube Music's. In the app it runs in the app's player (it keeps going with the screen off,

@@ -3,7 +3,7 @@ package dev.trashpanda.ytmp.protocol
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Listening history, see docs/features/history-and-recommendations.md. Stored on the
+// Listening history, see docs/features/music/history-and-recommendations.md. Stored on the
 // account's auth server; hosts report plays there.
 
 /** Someone you listened with. Guests by their name only; people who opted out are left out. */
@@ -91,7 +91,7 @@ enum class HistoryRadio {
 @SerialName("RoomPasswordRequest")
 data class RoomPasswordRequest(val password: String?)
 
-/** How far you got in a podcast episode (kept on your account's auth server, see docs/features/ui.md#podcasts). */
+/** How far you got in a podcast episode (kept on your account's auth server, see docs/features/ui/README.md#podcasts-). */
 @Serializable
 @SerialName("EpisodeProgress")
 data class EpisodeProgress(

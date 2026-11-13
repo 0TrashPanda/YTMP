@@ -1,6 +1,6 @@
 # Networking: Discovery, Room Codes, Transport
 
-Feature description: [features/joining.md](../features/joining.md).
+Feature description: [features/joining.md](../features/rooms/joining.md).
 
 ## LAN discovery
 

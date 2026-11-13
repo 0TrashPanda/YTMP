@@ -34,7 +34,7 @@ import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 
 /**
- * `/api/me/…`: your YouTube Music (docs/features/accounts.md#linked-youtube-account): your Home,
+ * `/api/me/…`: your YouTube Music (docs/features/accounts/accounts.md#linked-youtube-account): your Home,
  * Library, playlists and likes, and search and radio as you. On a server also for the pages of
  * rooms on other hosts ([HostOptions.crossOriginPersonal]).
  */

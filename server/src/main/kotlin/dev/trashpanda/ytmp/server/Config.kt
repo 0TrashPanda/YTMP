@@ -97,7 +97,7 @@ data class CastConfig(
     val audioBaseUrl: String = "",
 )
 
-/** See docs/implementation/playback-sync.md and [AudioProxyMode]. */
+/** See docs/implementation/outputs/playback-sync.md and [AudioProxyMode]. */
 @Serializable
 data class AudioConfig(
     /**
@@ -109,7 +109,7 @@ data class AudioConfig(
     fun proxyMode(): AudioProxyMode = AudioProxyMode.parse(proxy)
 }
 
-/** The song cache (docs/implementation/song-cache.md). */
+/** The song cache (docs/implementation/sources/song-cache.md). */
 @Serializable
 data class CacheConfig(
     /** Its folder. Empty: `cache` next to the SQLite database (in Docker: the data volume). */
@@ -176,7 +176,7 @@ data class MpdConfig(
     val devices: List<String> = emptyList(),
 )
 
-/** TVs with only the YouTube app (docs/implementation/youtube-tv.md). */
+/** TVs with only the YouTube app (docs/implementation/outputs/youtube-tv.md). */
 @Serializable
 data class YoutubeTvConfig(
     /** Find TVs with DIAL (SSDP). Needs UDP multicast replies to reach the server (firewall, Docker host networking). */
@@ -185,7 +185,7 @@ data class YoutubeTvConfig(
     val devices: List<String> = emptyList(),
 )
 
-/** Amplifier zones (docs/implementation/zones.md). */
+/** Amplifier zones (docs/implementation/outputs/zones.md). */
 @Serializable
 data class ZonesConfig(
     /** Find zones files with mDNS (`_ytmp-zones._tcp`). Inside Docker this needs `network_mode: host`. */
@@ -205,7 +205,7 @@ data class DatabaseConfig(
     val url: String = "",
 )
 
-/** See docs/features/accounts.md and docs/implementation/auth.md. */
+/** See docs/features/accounts/accounts.md and docs/implementation/auth.md. */
 @Serializable
 data class AccountsConfig(
     /**

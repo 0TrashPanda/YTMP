@@ -48,14 +48,14 @@ _None open right now._
 
 - **Updating yt-dlp on the phone**: the app downloads a newer yt-dlp itself, once a day,
   and goes back to its own when the new one fails. See
-  [ytm-module](implementation/ytm-module.md#yt-dlp-updating-itself-).
+  [ytm-module](implementation/sources/ytm-module.md#yt-dlp-updating-itself-).
 - **YouTube bot check**: PO tokens (bgutil's server on a server, BotGuard in a WebView on the
   phone), and a pause before asking again; not the account's cookies. See
-  [ytm-module](implementation/ytm-module.md#youtubes-bot-check-and-po-tokens-).
+  [ytm-module](implementation/sources/ytm-module.md#youtubes-bot-check-and-po-tokens-).
 
-- **Module HTTP API**: built as described in [module-api](implementation/module-api.md).
-- **Protocol messages**: built as described in [protocol-messages](implementation/protocol-messages.md).
+- **Module HTTP API**: built as described in [module-api](implementation/sources/module-api.md).
+- **Protocol messages**: built as described in [protocol-messages](implementation/protocol/protocol-messages.md).
 - **Kotlin → TS types**: a small custom generator (`protocol/.../tsgen`, `./gradlew
   :protocol:generateTs`), not kxs-ts-gen.
 - **On-device YTM**: Chaquopy with the same Python module; yt-dlp's JavaScript runs in the
-  WebView's JavaScript engine instead of QuickJS (see [android-app](implementation/android-app.md)).
+  WebView's JavaScript engine instead of QuickJS (see [android-app](implementation/apps/android-app.md)).

@@ -58,7 +58,7 @@ data class PlaybackTarget(
 )
 
 /**
- * The sleep timer (docs/features/playback-and-outputs.md#sleep-timer): it stops at [endsAt]
+ * The sleep timer (docs/features/playback-and-outputs.md#sleep-timer-): it stops at [endsAt]
  * (ms since 1970), or at the end of the song [itemId] (the room's queue item).
  */
 @Serializable

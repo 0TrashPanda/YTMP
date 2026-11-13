@@ -9,7 +9,7 @@ import dev.trashpanda.ytmp.protocol.Role
 
 /**
  * A room's roles, ranked highest first, and what people may do with them
- * (docs/features/rooms-and-roles.md): permissions, and Discord-style ranking, where you only
+ * (docs/features/rooms/rooms-and-roles.md): permissions, and Discord-style ranking, where you only
  * manage people and roles below your own. Only used with the room locked.
  */
 internal class RoomRoles(initial: List<Role>) {

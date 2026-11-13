@@ -32,7 +32,7 @@ data class YoutubeTvAddress(val id: String, val name: String, val appsUrl: Strin
  * The host finds them with DIAL and plays the room there the way a phone casts from the
  * YouTube app: it starts the TV's YouTube app and remote-controls it ([YoutubeLounge]). The
  * TV plays each song itself, from YouTube (with its video), so only YouTube songs can play
- * there. See docs/implementation/youtube-tv.md.
+ * there. See docs/implementation/outputs/youtube-tv.md.
  */
 class YoutubeTvOutputs(
     scope: CoroutineScope,

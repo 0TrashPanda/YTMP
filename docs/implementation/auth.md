@@ -5,7 +5,7 @@
 > YouTube Music sign-in. Not yet: YTMP playlists, linked media servers, and room transfer
 > data on the account.
 
-Feature description: [features/accounts.md](../features/accounts.md#auth-servers).
+Feature description: [features/accounts.md](../features/accounts/accounts.md#auth-servers).
 
 ## Baseline
 
@@ -139,7 +139,7 @@ app's player and Home follow it).
 
 ### Friends, groups and shared songs
 
-Friends, groups and shared songs ([friends](../features/friends.md)) work the same too
+Friends, groups and shared songs ([friends](../features/accounts/friends.md)) work the same too
 (`/api/account/friends`, `/api/account/groups`, `/api/account/shares`, `Social.kt`), so sharing a
 song and *From your friends* on Home work in rooms everywhere. A host token for another host
 doesn't reach them.

@@ -26,7 +26,7 @@ import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Songs from the music on a desktop app's computer (docs/implementation/desktop-app.md#music-and-songs-on-this-computer):
+ * Songs from the music on a desktop app's computer (docs/implementation/apps/desktop-app.md#music-and-songs-on-this-computer-):
  * `local:dev-<device>:s:<key>`. That computer plays them from its own disk. Only when another
  * player or a speaker loads one (`/api/audio`) does the server ask the computer for it (the app
  * waits for that at [wanted]) and keep it a while, so listening alone nothing leaves the computer.

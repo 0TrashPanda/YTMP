@@ -12,7 +12,7 @@
 | Frontend | **Svelte + Tailwind + TypeScript**, built as a static SPA |
 | Android app | Kotlin app with a **WebView** that loads the same frontend |
 | Web client | The same frontend, served by the server |
-| YouTube Music source | **Python** (`ytmusicapi` + `yt-dlp`), see [ytm-module.md](ytm-module.md) |
+| YouTube Music source | **Python** (`ytmusicapi` + `yt-dlp`), see [ytm-module.md](sources/ytm-module.md) |
 | Database | **SQLite** or **PostgreSQL** on the server, SQLite on Android, see [storage.md](storage.md) |
 
 **Goal:** maximise code sharing.
@@ -23,7 +23,7 @@
   both the server and Android. A JVM-friendly HTTP/WebSocket stack such as Ktor
   can run in both places.
 - **Shared protocol types**: Kotlin classes are the source of truth and TypeScript types
-  are generated from them (see [protocol](protocol.md)).
+  are generated from them (see [protocol](protocol/protocol.md)).
 
 ## Distribution
 
@@ -53,8 +53,8 @@ YTMP is made for a **small group of friends**, not for the general public.
 - **Host core**: rooms, queue and ordering, permissions, playback control
 - **Client protocol**: real-time sync between host and clients (queue updates, playback state)
 - **Web UI**: shared frontend (browser + Android WebView)
-- **Source modules**: see [modules.md](modules.md)
-- **Output modules**: see [modules.md](modules.md)
+- **Source modules**: see [modules.md](sources/modules.md)
+- **Output modules**: see [modules.md](sources/modules.md)
 - **Account service** (on the auth server): accounts, room transfer, playlists, role templates,
   linked YouTube accounts and media servers (see [auth](auth.md))
 - **History & graph service** (on the auth server): listening history, recap, song graph,
@@ -93,7 +93,7 @@ in `settings.apply` in the server's `Main.kt`.
 lists of items; `PlaylistConverter` keeps them as jobs, looks them up with `ConvertMatcher`
 and writes them to YouTube Music; the routes are `ConvertRoutes` (`/api/me/convert`). A new
 import source is a reader; a new place to put playlists a branch in `PlaylistConverter.write`
-(see [playlist converter](playlist-converter.md)).
+(see [playlist converter](sources/playlist-converter.md)).
 
 **Songs' audio** (`host/`): sources are wrapped, in front of YouTube Music: `LocalMusic`
 (`local:` songs) and the song cache `SongCache` (cached and downloaded songs), each with a
@@ -158,7 +158,7 @@ opens the same results with `library` set on the search page.
 **The YouTube Music module** (`ytm-module/ytmp_ytm/`): `core.py` talks to YouTube Music and
 yt-dlp, `parse.py` turns its answers into YTMP's songs and pages, `http.py` is the HTTP API.
 
-**The desktop app** (`desktop/`, see [desktop app](desktop-app.md)): a Tauri shell in
+**The desktop app** (`desktop/`, see [desktop app](apps/desktop-app.md)): a Tauri shell in
 `src-tauri/src/` (`main.rs`: the window on the server, the setup page in `setup/`, the
 `window.YtmpDesktop` bridge and its commands, updates; `module.rs`: starting the YouTube
 Music module and forwarding the page's requests to it). Something the web app needs from the

@@ -1,4 +1,4 @@
-// Download in the song menu (docs/implementation/downloads.md). The host makes the song a file
+// Download in the song menu (docs/implementation/sources/downloads.md). The host makes the song a file
 // with its title, artist, album and cover in it. A browser saves that the usual way; the app
 // saves it in the phone's Music/YTMP folder (it looks the song up itself, whatever the host).
 

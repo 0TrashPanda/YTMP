@@ -1,5 +1,5 @@
 <script lang="ts">
-	// The party screen (docs/features/ui.md#party-screen): the room on a TV, laptop or tablet.
+	// The party screen (docs/features/ui/party-screen.md): the room on a TV, laptop or tablet.
 	// Big album art on a background in its colour, the song and its progress, the next songs
 	// and who added them, and a QR code and the room code to join. It only watches.
 	import { onDestroy, onMount } from 'svelte';

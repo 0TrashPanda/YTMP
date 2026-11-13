@@ -59,7 +59,7 @@ data class AudioOutput(val id: String, val name: String) {
 data class EqualizerState(val output: AudioOutput, val settings: EqSettings)
 
 /**
- * The equalizer's settings, one per output (docs/features/playback-and-outputs.md#equalizer):
+ * The equalizer's settings, one per output (docs/features/playback-and-outputs.md#equalizer-):
  * the phone's speaker, wired headphones and each Bluetooth device keep their own. Follows what
  * the phone plays on, so [settings] is always the one for that ([EqualizerProcessor] reads it).
  */

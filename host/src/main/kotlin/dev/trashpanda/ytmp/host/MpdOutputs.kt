@@ -23,7 +23,7 @@ data class MpdAddress(val id: String, val name: String, val host: String, val po
  * MPD outputs: the MPDs the host knows about (say a Raspberry Pi with a Bluetooth speaker), and
  * one driver per room that keeps the MPDs the room plays on in step with it, like
  * [SonosOutputs]. MPD fetches the audio from the host's `/api/audio/…`, so [audioBaseUrl] must
- * be an address it can reach. See docs/implementation/mpd.md.
+ * be an address it can reach. See docs/implementation/outputs/mpd.md.
  */
 class MpdOutputs(
     scope: CoroutineScope,

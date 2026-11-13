@@ -3,7 +3,7 @@ package dev.trashpanda.ytmp.protocol
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Your rooms on all your hosts (docs/features/room-sync.md). A room lives on one host at a
+// Your rooms on all your hosts (docs/features/rooms/room-sync.md). A room lives on one host at a
 // time (its home); the account's YTMP server keeps track of where, and keeps a copy of rooms
 // that live elsewhere (a phone), so they can move: opened on another host, the room continues
 // there and its old home closes it.

@@ -95,7 +95,7 @@ data class LibraryPlaylist(val id: String, val title: String, val author: String
  * (`/api/local`), album and artist pages, autoplay, and playing them (stream links and
  * `/api/audio`). Songs are `local:<library>:s:<key>`; the YouTube Music source handles the
  * rest, through the wrappers ([streams], [radio], [catalog], [audio]). See
- * docs/implementation/local-music.md.
+ * docs/implementation/sources/local-music.md.
  */
 class LocalMusic {
     private val libraries = MutableStateFlow<Map<String, LocalLibrary>>(emptyMap())

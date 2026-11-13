@@ -46,7 +46,7 @@ const val COPY_KEY_HEADER = "X-Copy-Key"
 
 /**
  * This device's songs for the owner's other devices (the desktop app copies a phone's songs over
- * Wi-Fi, docs/implementation/desktop-app.md#songs-from-your-phone): the list
+ * Wi-Fi, docs/implementation/apps/desktop-app.md#songs-from-your-phone-): the list
  * (`GET /api/cache/songs`) and a song's file (`GET /api/cache/songs/<id>`). Only for the
  * device's owner: its own page, their account logged in on another device, or a computer with a
  * [CopyKey] it got that way.

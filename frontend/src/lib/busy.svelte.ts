@@ -1,4 +1,4 @@
-// Feedback for what takes a moment (docs/features/ui.md#feedback): at first nothing; when it
+// Feedback for what takes a moment (docs/features/ui/README.md#feeling-fast-): at first nothing; when it
 // isn't done after the wait set in Settings → Adding songs, a message saying what's going on
 // ("Adding Liked music…"), until it's done and the result's own message takes its place.
 import { settings } from './settings.svelte';

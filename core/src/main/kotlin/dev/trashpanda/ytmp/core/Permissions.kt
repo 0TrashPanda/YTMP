@@ -7,7 +7,7 @@ import dev.trashpanda.ytmp.protocol.Role
 import dev.trashpanda.ytmp.protocol.RoleTemplate
 import dev.trashpanda.ytmp.protocol.RoomSettings
 
-/** Roles a room starts with when its creator has no template. See docs/features/room-management.md. */
+/** Roles a room starts with when its creator has no template. See docs/features/rooms/room-management.md. */
 object DefaultRoles {
     // Listeners skip by voting when the room votes to skip (and right away when it doesn't); DJs always right away.
     // Listeners don't pause the party: their Pause stops the music on their own device.

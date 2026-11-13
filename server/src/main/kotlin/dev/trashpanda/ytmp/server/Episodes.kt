@@ -4,7 +4,7 @@ import dev.trashpanda.ytmp.protocol.EpisodeProgress
 import java.sql.Connection
 
 /**
- * How far accounts got in podcast episodes (docs/features/ui.md#podcasts): where they stopped,
+ * How far accounts got in podcast episodes (docs/features/ui/README.md#podcasts-): where they stopped,
  * and which they heard to the end. Hosts report it as episodes play; it's for resuming in any
  * room and the played marks on podcast pages. Not the listening history: it's kept with
  * history paused too.

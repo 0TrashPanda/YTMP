@@ -32,7 +32,7 @@ import javax.jmdns.ServiceEvent
 import javax.jmdns.ServiceListener
 
 /**
- * Songs from your phone (docs/implementation/desktop-app.md#songs-from-your-phone): copying a
+ * Songs from your phone (docs/implementation/apps/desktop-app.md#songs-from-your-phone-): copying a
  * phone's songs (its song cache, downloads and own music files that are a YouTube Music song)
  * into this computer's song cache, over Wi-Fi.
  *

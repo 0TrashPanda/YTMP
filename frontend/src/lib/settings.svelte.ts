@@ -1,4 +1,4 @@
-// Settings that follow your YTMP account (docs/features/ui.md#settings): the same on all your
+// Settings that follow your YTMP account (docs/features/ui/README.md#settings): the same on all your
 // devices, unless a device keeps its own (the phone icon next to a setting: "Only on this
 // device"). The account's value is one of your preferences (preferences.svelte.ts), which also
 // keeps it in this browser without an account; a device's own values are kept in this browser.

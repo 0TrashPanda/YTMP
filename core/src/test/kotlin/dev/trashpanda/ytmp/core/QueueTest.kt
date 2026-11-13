@@ -29,7 +29,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Fair order, shuffle, repeat, vote to skip and queue limits (docs/features/queue.md). */
+/** Fair order, shuffle, repeat, vote to skip and queue limits (docs/features/rooms/queue.md). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class QueueTest {
     private fun song(n: Int, minutes: Int = 1) = Song("ytm:$n", "Song $n", listOf(ArtistRef(null, "Artist")), null, minutes * 60_000L, emptyList())

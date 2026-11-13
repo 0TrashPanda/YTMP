@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { modal } from '../modal';
-	// The sleep timer (docs/features/playback-and-outputs.md#sleep-timer), like YouTube Music's:
+	// The sleep timer (docs/features/playback-and-outputs.md#sleep-timer-), like YouTube Music's:
 	// a few lengths, your own, or the end of the song; while it runs, how long is left and Turn off.
 	import { onDestroy } from 'svelte';
 	import type { RoomConnection } from '../room.svelte';

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { motionMs } from '../motion.svelte';
 	import { modal } from '../modal';
-	// The song graph (docs/features/history-and-recommendations.md#the-graph-view): around a song
+	// The song graph (docs/features/music/history-and-recommendations.md#the-graph-view): around a song
 	// (its neighbours and theirs), or your most played songs. Lines are where YTMP learned that
 	// two songs go together, coloured by where from; the sliders change how much each part
 	// counts, at once, and "Use for my radios" keeps them for your radios.

@@ -15,7 +15,7 @@ import java.net.URLEncoder
  * A house's amplifier zones, as a file on its network describes them (served by e.g. the Raspberry
  * Pi that plays into the amp): the player that feeds them and how to switch each zone to it,
  * from general building blocks (web requests, reading the amp's state, saving and restoring
- * what a zone had). No amp-specific code. See docs/implementation/zones.md.
+ * what a zone had). No amp-specific code. See docs/implementation/outputs/zones.md.
  */
 @Serializable
 data class ZoneConfig(

@@ -1,4 +1,4 @@
-// Your YTMP listening history (docs/features/history-and-recommendations.md), in the room's
+// Your YTMP listening history (docs/features/music/history-and-recommendations.md), in the room's
 // Library, and how far you got in podcast episodes (their played marks). It's kept on your account's server, and pages reach it there: on that server's own
 // pages with your login; in the phone's app with your login there (a token made for the app's
 // own pages: those only reach your own phone); on another host's pages with a token just for

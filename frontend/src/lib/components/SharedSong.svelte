@@ -1,5 +1,5 @@
 <script lang="ts">
-	// A song shared with you (docs/features/sharing.md): another phone held against this one, or
+	// A song shared with you (docs/features/rooms/sharing.md): another phone held against this one, or
 	// Share → YTMP from YouTube Music. Shows the song with what you can do with it, like YouTube
 	// Music: Play now, Play next, Add to queue, Start radio, Like, Save to playlist, Open in
 	// YouTube Music, Share. In a room it acts on that room; without one ([room] null) the

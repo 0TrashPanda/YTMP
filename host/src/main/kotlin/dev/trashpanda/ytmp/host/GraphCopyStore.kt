@@ -53,7 +53,7 @@ data class GraphCopyStatus(
  * play offline ([songs]) are matched to it by their ID, or else by title, artist and length,
  * so a music file never played still finds its song. Ranked like the server ([GraphRank]), with
  * groups found in the copy itself ([GraphGroups]).
- * Refreshed once a day; [enabled] off deletes it. See docs/features/history-and-recommendations.md.
+ * Refreshed once a day; [enabled] off deletes it. See docs/features/music/history-and-recommendations.md.
  */
 class GraphCopyStore(
     private val file: File,

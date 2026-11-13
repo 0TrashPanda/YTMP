@@ -1,5 +1,5 @@
 // Shazam's audio fingerprint ("signature") of a few seconds of sound, made on the device, so any
-// host can recognize a song (docs/implementation/module-api.md#recognize-a-song): only this small
+// host can recognize a song (docs/implementation/sources/module-api.md#recognize-a-song): only this small
 // signature goes to the host, which asks Shazam.
 //
 // A port of shazamio-core 2.0.0 (MIT, © 2024 dotX12; src/fingerprinting/algorithm.rs and

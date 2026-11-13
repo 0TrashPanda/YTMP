@@ -3,7 +3,7 @@ package dev.trashpanda.ytmp.protocol
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Roles and permissions, see docs/features/room-management.md#permissions.
+// Roles and permissions, see docs/features/rooms/room-management.md#permissions.
 // Every participant has one role; per-person overrides allow or deny single permissions on top.
 
 @Serializable
@@ -76,7 +76,7 @@ data class RoomSettings(
     val openElsewhere: RoomOpenMode? = null,
     /** Never deleted for being empty (a room on a server that's always there). Not in templates. */
     val alwaysOn: Boolean = false,
-    /** Fair order: the queue goes round by round, one song per person per round (docs/features/queue.md). */
+    /** Fair order: the queue goes round by round, one song per person per round (docs/features/rooms/queue.md). */
     val fairOrder: Boolean = false,
     /** People with [Permission.VOTE_SKIP] (and not [Permission.SKIP]) skip by voting. */
     val voteSkip: Boolean = false,

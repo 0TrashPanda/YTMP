@@ -371,7 +371,7 @@ const RENEW_MS = 7 * 24 * 3600_000;
 const SHARE_EVERY_MS = 12 * 3600_000;
 
 /**
- * Log in once (docs/features/accounts.md#log-in-once). On a server's own pages, a login there
+ * Log in once (docs/features/accounts/accounts.md#log-in-once-). On a server's own pages, a login there
  * (a session, e.g. from /account) is also your identity for its rooms, without /connect. In the
  * app, it's also handed to the phone's own pages. Returns your identity on this host.
  */

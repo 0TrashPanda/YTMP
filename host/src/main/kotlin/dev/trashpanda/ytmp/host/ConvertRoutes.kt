@@ -19,7 +19,7 @@ import io.ktor.server.routing.route
 
 /**
  * `/api/me/convert/…`: importing playlists into your YouTube Music
- * (docs/implementation/playlist-converter.md#api-host). Under `/me`, so a page of a room on
+ * (docs/implementation/sources/playlist-converter.md#api-host). Under `/me`, so a page of a room on
  * another host reaches the host with your YouTube Music sign-in, like the rest of it.
  */
 internal fun Route.convertRoutes(host: HostContext) {

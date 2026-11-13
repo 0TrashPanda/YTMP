@@ -9,7 +9,7 @@ import dev.trashpanda.ytmp.host.SongCache
 
 /**
  * What the phone's player reads anyway, into the song cache as it passes (Media3's
- * TeeDataSource writes here): docs/implementation/song-cache.md#filling-it. Only for songs the
+ * TeeDataSource writes here): docs/implementation/sources/song-cache.md#filling-it. Only for songs the
  * player marked with a cache key (their song ID); [copyFor] says where it goes, or nowhere.
  */
 @OptIn(UnstableApi::class)

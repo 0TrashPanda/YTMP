@@ -1,4 +1,4 @@
-// Holding a button for its choices (docs/features/ui.md#hold-for-choices): a long press on a
+// Holding a button for its choices (docs/features/ui/menus.md#hold-for-choices-): a long press on a
 // touch screen or with the mouse, or a right-click. The click that follows a hold is swallowed,
 // so the button doesn't also do its usual thing.
 import type { Action } from 'svelte/action';

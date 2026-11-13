@@ -18,7 +18,7 @@ audio into it, so people in the call can hear it without joining the room themse
 
 ## Watching videos together
 
-With the [YouTube source](sources.md#youtube-source), a room could also show the
+With the [YouTube source](music/sources.md#youtube-source), a room could also show the
 **video** in sync for everyone, for example in a Discord call. Not the primary focus.
 
 ## Stronger guest bans
@@ -29,8 +29,8 @@ A future feature could enforce guest bans more strongly (for example by device o
 ## Phone → server migration
 
 Move a phone-hosted room to an online server so it survives the phone leaving
-(see [room lifecycle](room-lifecycle.md)). For your **own** rooms this is built as
-[room sync](room-sync.md) (with an account); still open: doing it for a room you don't own,
+(see [room lifecycle](rooms/room-lifecycle.md)). For your **own** rooms this is built as
+[room sync](rooms/room-sync.md) (with an account); still open: doing it for a room you don't own,
 or without an account.
 
 ## Upvotes in the queue (maybe)
@@ -50,7 +50,7 @@ Emoji reactions on the current song, and/or a small text chat in the room.
 ## YTMP likes
 
 Liking songs without a linked YouTube account. These likes would be saved to the YTMP
-account and could also feed the [song graph](history-and-recommendations.md#song-graph).
+account and could also feed the [song graph](music/history-and-recommendations.md#song-graph).
 
 ## History and Import out of Library
 
@@ -64,7 +64,7 @@ The UI is English only for now. Translations (for example Dutch) could be added 
 
 ## Graph database (maybe)
 
-Store the [song graph](history-and-recommendations.md#song-graph) in a real graph
+Store the [song graph](music/history-and-recommendations.md#song-graph) in a real graph
 database (for example Neo4j or Memgraph) instead of normal tables, for bigger graphs or
 more advanced recommendations. Not needed at the current scale (see
 [storage](../implementation/storage.md#song-graph)).
@@ -73,7 +73,7 @@ more advanced recommendations. Not needed at the current scale (see
 
 A full **Spotify source module**: search, albums, artists, playlists, radio and a linked
 Spotify account (library, likes). Importing a Spotify **data export** is planned on its own,
-without any of this: see [importing playlists](importing-playlists.md).
+without any of this: see [importing playlists](music/importing-playlists.md).
 
 - To research: playing Spotify audio needs a **Spotify Premium** account and goes through
   DRM / unofficial clients, which may be hard or against Spotify's terms. A fallback is to
@@ -84,7 +84,7 @@ without any of this: see [importing playlists](importing-playlists.md).
   playlist's songs can only be read when the account **owns or collaborates on** it (not
   Spotify's own playlists). There are no recommendations or related artists for new apps.
   A linked Spotify account would be one more reader for
-  [importing playlists](importing-playlists.md).
+  [importing playlists](music/importing-playlists.md).
 
 ## Automatic sync with the microphone
 
@@ -114,7 +114,7 @@ into YTMP:
 
 Today the Share sheet's *Open in YTMP on their phone* switch is a manual choice: on, a phone
 with YTMP opens the song in YTMP, but an Android phone without it gets a store page; off, it
-always goes to YouTube Music (see [sharing](sharing.md#holding-phones-together-)). To look
+always goes to YouTube Music (see [sharing](rooms/sharing.md#holding-phones-together-)). To look
 into: doing the right thing on its own, for example a YTMP link (the server's, or an app link
 YTMP verifies) that opens YTMP where it's installed and sends anyone else on to YouTube Music,
 or knowing whether the other phone has YTMP before it reads the tag.

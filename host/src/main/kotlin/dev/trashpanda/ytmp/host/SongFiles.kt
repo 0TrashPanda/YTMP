@@ -10,7 +10,7 @@ import java.net.URI
 
 private val log = LoggerFactory.getLogger("ytmp")
 
-/** A song's whole audio, for downloads (docs/implementation/downloads.md) and the song cache. */
+/** A song's whole audio, for downloads (docs/implementation/sources/downloads.md) and the song cache. */
 interface AudioFiles {
     /**
      * Writes all of [songId]'s audio to [to]; answers its type, e.g. "audio/mp4". Throws if it

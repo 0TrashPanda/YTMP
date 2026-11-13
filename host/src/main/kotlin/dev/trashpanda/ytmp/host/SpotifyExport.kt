@@ -32,7 +32,7 @@ data class ConvertRead(val reader: String, val lists: List<ConvertList>, val ski
 class ConvertReadException(message: String) : Exception(message)
 
 /**
- * Spotify's *Download your data → Account data* (docs/implementation/playlist-converter.md#spotify-data-export):
+ * Spotify's *Download your data → Account data* (docs/implementation/sources/playlist-converter.md#spotify-data-export):
  * the zip, or one of its `Playlist1.json` / `YourLibrary.json`. Only those are read; the rest of
  * the zip (user data, streaming history) is skipped and nothing of it is kept.
  */

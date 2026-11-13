@@ -1,4 +1,4 @@
-// The equalizer (docs/features/playback-and-outputs.md#equalizer): ten bands, presets, on or
+// The equalizer (docs/features/playback-and-outputs.md#equalizer-): ten bands, presets, on or
 // off. It acts on this device's own playback. In a browser it's one setting for the browser,
 // done here with Web Audio (see WebPlayer). In the app the app's player does it, and keeps one
 // setting for each thing the phone plays on: its speaker, wired headphones, each Bluetooth

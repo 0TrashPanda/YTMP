@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory
 private val log = LoggerFactory.getLogger("ytmp.recognize")
 
 /**
- * Recognize a song (docs/implementation/module-api.md#recognize-a-song): asks Shazam which song a
+ * Recognize a song (docs/implementation/sources/module-api.md#recognize-a-song): asks Shazam which song a
  * signature is. The page makes the signature itself (`frontend/src/lib/shazamSignature.ts`), so
  * every host can do this, a phone too. Unofficial, the way shazamio asks (like yt-dlp for
  * YouTube): one try, no retries, since Shazam answers 429 when asked too often and the page tries

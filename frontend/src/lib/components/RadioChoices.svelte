@@ -1,5 +1,5 @@
 <script lang="ts">
-	// The choices for a radio (docs/features/history-and-recommendations.md#radio--mix): where it
+	// The choices for a radio (docs/features/music/history-and-recommendations.md#radio--mix): where it
 	// comes from, songs you know or new ones, with or without your YouTube Music account, and in
 	// parties whose taste. In the hold sheet of Start radio (for one radio) and in Settings → Radio
 	// (the defaults). [show] says which of them (Settings → Song menu can hide some).

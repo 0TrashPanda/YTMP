@@ -53,7 +53,7 @@ class FakeAmp : AutoCloseable {
         return 200 to "/audio_set?$query"
     }
 
-    /** A zones file for this amp and [mpdPort], with an AudioSystem 8.8 setup like docs/implementation/zones.md's. */
+    /** A zones file for this amp and [mpdPort], with an AudioSystem 8.8 setup like docs/implementation/outputs/zones.md's. */
     fun zonesFor(mpdPort: Int, names: Map<Int, String>, hidden: Set<Int> = emptySet()): String = """
         {
           "player": {"type": "mpd", "port": $mpdPort},

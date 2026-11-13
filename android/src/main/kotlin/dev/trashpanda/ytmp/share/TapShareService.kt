@@ -5,7 +5,7 @@ import android.os.Bundle
 import dev.trashpanda.ytmp.Log
 
 /**
- * What holding another phone against this one shares (docs/features/sharing.md): the link the
+ * What holding another phone against this one shares (docs/features/rooms/sharing.md): the link the
  * web app set while a Share sheet is open (a room's, or a song's), only while the app is on
  * screen. Otherwise nothing, and the other phone finds no tag here.
  */

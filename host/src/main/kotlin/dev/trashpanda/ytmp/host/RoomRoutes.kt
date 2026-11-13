@@ -98,7 +98,7 @@ internal fun Route.roomRoutes(host: HostContext) = with(host) {
     }
 }
 
-/** `/ws`: a connection to a room (docs/implementation/protocol.md). */
+/** `/ws`: a connection to a room (docs/implementation/protocol/protocol.md). */
 internal fun Route.roomSocket(host: HostContext) = with(host) {
     webSocket("/ws") {
         val outgoing = Channel<ServerMessage>(OUTBOX_CAPACITY)

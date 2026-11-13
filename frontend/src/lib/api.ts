@@ -105,7 +105,7 @@ export async function answer<T>(response: Response): Promise<T> {
 	return (response.status === 204 ? null : await response.json()) as T;
 }
 
-// --- party screens on a TV (docs/features/ui.md#party-screen) ---
+// --- party screens on a TV (docs/features/ui/party-screen.md) ---
 
 /** The TV: a code to show, and the secret to wait with. */
 export function startScreenPairing(): Promise<ScreenPairing> {
@@ -254,7 +254,7 @@ function abortable<T>(value: Promise<T>, signal?: AbortSignal): Promise<T> {
  */
 const viaYourServer = () => !!youtubeFrom?.personalize;
 
-// --- your own module first (docs/implementation/playback-sync.md#search-and-pages-from-your-own-module) ---
+// --- your own module first (docs/implementation/outputs/playback-sync.md#search-and-pages-from-your-own-module) ---
 
 /**
  * Your YouTube Music sign-in on this host (not from your server, see [useYoutubeFrom]): Home is
@@ -699,7 +699,7 @@ export async function createPlaylist(title: string, songIds: string[]): Promise<
 	return response.id;
 }
 
-// --- importing playlists (docs/features/importing-playlists.md), on the host with your YouTube Music ---
+// --- importing playlists (docs/features/music/importing-playlists.md), on the host with your YouTube Music ---
 
 /** What's in an export (a Spotify data export: the zip, or a JSON from it). */
 export function readImport(file: File, reader = 'spotify-export'): Promise<ConvertPreview> {
@@ -786,7 +786,7 @@ export function reportProblem(message: string, room?: string): void {
 	fetch('/api/log', { method: 'POST', headers, body: JSON.stringify({ message, room }), keepalive: true }).catch(() => {});
 }
 
-/** A song made into a file to keep by the host (docs/implementation/downloads.md): its bytes and Content-Disposition. */
+/** A song made into a file to keep by the host (docs/implementation/sources/downloads.md): its bytes and Content-Disposition. */
 export async function downloadFile(song: Song): Promise<{ blob: Blob; disposition: string | null }> {
 	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 	if (identity.token) headers['Authorization'] = `Bearer ${identity.token}`;
@@ -823,7 +823,7 @@ export function forgetTakeout(): Promise<SongCacheStatus> {
 	return request('/api/cache/takeout', { method: 'DELETE' });
 }
 
-/** The phone's playlists kept offline, its most played ones and the ones that are all on it (docs/implementation/song-cache.md#playlists-offline). */
+/** The phone's playlists kept offline, its most played ones and the ones that are all on it (docs/implementation/sources/song-cache.md#playlists-offline). */
 export function getOfflinePlaylists(): Promise<OfflinePlaylists> {
 	return request('/api/cache/playlists');
 }

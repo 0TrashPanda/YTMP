@@ -62,7 +62,7 @@ data class RecognizeResponse(
 )
 
 /**
- * `POST /api/screens`: a TV asks for a code to show (docs/features/ui.md#party-screen). It
+ * `POST /api/screens`: a TV asks for a code to show (docs/features/ui/party-screen.md). It
  * then waits with [secret] (`GET /api/screens/{secret}`) until someone in a room links it.
  */
 @Serializable
@@ -109,7 +109,7 @@ data class ApiError(val error: ErrorInfo)
 enum class HostKind {
     @SerialName("server") SERVER,
     @SerialName("phone") PHONE,
-    /** The desktop app's own host: no rooms, only this computer's music, song cache and speakers (docs/implementation/desktop-app.md). */
+    /** The desktop app's own host: no rooms, only this computer's music, song cache and speakers (docs/implementation/apps/desktop-app.md). */
     @SerialName("computer") COMPUTER,
 }
 

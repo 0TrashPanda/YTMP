@@ -8,7 +8,7 @@ import dev.trashpanda.ytmp.protocol.ServerSettingValues
 import org.slf4j.LoggerFactory
 
 /**
- * The server settings the admin page changes (docs/features/server-admin.md). They start as in
+ * The server settings the admin page changes (docs/features/accounts/server-admin.md). They start as in
  * `ytmp.toml` ([config]); what the admin sets is saved in the database and wins. [apply] puts
  * new values to work while the server runs.
  */

@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicReference
  * still for ~250 ms and then jumps (measured: a ±125 ms sawtooth), which made sync decisions
  * chase errors that weren't there. The audio output is asked for its position every few ms
  * by the playback thread; each answer is kept here with the exact time, and extrapolated to
- * now (±1 ms, see docs/implementation/playback-sync.md).
+ * now (±1 ms, see docs/implementation/outputs/playback-sync.md).
  */
 @OptIn(UnstableApi::class)
 class AudioClock(sink: AudioSink) : ForwardingAudioSink(sink) {

@@ -9,7 +9,7 @@ import kotlinx.coroutines.launch
 /**
  * Sends finished songs to the listening history of every account holder who heard them,
  * at their own auth server. The auth server keeps it only if they turned tracking on.
- * See docs/features/history-and-recommendations.md.
+ * See docs/features/music/history-and-recommendations.md.
  */
 class PlayReporter(private val auth: HostAuth, private val scope: CoroutineScope) {
     fun report(play: FinishedPlay) {

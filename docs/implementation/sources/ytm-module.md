@@ -1,0 +1,190 @@
+# YouTube Music Source Module
+
+Feature description: [features/sources.md](../../features/music/sources.md#youtube-music-source).
+
+## Server variant
+
+- Separate **Python service**.
+- Uses **[ytmusicapi](https://github.com/sigma67/ytmusicapi)** for search and metadata.
+- Uses **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** to resolve the audio stream URL.
+- The stream URL is fetched **on demand**, when the song is about to be played.
+- Stream links are cached until shortly before they expire (`YtmCore._streams`); a link
+  YouTube refuses is dropped (`forget_stream`).
+- The audio cache is not in the module but in the host (server and phone alike): see
+  [song-cache](song-cache.md).
+
+**On a listener's computer:** the same module can run next to a browser, so the web app
+gets stream links from the listener's own IP address (see
+[playback-sync](../outputs/playback-sync.md#known-risk-ip-bound-stream-urls)). With a key set, it allows
+requests from any web page (CORS, `Access-Control-Allow-Private-Network`); the key keeps
+other pages out. Without a key it sends no CORS headers.
+
+## YouTube's bot check and PO tokens ✅
+
+After too many lookups from one network (yt-dlp's estimate: ~300 songs an hour signed out),
+or when YouTube distrusts the network for other reasons, it answers lookups with "Sign in to
+confirm you're not a bot", for the whole network, for minutes to hours. Seen on a home server
+on 2026-10-18 with only 8–16 lookups an hour, so it's not only about the rate.
+
+- **PO tokens** ("proof of origin"): a token from YouTube's BotGuard script that says a
+  request comes from a real YouTube player. yt-dlp asks as the usual player (`visionos`, no
+  token, no ads) **and** as the mobile web player (`mweb`) with a token for its player
+  request (`fetch_pot=always`, `_PO_TOKEN_ARGS`). The usual player's link is used when it
+  gives one; when the bot check turns it away, the mobile web player's link is the fallback.
+  That one comes with a pre-roll ad and only works once the ad would be over (a few seconds,
+  yt-dlp's `available_at`): `stream()` waits that long (at most 60 s) before answering.
+  The log line of each lookup names the player its link came from (`visionos` / `mweb`).
+  Without tokens (the desktop app) `visionos` goes first too (`_PLAYER_CLIENTS`: `visionos`,
+  then yt-dlp's defaults): yt-dlp's own order asks the TV player first, whose links come
+  with a ~5 s ad wait, so every song took ~7 s to look up instead of ~2 s.
+- **Server:** the [bgutil](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) plugin
+  (`.[pot]` extra) asks the `pot` container (bgutil's server, ~180 MB of memory) for tokens:
+  `YTMP_YTM_POT_URL=http://pot:4416` in [docker-compose.yml](../../../deploy/docker-compose.yml).
+  The module image follows the newest plugin every night, the container its newest image
+  (Watchtower), so the two stay on the same version.
+- **Phone:** the app runs BotGuard itself in a hidden WebView (`BotGuard.kt`,
+  `assets/botguard.html`), with YouTube's address but no network of its own; `ytmp_ytm/pot.py`
+  is the yt-dlp provider around it and does the requests: YouTube's page (BotGuard's
+  challenge and settings), BotGuard's script (kept while it's the same), then Google's
+  integrity token (`GenerateIT`). The minter that comes out makes a token per video in an
+  instant; it's used until Google's expiry (12 h) or until the phone's IP address changes
+  (tokens are bound to it). The page closes after 10 minutes without lookups, and starts over
+  (~1 s) on the next one. When BotGuard fails, lookups go without tokens for 10 minutes
+  (each try fetches YouTube's 1 MB page). Only with yt-dlp's JavaScript engine (the mobile
+  web player needs it). Costs ~16 MB in the WebView's process while the page is open; BotGuard
+  runs in ~0.3 s.
+- **When it still happens:** no lookups for 2 minutes, then 4, 8, 16 and at most 30 while it
+  lasts, back to 2 after a lookup works (`_BotCheck`): asking again right away makes the
+  network look even more like a bot. Lookups fail at once with `Blocked` (HTTP 503 `blocked`,
+  see [module API](module-api.md)) and "Try again in N min."; the room pauses on the song
+  instead of skipping (`SourceBlocked`, see [Room](../../../core/src/main/kotlin/dev/trashpanda/ytmp/core/Room.kt)).
+- Not used: the linked YouTube account's cookies for yt-dlp (yt-dlp warns the account can be
+  banned), and proxies.
+
+## Logging
+
+Python `logging` under `ytmp_ytm` (the HTTP service: console, level `YTMP_YTM_LOG_LEVEL`;
+on the phone: the app's log, see [android-app](../apps/android-app.md#logs-)). Each stream lookup
+logs its time, format, link host and expiry. yt-dlp gets a logger per lookup (`_YdlLog`):
+its warnings are logged right away (the same one at most once an hour), its steps are kept
+and only logged when the lookup fails or takes longer than 8 s. The audio proxy logs 403s
+and the fresh lookup after one, links YouTube refuses (dropped from the cache), pieces
+slower than 5 s, and streams that break off. httpx and uvicorn's access log stay quiet
+(YouTube links contain the server's IP address).
+
+## Linking a YouTube account
+
+**Phone app (done):** `YoutubeLoginActivity` shows Google's sign-in in a WebView (without
+the `; wv` user-agent marker, which Google refuses). Once it lands on music.youtube.com with
+`__Secure-3PAPISID`, the cookies go to `PhoneYoutubeAccount` (app-private SharedPreferences
+`youtube`, excluded from backup and device transfer) and to the on-device module's
+`YtmCore.sign_in()`, which keeps a second, signed-in `YTMusic` next to the anonymous one.
+Only `home(personal=True)`, `library()` and `playlist(personal=True)` use it; search, rooms
+and yt-dlp stay anonymous. The host serves it through `PersonalCatalog`: `GET /api/home`
+(own home for the phone itself), `GET/DELETE /api/me/youtube`, `GET /api/me/library`,
+`GET /api/me/playlists/{id}`, all only for loopback requests. An expired sign-in
+(`NotSignedIn`) is forgotten; being offline isn't.
+
+**Servers (done):** cookies / request headers, "browser auth" in ytmusicapi. The user
+pastes their YouTube Music browser cookies, request headers or a "Copy as cURL" once (the
+Settings → YouTube Music has a short guide), or hands over the phone app's sign-in. The server keeps
+them encrypted with the account (`YoutubeLinks.kt`, AES-GCM) and sends them to the module in
+`X-Ytm-Cookie` (see [module API](module-api.md#library-user-scoped-needs-x-ytm-cookie)).
+Works without a Google Cloud project. An expired sign-in shows as signed out. yt-dlp stays
+anonymous (it doesn't use the cookies).
+
+**Playlists in parts:** playlists (public ones, Liked music and your own) load part by part
+(YouTube Music's own parts, ~100 songs), so a long one opens as fast as a short one; the
+artist page has YouTube Music's 5 top songs (no second request); the web app loads the
+artist's songs playlist (`songsPlaylistId`) when it needs more (*Add top songs*, a pinned
+artist): 1.5 s → 0.55 s for an artist page on a Pixel 7. ytmusicapi's `limit`
+doesn't count the first part (`limit=20` still loads a second part of 100). ytmusicapi's `get_playlist`
+loads all parts itself and doesn't hand out the token for the next one, so `core.py` wraps
+its `get_continuations_2025`: with `limit=0` it stops after the first part and keeps that
+part's token (per thread) as the page's `more`. The next part is one `browse` request with
+that token, parsed with ytmusicapi's own `parse_playlist_items`. If a newer ytmusicapi
+renames that function, playlists simply load whole again (public ones up to 1000 songs).
+
+**Only what's needed (speed):** yt-dlp skips its *initial data* request (`player_skip:
+initial_data`): that's chapters, comments and the heatmap, ~0.8 s per song whose answer YTMP
+never uses. At start the module gets YouTube Music's visitor ID in the background
+(`warm_up()`), so the first search or page doesn't wait for that 650 KB page (and doesn't
+fetch it three times over for a search's three parallel lookups). A personal Home loads the
+new episodes and YouTube Music's home at the same time. yt-dlp instances are kept between
+stream lookups (`_YdlPool`: one lookup per instance at a time, dropped after a failure,
+renewed after 30 min): ~0.3 s less per song on a Pixel 7 (3.6 → 3.3 s). Measured and left out:
+skipping yt-dlp's watch page (`player_skip: webpage`) makes YouTube turn the usual player away,
+so the mobile web player with its ad answers instead: 7–8 s per song.
+
+## Android on-device variant ✅ (Chaquopy)
+
+Built: the app embeds the module with Chaquopy, see [android-app](../apps/android-app.md), and
+yt-dlp updates itself on the phone (below). Not built: using the server's YTM service from the
+phone.
+
+### Constraint
+YouTube changes often, and **yt-dlp releases fixes very frequently**. If extraction
+only gets updated through app updates (Play Store review, users who don't update),
+the on-device module will regularly be broken.
+
+### Plan: embed Python with Chaquopy, and update yt-dlp at runtime
+
+- Embed a Python runtime in the app with **[Chaquopy](https://chaquo.com/chaquopy/)**.
+- Run the **same Python module code** as the server service, so there is one
+  implementation of the YTM logic.
+- `yt-dlp` and `ytmusicapi` are **pure Python**. The app ships a known-good version and
+  **downloads newer yt-dlp releases at runtime** ✅ (see above) (from PyPI/GitHub), then load them
+  instead of the bundled one, with a fallback to the bundled version if the new one fails.
+  This decouples yt-dlp fixes from app releases.
+
+### yt-dlp updating itself ✅
+
+`ytmp_ytm/update.py`, for the copies that only get the yt-dlp they were built with (the phone,
+the planned desktop app). Off on the server: its image is rebuilt nightly with the newest
+yt-dlp. On when the module gets a folder of its own: `update.activate(folder)` (the phone, from
+`OnDeviceYtm`) or `YTMP_YTM_UPDATE_DIR` (read in `ytmp_ytm/__init__.py`, so before anything
+imports yt-dlp; `ytmp-ytm` then also starts the checks).
+
+- **Checking** (`update.start()`): a minute after the start and then once a day, it asks
+  PyPI (`/pypi/yt-dlp/json`) for the newest release. Only a full release (no `.dev`) that's
+  newer than the yt-dlp in use and hasn't failed before is downloaded: its pure Python wheel,
+  checked against PyPI's sha256 (and no file outside its folder), unpacked into
+  `<folder>/yt-dlp/<version>/`. yt-dlp pins its `yt-dlp-ejs` (the challenge scripts, major and
+  minor version must match); when that's another version than the bundled one, its wheel goes
+  into the same folder. `<folder>/yt-dlp.json` keeps what's ready, what failed, what worked and
+  when PyPI was last asked. A failed check (no network) tries again in an hour.
+- **Loading** (`update.activate`): at the next start the ready version goes first on
+  `sys.path`, before the bundled one. A running yt-dlp isn't swapped: the module's PO token
+  and JavaScript providers are registered with it, and lookups in flight use it.
+- **Falling back:** to the bundled yt-dlp, and that version is never downloaded or tried again,
+  when it doesn't import (yt-dlp itself, its YouTube extractor and the module's code that uses
+  yt-dlp's internals: `core`, `jsc`) — then right away, in the same start — or when its first
+  3 stream lookups all fail (not counting YouTube's bot check) — then from the next start. One
+  that worked once is trusted from then on: a later failure is YouTube's doing. A bundled
+  yt-dlp that's newer than the download (an app update) wins, and the download is removed.
+- The log says which one is in use: `yt-dlp 2026.11.5 (downloaded; bundled 2026.10.26),
+  ytmusicapi …`, and why one was dropped. Tests: `tests/test_update.py`, against a fake PyPI on
+  localhost (no real downloads or lookups).
+
+Costs and risks:
+
+- Larger APK (Python runtime), and slower cold start of the Python part.
+- **JavaScript runtime:** recent yt-dlp versions need a JS runtime (Deno, Node, Bun or
+  QuickJS) for full YouTube support. The server's image has Deno, which yt-dlp starts once
+  per lookup (~250 MB) and waits for without a time limit; `ytmp_ytm/deno.py` lets at most 2
+  run at once, caps their heap and stops one after 30 s (the lookup then takes a client that
+  needs no challenge). Docker Compose also gives the module a memory limit. On Android the app gives
+  yt-dlp the WebView's JavaScript engine instead, through `ytmp_ytm/jsc.py` (see
+  [Android app](../apps/android-app.md)).
+- Loading downloaded code at runtime would conflict with Play Store policy. This is not an
+  issue, because YTMP is distributed through **GitHub Releases**.
+
+### Alternatives considered
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **NewPipe Extractor** (Java) | Native to Kotlin, small, proven on Android | A second implementation next to the server's; fixes only arrive through app updates; YT Music support is limited |
+| **Use the server's YTM service from the phone** | No extraction on the phone | Needs a server, so it breaks "works without a server". Good as an *optional* mode. |
+
+Suggested behaviour: if a YTMP server is configured and reachable, the phone **may**
+use its YTM service. Otherwise it uses the on-device module.

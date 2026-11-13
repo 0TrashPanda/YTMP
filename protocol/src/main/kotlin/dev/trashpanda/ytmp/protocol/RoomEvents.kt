@@ -2,7 +2,7 @@ package dev.trashpanda.ytmp.protocol
 
 /**
  * The room after [event]: how a client keeps its copy of the room up to date between snapshots
- * (docs/implementation/protocol.md). The app's player (RoomFollower) and the tests use this; the
+ * (docs/implementation/protocol/protocol.md). The app's player (RoomFollower) and the tests use this; the
  * web app has the same in `frontend/src/lib/room.svelte.ts`. Every event is handled here, so a
  * new one doesn't compile until it is (the web app's check is the same).
  */

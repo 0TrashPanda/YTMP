@@ -7,7 +7,7 @@ import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.Job
 
 /**
- * The autoplay queue (docs/features/queue.md#autoplay-queue): what plays when the queue runs
+ * The autoplay queue (docs/features/rooms/queue.md#autoplay-queue): what plays when the queue runs
  * out, refilled with a radio from its last song so it never runs dry. The room fills it; this
  * keeps its state. Only used with the room locked.
  */

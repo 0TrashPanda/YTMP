@@ -1,7 +1,7 @@
 package dev.trashpanda.ytmp.share
 
 /**
- * The phone as an NFC tag with one link (docs/implementation/tap-to-share.md): another phone
+ * The phone as an NFC tag with one link (docs/implementation/apps/tap-to-share.md): another phone
  * held against it reads an NFC Forum Type 4 tag, like a sticker with a link. This answers the
  * reader's commands (ISO 7816-4 APDUs): select the NDEF application, select and read its
  * capability container, select and read the NDEF file with the link. Writing is refused.

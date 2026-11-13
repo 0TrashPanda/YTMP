@@ -305,13 +305,13 @@ enum class LocalLibraryKind {
 
     /**
      * Songs the hosting phone has cached or downloaded ("Cached on this phone"): YouTube Music
-     * songs that keep their own IDs, so they play without internet (docs/implementation/song-cache.md).
+     * songs that keep their own IDs, so they play without internet (docs/implementation/sources/song-cache.md).
      */
     @SerialName("cache") CACHE,
 
     /**
      * The music on this computer (the desktop app): the web app gets it from the app's own
-     * module, never from a host (docs/implementation/desktop-app.md#music-and-songs-on-this-computer).
+     * module, never from a host (docs/implementation/apps/desktop-app.md#music-and-songs-on-this-computer-).
      */
     @SerialName("computer") COMPUTER,
 }
@@ -355,7 +355,7 @@ data class LocalPlaylist(val id: String, val title: String, val author: String? 
 data class LocalGroup(val name: String, val songs: List<Int>)
 
 // The song cache (`GET /api/cache`, `PUT /api/cache`, `POST /api/cache/clear`): songs kept
-// so they start at once and, on a phone, play without internet (docs/features/sources.md#song-cache).
+// so they start at once and, on a phone, play without internet (docs/features/music/sources.md#song-cache).
 
 @Serializable
 @SerialName("SongCacheStatus")

@@ -10,7 +10,7 @@
 <script lang="ts">
 	// Where the sound playing on this device comes from, small next to the song: YouTube itself,
 	// the host streaming it (its saved songs and music files, or YouTube's link through it), or
-	// this phone (saved on it, or its own music when it hosts). See docs/features/ui.md.
+	// this phone (saved on it, or its own music when it hosts). See docs/features/ui/README.md.
 	import type { AudioSource } from '../player.svelte';
 	import Icon from './Icon.svelte';
 

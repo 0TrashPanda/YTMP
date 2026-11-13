@@ -48,7 +48,7 @@ export type Block = { key: string; title: string; layout: Layout } & (
 /** The Pinned section's key; a pin's section is `ytmp:pin:…`. YTM's names don't look like this. */
 export const PINNED = 'ytmp:pinned';
 export const pinKey = (pin: Pin) => `ytmp:pin:${pin.kind}:${pin.id}`;
-/** The songs friends shared with you (docs/features/friends.md). */
+/** The songs friends shared with you (docs/features/accounts/friends.md). */
 export const FRIENDS = 'ytmp:friends';
 export const FRIENDS_TITLE = 'From your friends';
 

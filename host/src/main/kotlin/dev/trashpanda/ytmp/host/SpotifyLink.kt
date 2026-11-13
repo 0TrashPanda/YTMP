@@ -15,7 +15,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 
 /**
- * A public Spotify playlist or album by its link (docs/implementation/playlist-converter.md#a-spotify-link):
+ * A public Spotify playlist or album by its link (docs/implementation/sources/playlist-converter.md#a-spotify-link):
  * read from Spotify's embed page (`open.spotify.com/embed/…`), which anyone can open without an
  * account and which has the list as JSON. It shows at most [EMBED_MAX] songs.
  */

@@ -19,7 +19,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Party screens: a TV someone in the room linked (docs/features/ui.md#party-screen). */
+/** Party screens: a TV someone in the room linked (docs/features/ui/party-screen.md). */
 class ScreenTest {
     private val song = Song("ytm:1", "Song", listOf(ArtistRef(null, "Artist")), null, 60_000, emptyList())
 

@@ -1,4 +1,4 @@
-// Links pasted in the search box (docs/features/ui.md#search): YouTube Music and YouTube
+// Links pasted in the search box (docs/features/ui/search.md): YouTube Music and YouTube
 // links open their song, album, playlist, artist or podcast; a YTMP room link opens the room.
 
 export type Link =

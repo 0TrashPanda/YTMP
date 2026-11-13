@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Settings → Friends (docs/features/friends.md), also from Home's "From your friends" and the
+	// Settings → Friends (docs/features/accounts/friends.md), also from Home's "From your friends" and the
 	// share sheet: add a friend by their username, say yes to requests, and make groups to share
 	// songs with (like a hardcore group). Friends are people with an account on your server. A
 	// friend or group opens their page (FriendPage): what they shared with you, and Show on Home.

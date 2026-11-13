@@ -75,7 +75,7 @@ class Room(
     /** Similar songs, for Start radio and the autoplay queue. Null: no radio. */
     private val radio: OptionsRadio? = null,
     /**
-     * The same room on all the owner's hosts (docs/features/room-sync.md): only rooms with an
+     * The same room on all the owner's hosts (docs/features/rooms/room-sync.md): only rooms with an
      * owner account have one.
      */
     syncId: String? = ownerAccount?.let { Ids.token() },

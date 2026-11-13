@@ -8,7 +8,7 @@ import java.security.SecureRandom
 import java.util.Base64
 
 /**
- * Linking a TV as a party screen, like YouTube's "Link with TV code" (docs/features/ui.md#party-screen):
+ * Linking a TV as a party screen, like YouTube's "Link with TV code" (docs/features/ui/party-screen.md):
  * the TV gets a short code and waits; someone in a room enters the code on their phone, and
  * the TV is let into that room. Codes live [LIFETIME_MS], only in memory.
  */

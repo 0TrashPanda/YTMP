@@ -118,7 +118,7 @@ fun main(args: Array<String>) {
         val live = settings.values
         if (live.logLevel != config.logs.level.lowercase()) setLogLevel(live.logLevel)
         log.info("Streaming audio through the server: {}", live.proxyMode().name.lowercase())
-        // The song graph learns from YouTube Music's radios too (docs/features/history-and-recommendations.md#song-graph).
+        // The song graph learns from YouTube Music's radios too (docs/features/music/history-and-recommendations.md#song-graph).
         val graph = SongGraph(db)
         graph.buildIfNeeded(accounts)
         val cached = CachedSource(ytm, RadioSource { seed -> ytm.radio(seed).also { graph.learnRadio(seed, it) } }, ytm, ytm)
@@ -174,7 +174,7 @@ fun main(args: Array<String>) {
             val id = token?.let(auth::verify)?.id ?: token?.let { service.verifyYoutubeToken(it, call.request.httpMethod, call.request.path()) }
             return id?.let(::localAccount)
         }
-        // Importing playlists into accounts' YouTube Music, kept next to the database (docs/features/importing-playlists.md).
+        // Importing playlists into accounts' YouTube Music, kept next to the database (docs/features/music/importing-playlists.md).
         val importsDir = if (config.database.type == "sqlite") File(File(config.database.path).absoluteFile.parentFile, "imports") else File("imports")
         val converter = PlaylistConverter(importsDir, cached, personalOf = youtube::of, scope = this).also { it.start() }
         // Songs from the music on listeners' computers (the desktop app), sent here only when another player needs one.

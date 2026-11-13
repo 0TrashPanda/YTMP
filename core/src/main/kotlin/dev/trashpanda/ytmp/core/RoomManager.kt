@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-/** How room codes look. See docs/features/joining.md. */
+/** How room codes look. See docs/features/rooms/joining.md. */
 /** Another room has the code someone chose. */
 class RoomCodeTaken(val code: String) : Exception("The code $code is taken")
 

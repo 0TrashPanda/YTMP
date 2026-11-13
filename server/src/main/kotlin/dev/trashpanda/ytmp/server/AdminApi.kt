@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.hours
 
 /**
- * The server admin's page (Settings → Server admin, docs/features/server-admin.md): accounts,
+ * The server admin's page (Settings → Server admin, docs/features/accounts/server-admin.md): accounts,
  * invite links, server settings, rooms and versions. Only for accounts that are server admin.
  * The song cache has its own routes (`/admin/cache`, see Main.kt).
  */

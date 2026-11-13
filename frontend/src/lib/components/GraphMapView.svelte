@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { motionMs } from '../motion.svelte';
 	import { modal } from '../modal';
-	// The whole song graph (docs/features/history-and-recommendations.md#the-whole-graph): every
+	// The whole song graph (docs/features/music/history-and-recommendations.md#the-whole-graph): every
 	// song, laid out by the server so songs that go together are close, in groups much like
 	// genres. Your listening, everyone else's and YouTube Music's radios, any of them together,
 	// for the songs shown and for the links that place and group them, apart (your songs, placed

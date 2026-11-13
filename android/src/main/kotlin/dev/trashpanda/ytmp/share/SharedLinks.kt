@@ -4,7 +4,7 @@ import java.net.URI
 
 /**
  * What another phone (or another app's Share) handed over: a song, as its YouTube Music link,
- * or a YTMP room link (docs/features/sharing.md). Pure, so it can be tested without Android.
+ * or a YTMP room link (docs/features/rooms/sharing.md). Pure, so it can be tested without Android.
  */
 sealed interface Shared {
     /** A YouTube Music or YouTube song; [songId] as YTMP names it (`ytm:<videoId>`). */

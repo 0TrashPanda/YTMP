@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory
 
 /**
  * What the server's admins did (accounts, invites, settings, rooms, backups), for the admin
- * page's *Log* (docs/features/server-admin.md). Kept in the database; the newest [KEPT] stay.
+ * page's *Log* (docs/features/accounts/server-admin.md). Kept in the database; the newest [KEPT] stay.
  */
 class AuditLog(private val db: Database, private val clock: () -> Long = System::currentTimeMillis) {
     /** [actor] did [action] to [target], with a few words of [detail]. Never fails the action itself. */

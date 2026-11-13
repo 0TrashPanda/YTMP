@@ -4,7 +4,7 @@ import dev.trashpanda.ytmp.protocol.QueueItem
 import dev.trashpanda.ytmp.protocol.QueueItemOrigin
 
 /**
- * Fair order (docs/features/queue.md#fair-ordering): the queue in rounds, one song per person
+ * Fair order (docs/features/rooms/queue.md#fair--round-robin-): the queue in rounds, one song per person
  * per round. [current] is the song playing now: its person has had their turn this round.
  */
 internal object FairOrder {

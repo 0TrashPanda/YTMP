@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 
 /**
- * Playlists on the phone (docs/implementation/song-cache.md#playlists-offline): the playlists
+ * Playlists on the phone (docs/implementation/sources/song-cache.md#playlists-offline): the playlists
  * the owner keeps offline ([keep]) and, as set, their [mostPlayed] most played ones are kept in
  * the [cache] and kept up to date; and every playlist whose songs are all on the phone (cached or
  * downloaded, however they got there) is listed in "Cached on this phone" ([complete]).

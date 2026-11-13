@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The YTMP server this phone uses for accounts (see docs/features/accounts.md). Without one,
+ * The YTMP server this phone uses for accounts (see docs/features/accounts/accounts.md). Without one,
  * only guests join the phone's rooms. Remembered with the server's public key, so tokens
  * can be checked without reaching the server.
  */

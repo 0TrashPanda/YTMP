@@ -39,7 +39,7 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 
 /**
- * Where each account's rooms live (docs/features/room-sync.md). A room lives on one host at a
+ * Where each account's rooms live (docs/features/rooms/room-sync.md). A room lives on one host at a
  * time: this server, or one of the account's phones. Rooms here are in [rooms]; for rooms on
  * a phone, the phone sends its latest state, kept here as a copy. A room moves when it's
  * opened on another host ([take]): it gets a higher epoch there, and its old home closes it
@@ -185,7 +185,7 @@ class RoomHub(
             val me = call.owner()
             call.respond(heartbeat(me.account(), call.receive<RoomHeartbeatRequest>()))
         }
-        // A phone clones a room onto this server, for its owner here (docs/features/room-lifecycle.md#cloning-a-room).
+        // A phone clones a room onto this server, for its owner here (docs/features/rooms/room-lifecycle.md#cloning-a-room).
         post("/auth/rooms/clone") {
             val me = call.owner()
             val room = rooms.createFor(

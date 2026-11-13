@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { modal } from '../modal';
 	// "Show on a TV": the TV opens <host>/tv and shows a code; entering it here makes the TV
-	// this room's party screen (docs/features/ui.md#party-screen).
+	// this room's party screen (docs/features/ui/party-screen.md).
 	import { linkScreen } from '../api';
 	import type { HostInfo } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';

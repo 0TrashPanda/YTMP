@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { scrollBehavior } from '../motion.svelte';
-	// Importing playlists (Library → Import, docs/features/importing-playlists.md): your imports,
+	// Importing playlists (Library → Import, docs/features/music/importing-playlists.md): your imports,
 	// a new one from a Spotify data export (what's in it, where each list goes, the settings),
 	// and one import's page, with the songs to check. YTMP looks the songs up on the host with
 	// your YouTube Music sign-in, in the background; these pages ask how far it got.

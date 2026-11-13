@@ -1,4 +1,4 @@
-// The song graph view (docs/features/history-and-recommendations.md#the-graph-view): the server
+// The song graph view (docs/features/music/history-and-recommendations.md#the-graph-view): the server
 // sends raw counts, this weighs them with the sliders (the same as SongGraph.weight on the
 // server, keep them in step) and lays the songs out.
 import type { EdgeKind, GraphEdge, GraphNode, GraphTuning } from './protocol.gen';

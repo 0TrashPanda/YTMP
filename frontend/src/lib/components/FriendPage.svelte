@@ -1,5 +1,5 @@
 <script lang="ts">
-	// A friend's or a group's page (docs/features/friends.md), opened from Settings → Friends: a
+	// A friend's or a group's page (docs/features/accounts/friends.md), opened from Settings → Friends: a
 	// switch for whether what they share shows on your Home, and everything they ever shared with
 	// you, newest first (also what you took off Home). In a room the songs play like other lists,
 	// with Play for all of them; in Settings outside a room they only show.

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Settings → Radio (docs/features/history-and-recommendations.md#radio--mix): how every radio
+	// Settings → Radio (docs/features/music/history-and-recommendations.md#radio--mix): how every radio
 	// is made unless you hold Start radio to choose for one; what radios leave out; and on the
 	// phone, learning YouTube Music's radios of your music for the song graph.
 	import { onMount } from 'svelte';

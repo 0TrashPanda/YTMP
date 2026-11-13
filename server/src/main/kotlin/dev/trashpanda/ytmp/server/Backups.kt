@@ -5,7 +5,7 @@ import java.io.File
 import java.io.InputStream
 
 /**
- * The admin page's backup and restore (docs/features/server-admin.md#backup): a copy of the
+ * The admin page's backup and restore (docs/features/accounts/server-admin.md#backup-and-restore-): a copy of the
  * whole database to download, and an uploaded one that replaces it at the next start. SQLite only.
  */
 class Backups(private val db: Database) {

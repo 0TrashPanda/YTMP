@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { scrollBehavior } from '../motion.svelte';
-	// A song's lyrics (docs/features/ui.md#lyrics). Timed ones follow the song, with the line
+	// A song's lyrics (docs/features/ui/player.md#lyrics). Timed ones follow the song, with the line
 	// being sung highlighted (tap a line to go there); plain ones are text. [large]: karaoke mode,
 	// on the party screen and in the full player: big lines that glide up as the song goes, the
 	// line being sung bright in the middle; plain lyrics scroll along with the song.

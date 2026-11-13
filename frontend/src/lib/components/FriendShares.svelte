@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Home's "From your friends" (docs/features/friends.md): the songs friends shared with you,
+	// Home's "From your friends" (docs/features/accounts/friends.md): the songs friends shared with you,
 	// newest first, each with who shared it (and in which group) and their note. Tap and ⋮ like
 	// Home's other songs; × takes it off your Home (with Undo). A friend's or group's page lists
 	// everything they shared with it too ([removable] off; without a room, only to look at).

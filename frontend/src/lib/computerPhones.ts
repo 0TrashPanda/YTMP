@@ -1,4 +1,4 @@
-// Songs from your phone (the desktop app, docs/implementation/desktop-app.md#songs-from-your-phone):
+// Songs from your phone (the desktop app, docs/implementation/apps/desktop-app.md#songs-from-your-phone-):
 // copying your phone's songs into this computer's song cache over Wi-Fi. Only your phones:
 // - Through your server: *Copy from my phone* asks it, and your phone (YTMP open on it, waiting
 //   on the server) answers at once with where it is; then this computer copies straight from it.

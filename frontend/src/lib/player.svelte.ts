@@ -127,7 +127,7 @@ export function createPlayer(room: RoomConnection, options: { loose?: boolean } 
  * Uses the direct stream URL first. When that doesn't work here (YouTube's links are tied to
  * the host's internet connection), it uses links from your own module if you have one set up,
  * and otherwise streams through the host, for the rest of the room
- * (see docs/implementation/playback-sync.md).
+ * (see docs/implementation/outputs/playback-sync.md).
  */
 class WebPlayer implements RoomPlayer {
 	get canStartWithoutGesture(): boolean {

@@ -17,7 +17,7 @@ import kotlin.math.abs
 data class ConvertMatch(val state: ConvertItemState, val song: Song?, val candidates: List<Song>, val score: Double?)
 
 /**
- * Finds an imported item on YouTube Music (docs/implementation/playlist-converter.md#matching):
+ * Finds an imported item on YouTube Music (docs/implementation/sources/playlist-converter.md#matching):
  * a search for "artist title" (episodes: "show title", shows: their name), each result scored on
  * title, artist, album, length and version ([score]). The match memory and writing are
  * [PlaylistConverter]'s.

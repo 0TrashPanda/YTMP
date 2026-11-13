@@ -236,7 +236,7 @@
 		return [...mine, ...here.filter((r): r is RoomInfo => r !== null)];
 	}
 
-	// Your rooms on your other device (docs/features/room-sync.md): on the phone, the ones on
+	// Your rooms on your other device (docs/features/rooms/room-sync.md): on the phone, the ones on
 	// your server; on the server, the ones on your phone. Opening one either opens it where it
 	// lives or moves it here, as your account (or the room) says.
 	let elsewhere = $state<SyncedRoom[]>([]);

@@ -12,7 +12,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 
 /**
- * This phone's side of *Songs from your phone* (docs/implementation/desktop-app.md#songs-from-your-phone):
+ * This phone's side of *Songs from your phone* (docs/implementation/apps/desktop-app.md#songs-from-your-phone-):
  * the owner's computer asks through their server ([check]: the open app waits on the server for
  * that); asked, the phone tells the server where it is on
  * its network and shows itself there for a while. [sendNow] does that by hand, also without

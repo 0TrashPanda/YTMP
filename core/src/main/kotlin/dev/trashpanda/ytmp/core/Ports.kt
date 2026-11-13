@@ -179,7 +179,7 @@ interface PersonalCatalog {
 suspend fun PersonalCatalog.personalized(): PersonalCatalog? = takeIf { personalize() && account() != null }
 
 /**
- * Where people are in podcast episodes, kept on their accounts (docs/features/ui.md#podcasts):
+ * Where people are in podcast episodes, kept on their accounts (docs/features/ui/README.md#podcasts-):
  * a room asks it to resume an episode someone added, and tells it when an episode is paused,
  * skipped or ends for everyone listening.
  */

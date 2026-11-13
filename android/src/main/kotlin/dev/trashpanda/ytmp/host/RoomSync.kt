@@ -44,7 +44,7 @@ import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * This phone's part in syncing rooms with the account's server (docs/features/room-sync.md):
+ * This phone's part in syncing rooms with the account's server (docs/features/rooms/room-sync.md):
  * rooms that an account of the linked server owns are sent there whenever they're saved, the
  * phone checks in every few seconds, and a room that moved to another host is closed here
  * (changes made here meanwhile are dropped). The page lists your rooms on other hosts and can

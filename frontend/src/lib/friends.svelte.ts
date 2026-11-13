@@ -1,4 +1,4 @@
-// Friends, groups of friends and the songs they share with you (docs/features/friends.md). Kept
+// Friends, groups of friends and the songs they share with you (docs/features/accounts/friends.md). Kept
 // on your account's server, reached like your listening history (listening.svelte.ts), so it
 // works in rooms everywhere you're logged in with your YTMP account.
 import { listening } from './listening.svelte';

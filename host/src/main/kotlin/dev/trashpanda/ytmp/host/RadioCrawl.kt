@@ -46,7 +46,7 @@ data class RadioCrawlSettings(
  * Music ID and saved songs): one radio without an account every [RadioCrawlSettings.paceSeconds],
  * each song again after [RadioCrawlSettings.refreshDays], for the song graph ([learned]). Stops
  * for hours when YouTube Music doesn't answer: many lookups get a home network blocked.
- * See docs/features/history-and-recommendations.md#learning-from-youtube-music.
+ * See docs/features/music/history-and-recommendations.md#learning-from-youtube-music.
  */
 class RadioCrawl(
     private val scope: CoroutineScope,

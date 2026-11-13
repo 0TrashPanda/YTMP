@@ -37,7 +37,7 @@ private data class TakeoutFile(val songs: List<TakeoutSong>)
 
 /**
  * The owner's YouTube Music plays from a Google Takeout export
- * (docs/implementation/song-cache.md#from-a-google-takeout-history), kept in [file]: every play,
+ * (docs/implementation/sources/song-cache.md#from-a-google-takeout-history), kept in [file]: every play,
  * years back, so the song cache can keep what was played most ([pick]).
  */
 class TakeoutHistory(private val file: File) {

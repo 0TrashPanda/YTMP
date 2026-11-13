@@ -46,7 +46,7 @@ import java.io.InputStream
 class ConvertException(message: String, val notFound: Boolean = false) : Exception(message)
 
 /**
- * Imports playlists (docs/implementation/playlist-converter.md): what a reader read becomes a
+ * Imports playlists (docs/implementation/sources/playlist-converter.md): what a reader read becomes a
  * stored job, whose songs are looked up one at a time in the background ([ConvertMatcher], with
  * the match memory first) and written to YouTube Music as each list is looked up whole. Kept in
  * [dir] as JSON (a job per file, and `matches.json`), so it goes on after a restart.

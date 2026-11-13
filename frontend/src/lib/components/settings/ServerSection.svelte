@@ -4,7 +4,7 @@
 
 <script lang="ts">
 	// Settings → Server admin (the server's admins only): accounts and invite links, the server's
-	// settings, its rooms, and versions (docs/features/server-admin.md).
+	// settings, its rooms, and versions (docs/features/accounts/server-admin.md).
 	import type { AccountInfo, AuthServerInfo } from '../../protocol.gen';
 	import AdminAbout from './AdminAbout.svelte';
 	import AdminAccounts from './AdminAccounts.svelte';

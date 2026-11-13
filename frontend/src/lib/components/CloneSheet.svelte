@@ -2,7 +2,7 @@
 	import { modal } from '../modal';
 	// "Clone room": a new room with a copy of this one (queue, history, autoplay, roles, where
 	// the song is), here, on this phone or on your server. Optionally everyone is invited or
-	// moved to it, and keeps their role (docs/features/room-lifecycle.md#cloning-a-room).
+	// moved to it, and keeps their role (docs/features/rooms/room-lifecycle.md#cloning-a-room).
 	import { positionNow } from '../sync';
 	import { cloneToServer, createRoom } from '../api';
 	import { identity } from '../account';

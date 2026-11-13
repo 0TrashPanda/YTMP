@@ -3,7 +3,7 @@ package dev.trashpanda.ytmp.protocol
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Radio choices and the song graph, see docs/features/history-and-recommendations.md#radio--mix
+// Radio choices and the song graph, see docs/features/music/history-and-recommendations.md#radio--mix
 // and #song-graph.
 
 /** Where a radio's songs come from. */

@@ -72,7 +72,7 @@ import java.security.MessageDigest
 import java.time.Duration
 
 /**
- * The desktop app's own host (docs/implementation/desktop-app.md#this-computers-host): the
+ * The desktop app's own host (docs/implementation/apps/desktop-app.md#this-computers-host-): the
  * shared host code for this computer, like the phone's host, without rooms (they're on your
  * server) and without accounts. Only on 127.0.0.1, and only with the key the app made for this
  * start: the app passes the window's requests (`ytmphost://`) on to it with that key.

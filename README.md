@@ -20,22 +20,22 @@ Music, without Premium, and not tied to a single music service.
 
 - **Rooms**: party and solo rooms, a shared queue with Undo, fair order, shuffle, repeat,
   vote to skip and limits; a party screen for the TV; roles and permissions; handing over,
-  cloning and moving rooms. → [queue](docs/features/queue.md),
-  [rooms](docs/features/rooms-and-roles.md), [sharing](docs/features/sharing.md)
+  cloning and moving rooms. → [queue](docs/features/rooms/queue.md),
+  [rooms](docs/features/rooms/rooms-and-roles.md), [sharing](docs/features/rooms/sharing.md)
 - **Finding music**: YouTube Music's Home, search and pages, links pasted in search, song
   recognition, synced lyrics with karaoke, radio and autoplay, podcasts that resume, a song
   graph from your listening, Spotify playlist import.
-  → [UI](docs/features/ui.md), [history and recommendations](docs/features/history-and-recommendations.md),
-  [importing playlists](docs/features/importing-playlists.md)
+  → [UI](docs/features/ui/README.md), [history and recommendations](docs/features/music/history-and-recommendations.md),
+  [importing playlists](docs/features/music/importing-playlists.md)
 - **Playing**: in sync on every device, on Chromecast, Sonos, MPD, YouTube TVs and
   amplifier zones; equalizer, sleep timer, downloads, a song cache and offline playlists on
   the phone, a *Local* tab with your own music.
-  → [playback and outputs](docs/features/playback-and-outputs.md), [sources](docs/features/sources.md)
+  → [playback and outputs](docs/features/playback-and-outputs.md), [sources](docs/features/music/sources.md)
 - **People and accounts**: optional YTMP accounts with listening history, your YouTube Music
   sign-in (on the phone or the server), friends and shared songs, your rooms on all your
   devices, settings that follow you, an admin page for the server.
-  → [accounts](docs/features/accounts.md), [friends](docs/features/friends.md),
-  [server admin](docs/features/server-admin.md)
+  → [accounts](docs/features/accounts/accounts.md), [friends](docs/features/accounts/friends.md),
+  [server admin](docs/features/accounts/server-admin.md)
 - **Apps**: Android (lock screen, widget, hosting on the phone, updates itself) and a desktop
   app for Windows and Linux (its own YouTube lookups, media keys, local music, speakers
   nearby). → [platforms](docs/features/platforms.md)
@@ -43,7 +43,7 @@ Music, without Premium, and not tied to a single music service.
 ## What's next
 
 - The desktop app: your YouTube Music sign-in in the app, and the bot-check token
-  ([status](docs/implementation/desktop-app.md#order-of-work))
+  ([status](docs/implementation/apps/desktop-app.md#order-of-work))
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
 - Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists

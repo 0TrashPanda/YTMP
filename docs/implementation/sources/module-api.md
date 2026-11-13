@@ -1,0 +1,297 @@
+# Module HTTP API
+
+> Status: **implemented in part.** Endpoints marked ✅ exist in the YTM module
+> (`ytm-module/ytmp_ytm/http.py`); the rest is the plan for later.
+
+## What is this?
+
+This is the **contract that every source module follows**: the list of things the host can
+ask a source ("search for X", "give me a playable stream for song Y", "give me a radio
+from song Y", …). It is **not** the YTM module itself. The YTM module is the **first
+module that implements it**. A future SoundCloud module, for example, would implement
+the same contract.
+
+The same operations reach a module in three ways (see [modules](modules.md)):
+
+| Module runs… | How the host calls it | Example |
+|--------------|-----------------------|---------|
+| as a **separate program** | **HTTP**, as described on this page | YTM service on the server |
+| **inside the app**, in Kotlin | normal Kotlin function calls (a `SourceModule` interface with the same operations) | local files, Plex |
+| **inside the app**, in Python | Chaquopy function calls | YTM on Android |
+
+This page describes the HTTP form, because that's the one that needs an exact
+definition: the host and the module are separate programs, possibly in different
+languages.
+
+### Example: from search to playback
+
+1. Someone types *daft punk* in the search bar. The frontend asks the host.
+2. The host asks every enabled source: `GET /search?q=daft punk` on the YTM module, and
+   the same operation on the local files and Plex modules. It merges the results.
+3. Someone taps *One More Time* (`ytm:FGBhQbmPwH8`). It goes into the queue.
+4. When the song is about to play, the host asks `GET /songs/ytm:FGBhQbmPwH8/stream`
+   and gets a playable URL, which it sends to the listening clients.
+5. A client that can't use that URL gets the audio through the host instead, which uses
+   `GET /songs/ytm:FGBhQbmPwH8/audio`.
+
+### Not every module supports everything
+
+`GET /info` returns a list of **capabilities**. A module only implements what it can.
+For example, a module for internet radio stations has no `lyrics`, and only a module with
+user accounts has `library`. The host hides features a module doesn't support.
+
+### What modules do *not* do
+
+- **Matching** songs across sources ("which YTM song is this local file?") is done by the
+  **host**, using the module's `search`. See [storage](../storage.md#song-matching).
+- **Downloads** (a finished, tagged file) are made by the **host**, using the module's
+  `audio`. See [downloads](downloads.md).
+
+That way this logic is written once, and works the same for every source.
+
+### What is YTM-specific?
+
+The contract is generic. A few parts only make sense for YTM/YT, and other modules
+leave them out:
+
+- `X-Ytm-Cookie` (the linked YouTube account), and the `/me/...` library endpoints
+- `/admin/update` (updating yt-dlp)
+- `loudnessDb` from YouTube, used for loudness normalisation
+
+## Code layout of the Python YTM module
+
+```
+ytmp_ytm/            # Python package: all YTM/YT logic (ytmusicapi + yt-dlp)
+  core.py            # plain functions: search(), song(), stream(), radio(), …
+  http.py            # thin HTTP layer (e.g. FastAPI) that exposes core.py as this API
+```
+
+- **Server**: runs `http.py` as a service. The host's *remote adapter* calls it over HTTP.
+- **Android**: Chaquopy calls `core.py` **directly**, with no HTTP. The *embedded Python
+  adapter* maps the same operations onto function calls.
+
+So the operations below are the contract for both. HTTP is only the transport on the server.
+
+## General
+
+- JSON over HTTP. The base URL and a **shared key** are set in the host's config.
+  Every request sends `Authorization: Bearer <key>`.
+- With a key, the YTM module also answers web pages (CORS: any `Origin`, `GET`, the
+  `Authorization` header, and `Access-Control-Allow-Private-Network` for Chrome), so a
+  listener's browser can use a module on their own computer
+  ([playback-sync](../outputs/playback-sync.md#known-risk-ip-bound-stream-urls)).
+- IDs are **namespaced**: `ytm:dQw4w9WgXcQ`, `yt:…`. The prefix is the module ID.
+- Lists are **paginated** with an opaque `cursor`: the response has `next` (or `null`).
+- **User-scoped** calls (a linked YouTube account) get the user's credentials per request
+  in the `X-Ytm-Cookie` header (see Library below). The module stores no user data.
+- Errors:
+
+  ```json
+  { "error": { "code": "unavailable", "message": "Video unavailable in this country" } }
+  ```
+
+  Codes used now: `unauthorized` (wrong module key), `not_found`, `unavailable`,
+  `not_signed_in`, `invalid`, `upstream_error`, `blocked` (HTTP 503: YouTube's bot check, no
+  lookups for a few minutes, see [ytm-module](ytm-module.md#youtubes-bot-check-and-po-tokens-)).
+  Planned: `unsupported`.
+
+## Data types
+
+```jsonc
+// Song
+{
+  "id": "ytm:dQw4w9WgXcQ",
+  "title": "Never Gonna Give You Up",
+  "artists": [{ "id": "ytm:UCuAXFkgsw1L7xaCfnd5JJOw", "name": "Rick Astley" }],
+  "album": { "id": "ytm:MPREb_…", "name": "Whenever You Need Somebody" },
+  "durationMs": 213000,
+  "thumbnails": [{ "url": "https://…", "width": 544, "height": 544 }],
+  "explicit": false,
+  "isrc": null                 // when known, helps matching songs across sources
+}
+// Album, Artist, Playlist: id, name/title, thumbnails, and their songs/albums (paginated)
+
+// SearchPage: sections; one for a single type, several for "all"
+{
+  "sections": [
+    { "title": "Top result", "type": null, "items": [ SearchItem ] },
+    { "title": "Songs", "type": "songs", "items": [ SearchItem, … ] }   // type: the chip for "More"
+  ]
+}
+// SearchItem, by "kind":
+{ "kind": "song", "song": Song, "video": false }        // videos play like songs
+{ "kind": "album", "album": AlbumSummary, "artists": [ArtistRef] }
+{ "kind": "artist", "id": "UC…", "name": "Daft Punk", "thumbnails": [...] }
+{ "kind": "playlist", "id": "VLPL…", "title": "…", "author": "…", "itemCount": 35, "thumbnails": [...] }
+{ "kind": "podcast", "id": "MPSP…", "title": "The Daily", "author": "…", "thumbnails": [...] }   // episodes are "song" items with song.podcast set
+```
+
+For `all`, the YTM module runs YTM's mixed search (for the top result, albums, artists
+and playlists) plus a `songs` and a `videos` search at the same time: YTM's mixed results
+mostly lack song durations, and a song without a duration can't end on its own in a room.
+
+## Endpoints
+
+### Module info
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/info` ✅ | `{ id, name, version, apiVersion, capabilities: [...] }` |
+| GET | `/health` ✅ | Liveness check |
+
+`capabilities` tells the host which of the optional endpoints below are supported. The YTM
+module now answers `search`, `suggestions`, `stream`, `audio`, `radio`, `artist`, `album`,
+`playlist`, `podcast`, `home`, `personal`. Planned: `explore`, `resolve_url`, `related`,
+`lyrics`, `isrc_lookup`.
+
+### Search & browse
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/search?q=&type=&limit=` ✅ | Search. `type`: `all` (default), `songs`, `videos`, `albums`, `artists`, `community_playlists`, `featured_playlists`, `podcasts`, `episodes`. Answers a `SearchPage` (below). Paging (`cursor`) later |
+| GET | `/search/suggestions?q=` ✅ | Suggestions while typing: `{ items: ["daft punk", …] }` (the host: `GET /api/search/suggestions?q=`, empty without a source) |
+| GET | `/search?isrc=` | Find a song by ISRC (optional `isrc_lookup` capability, helps [matching](../storage.md#song-matching)) |
+| GET | `/songs/{id}` | Song details |
+| GET | `/albums/{id}` ✅ | Album with songs (see Recommendations below); also by the album's playlist ID (`OLAK5uy_…`), as album links have it |
+| GET | `/songs/{id}` ✅ | One song (or episode, with its podcast) by its ID, for a pasted link |
+| GET | `/artists/{id}` ✅ | Artist: top songs, albums, singles |
+| GET | `/podcasts/{id}` ✅ | A podcast: `PodcastPage` (`id, title, author, description, thumbnails, episodes: [{ song, date, description }]`). Episodes are `Song`s with `podcast: { id, name }` |
+| GET | `/playlists/{id}` | Public playlist with songs ✅ (`PlaylistPage`: `id, title, author, description, thumbnails, songs, songCount`), in parts like `/me/playlists/{id}`: the first (~100 songs) with `more`; `?more=…` answers with only the next songs |
+| GET | `/resolve?url=` | Turn a YTM/YT URL into `{ type, item }` (for links pasted in search) |
+| GET | `/home` ✅ | Home page: `{ sections: [{ title, items: [SearchItem] }] }` (quick picks, new releases, mixes, …). Songs there have no length (the stream has it). Personalised with credentials (later). The host: `GET /api/home`, cached 30 min |
+| GET | `/explore` | Explore page: new releases, charts, moods & genres |
+| GET | `/explore/{sectionId}` | One explore section, for example a mood or genre |
+
+### Playback
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/songs/{id}/stream` ✅ | Resolve a **direct stream URL** on demand: `{ url, expiresAt, mimeType, bitrate, loudnessDb, durationMs }`. `durationMs` ✅ is the exact length (listings round podcast lengths); the host gives the current song that length. `loudnessDb` is always null for now |
+| GET | `/songs/{id}/audio?format=` ✅ | The **audio bytes** themselves, with HTTP `Range` support. Used for proxying (✅), [downloads](downloads.md) (✅, the whole file) and the [song cache](song-cache.md) (✅, the whole file). `format` is a preference (for example `m4a`; not read yet). |
+
+- `/stream` is for the direct path of the [hybrid approach](../outputs/playback-sync.md). `/audio` is
+  for the proxied path and the host's [song cache](song-cache.md).
+- `loudnessDb` (YouTube's loudness value, when available) is used for loudness normalisation.
+
+### Recommendations
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/radio?seed=&cursor=` ✅ | YTM radio from a song, artist, album or playlist ID (`seed`): an endless list via `cursor`. ✅ Songs only, `limit` (default 25) instead of `cursor`; the host keeps it endless by asking again from the last song |
+| GET | `/songs/{id}/related` | Related songs |
+| GET | `/artists/{id}` | ✅ Artist page: name, art, description, top songs, albums, singles |
+| GET | `/albums/{id}` | ✅ Album page: title, kind, year, artists, art, songs |
+
+A server stores the radios it fetches as **YTM edges** in the song graph (see
+[storage](../storage.md#song-graph)); a phone doesn't yet.
+
+### Lyrics
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/songs/{id}/lyrics` | ✅ `{ plain, synced: [{ timeMs, text }] \| null, source }`; 404 when there are none |
+
+Lyrics from modules are a **fallback**. The host first looks up the song on **LRCLIB**
+itself (by title, artist, album and duration), so synced lyrics work for every source,
+including local files. The YTM module asks YouTube Music for the song's lyrics (from
+`get_watch_playlist`, then `get_lyrics(timestamps=True)`; timed when YouTube Music has them,
+e.g. from LyricFind).
+
+Host side (`host/.../LyricsLookup.kt`): `GET /api/lyrics?id&title&artist&album&durationMs`
+(the page sends the song as it knows it). LRCLIB's `/api/get` (exact title, first artist,
+album, length in seconds), else `/api/search` by title (without "(Official Video)" and the
+like) and artist, taking one within 3 s of the length, timed ones first. Then the source's
+lyrics (`ytm:` songs: the module's `/songs/{id}/lyrics`, on a phone through Chaquopy). Timed
+lyrics win; results (also "none") are kept 6 hours, unless a lookup failed. `&from=lrclib`: only
+LRCLIB, for a page that asks YouTube Music itself through the listener's own module
+([playback-sync](../outputs/playback-sync.md#search-and-pages-from-your-own-module)).
+
+### Recognize a song
+
+Not a module endpoint: every host does it itself, a phone too. The web app makes Shazam's
+signature of the sound (`frontend/src/lib/shazamSignature.ts`, a port of shazamio-core 2.0.0's
+`algorithm.rs` and `signature_format.rs`, MIT, itself from SongRec: an FFT of 2048 samples every
+128 samples at 16 kHz, the spectrum spread over neighbouring bins and frames, its local maxima
+between 250 Hz and 5.5 kHz packed per band). Checked against shazamio's own Rust code on the same
+samples: the same peaks at the same times and frequencies, a few in a few hundred 1 louder or
+softer (the last bit of the FFT, doubles here, floats there); `shazamSignature.test.ts` keeps its
+output for a test sound. Only that signature (2–6 KB) goes to the host, not the sound.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/recognize` | ✅ `RecognizeRequest { signature, sampleMs }` → `RecognizeResponse { title, artist, album, art, isrc }`, all null when Shazam didn't know it; 429 when Shazam refuses for a moment |
+| GET | `/api/recognize/song?title&artist&album` | ✅ that song on YouTube Music: `SearchResponse` with it, or empty |
+
+`ShazamLookup` (host) posts the signature to `amp.shazam.com/discovery/v5/…/tag/{uuid}/{uuid}`
+the way shazamio does (iPhone headers, one try: shazamio's retries on 429 take up to a minute,
+and the page asks again with more sound anyway), keeping the connection open between tries.
+The song is then matched like a playlist import (`ConvertMatcher`: "artist title", scored on
+title, artist, album and version; a matched or unsure song counts). `HostInfo.canRecognize` is
+whether the host has a recognizer (`HostSources.recognizer`, `ShazamLookup` by default).
+
+The web app (`lib/listen.ts`) records with `getUserMedia` and a `ScriptProcessorNode` (also in
+Chrome 90) and asks after 2.5, 4, 6 and 10 seconds of sound until Shazam knows it; the sheet
+shows Shazam's answer at once and looks the song up on YouTube Music next. Measured with real
+lookups: 2 s was never enough, 2.5 s was for every song Shazam knows (shazamio itself needed
+3 s: it runs the sound through a resampling filter first); Shazam answers in 0.5–1.5 s,
+the YouTube Music search in ~0.5–1 s. Shazam refuses (429) after a burst of lookups from one
+IP address (about 16 in 30 s); one every 15 s was always fine. The Android app grants the page
+the microphone (`onPermissionRequest`, only its own pages) after asking Android for
+`RECORD_AUDIO`.
+
+### Library (user-scoped, needs `X-Ytm-Cookie`)
+
+Implemented in the YTM module: the server sends the account's music.youtube.com cookies in
+`X-Ytm-Cookie` with every request (it stores them encrypted, see `YoutubeLinks.kt`); the
+module keeps a signed-in session per cookie (up to 50). Cookies that aren't (or no longer)
+signed in give `401 not_signed_in`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/me/account` | `{ name, handle, photoUrl }`: checks the sign-in |
+| GET | `/me/home` | The account's own home page, *New episodes* first (YouTube Music's `RDPN` list; each episode's podcast looked up once and kept) |
+| GET | `/me/library` | Playlists (Liked music first) and podcasts, as home sections |
+| GET | `/me/playlists` | The account's own playlists (to save songs to) |
+| POST | `/me/playlists` | Create a private playlist: `{ title, songIds }` → `{ id }` |
+| GET | `/me/playlists/{id}` | A playlist, also private ones (`LM` = Liked music), in parts: the first (~100 songs, YouTube Music's own parts) with `more`, a token; `?more=…` answers with only the next songs (and the next `more`, null after the last) |
+| POST | `/me/playlists/{id}/songs` | Add songs: `{ songIds: [...] }` |
+| GET / PUT | `/me/likes/{songId}` | `{ liked, disliked }` (thumbs up or down, never both) |
+| GET | `/me/podcasts/{id}` | A podcast page as the account: with `saved` (subscribed: in the library) |
+| PUT | `/me/podcasts/{id}/saved` | `{ saved }`: subscribe (add to the library) or unsubscribe |
+| POST | `/me/playlists/{id}/remove` | `{ items: [{ songId, itemId }] }`: remove songs (`itemId`: their place, from `PlaylistPage.itemIds`) |
+| POST | `/me/playlists/{id}/move` | `{ itemId, beforeItemId }`: move one song (null: to the end) |
+| PUT / DELETE | `/me/playlists/{id}` | Rename (`{ title }`) / delete one of your playlists |
+| POST | `/me/history/{songId}` | Add a play to the account's YouTube Music history |
+| GET | `/me/search`, `/me/search/suggestions`, `/me/radio` | Like `/search`, `/search/suggestions` and `/radio`, as the account |
+
+`GET /me/playlists/{id}` says whether it's one of yours (`owned`) and each song's place in it
+(`itemIds`). Not yet: liked songs paging.
+
+### Admin (planned)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/status` | yt-dlp / ytmusicapi versions, last update |
+| POST | `/admin/update` | Update yt-dlp now |
+
+## Output modules
+
+Remote **output** modules (for example a future Discord bot) would use a similar,
+much smaller API: `POST /play { audioUrl, positionMs }`, `POST /pause`,
+`POST /volume { level }`, `GET /state`. This will be defined when the first remote
+output module is built.
+
+## Unreadable pages
+
+YouTube sometimes sends some visitors another page layout that ytmusicapi can't read (an
+artist page without `musicImmersiveHeaderRenderer`, 2026-10). `ytmp_ytm/keep.py` remembers
+YouTube's answers to the last few requests of each call, and when a call fails because a page
+didn't look as expected (a `KeyError`, `IndexError`, … anywhere in the cause) or only read with
+a fallback, writes them to `page-<time>-<what>-<id>.json` (the newest 10; requests and answers,
+never the request headers, so no cookies). Turn one into a test like
+`tests/test_core.py::test_artist_page_with_another_header` (the page in `tests/data/`).
+
+- **Phone:** in the app's `files/logs/pages`; *Settings → App → Send logs* adds them after the
+  logs. A debug build: `adb shell run-as dev.trashpanda.ytmp.debug ls files/logs/pages`.
+- **Server module:** in its temp folder (`/tmp/ytmp-ytm-pages`), or `YTMP_YTM_KEEP_DIR`
+  (empty: not kept); copy them out with `docker cp`.
