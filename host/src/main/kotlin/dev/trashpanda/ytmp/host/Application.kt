@@ -295,6 +295,8 @@ fun Application.ytmpModule(
             screenRoutes(host)
             // The song cache, in the hosting phone's settings (a server has its own, for its admin).
             songCacheRoutes("/cache", sources.cache, options.cacheSettings) { options.isLocal(it) }
+            // ...and its songs for the owner's other devices (the desktop app copies them).
+            cacheCopyRoutes(host)
             // Learning radios, in the hosting phone's settings (a server's is on its admin page).
             radioCrawlRoutes("/radio-crawl", sources.radioCrawl) { options.isLocal(it) }
             graphCopyRoutes("/graph-copy", sources.graphCopy) { options.isLocal(it) }

@@ -92,6 +92,24 @@ class SongCacheTest {
     }
 
     @Test
+    fun `a song copied from another of the owner's devices is kept, and listed for copying on`() = runBlocking {
+        val youtube = FakeYoutube()
+        val cache = cache(youtube)
+        val song = song("a")
+        assertTrue(cache.take(song) { it.writeBytes(bytesOf("a")) })
+        assertTrue(cache.has(song.id))
+        assertEquals(listOf(CachedSongFile(song, bytesOf("a").size.toLong(), SongFiles.MP4)), cache.copyable())
+        assertContentEquals(bytesOf("a"), cache.fileOf(song.id)!!.first.readBytes())
+        // Here already, or not audio: not taken.
+        assertFalse(cache.take(song) { it.writeBytes(bytesOf("a")) })
+        assertFalse(cache.take(song("b")) { it.writeText("<html>not a song</html>") })
+        assertFalse(cache.has("ytm:b"))
+        assertEquals(emptyList(), youtube.lookups)
+        // The cache off: nothing is taken.
+        assertFalse(cache(maxBytes = 0, at = File(dir, "off")).take(song("c")) { it.writeBytes(bytesOf("c")) })
+    }
+
+    @Test
     fun `a song the player read all of is kept, and then needs no lookup`() = runBlocking {
         val youtube = FakeYoutube()
         val cache = cache(youtube)

@@ -671,6 +671,37 @@ class SongCache(
         }
     }
 
+    // --- copying between the owner's devices ---
+
+    /** The cached songs with their sizes (another of the owner's devices copies them: [CacheCopy]). */
+    fun copyable(): List<CachedSongFile> = synchronized(lock) { entries.values.map { CachedSongFile(it.song, it.size, it.type) } }
+
+    /** [songId]'s file and type, when it's here whole. */
+    fun fileOf(songId: String): Pair<File, String>? = synchronized(lock) { entries[songId]?.let { File(dir, it.file) to it.type } }
+
+    /**
+     * Keeps [song] from elsewhere (another of the owner's devices): [write] puts the file in the
+     * file it's given. True when it's kept; false when it isn't audio, the cache is off, or the
+     * song is here already.
+     */
+    suspend fun take(song: Song, write: suspend (File) -> Unit): Boolean {
+        if (maxBytes <= 0 || moving || has(song.id)) return false
+        val temp = File(dir, key(song.id) + ".take")
+        try {
+            write(temp)
+        } catch (e: Throwable) {
+            temp.delete()
+            throw e
+        }
+        val type = typeOf(temp) ?: run {
+            temp.delete()
+            return false
+        }
+        synchronized(lock) { known[song.id] = song }
+        commit(song, temp, type)
+        return has(song.id)
+    }
+
     // --- keeping and removing ---
 
     /** Keeps [temp] (whole) as [song]'s file, unless it's here already. */

@@ -123,6 +123,8 @@ class DesktopHost(private val config: Config) {
     private val tvs = YoutubeTvOutputs(scope)
     val outputs = OutputDrivers(scope, listOf(casts, sonos, mpd, zones, tvs))
     val nearby = NearbySpeakers(scope, outputs.all)
+    /** Your phones on this network, and copying their songs here. */
+    val phones = PhoneCopy(cache, scope)
     /** Problems with the speakers (another app took one), numbered, for the window to show once. */
     private val notices = ArrayDeque<NearbyNotice>()
     private var noticeCount = 0
@@ -165,6 +167,7 @@ class DesktopHost(private val config: Config) {
                 mpd.discover()
                 zones.discover()
                 tvs.discover()
+                phones.discover()
             }.onFailure { log.warn("Looking for speakers failed: {}", it.toString()) }
         }
         embeddedServer(CIO, port = config.port, host = "127.0.0.1") { module() }.start(wait = true)
@@ -238,6 +241,15 @@ class DesktopHost(private val config: Config) {
         get("/health") { call.respondText("ok") }
         route("/desktop") {
             // Play on: the speakers here and what plays on them (`?after=` the last notice seen).
+            // Songs from your phone: the phones here, and copying one's song cache into this computer's.
+            get("/phones") { call.respond(phones.state()) }
+            post("/phones/copy") {
+                val copy = call.receive<PhoneCopyRequest>()
+                if (cache.maxBytes <= 0) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Turn the song cache on first")
+                val phone = phones.phone(copy.phoneId) ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "That phone isn't on this network now")
+                call.respond(phones.start(phone, copy.token))
+            }
+            post("/phones/stop") { call.respond(phones.stop()) }
             get("/nearby") { call.respond(nearbyState(call.request.queryParameters["after"]?.toIntOrNull() ?: Int.MAX_VALUE)) }
             post("/nearby/play") {
                 val play = call.receive<NearbyPlay>()
@@ -325,6 +337,9 @@ class DesktopHost(private val config: Config) {
 
     @Serializable
     data class Upload(val songId: String, val url: String, val secret: String)
+
+    @Serializable
+    data class PhoneCopyRequest(val phoneId: String, val token: String)
 
     @Serializable
     data class NearbyDevice(val id: String, val name: String, val kind: OutputKind)

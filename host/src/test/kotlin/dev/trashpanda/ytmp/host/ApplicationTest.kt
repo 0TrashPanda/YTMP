@@ -84,6 +84,11 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
+import kotlin.test.assertContentEquals
+import io.ktor.client.statement.readRawBytes
+import io.ktor.client.request.HttpRequestBuilder
+import java.nio.file.Files
 import dev.trashpanda.ytmp.protocol.ScreenPairing
 import dev.trashpanda.ytmp.protocol.ScreenLinked
 import dev.trashpanda.ytmp.protocol.ScreenLinkRequest
@@ -555,12 +560,13 @@ class ApplicationTest {
         deviceOwner: () -> String? = { null },
         onLocalAccount: (AccountIdentity) -> Unit = {},
         converter: PlaylistConverter? = null,
+        cache: SongCache? = null,
     ) {
         application {
             val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
             ytmpModule(
                 rooms,
-                HostSources(search, catalog = catalog, personal = personal, suggestions = suggestions, converter = converter),
+                HostSources(search, catalog = catalog, personal = personal, suggestions = suggestions, converter = converter, cache = cache),
                 HostOptions(
                     kind = HostKind.PHONE,
                     shareUrl = { "http://192.168.1.23:8765" },
@@ -751,6 +757,27 @@ class ApplicationTest {
         // A remote device can't make itself the owner.
         client.get("/api/me/youtube") { header("X-Remote", "1"); header(HttpHeaders.Authorization, "Bearer token-sam") }
         assertEquals("jonah@home", owner)
+    }
+
+    @Test
+    fun `the phone's songs go only to its owner's other devices`() = testApplication {
+        val dir = Files.createTempDirectory("ytmp-copy").toFile()
+        val cache = SongCache(dir, 10_000_000, lookup = { "https://stream/$it" }, audio = null, scope = CoroutineScope(SupervisorJob()), coverOf = { null })
+        val bytes = ByteArray(2_000).also { "....ftypM4A ".toByteArray().copyInto(it) }
+        runBlocking { assertTrue(cache.take(song) { it.writeBytes(bytes) }) }
+        setupPhone(deviceOwner = { "jonah@home" }, cache = cache)
+        val client = jsonClient()
+        fun HttpRequestBuilder.from(token: String?) {
+            header("X-Remote", "1")
+            if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
+        }
+
+        assertEquals(listOf(song.id), client.get("/api/cache/songs") { from("token-jonah") }.body<CachedSongFiles>().songs.map { it.song.id })
+        assertContentEquals(bytes, client.get("/api/cache/songs/ytm:abc") { from("token-jonah") }.readRawBytes())
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/cache/songs") { from("token-sam") }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/cache/songs/ytm:abc") { from(null) }.status)
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/cache/songs/ytm:other") { from("token-jonah") }.status)
+        dir.deleteRecursively()
     }
 
     @Test

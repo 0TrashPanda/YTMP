@@ -164,6 +164,13 @@ up to 10 GB, *Clear cache*): YouTube Music songs the computer plays are kept on 
 they play (one download, nothing extra), and the next song in the queue is fetched into it
 while the current one plays. Only music, nothing over an hour.
 
+**Songs from your phone** ✅ (the desktop app, *Settings → Song cache*): copies the songs your
+phone keeps in its song cache to the computer's over Wi-Fi, so they play from the computer
+without looking them up. Open YTMP on the phone on the same Wi-Fi, logged in with the same
+account as on the computer, and press *Copy its songs* next to it. Songs already on the
+computer are left alone; songs that don't fit in the computer's cache are left out (it says
+how many). The phone gives its songs only to its owner: logged in with the phone's account.
+
 - **Songs are saved when that costs nothing extra**: a song the phone plays itself, or that
   the server or phone already streams (to speakers, or to players that stream through it),
   is kept as it passes.

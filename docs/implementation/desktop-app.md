@@ -168,6 +168,28 @@ over its own connection (`FollowerSource`/`RoomFollower`, moved from the Android
 - **Not tried yet**: playing on a speaker from the app (it needs the owner's OK to play sound
   at home), and the AppImage on Linux.
 
+## Songs from your phone ✅
+
+Copying a phone's song cache into the computer's over Wi-Fi.
+
+- **The phone announces itself** while the app runs: `_ytmp-device._tcp` (its Android device
+  name, `Nearby.announceDevice`), next to its public rooms' `_ytmp._tcp`.
+- **The phone's songs** (`CacheCopy.kt`, any host): `GET /api/cache/songs` (each cached song
+  with its size and type) and `GET /api/cache/songs/<id>` (the file, with ranges). Only the
+  device's own page or its owner on another device (`isDeviceOwner`: a host token of the
+  account the phone's own page is logged in with); others get 403.
+- **The login for the phone**: the window (on your server, logged in) asks the server for a
+  host token for the phone's address (`POST /api/account/host-token { origin }`, the same as
+  `/connect` makes), `aud` = `http://<phone>:<port>`, which the phone accepts as its own.
+- **The copy** (`PhoneCopy`, desktop host): finds the phones with jmDNS (with the speakers),
+  `GET /api/desktop/phones` (phones and the copy's progress), `POST …/phones/copy
+  { phoneId, token }`, `…/phones/stop`. It skips songs that are here and the ones that don't
+  fit in what's left of the cache (it would push others out), and fetches the rest one at a
+  time into `SongCache.take` (kept like a fetched song; not audio: dropped).
+- **The window**: *Settings → Song cache* (`ComputerCacheSection`, `computerPhones.ts`) lists
+  the phones and the progress, looking every 2 s.
+- **Not tried yet** with a real phone: the phone part needs a new release on it.
+
 ## Why Tauri
 
 | | Tauri | Electron |
@@ -364,7 +386,7 @@ the module.
 8. ✅ The music on the computer and a song cache (see above).
 9. ✅ This computer's host (Kotlin, the phone's host code) instead of the module doing them.
 10. ✅ Speakers (Chromecast, Sonos, MPD, zones, YouTube TVs) from the host, with always-on
-    discovery in the app. Next: copying songs from a phone's cache over Wi-Fi.
+    discovery in the app; ✅ copying songs from a phone's cache over Wi-Fi.
 
 ## Open questions
 

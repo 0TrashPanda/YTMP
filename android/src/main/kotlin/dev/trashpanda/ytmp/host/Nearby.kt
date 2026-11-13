@@ -60,6 +60,36 @@ class Nearby(context: Context) {
         }
     }
 
+    private var device: NsdManager.RegistrationListener? = null
+
+    /**
+     * Announces this phone itself (`_ytmp-device._tcp`, named [name]) while the app runs, so the
+     * owner's desktop app finds it to copy its songs (it only gets them logged in as the owner).
+     */
+    @Synchronized
+    fun announceDevice(name: String) {
+        if (device != null) return
+        val info = NsdServiceInfo().apply {
+            serviceName = name
+            serviceType = DEVICE_SERVICE_TYPE
+            port = LocalHost.PORT
+            setAttribute("name", name)
+            setAttribute("v", PROTOCOL_VERSION.toString())
+        }
+        val listener = object : NsdManager.RegistrationListener {
+            override fun onServiceRegistered(info: NsdServiceInfo) {
+                Log.d(TAG, "Announcing this phone as ${info.serviceName}")
+            }
+            override fun onRegistrationFailed(info: NsdServiceInfo, error: Int) {
+                Log.w(TAG, "Announcing this phone failed: $error")
+            }
+            override fun onServiceUnregistered(info: NsdServiceInfo) = Unit
+            override fun onUnregistrationFailed(info: NsdServiceInfo, error: Int) = Unit
+        }
+        device = listener
+        runCatching { nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener) }.onFailure { device = null }
+    }
+
     /** Looks for rooms while the app is visible. */
     @Synchronized
     fun startDiscovery() {
@@ -108,6 +138,7 @@ class Nearby(context: Context) {
 
     companion object {
         private const val SERVICE_TYPE = "_ytmp._tcp"
+        private const val DEVICE_SERVICE_TYPE = "_ytmp-device._tcp"
         private const val TAG = "YtmpNearby"
     }
 }

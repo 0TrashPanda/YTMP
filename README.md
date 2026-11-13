@@ -237,6 +237,8 @@ Music, without Premium, and not tied to a single music service.
 - Opens the room you were in, like the Android app.
 - Plays the room on the Chromecasts, Sonos speakers, MPDs and TVs on your computer's
   network (*Play on → Near this computer*), also when your server can't reach them.
+- Copies the songs your phone keeps to the computer over Wi-Fi (*Settings → Song cache →
+  Songs from your phone*).
 
 ## What's next
 

@@ -57,6 +57,11 @@ class YtmpApp : Application() {
         host = LocalHost(this).also { it.start() }
         nearby = Nearby(this)
         scope.launch { host.rooms.list.collect { nearby.announce(it) } }
+        // This phone itself, for the owner's desktop app (copying its songs).
+        nearby.announceDevice(
+            runCatching { android.provider.Settings.Global.getString(contentResolver, android.provider.Settings.Global.DEVICE_NAME) }.getOrNull()
+                ?.takeIf { it.isNotBlank() } ?: android.os.Build.MODEL,
+        )
         Widget.start(this, scope)
         scope.launch {
             combine(host.rooms.hosting, host.rooms.playing, host.nearby.playing, ::Triple).distinctUntilChanged().collect { (rooms, playing, speakers) ->

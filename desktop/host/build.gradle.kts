@@ -23,6 +23,8 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.logback.classic)
     implementation(libs.jaudiotagger)
+    // Finding your phones on the network (PhoneCopy).
+    implementation(libs.jmdns)
 
     testImplementation(kotlin("test"))
     testImplementation(libs.ktor.server.test.host)

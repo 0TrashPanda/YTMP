@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { clearComputerCache, changeComputer, computer, loadComputer } from '../../computer.svelte';
 	import Choice from './Choice.svelte';
+	import { copyFromPhone, phonesHere, stopCopying, type PhoneCopyStatus, type PhonesState } from '../../computerPhones';
 
 	let { onToast }: { onToast: (text: string) => void } = $props();
 
@@ -18,6 +19,32 @@
 	let busy = $state(false);
 
 	onMount(() => void loadComputer());
+
+	// Songs from your phone: the phones here, looked at every few seconds while this shows (and
+	// the copy's progress), and the computer's cache numbers once a copy finishes.
+	let phones = $state<PhonesState | null>(null);
+	onMount(() => {
+		let wasRunning = false;
+		const look = () =>
+			phonesHere()
+				.then((state) => {
+					phones = state;
+					if (wasRunning && !state.copy?.running) void loadComputer();
+					wasRunning = !!state.copy?.running;
+				})
+				.catch(() => {});
+		void look();
+		const timer = setInterval(look, 2_000);
+		return () => clearInterval(timer);
+	});
+	const copy = $derived(phones?.copy ?? null);
+
+	function copyText(c: PhoneCopyStatus): string {
+		const left = [c.here ? `${c.here} were here already` : '', c.noRoom ? `${c.noRoom} didn't fit (make the cache bigger for them)` : ''].filter(Boolean).join(', ');
+		if (c.running) return c.total ? `Copying ${c.copied + 1} of ${c.total}${c.current ? `: ${c.current}` : ''}` : `Asking ${c.phone}…`;
+		if (c.error) return `Stopped after ${c.copied} ${c.copied === 1 ? 'song' : 'songs'}: ${c.error}`;
+		return `Copied ${c.copied} ${c.copied === 1 ? 'song' : 'songs'} (${formatSize(c.bytes)}) from ${c.phone}${left ? `. ${left}.` : '.'}`;
+	}
 
 	const status = $derived(computer.status);
 	const size = $derived(String(status?.cacheMb ?? 0));
@@ -61,6 +88,38 @@
 				disabled={busy || !status.cacheSongs}
 				onclick={() => run(clearComputerCache, "The cache wasn't cleared")}>Clear cache</button
 			>
+		</div>
+		<div class="flex flex-col gap-3">
+			<div>
+				<p class="text-sm font-medium">Songs from your phone</p>
+				<p class="text-xs text-muted">
+					Copies the songs your phone keeps (its song cache) to this computer over Wi-Fi, so they play from here without looking them up. Open YTMP on your phone on the same Wi-Fi,
+					logged in with the same account as here.
+				</p>
+			</div>
+			{#if copy}
+				<div class="flex items-center gap-3">
+					<p class="min-w-0 flex-1 text-xs {copy.error ? 'text-red-400' : 'text-muted'}">{copyText(copy)}</p>
+					{#if copy.running}
+						<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => run(async () => void (phones = await stopCopying()), "Copying didn't stop")}
+							>Stop</button
+						>
+					{/if}
+				</div>
+			{/if}
+			{#each phones?.phones ?? [] as phone (phone.id)}
+				<div class="flex items-center gap-3">
+					<p class="min-w-0 flex-1 truncate text-sm">{phone.name}</p>
+					<button
+						class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line disabled:opacity-50"
+						disabled={busy || !!copy?.running || !status.cacheMb}
+						title={status.cacheMb ? undefined : 'Turn the song cache on first'}
+						onclick={() => run(async () => void (phones = await copyFromPhone(phone)), "Copying didn't start")}>Copy its songs</button
+					>
+				</div>
+			{:else}
+				<p class="text-xs text-muted">No phone found on this network. Open YTMP on your phone (the newest version).</p>
+			{/each}
 		</div>
 	{/if}
 </section>
