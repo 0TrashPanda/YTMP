@@ -602,10 +602,11 @@ class YtmCore:
         """
         ytm = self._signed_in() if personal else self._ytm
         sections = []
-        with ThreadPoolExecutor(2) as pool:
-            # At the same time: the new episodes take a lookup per podcast.
+        with ThreadPoolExecutor(1) as pool:
+            # At the same time: the new episodes take a lookup per podcast. Home itself is asked on
+            # this thread, so a Home page that can't be read is kept ([keep] records per thread).
             episodes = pool.submit(self.new_episodes) if personal else None
-            home = pool.submit(ytm.get_home, limit=_HOME_SECTIONS)
+            home_sections = ytm.get_home(limit=_HOME_SECTIONS)
             if episodes:
                 # New episodes of your podcasts first, like YouTube Music shows them to podcast listeners.
                 try:
@@ -613,7 +614,6 @@ class YtmCore:
                         sections.append({"title": "New episodes", "items": [{"kind": "song", "song": s, "video": False} for s in found]})
                 except Exception as e:
                     log.info("No new episodes on Home: %s", e)
-            home_sections = home.result()
         for s in home_sections:
             items = [item for c in s.get("contents") or [] if (item := parse.home_item(c))]
             if items:
