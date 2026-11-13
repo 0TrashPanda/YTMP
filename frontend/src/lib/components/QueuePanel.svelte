@@ -2,7 +2,7 @@
 	import { playingMark } from '../playingMark';
 	import { scrollBehavior } from '../motion.svelte';
 	// "Up next": played songs, the current one, the queue and the autoplay queue as one list.
-	// Every song can be dragged anywhere in it (a played song moved below the current one
+	// Every song can be dragged anywhere in it, by any part of it (a played song moved below the current one
 	// plays again; the current one keeps playing, and the songs it's dragged past change sides). Tap, swipe right, swipe
 	// left and hold do what Settings → Taps and swipes says (play, play next, remove like YTM,
 	// the song menu by default); right-click or ⋮ on hover with a mouse: the song menu.
@@ -133,17 +133,20 @@
 		return drag.mids.filter((mid, i) => i !== drag!.from && mid < center).length;
 	});
 
-	function startDrag(event: PointerEvent, index: number) {
-		event.preventDefault();
+	function startDrag(row: HTMLElement, pointerId: number, y: number, index: number) {
 		glide = null;
 		glides++;
-		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		try {
+			row.setPointerCapture(pointerId);
+		} catch {
+			// The pointer is gone already.
+		}
 		const elements = [...(list?.querySelectorAll<HTMLElement>('[data-slot]') ?? [])];
 		drag = {
 			from: index,
-			startY: event.clientY,
+			startY: y,
 			startScroll: list?.scrollTop ?? 0,
-			pointerY: event.clientY,
+			pointerY: y,
 			offset: 0,
 			mids: elements.map((el) => el.offsetTop + el.offsetHeight / 2),
 			height: elements[index]?.offsetHeight ?? 64
@@ -151,6 +154,100 @@
 		cancelAnimationFrame(edgeScroll);
 		edgeScroll = requestAnimationFrame(scrollNearEdges);
 	}
+
+	/**
+	 * Dragging a song by any part of it, like YouTube Music: with a mouse, press and move up or
+	 * down; with a finger, hold it a moment (it lifts), then move. Held and let go without
+	 * moving, it does what Hold does (the song menu).
+	 */
+	const HOLD_TO_DRAG_MS = 350;
+	let pressing: { index: number; x: number; y: number; pointerId: number; row: HTMLElement; touch: boolean; timer?: ReturnType<typeof setTimeout> } | null = null;
+	/** The drag that's on was started by holding a finger, and the finger hasn't moved since. */
+	let heldStill = false;
+	/** A mouse drag ended on the song: its click isn't a tap. */
+	let dragClick = false;
+
+	function press(event: PointerEvent, index: number) {
+		if (!room.can('reorder') || drag) return;
+		if (event.pointerType === 'mouse' && event.button !== 0) return;
+		if ((event.target as HTMLElement).closest('[data-no-drag]')) return;
+		const row = event.currentTarget as HTMLElement;
+		pressing = { index, x: event.clientX, y: event.clientY, pointerId: event.pointerId, row, touch: event.pointerType !== 'mouse' };
+		if (pressing.touch) pressing.timer = setTimeout(() => lift(true), HOLD_TO_DRAG_MS);
+	}
+
+	function lift(held: boolean) {
+		const p = pressing;
+		stopPressing();
+		if (!p) return;
+		heldStill = held;
+		swipe.cancel();
+		startDrag(p.row, p.pointerId, p.y, p.index);
+		if (held) navigator.vibrate?.(10);
+	}
+
+	function stopPressing() {
+		clearTimeout(pressing?.timer);
+		pressing = null;
+	}
+
+	function pressMove(event: PointerEvent) {
+		if (drag) {
+			if (Math.abs(event.clientY - drag.startY) > 6) heldStill = false;
+			moveDrag(event);
+			return;
+		}
+		if (!pressing || event.pointerId !== pressing.pointerId) return;
+		const dx = event.clientX - pressing.x;
+		const dy = event.clientY - pressing.y;
+		// A finger that moves before it's held is scrolling or swiping.
+		if (pressing.touch) {
+			if (Math.hypot(dx, dy) > 8) stopPressing();
+			return;
+		}
+		if (Math.abs(dy) > 6 && Math.abs(dy) > Math.abs(dx)) {
+			lift(false);
+			moveDrag(event);
+		} else if (Math.abs(dx) > 6) stopPressing();
+	}
+
+	function pressUp(slot: Slot) {
+		if (pressing) {
+			stopPressing();
+			return;
+		}
+		if (!drag) return;
+		if (heldStill) {
+			// Held, not moved: Hold's action, as before songs could be dragged by holding them.
+			cancelAnimationFrame(edgeScroll);
+			drag = null;
+			heldStill = false;
+			const row = list?.querySelectorAll<HTMLElement>('[data-slot]')[slots.indexOf(slot)] ?? null;
+			rows.act('hold', slot, null, row);
+			return;
+		}
+		dragClick = true;
+		setTimeout(() => (dragClick = false), 0);
+		void endDrag();
+	}
+
+	function pressCancel() {
+		stopPressing();
+		if (!drag) return;
+		cancelAnimationFrame(edgeScroll);
+		drag = null;
+	}
+
+	// While a song is dragged with a finger, the list doesn't scroll under it (the drag scrolls it near its edges).
+	$effect(() => {
+		const el = list;
+		if (!el) return;
+		const still = (e: TouchEvent) => {
+			if (drag) e.preventDefault();
+		};
+		el.addEventListener('touchmove', still, { passive: false });
+		return () => el.removeEventListener('touchmove', still);
+	});
 
 	function moveDrag(event: PointerEvent) {
 		if (!drag) return;
@@ -501,6 +598,7 @@
 				{@const place = slot.kind === 'current' ? 'current' : slot.place}
 				{@const offset = swipe.offset(slot.key)}
 				{@const swiping = offset !== 0}
+				{@const moreOnTouch = moreButtonClass(rows.of(slot).hold === 'menu') === ''}
 				<div
 					data-slot
 					data-id={id}
@@ -530,8 +628,18 @@
 							{dragging ? 'bg-line' : ''}
 							{swiping ? '' : 'transition-transform duration-200'}"
 						style:transform="translateX({swipeOffset(slot.key)})"
-						onpointerdown={(e) => rows.pressed(e)}
-						oncontextmenu={(e) => rows.held(e, slot)}
+						onpointerdown={(e) => {
+							rows.pressed(e);
+							press(e, index);
+						}}
+						onpointermove={pressMove}
+						onpointerup={() => pressUp(slot)}
+						onpointercancel={pressCancel}
+						oncontextmenu={(e) => {
+							// Held to drag: no menu now (letting go without moving opens it).
+							if (drag || pressing) e.preventDefault();
+							else rows.held(e, slot);
+						}}
 						ontouchstart={(e) => !drag && swipe.start(e, slot.key)}
 						ontouchmove={(e) => swipe.move(e, rows.canSwipe(slot))}
 						ontouchend={(e) => rows.swiped(slot, e.currentTarget as HTMLElement)}
@@ -542,42 +650,33 @@
 						<button
 							class="flex min-w-0 flex-1 items-center gap-3 text-left {canOpen(slot) ? '' : 'cursor-default'}"
 							aria-disabled={!canOpen(slot)}
-							onclick={(e) => rows.act('tap', slot, e, e.currentTarget.parentElement)}
-							title={ACTION_NAMES[rows.of(slot).tap]}
+							onclick={(e) => !dragClick && rows.act('tap', slot, e, e.currentTarget.parentElement)}
+							title={room.can('reorder') ? `${ACTION_NAMES[rows.of(slot).tap]}. Drag it to move it (or ↑ ↓)` : ACTION_NAMES[rows.of(slot).tap]}
+							data-move-id={slot.item.itemId}
+							onkeydown={(e) => room.can('reorder') && moveKey(e, slot)}
 						>
 							<Art song={slot.item.song} size={40} class="h-10 w-10" playing={slot.kind === 'current' ? playingMark(room, slot.item.song.id) : null} />
 							<div class="min-w-0 flex-1">
 								<div class="truncate text-sm font-medium {slot.kind === 'current' ? 'text-white' : ''}">{slot.item.song.title}</div>
 								<div class="truncate text-xs text-muted">{subtitle(slot.item, place)}</div>
 							</div>
-							<span class="text-xs text-muted tabular-nums max-[360px]:hidden">{slot.item.song.durationMs ? formatTime(slot.item.song.durationMs) : ''}</span>
 						</button>
-						<!-- With a mouse, on hover; touch screens hold the song for the menu, or (when Hold does something else) have it here. -->
-						<button
-							class="tap rounded-full p-1.5 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus:opacity-100 pointer-coarse:opacity-100 {moreButtonClass(rows.of(slot).hold === 'menu')}"
-							aria-label="More for {slot.item.song.title}"
-							onclick={(e) => menu(slot, e, false)}
-						>
-							<Icon name="more" size={18} />
-						</button>
-						{#if room.can('reorder')}
-							<button
-								class="tap cursor-grab touch-none rounded-full p-1.5 text-muted hover:text-white active:cursor-grabbing"
-								aria-label="Move {slot.item.song.title}"
-								title="Drag it, or use the arrow keys"
-								data-move-id={slot.item.itemId}
-								onkeydown={(e) => moveKey(e, slot)}
-								onpointerdown={(e) => startDrag(e, index)}
-								onpointermove={moveDrag}
-								onpointerup={endDrag}
-								onpointercancel={() => {
-									cancelAnimationFrame(edgeScroll);
-									drag = null;
-								}}
+						<!-- The time, with ⋮ in its place, like YouTube Music: with a mouse on hover; touch
+							 screens hold the song for the menu, or (when Hold does something else, or the
+							 setting says so) have ⋮ there. -->
+						<div class="relative flex w-11 shrink-0 items-center justify-center" data-no-drag>
+							<span
+								class="text-xs text-muted tabular-nums group-focus-within:invisible group-hover:invisible {moreOnTouch ? 'pointer-coarse:invisible' : ''}"
+								>{slot.item.song.durationMs ? formatTime(slot.item.song.durationMs) : ''}</span
 							>
-								<Icon name="drag" size={18} />
+							<button
+								class="tap absolute rounded-full p-1.5 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus:opacity-100 pointer-coarse:opacity-100 {moreButtonClass(rows.of(slot).hold === 'menu')}"
+								aria-label="More for {slot.item.song.title}"
+								onclick={(e) => menu(slot, e, false)}
+							>
+								<Icon name="more" size={18} />
 							</button>
-						{/if}
+						</div>
 					</div>
 				</div>
 			{/if}

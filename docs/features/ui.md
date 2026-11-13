@@ -311,7 +311,7 @@ queue and *Autoplay* also *Remove*. The defaults:
 | **Swipe right** | **Play next** | **Play next** (moved to the start of the queue) | **Play now**: it plays right away; the queue and the autoplay songs above it stay |
 | **Swipe left** | **Play now** | **Remove**, like YTM (the current song too: the next one plays) | **Remove** |
 | **Hold** | Open the [song menu](#song-menu) | Open the song menu | Open the song menu |
-| **Drag** (the handle) | Move it in your own playlists | Move it | Move it |
+| **Drag** | Move it in your own playlists (the handle) | Move it: anywhere on the song (with a finger: hold, then move) | Move it, the same way |
 
 A tap on a song that isn't in a list (Home's quick picks, the top search result, a podcast's
 episodes, speed dial tiles) does what *Tap* does in lists (*Song menu* there opens the menu
@@ -443,9 +443,13 @@ song's menu on an album's or artist's page has no *Go to* that same page.
 | Open in YouTube Music | For YTM songs |
 
 - In *Up next*, **hold** a song (or right-click it) for its menu; with a mouse a ⋮ also shows
-  on hover. **Swipe a song left** to remove it, like YTM (the menu has *Remove* too,
+  on hover, in the place of the song's length, like YTM (touch screens: hold and let go, or ⋮
+  there when the setting for it is on). No drag handles. **Swipe a song left** to remove it, like YTM (the menu has *Remove* too,
   also for the current song: the next one plays). Both [settable](#gestures).
-- There is no *Move* action: songs are moved by **dragging** them in *Up next*. The song
+- There is no *Move* action: songs are moved by **dragging** them in *Up next*, by any
+  part of the song: with a mouse press and move up or down; with a finger hold it a moment
+  (it lifts), then move (held and let go without moving: Hold's action). ↑ ↓ on a song move
+  it with the keyboard. The song
   stays under the pointer while the list scrolls (the mouse wheel, or holding it near the
   top or bottom edge, which scrolls the list). Played
   songs, upcoming songs and autoplay songs are one list: any of them can be dragged
