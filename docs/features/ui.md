@@ -61,6 +61,13 @@ Like YTM:
   sections* hides YTM's sections of podcasts and episodes. A section's **⋮** on Home does the
   same in place. YTM picks and names its sections, so they're known by name; a new one shows
   where YTM puts it.
+- **Home on a computer** (planned, [how](../implementation/home-layout.md)): the sections fit
+  what they have instead of fixed pages. A **speed dial** shows all its tiles at once in as many
+  columns as fit (20 songs: two rows of 10; six playlists: one row); on a phone it keeps 3×3
+  pages, split evenly (no last page of 2). **Quick picks** are four rows across the whole
+  width (20 songs: 4 × 5). A row with **few playlists or albums** gets bigger cards that fill
+  the row. Each section has what YouTube Music's Home sends at once (quick picks 20, playlist
+  rows 3 to 6, new releases 10).
 - **Library** ✅ (with a linked YouTube Music account): your playlists and podcasts. The
   search bar at the top searches only your library here ([search](#search); *Settings →
   Search*). With that setting off, a search field on the page finds them by name or author as

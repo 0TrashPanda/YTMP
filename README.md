@@ -242,6 +242,7 @@ Music, without Premium, and not tied to a single music service.
 - Recaps from your listening history ("you listened 12 hours with Sam")
 - Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists
 - YTMP playlists, explore page
+- Home on a computer: sections that fit what they have (a speed dial of 20 as two rows of 10, quick picks across the full width)
 
 ## Known problems
 
