@@ -5,6 +5,10 @@
 #   installer, the Linux AppImage and latest.json (the desktop app's updates).
 # - Run it by hand (Actions → Release → Run workflow): builds test versions, kept as
 #   artifacts of the run, no release.
+# - Weekly, and when the Rust or Gradle dependencies change on main, it builds test versions
+#   too: that keeps the Rust and Gradle caches on main, the only place a tag's run can read
+#   them from (GitHub keeps a tag's own caches for that tag). With them a release takes about
+#   half the time.
 #
 # Needs the repository secrets YTMP_KEYSTORE_BASE64 (the release keystore, base64) and
 # YTMP_KEYSTORE_PASSWORD. Every release must be signed with the same key, or phones
@@ -16,6 +20,13 @@ name: Release
 on:
   push:
     tags: ['v*']
+    branches: [main]
+    paths:
+      - desktop/src-tauri/Cargo.lock
+      - gradle/libs.versions.toml
+      - gradle/wrapper/gradle-wrapper.properties
+  schedule:
+    - cron: '0 3 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -103,8 +114,7 @@ jobs:
           path: ytmp-*.apk
 
   desktop:
-    # After the APK's job, which makes the release.
-    needs: android
+    # At the same time as the APK's job; `publish` puts them in the release it makes.
     strategy:
       fail-fast: false
       matrix:
@@ -140,6 +150,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # The compiled Rust crates (Tauri and the rest): most of the app's build time.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+          # Saved on main only (a tag's caches can't be read by the next tag).
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
       - name: Linux libraries
         if: runner.os == 'Linux'
         run: |
@@ -165,6 +182,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      # Saved on main only, like the APK's.
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: This computer's host
         run: python desktop/scripts/bundle_host.py
@@ -206,27 +226,33 @@ jobs:
           fi
           if [ -f "${sig[0]}" ]; then cp "${sig[0]}" "../out/$file.sig"; fi
 
-      - name: Upload to the release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: find out -type f ! -name '*.sig' -exec gh release upload "$GITHUB_REF_NAME" {} --clobber \;
-
       - uses: actions/upload-artifact@v5
         with:
           name: desktop-${{ matrix.platform }}
           path: out/
 
-  desktop-updates:
+  publish:
+    # The desktop apps into the release the APK's job made (each one that built), and
     # latest.json: where the desktop app finds the new version and its signatures.
-    needs: desktop
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, desktop]
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/v') && needs.android.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v5
+        # None when both desktop builds failed.
+        continue-on-error: true
         with:
           path: out
+          pattern: desktop-*
           merge-multiple: true
+
+      - name: Desktop apps
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir -p out
+          find out -type f ! -name '*.sig' -exec gh release upload "$GITHUB_REF_NAME" {} --clobber --repo "$REPO" \;
 
       - name: latest.json
         env:

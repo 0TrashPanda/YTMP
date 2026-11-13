@@ -321,11 +321,14 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
   key (development) don't look for updates. **To do by the owner**: make the key
   (`cd desktop && pnpm tauri signer generate -w ~/.tauri/ytmp-updater.key`), commit the public
   key as `desktop/updater.pub` and add the two secrets.
-- ✅ **Release**: `release.yml`'s `desktop` job (after the APK's, which makes the release),
-  per OS (`ubuntu-22.04`, `windows-latest`): the module (`bundle_module.py`), `tauri build`
-  with the tag's version, and uploads `ytmp-<version>-linux-x86_64.AppImage` and
-  `ytmp-<version>-windows-x64-setup.exe` to the release (artifacts on a run by hand). Then
-  `desktop-updates` writes `latest.json` from both signatures and uploads it.
+- ✅ **Release**: `release.yml`'s `desktop` job (at the same time as the APK's, which makes
+  the release), per OS (`ubuntu-22.04`, `windows-latest`): the module (`bundle_module.py`),
+  the host, `tauri build` with the tag's version, kept as artifacts. Then `publish` uploads
+  `ytmp-<version>-linux-x86_64.AppImage` and `ytmp-<version>-windows-x64-setup.exe` (each that
+  built) to the release and writes `latest.json` from their signatures. The Rust crates
+  (`Swatinem/rust-cache`) and Gradle are cached; a tag's run can only read caches saved on main,
+  so the workflow also runs there as a test build (weekly, and when `Cargo.lock` or the Gradle
+  versions change).
 - **Code**: `desktop/` (Tauri project: `src-tauri/`, `setup/`, `scripts/`); the module and the
   web app stay where they are. Development: `python desktop/scripts/bundle_module.py` once
   (or without it the app uses `ytm-module/.venv` and no Deno), then `cd desktop && pnpm
