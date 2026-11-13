@@ -29,9 +29,10 @@ except that speed dial pages are split evenly.
    tiles about 8–9rem) and as many rows as the tiles need: 20 tiles at desktop width are 2
    rows of 10, 6 playlists one row of 6. Nothing is left on a page of its own. The name over
    the cover and the hover zoom stay. `PageDots` only on phones.
-   - **Phones**: still 3×3 pages swiped sideways, but evened out: `pages = ceil(n / 9)`, then
-     `per page = ceil(n / pages)` (20 → 10 + 10 with a 4th row on short pages… or simpler:
-     columns of 3, `ceil(per page / 3)` rows). Pick what keeps the tiles the same size.
+   - **Phones**: still pages of 3 columns swiped sideways, but evened out: `pages = ceil(n / 9)`,
+     `per page = ceil(n / pages)`, each page `ceil(per page / 3)` rows (20 → 2 pages of 10: 3
+     full rows and one tile on a 4th, or 7 + 7 + 6 with 3 pages; pick whichever keeps the
+     tiles the same size and looks calmer on a real phone).
 2. **Quick picks** (any song section shown as carousel): always 4 rows (fewer when there are
    fewer songs), and on wide screens the columns are `ceil(n / 4)` stretched to the full
    width (`grid-template-columns: repeat(cols, minmax(0, 1fr))`, no sideways scroll): 20
