@@ -2,7 +2,7 @@
 	// Settings → Home: your pins (a tile in Pinned, or a section with their songs) and which
 	// sections Home shows, in which order, and each as a carousel or a list (see home.svelte.ts).
 	// YouTube Music's sections are listed once Home has shown them.
-	import { home, layoutOf, movePin, moveSection, PINNED, resetHome, sectionList, setHidden, setHidePodcasts, setLayout, setPinContents, togglePin, type Layout } from '../../home.svelte';
+	import { home, layoutOf, movePin, moveSection, PINNED, resetHome, sectionList, setFullDialPages, setHidden, setHidePodcasts, setLayout, setPinContents, togglePin, type Layout } from '../../home.svelte';
 	import Icon from '../Icon.svelte';
 	import Choice from './Choice.svelte';
 
@@ -72,6 +72,17 @@
 		] as ['show' | 'hide', string][]}
 		value={home.hidePodcasts ? 'hide' : 'show'}
 		onchange={(v) => setHidePodcasts(v === 'hide')}
+	/>
+
+	<Choice
+		label="Speed dials on a phone"
+		hint="Full pages: YouTube Music's suggestions show as 18 covers (two pages of nine), or nine, so no page is half empty. Your pins always all show."
+		options={[
+			['full', 'Full pages'],
+			['all', 'Everything']
+		] as ['full' | 'all', string][]}
+		value={home.fullDialPages ? 'full' : 'all'}
+		onchange={(v) => setFullDialPages(v === 'full')}
 	/>
 
 	<section class="flex flex-col gap-3">

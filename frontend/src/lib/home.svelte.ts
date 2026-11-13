@@ -19,6 +19,8 @@ export interface HomePrefs {
 	layouts: Record<string, Layout>;
 	/** YTM's sections that are (mostly) podcasts and episodes don't show. */
 	hidePodcasts: boolean;
+	/** On a phone, a speed dial of suggestions shows only full 3×3 pages (18, or 9); off: all of it. */
+	fullDialPages: boolean;
 	pins: Pin[];
 }
 
@@ -88,10 +90,11 @@ export function loadPrefs(text: string | null): HomePrefs {
 			hidden: strings(stored.hidden),
 			layouts: layouts(stored.layouts),
 			hidePodcasts: stored.hidePodcasts === true,
+			fullDialPages: stored.fullDialPages !== false,
 			pins: pins(stored.pins)
 		};
 	} catch {
-		return { order: [], hidden: [], layouts: {}, hidePodcasts: false, pins: [] };
+		return { order: [], hidden: [], layouts: {}, hidePodcasts: false, fullDialPages: true, pins: [] };
 	}
 }
 
@@ -150,16 +153,16 @@ export const home = $state<HomePrefs & { podcastSections: string[] }>({
 });
 
 function save() {
-	const { order, hidden, layouts, hidePodcasts, pins } = home;
-	settings.home.set({ order, hidden, layouts, hidePodcasts, pins });
+	const { order, hidden, layouts, hidePodcasts, fullDialPages, pins } = home;
+	settings.home.set({ order, hidden, layouts, hidePodcasts, fullDialPages, pins });
 }
 
 // Changed on another device (or this one went back to your account's).
 if (typeof window !== 'undefined') {
 	window.addEventListener('ytmp:settings', () => {
 		const next = loadPrefs(JSON.stringify(settings.home.value));
-		const { order, hidden, layouts, hidePodcasts, pins } = home;
-		if (JSON.stringify(next) !== JSON.stringify({ order, hidden, layouts, hidePodcasts, pins })) Object.assign(home, next);
+		const { order, hidden, layouts, hidePodcasts, fullDialPages, pins } = home;
+		if (JSON.stringify(next) !== JSON.stringify({ order, hidden, layouts, hidePodcasts, fullDialPages, pins })) Object.assign(home, next);
 	});
 }
 
@@ -209,6 +212,11 @@ export const layoutOf = (key: string): Layout => home.layouts[key] ?? defaultLay
 
 export function setHidePodcasts(on: boolean): void {
 	home.hidePodcasts = on;
+	save();
+}
+
+export function setFullDialPages(on: boolean): void {
+	home.fullDialPages = on;
 	save();
 }
 

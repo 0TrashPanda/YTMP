@@ -25,8 +25,10 @@
 	import SpeedDial from './SpeedDial.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import type { Toast } from '../songActions';
-	import { menuAt } from '../songActions';
+	import { menuAt, tapSong } from '../songActions';
 	import { openCardMenu } from '../cardMenu.svelte';
+	import { youtube } from '../youtube.svelte';
+	import type { DialTile } from './SpeedDial.svelte';
 
 	let {
 		room,
@@ -85,6 +87,22 @@
 
 	const songs = (items: SearchItem[]): Song[] => items.flatMap((i) => (i.kind === 'song' ? [i.song] : []));
 	const cards = (items: SearchItem[]) => items.flatMap((i) => itemCard(i, open) ?? []);
+
+	/** All the songs Home suggests, for a speed dial's *Random song*. */
+	const homeSongs = $derived(sections.flatMap((b) => (b.kind === 'ytm' ? songs(b.section.items) : [])));
+	/** Tiles that fill a speed dial's gaps (SpeedDial: extras): Liked music (signed in), and a
+	 * random song from Home that isn't in [shown] (what Tap does in song lists). */
+	function dialExtras(shown: Song[] = []): DialTile[] {
+		const others = homeSongs.filter((s) => !shown.some((t) => t.id === s.id));
+		return [
+			...(youtube.account
+				? [{ key: 'playlistLM', title: 'Liked music', art: undefined, icon: 'liked' as const, open: () => open.onPlaylist({ id: 'LM', title: 'Liked music' }, true) }]
+				: []),
+			...(others.length
+				? [{ key: 'ytmp:random', title: 'Random song', art: undefined, icon: 'shuffle' as const, open: () => tapSong(room, others[Math.floor(Math.random() * others.length)], onToast) }]
+				: [])
+		];
+	}
 
 	/** ‹ or › of a section: its row moves along by most of its width. */
 	function slide(event: MouseEvent, way: -1 | 1) {
@@ -219,6 +237,7 @@
 						menu: (e: MouseEvent) => pinMenu(pin, e)
 					}))}
 					all
+					extras={dialExtras()}
 				/>
 			{:else if block.kind === 'pinned'}
 				<div class={block.layout === 'list' ? 'flex flex-col' : 'grid grid-cols-2 gap-2 px-2 sm:grid-cols-3 lg:grid-cols-4'}>
@@ -229,14 +248,14 @@
 			{:else if block.kind === 'pin'}
 				<PinContents {room} pin={block.pin} layout={block.layout} {onToast} {onMenu} onScrolls={(s) => (scrolling[`${block.key}:songs`] = s)} />
 			{:else if block.kind === 'friends' && block.layout === 'dial'}
-				<SpeedDial tiles={songTiles(block.shares.map((s) => s.song), room, onToast, onMenu)} />
+				<SpeedDial tiles={songTiles(block.shares.map((s) => s.song), room, onToast, onMenu)} extras={dialExtras(block.shares.map((s) => s.song))} />
 			{:else if block.kind === 'friends'}
 				<FriendShares {room} shares={block.shares} list={block.layout === 'list'} {onToast} {onMenu} />
 			{:else}
 				{@const list = songs(block.section.items)}
 				{@const others = cards(block.section.items)}
 				{#if block.layout === 'dial'}
-					<SpeedDial tiles={[...songTiles(list, room, onToast, onMenu), ...cardTiles(others)]} />
+					<SpeedDial tiles={[...songTiles(list, room, onToast, onMenu), ...cardTiles(others)]} extras={dialExtras(list)} />
 				{:else if list.length && block.layout === 'list'}
 					<SongList {room} songs={list} {onToast} {onMenu} />
 				{:else if list.length}

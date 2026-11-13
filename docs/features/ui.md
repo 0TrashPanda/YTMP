@@ -63,8 +63,11 @@ Like YTM:
   where YTM puts it.
 - **Home fits what each section has** ✅ ([how](../implementation/home-layout.md)). On a
   **phone**, a speed dial of suggestions shows only full 3×3 pages: 18 tiles (two pages), or 9
-  when there are fewer than 18; your own pins in *Pinned* all show. On a **computer**, a speed
-  dial shows all its tiles at once in even rows that fill the width (20: 7 · 7 · 6 at 1440 px),
+  when there are fewer than 18 (*Settings → Home → Speed dials on a phone*: *Full pages* or
+  *Everything*); your own pins in *Pinned* all show. On a **computer**, a speed dial shows all
+  its tiles at once in even rows that fill the width (20 at 1440 px: three rows of 7). A gap
+  in the last row or page is filled with **Liked music** (signed in) and **Random song** (a
+  song from Home that isn't in the dial, played the way a tap on a song does),
   **quick picks** sit across the whole width without scrolling (20 songs: 4 columns of 5, or 5
   of 4 on a wider screen), and a row of **playlists or albums** shows whole cards, never one
   cut off at the edge; a row with few gets bigger cards that fill it. The ‹ › buttons only

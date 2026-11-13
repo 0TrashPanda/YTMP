@@ -54,6 +54,8 @@ describe('home sections', () => {
 
 	it('reads what was saved, and survives junk', () => {
 		expect(loadPrefs('nonsense').order).toEqual([]);
+		expect(loadPrefs(null).fullDialPages).toBe(true);
+		expect(loadPrefs('{"fullDialPages":false}').fullDialPages).toBe(false);
 		expect(loadPrefs('{"order":["A","A",3],"hidePodcasts":true}')).toMatchObject({ order: ['A'], hidePodcasts: true });
 	});
 });

@@ -24,8 +24,13 @@ What looks off on a wide screen now:
 ## What was built
 
 - `SpeedDial.svelte`: phones (`screen.wide` false, `screen.svelte.ts`: `min-width: 640px`):
-  pages of 9; suggestions show only full pages (≥18 tiles: 18, ≥9: 9, fewer: all on one page);
-  `all` (the *Pinned* section) shows every pin. Computers: one grid, as many columns as fit at
+  pages of 9; suggestions show only full pages (≥18 tiles: 18, ≥9: 9, fewer: all on one page),
+  unless *Settings → Home → Speed dials on a phone* is *Everything* (`HomePrefs.fullDialPages`,
+  default on; `all` defaults to its opposite); `all` (the *Pinned* section) shows every pin.
+  `extras` (from `HomeView.dialExtras`: Liked music when signed in, key `playlistLM` like its
+  pin; *Random song* from Home's songs not in the dial) fill a gap: a full page counts them
+  (17 tiles + 1 = 18), on a computer the last row (20 at 7 columns + 1 = 21), with everything
+  shown the last row of 3. They only show when there are enough of them for the whole gap. Computers: one grid, as many columns as fit at
   120 px, then fewer so the rows are even, `1fr` each; fewer tiles than fit: at most 176 px.
 - `SongCarousel.svelte`: on a computer, no scrolling when the songs fit in at most 5 rows of
   columns ≥ 256 px (20 at 1440 px: 4 columns of 5; at 1024 px, 2 fit, so they scroll); otherwise

@@ -24,30 +24,41 @@
 
 <script lang="ts">
 	// YTM's speed dial: covers with the name over them (Home: Pinned, and any section set to Speed
-	// dial). Phones: 3×3 pages swiped sideways, only full pages for suggestions (18, or 9) so no page
-	// is half empty; your own pins all show. Computers: one grid without pages, its rows even
-	// (20 tiles: 7 · 7 · 6 at 1440 px, two rows of 10 on a wider screen).
+	// dial). Phones: 3×3 pages swiped sideways; with Settings → Home's *Full pages* only full pages
+	// (18, or 9) so no page is half empty; your own pins all show. Computers: one grid without
+	// pages, its rows even (20 tiles: 7 · 7 · 6 at 1440 px, two rows of 10 on a wider screen).
+	// [extras] (Liked music, a random song) fill the gaps a full last row or page would leave.
+	import { home } from '../home.svelte';
 	import { screen } from '../screen.svelte';
 	import Icon from './Icon.svelte';
 	import Picture from './Picture.svelte';
 	import PageDots from './PageDots.svelte';
 
-	/** [all]: show every tile on phones too (your pins), not only full pages. */
-	let { tiles, all = false }: { tiles: DialTile[]; all?: boolean } = $props();
+	/** [all]: show every tile on phones too (your pins), not only full pages; [extras]: tiles that
+	 * only show to fill a gap. */
+	let { tiles, all = !home.fullDialPages, extras = [] }: { tiles: DialTile[]; all?: boolean; extras?: DialTile[] } = $props();
 
 	const unique = $derived(tiles.filter((t, i) => tiles.findIndex((u) => u.key === t.key) === i));
-	const onPhone = $derived(all || unique.length < 9 ? unique : unique.slice(0, unique.length >= 18 ? 18 : 9));
+	const spare = $derived(extras.filter((e) => !unique.some((t) => t.key === e.key)));
+	/** [list] with the first [count] spare tiles after it, when that many are there. */
+	const filled = (list: DialTile[], count: number) => (count > 0 && count <= spare.length ? [...list, ...spare.slice(0, count)] : list);
+	const onPhone = $derived.by(() => {
+		if (all) return filled(unique, (3 - (unique.length % 3)) % 3);
+		const pages = unique.length + spare.length >= 18 ? 2 : unique.length + spare.length >= 9 ? 1 : 0;
+		if (!pages) return filled(unique, (3 - (unique.length % 3)) % 3);
+		return filled(unique.slice(0, pages * 9), pages * 9 - Math.min(unique.length, pages * 9));
+	});
 	const pages = $derived(Array.from({ length: Math.ceil(onPhone.length / 9) }, (_, i) => onPhone.slice(i * 9, i * 9 + 9)));
 
 	let width = $state(0);
 	const fit = $derived(Math.max(1, Math.floor((width + GAP) / (MIN_TILE + GAP))));
 	/** Columns on a computer: as many as fit, then fewer so the rows come out even; they fill the
 	 * width, except when there are fewer tiles than fit (those stay at most [MAX_TILE] wide). */
-	const columns = $derived.by(() => {
-		if (unique.length <= fit) return `repeat(${unique.length}, minmax(0, ${MAX_TILE}px))`;
-		const rows = Math.ceil(unique.length / fit);
-		return `repeat(${Math.ceil(unique.length / rows)}, minmax(0, 1fr))`;
-	});
+	const rows = $derived(Math.ceil(unique.length / fit));
+	const perRow = $derived(Math.ceil(unique.length / Math.max(1, rows)));
+	/** On a computer: the tiles, and extras where the last row has a gap. */
+	const onComputer = $derived(rows > 1 ? filled(unique, rows * perRow - unique.length) : unique);
+	const columns = $derived(rows > 1 ? `repeat(${perRow}, minmax(0, 1fr))` : `repeat(${unique.length}, minmax(0, ${MAX_TILE}px))`);
 	let scroller = $state<HTMLElement>();
 </script>
 
@@ -71,7 +82,7 @@
 {#if screen.wide}
 	<div class="px-2" bind:clientWidth={width}>
 		<div class="grid gap-2" style:grid-template-columns={columns}>
-			{#each unique as t (t.key)}
+			{#each onComputer as t (t.key)}
 				{@render tile(t)}
 			{/each}
 		</div>
