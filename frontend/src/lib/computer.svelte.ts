@@ -1,12 +1,12 @@
 // The desktop app's music and song cache on this computer (docs/implementation/desktop-app.md#music-and-songs-on-this-computer).
-// The app's own module keeps them (ytm-module/ytmp_ytm/desktop.py); the window plays them from
-// the app's `ytmpfiles` address, so they never go through the server, unless the server asks
-// for a song another player in the room needs ([sendWhenAsked]).
-import type { AlbumPage, ArtistPage, LocalLibraryPage, LocalLibrarySummary, Song } from './protocol.gen';
+// The app's own host keeps them (desktop/host/: the same host code as the phone's, without
+// rooms); the window reaches it at the app's `ytmphost` address and plays from there, so they
+// never go through the server, unless the server asks for a song another player in the room
+// needs ([watchForRequests]).
+import type { AlbumPage, ArtistPage, LocalLibraries, LocalLibraryPage, LocalLibrarySummary, Song, SongCacheStatus } from './protocol.gen';
 import { desktopApp } from './ownModule.svelte';
 
 export interface ComputerStatus {
-	device: string;
 	libraryId: string;
 	cacheMb: number;
 	cacheSongs: number;
@@ -17,54 +17,85 @@ export interface ComputerStatus {
 	scanning: boolean;
 }
 
+interface MusicStatus {
+	music: boolean;
+	folders: { path: string; name: string }[];
+	songs: number;
+	scanning: boolean;
+	libraryId: string;
+}
+
 /** Songs longer than this (mixes, whole concerts) aren't kept, like on the phone. */
 const MAX_CACHED_MS = 60 * 60 * 1000;
+const MB = 1024 * 1024;
 
 /** This computer's music and cache; null until asked (and always outside a desktop app that has them). */
 export const computer = $state({ status: null as ComputerStatus | null });
 
-/** The desktop app has them (0.46 on: older apps don't). */
+/** The desktop app has its own host (0.46 on: older apps don't). */
 export function onComputer(): boolean {
-	return !!desktopApp()?.files;
+	return !!desktopApp()?.host;
 }
 
 async function ask<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
-	const app = desktopApp();
-	if (!app?.files || !app.moduleRequest) throw new Error('Only in the desktop app');
-	const answer = await app.moduleRequest(path, method, body === undefined ? undefined : JSON.stringify(body));
+	const host = desktopApp()?.host;
+	if (!host) throw new Error('Only in the desktop app');
+	const response = await fetch(host + path, {
+		method,
+		headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+		body: body === undefined ? undefined : JSON.stringify(body)
+	});
+	const text = await response.text();
 	const parsed = (() => {
 		try {
-			return JSON.parse(answer.body);
+			return JSON.parse(text);
 		} catch {
 			return null;
 		}
 	})();
-	if (answer.status < 200 || answer.status > 299) throw new Error(parsed?.error?.message ?? `the app's module answered ${answer.status}`);
+	if (!response.ok) throw new Error(parsed?.error?.message ?? `this computer's host answered ${response.status}`);
 	return parsed as T;
+}
+
+function combine(music: MusicStatus, cache: SongCacheStatus): ComputerStatus {
+	return {
+		libraryId: music.libraryId,
+		cacheMb: Math.round(cache.maxBytes / MB),
+		cacheSongs: cache.songs,
+		cacheBytes: cache.bytes,
+		music: music.music,
+		folders: music.folders,
+		musicSongs: music.songs,
+		scanning: music.scanning
+	};
 }
 
 export async function loadComputer(): Promise<ComputerStatus | null> {
 	if (!onComputer()) return null;
 	try {
-		computer.status = await ask<ComputerStatus>('desktop/status');
+		const [music, cache] = await Promise.all([ask<MusicStatus>('/api/desktop/music'), ask<SongCacheStatus>('/api/cache')]);
+		computer.status = combine(music, cache);
 		watchForRequests();
 	} catch {
-		// The module is starting: the settings ask again.
+		// The host is starting: the settings ask again.
 	}
 	return computer.status;
 }
 
 export async function changeComputer(changes: { cacheMb?: number; music?: boolean; folders?: string[] }): Promise<void> {
-	computer.status = await ask<ComputerStatus>('desktop/settings', 'PUT', changes);
-	watchForRequests();
+	if (changes.cacheMb !== undefined) await ask<SongCacheStatus>('/api/cache', 'PUT', { maxBytes: changes.cacheMb * MB });
+	if (changes.music !== undefined || changes.folders !== undefined) await ask<MusicStatus>('/api/desktop/music', 'PUT', { music: changes.music, folders: changes.folders });
+	await loadComputer();
 }
 
 export async function clearComputerCache(): Promise<void> {
-	computer.status = await ask<ComputerStatus>('desktop/cache/clear', 'POST');
+	await ask('/api/cache/clear', 'POST');
+	await loadComputer();
 }
 
 export async function rescanComputer(): Promise<void> {
-	computer.status = await ask<ComputerStatus>('desktop/music/rescan', 'POST');
+	await ask('/api/desktop/music/rescan', 'POST');
+	await loadComputer();
 }
 
 /** The system's folder picker; the folder joins the music on this computer. */
@@ -87,14 +118,15 @@ export async function computerLibrary(): Promise<LocalLibrarySummary | null> {
 	if (!computer.status) await loadComputer();
 	if (!musicOn()) return null;
 	try {
-		return await ask<LocalLibrarySummary>('desktop/library/summary');
+		const { libraries } = await ask<LocalLibraries>('/api/local');
+		return libraries.find((l) => l.id === computer.status?.libraryId) ?? null;
 	} catch {
 		return null;
 	}
 }
 
 export const isComputerLibrary = (id: string) => !!computer.status && id === computer.status.libraryId;
-export const computerLibraryPage = () => ask<LocalLibraryPage>('desktop/library');
+export const computerLibraryPage = (id: string) => ask<LocalLibraryPage>(`/api/local/${encodeURIComponent(id)}`);
 
 /** A song, album or artist of this computer's music (not another computer's). */
 export function isMine(id: string | null | undefined): boolean {
@@ -102,26 +134,38 @@ export function isMine(id: string | null | undefined): boolean {
 	return !!device && !!id && id.startsWith(`local:dev-${device}:`);
 }
 
-export const computerAlbum = (id: string) => ask<AlbumPage>(`desktop/albums/${encodeURIComponent(id)}`);
-export const computerArtist = (id: string) => ask<ArtistPage>(`desktop/artists/${encodeURIComponent(id)}`);
+export const computerAlbum = (id: string) => ask<AlbumPage>(`/api/albums/${encodeURIComponent(id)}`);
+export const computerArtist = (id: string) => ask<ArtistPage>(`/api/artists/${encodeURIComponent(id)}`);
+
+/** A YouTube Music song the song cache takes (it's on, music, at most an hour). */
+function cacheTakes(song: Song): boolean {
+	return (computer.status?.cacheMb ?? 0) > 0 && song.id.startsWith('ytm:') && !song.podcast && song.durationMs <= MAX_CACHED_MS;
+}
 
 /**
  * Where this computer plays [song] from itself, or null: a song of its own music, or (with the
  * song cache on) a YouTube Music song, which the cache keeps as it plays.
  */
 export function computerAudio(song: Song): string | null {
-	const files = desktopApp()?.files;
-	if (!files) return null;
-	const cached = (computer.status?.cacheMb ?? 0) > 0 && song.id.startsWith('ytm:') && !song.podcast && song.durationMs <= MAX_CACHED_MS;
-	if (!isMine(song.id) && !cached) return null;
-	return `${files}audio/${encodeURIComponent(song.id)}`;
+	const host = desktopApp()?.host;
+	if (!host || (!isMine(song.id) && !cacheTakes(song))) return null;
+	return `${host}/api/audio/${encodeURIComponent(song.id)}`;
+}
+
+/**
+ * Before the window asks for [song]'s audio: the cache hears about it (`started`: it plays now
+ * and counts as a play; `known`: it's next), so the request fills the cache.
+ */
+export async function tellComputer(song: Song, how: 'started' | 'known'): Promise<void> {
+	if (!cacheTakes(song)) return;
+	await ask(`/api/desktop/${how}`, 'POST', song).catch(() => {});
 }
 
 let watching = false;
 
 /**
  * While the music on this computer is on: the server says when another player in a room needs
- * one of its songs (it asks no sooner), and the app's module sends that one file.
+ * one of its songs (it asks no sooner), and this computer's host sends that one file.
  */
 function watchForRequests(): void {
 	const app = desktopApp();
@@ -138,7 +182,7 @@ function watchForRequests(): void {
 				const { songs } = (await response.json()) as { songs: string[] };
 				for (const songId of songs) {
 					const url = new URL(`/api/devices/${id}/songs/${encodeURIComponent(songId)}`, location.href).href;
-					ask('desktop/upload', 'POST', { songId, url, secret }).catch((e: Error) => console.warn(`sending ${songId}: ${e.message}`));
+					ask('/api/desktop/upload', 'POST', { songId, url, secret }).catch((e: Error) => console.warn(`sending ${songId}: ${e.message}`));
 				}
 			} catch {
 				// An older server, or no connection: ask again a little later.

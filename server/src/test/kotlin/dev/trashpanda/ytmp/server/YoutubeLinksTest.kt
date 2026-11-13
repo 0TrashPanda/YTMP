@@ -1,5 +1,7 @@
 package dev.trashpanda.ytmp.server
 
+import dev.trashpanda.ytmp.host.RemoteSourceModule
+
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

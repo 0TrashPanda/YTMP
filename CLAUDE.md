@@ -10,7 +10,7 @@ what's planned is marked there.
 - `protocol/` message types (Kotlin is the source of truth) · `core/` rooms, queue, roles ·
   `host/` HTTP/WebSocket API, shared by server and phone · `cast/` Chromecast, DIAL and YouTube Lounge clients ·
   `server/` Linux server, accounts, room sync · `android/` the app (WebView, Media3, Chaquopy,
-  its own host) · `desktop/` Windows/Linux app (Tauri, bundles the Python module) ·
+  its own host) · `desktop/` Windows/Linux app (Tauri; bundles the Python module and its own host, `desktop/host/`) ·
   `frontend/` Svelte 5 + Tailwind · `ytm-module/` Python · `deploy/` Docker
   Compose, Caddy, Proxmox guide · `tools/smoke-test.py`.
 
@@ -25,7 +25,9 @@ what's planned is marked there.
   styles (`app.css`, Tailwind config), polyfills, or updated dependencies (Svelte, Vite,
   Tailwind); and once before a release. Skip it for screens the Chromecast never shows.
 - Android: `./gradlew :android:assembleDebug`; release lint: `./gradlew :android:lintRelease`.
-- Desktop app: `python desktop/scripts/bundle_module.py` (the module and Deno, once), then
+- Desktop app: `python desktop/scripts/bundle_module.py` (the module and Deno, once) and
+  `python desktop/scripts/bundle_host.py` (this computer's host and its Java runtime; needs a
+  JDK 21, again after changing `host/` or `desktop/host/`), then
   `cd desktop && pnpm install && pnpm tauri dev`; an AppImage: `pnpm tauri build --bundles appimage`.
 - After changing anything in `protocol/`: `./gradlew :protocol:generateTs` (new request types
   must also be added as roots in `protocol/.../tsgen/TsGenerator.kt`).

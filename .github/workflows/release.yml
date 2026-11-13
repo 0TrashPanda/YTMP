@@ -160,6 +160,15 @@ jobs:
       - name: YouTube Music module
         run: python desktop/scripts/bundle_module.py
 
+      # This computer's host (desktop/host) and a Java runtime made for it with jlink.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: This computer's host
+        run: python desktop/scripts/bundle_host.py
+
       - name: App
         working-directory: desktop
         env:

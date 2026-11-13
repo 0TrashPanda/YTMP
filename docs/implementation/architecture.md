@@ -105,6 +105,13 @@ themselves extend `DeviceDriver` and only give a `DeviceSession` (keep one devic
 the room); `ZoneOutputs` has its own loop on `RoomFollowingDriver`. A host lists its drivers once
 in `OutputDrivers` (server `Main.kt`, phone `LocalHost.kt`).
 
+**The desktop app** (`desktop/`): the window, media keys and updater in Rust (`src-tauri/`),
+which also starts and watches the Python module and this computer's host (`module.rs`) and
+passes the window's `ytmphost://` requests to the host (`host_request` in `main.rs`). The host is
+`desktop/host/` (`DesktopHost.kt`: the shared `host/` code wired like the phone's
+`LocalHost.kt`, without rooms or accounts); something for the desktop only (a setting, a
+library) goes there, and the web app reaches it through `lib/computer.svelte.ts`.
+
 **The web app** (`frontend/src/`): the room page (`routes/room/[code]/+page.svelte`) shows one
 page of the stack (`lib/pageStack.svelte.ts`: a new kind of page is a `View`) and at most one
 sheet, menu or dialog (`sheet`). Song lists use `SongList.svelte`; what tap, swipe and hold do

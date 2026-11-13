@@ -22,8 +22,9 @@ Windows check below).
 └─────────────────────────────────────────────┘
 ```
 
-- **No Kotlin host on the computer**: it's a client, so no Java runtime is shipped. That's
-  most of the memory and size a full host would cost.
+- **A Kotlin host on the computer, but no rooms or accounts**: the phone's host code for the
+  song cache, local music and (later) speakers, see [this computer's host](#this-computers-host-).
+  It costs a Java runtime of its own (~95 MB on disk, ~190 MB of memory).
 - ✅ **The window loads the web app from the server**, like the Android app
   ([android-app.md](android-app.md#client-mode-milestone-2-)): the app and the server's UI
   can't get out of sync. The bundled setup page (`desktop/setup/index.html`, the Android
@@ -62,48 +63,81 @@ Windows check below).
   module, the room's link, through the server), so songs come from this computer unless
   you change the order; browsers keep the room's link first.
 
+## This computer's host ✅
+
+The same host code as the phone's (`host/`), run by the app as a third program next to its
+window and the Python module (`desktop/host/`, Gradle project `:desktop-host`, main
+`dev.trashpanda.ytmp.desktop.DesktopHostKt`). So the desktop gets the song cache, local music,
+and later the speakers and copying from a phone, from the code the phone and the server
+already use, instead of a second copy in Python. Python stays YouTube only; Rust stays the
+window, media keys, updater and starting the other two.
+
+It is **not a server**: no accounts, no admin, no rooms (`roomCreateDenied`; your rooms stay on
+your server), `HostKind.COMPUTER`.
+
+- **Only for the app**: it listens on `127.0.0.1` only, on a free port, and answers only with
+  the key the app made for this start (`Authorization: Bearer …`; `/api/health` without, for
+  the app to see it's up). Requests from elsewhere get 401.
+- **The window reaches it through the app**: `ytmphost://localhost/api/…` (Windows:
+  `http://ytmphost.localhost/api/…`, `HOST_BASE`, given to the page as `YtmpDesktop.host`). The
+  app's protocol handler (`host_request` in `main.rs`) passes method, path, `Range`,
+  `Content-Type` and body on with the key, answers CORS (`OPTIONS` itself) so the server's page
+  may `fetch` it, and caps a song's open range to 4 MB per answer (`piece`): Tauri keeps each
+  answer in memory, the player asks on.
+- **Started and watched like the module** (`module.rs`: `Sidecars`, `Kind::Host`): restarted
+  when it stops, in the same kind of job object on Windows (`PR_SET_PDEATHSIG` on Linux), so
+  it ends with the app. Its output goes to `host.log` in the app's log folder. Env:
+  `YTMP_HOST_PORT`, `YTMP_HOST_KEY`, `YTMP_HOST_DIR` (the data folder's `host/`),
+  `YTMP_HOST_WINDOW_BASE`, `YTMP_MODULE_URL`/`YTMP_MODULE_KEY` (YouTube through the module,
+  `RemoteSourceModule`, moved from `server/` to `host/` for this), `YTMP_DEVICE`.
+- **The Java runtime is the app's own**: `desktop/scripts/bundle_host.py` builds the host
+  (`installDist`), lets `jdeps` find the Java modules it uses (plus a few it loads by name), and
+  makes a runtime of only those with `jlink` (with a class data archive, for a faster start)
+  in `src-tauri/resources/java`, the libraries in `resources/host/lib`. Without them (a dev
+  build) the app uses `YTMP_DESKTOP_JAVA` or the `java` on `PATH`, and
+  `desktop/host/build/install/desktop-host/lib`. Windows gives Tauri's resource folder with a
+  `\\?\` prefix, which Java's `lib\*` classpath doesn't understand: the app strips it.
+- **Size and memory** (Windows, 2026-11-13): the runtime 73 MB and the libraries 21 MB on disk;
+  the host used ~190 MB of memory after playing songs, next to the module's ~100 MB (JVM flags:
+  serial GC, `-Xmx256m`, C1 only). Worth tuning further.
+
 ## Music and songs on this computer ✅
 
 The music files on the computer and a song cache, both off by default (features:
 [sources](../features/sources.md#local-music-)). Tried in a debug build on Windows 10 against a
-local server: the Local tab with three MP3s (tags, covers, albums, folders), one playing in a
-solo room from the computer with the server asking for nothing; the same song in a party room
-with a second listener (the browser), where the server asked the app once and the app sent
-5 MB; a YouTube song kept by the cache while the one before it played, then played from the disk
-without another lookup.
+local server, with the host: the Local tab with three MP3s (tags, covers, albums, folders), one
+playing in a solo room from the computer with the server asking for nothing; the same song in a
+party room with a second listener (the browser), where the server asked once and the host sent
+5 MB; a YouTube song fetched into the cache while the one before it played, then played from
+the disk without another lookup.
 
-- **The module does the work** (`ytmp_ytm/desktop.py`, only with `YTMP_YTM_DESKTOP_DIR` = the
-  app's data folder `on-this-computer/`): settings in `desktop.json` (`cacheMb`, `music`,
-  `folders`), the music index in `music-index.json` (tags read once per file with mutagen, by its
-  modified time and size), the cache in `song-cache/` with its `index.json`. Routes under
-  `/desktop/…` (status, settings, library, albums, artists, files, upload), with the key like the
-  rest.
-- **The window plays from the computer** through a protocol of the app's own, `ytmpfiles`
-  (`http://ytmpfiles.localhost/` on Windows, `ytmpfiles://localhost/` on Linux; `FILES_BASE`):
-  `audio/<song>` and `art/<song>`. The app passes each request (with its `Range`) to the
-  module's `/desktop/files/…` with the key and answers with CORS open, so the equalizer can use
-  it too. The module answers at most 2 MB per request (`PIECE`) and the player asks on.
+- **The music** (`ComputerLibrary`, a `LocalLibrary` of kind `computer`, id `dev-<device>`):
+  the folders picked with the system's folder picker (the app's `pick_folder`), kept in
+  `desktop.json` with the cache's size. Tags (jaudiotagger: MP3, M4A, FLAC, OGG, WAV, WMA; the
+  file name when there are none) are read once per file, by its modified time and size, and
+  kept in `music-index.json`; the folders are looked through again when the Local tab asks
+  (at most every 10 minutes) or with *Look again*. Covers: the picture in the file, else a
+  `cover`/`folder`/`front.jpg` in its folder. `LocalMusic` makes the songs, albums, artists,
+  genres and folders, as on the phone and the Pi.
+- **The cache** is the host's `SongCache`, as on the phone and the server, in the data folder's
+  `host/song-cache` (*Settings → Song cache*: `GET/PUT /api/cache`, `POST /api/cache/clear`).
+  The window tells it about a song first (`POST /api/desktop/started`: it plays now and counts
+  as a play; `…/known`: it's next), so asking for its audio (`/api/audio/…`) fetches it once
+  into the cache as it plays (`Fill`), and the next one ahead of time.
 - **IDs**: this computer's id and secret are made once and kept in the app's `settings.json`
-  (`device_id`, `device_secret`). Songs `local:dev-<id>:s:<key>` (key: SHA-1 of the path), albums
-  `…:a:…`, artists `…:r:…`. The web app sends album and artist pages of its own device to the
-  module (`computer.svelte.ts`, `isMine`); the Local tab's library (`kind: computer`) comes from
-  the module too, never through a host.
-- **Playing**: the web player (`player.svelte.ts`) plays from `ytmpfiles` when the song is this
+  (`device_id`, `device_secret`). Songs `local:dev-<id>:s:<key>` (key: from the file's path),
+  albums `…:a:…`, artists `…:r:…`. The web app sends the Local tab's library and album and
+  artist pages of its own device to the host (`computer.svelte.ts`, `isMine`).
+- **Playing**: the web player (`player.svelte.ts`) plays from the host when the song is this
   computer's, or when the cache is on and it's a YouTube Music song (not a podcast, at most an
   hour): `computerAudio`. If that fails it plays the usual way. The badge says *This computer*.
-- **The cache** (`Desktop.file` → `_from_fill`): a song not kept yet is fetched once, in 1 MB
-  ranges like yt-dlp, into a `.part` file that the player reads as it comes in (a seek far
-  ahead is fetched from YouTube directly meanwhile). Complete and under an hour: kept. Over the
-  size: the lowest keep score goes first (last played, plus a week per extra play in 90 days),
-  like the phone's. The player asks for the next song's start while one plays, so it's fetched
-  ahead.
 - **Sent only when needed** (`DeviceSongs` in `host/`, on the server): the room's stream link
   for these songs is the server's `/api/audio/<song>`. Nobody asks for it while the computer
-  plays alone (its player plays from `ytmpfiles`). When another player or a speaker does, the
-  server marks the song wanted and waits up to 60 s. The app's web page waits at
-  `GET /api/devices/<id>/wanted` (25 s at a time, `X-Device-Secret`; the first secret a device
-  comes with is its own until the server restarts), and on an answer has the module `PUT` that
-  file to `/api/devices/<id>/songs/<song>`. The server keeps it in `device-songs/` next to the
+  plays alone. When another player or a speaker does, the server marks the song wanted and
+  waits up to 60 s. The page waits at `GET /api/devices/<id>/wanted` (25 s at a time,
+  `X-Device-Secret`; the first secret a device comes with is its own until the server
+  restarts), and on an answer has the host (`POST /api/desktop/upload`) `PUT` that file to
+  `/api/devices/<id>/songs/<song>`. The server keeps it in `device-songs/` next to the
   database: at most 2 GB, a day unused, emptied when it starts, 500 MB a file at most.
 - **Not yet**: radio and autoplay from these songs (the server can't read them); their covers
   for others in the room (the cover link is the computer's own, so others see the placeholder).
@@ -245,6 +279,7 @@ Measured with the AppImage on Linux, on the join page (2026-11-11):
 | Web view: network | always | ~100 MB |
 | The app itself | always | ~25 MB |
 | YTM module (Python) | always | ~85 MB |
+| This computer's host (Java) | always | ~190 MB (Windows, after playing songs) |
 | Deno | during a song lookup, a few seconds | ~250 MB |
 | BotGuard window (planned) | while lookups happen, closes after 10 min without | ~20 MB |
 
@@ -301,6 +336,9 @@ the module.
 6. Next: PO tokens (BotGuard in a hidden window) and the YouTube Music sign-in in the app.
 7. ✅ Trying it on Windows, and the first release with it (0.44.0).
 8. ✅ The music on the computer and a song cache (see above).
+9. ✅ This computer's host (Kotlin, the phone's host code) instead of the module doing them.
+10. Next: speakers (Chromecast, Sonos, MPD) from the host, with always-on discovery in the app;
+    copying songs from a phone's cache over Wi-Fi.
 
 ## Open questions
 

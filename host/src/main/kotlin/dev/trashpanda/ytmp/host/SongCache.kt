@@ -218,6 +218,15 @@ class SongCache(
         }
     }
 
+    /**
+     * [song] may be asked for at the audio route soon (the next one in a room, on the desktop):
+     * known, so a request fetches it into the cache, without counting a play.
+     */
+    fun know(song: Song) {
+        if (!takes(song)) return
+        synchronized(lock) { known[song.id] = song }
+    }
+
     /** A song a room played ended: skipped within 30 s, it doesn't count as a play (like YouTube's). */
     fun finished(play: FinishedPlay) = finished(play.item.song, play.heardMs >= COUNTS_AFTER_MS || !play.skipped)
 
@@ -1030,7 +1039,7 @@ class SongCache(
         }
 
         /** Sends [file] with [range], like a web server. */
-        internal suspend fun respondFile(call: ApplicationCall, file: File, type: String, range: String?) {
+        suspend fun respondFile(call: ApplicationCall, file: File, type: String, range: String?) {
             val total = file.length()
             val (start, requestedEnd) = ByteRange.parse(range)
             val end = minOf(requestedEnd, total - 1)

@@ -180,7 +180,7 @@
 					'Music and storage',
 					[
 						['local', 'Local music', 'local', true],
-						['storage', desktop?.files ? 'Song cache' : 'Song cache and downloads', 'download', inApp || !!desktop?.files],
+						['storage', desktop?.host ? 'Song cache' : 'Song cache and downloads', 'download', inApp || !!desktop?.host],
 						['module', 'Where songs play from', 'server', !inApp]
 					]
 				],
@@ -861,7 +861,7 @@
 	{:else if id === 'local'}
 		<LocalSection {onToast} />
 	{:else if id === 'storage'}
-		{#if desktop?.files}
+		{#if desktop?.host}
 			<ComputerCacheSection {onToast} />
 		{:else if onThisPhone}
 			<DownloadsSection {onToast} />

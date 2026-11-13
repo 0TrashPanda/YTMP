@@ -83,8 +83,8 @@ export interface DesktopApp {
 	changeServer?: () => Promise<void>;
 	/** This build looks for new versions when it starts (absent before 0.45: those didn't). */
 	updates?: boolean;
-	/** Where the window plays this computer's music and song cache (`audio/<song>`, `art/<song>`); absent in older apps. */
-	files?: string;
+	/** This computer's host, where the window gets this computer's music and song cache (`…/api/…`); absent in older apps. */
+	host?: string;
 	/** This computer's id (in its songs' IDs) and secret, for the server's requests for a song. */
 	device?: { id: string; secret: string };
 	/** The system's folder picker: the folder's path, or null. */

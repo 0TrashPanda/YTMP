@@ -580,7 +580,7 @@ export function getLocalLibraries(fresh = false): Promise<LocalLibraries> {
 /** One local library, whole: its albums, artists and songs. */
 export function getLocalLibrary(id: string): Promise<LocalLibraryPage> {
 	// The music on this computer (the desktop app): from the app's module, never through a host.
-	if (isComputerLibrary(id)) return computerLibraryPage();
+	if (isComputerLibrary(id)) return computerLibraryPage(id);
 	const load = () => request<LocalLibraryPage>(`/api/local/${encodeURIComponent(id)}`);
 	// "Cached on this phone" changes as songs come in and go (and its playlists with them): always as it is now.
 	return id === 'cache' ? load() : cached(`local:${id}`, load);

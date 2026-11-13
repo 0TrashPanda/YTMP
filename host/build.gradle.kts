@@ -20,6 +20,9 @@ dependencies {
     // Your YouTube Music on your server, from rooms on other hosts (HostOptions.crossOriginPersonal).
     implementation(libs.ktor.server.cors)
     implementation(libs.ktor.serialization.kotlinx.json)
+    // The YouTube Music module over HTTP (RemoteSourceModule): the server's, and the desktop app's own.
+    api(libs.ktor.client.cio)
+    implementation(libs.ktor.client.content.negotiation)
 
     testImplementation(kotlin("test"))
     testImplementation(libs.ktor.server.test.host)

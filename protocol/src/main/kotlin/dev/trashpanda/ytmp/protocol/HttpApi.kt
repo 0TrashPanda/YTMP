@@ -109,6 +109,8 @@ data class ApiError(val error: ErrorInfo)
 enum class HostKind {
     @SerialName("server") SERVER,
     @SerialName("phone") PHONE,
+    /** The desktop app's own host: no rooms, only this computer's music, song cache and speakers (docs/implementation/desktop-app.md). */
+    @SerialName("computer") COMPUTER,
 }
 
 /** `GET /api/host`: what kind of host served this page. */

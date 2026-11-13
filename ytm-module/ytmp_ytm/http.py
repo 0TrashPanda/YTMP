@@ -10,7 +10,6 @@ import threading
 import time
 from collections import OrderedDict
 from contextlib import asynccontextmanager
-from pathlib import Path
 from urllib.parse import unquote_plus
 
 import httpx
@@ -19,7 +18,7 @@ from fastapi import Depends, FastAPI, Header, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from . import core, desktop as desktop_mod, update
+from . import core, update
 
 API_VERSION = 1
 VERSION = "0.1.0"
@@ -29,7 +28,7 @@ log = logging.getLogger("ytmp_ytm.http")
 _SLOW_CHUNK_S = 5.0
 
 
-def create_app(ytm: core.YtmCore, key: str | None, desktop: desktop_mod.Desktop | None = None) -> FastAPI:
+def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
     http = httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=30.0), follow_redirects=True)
 
     @asynccontextmanager
@@ -68,7 +67,7 @@ def create_app(ytm: core.YtmCore, key: str | None, desktop: desktop_mod.Desktop 
         started = time.monotonic()
         response = await call_next(request)
         path = request.url.path
-        if request.method != "OPTIONS" and path != "/health" and not path.endswith("/audio") and not path.startswith("/desktop/files/"):
+        if request.method != "OPTIONS" and path != "/health" and not path.endswith("/audio"):
             query = f"?{unquote_plus(request.url.query)}" if request.url.query else ""
             client = request.client.host if request.client else "?"
             log.info("%s %s%s -> %d in %d ms (from %s)", request.method, path, query,
@@ -344,66 +343,7 @@ def create_app(ytm: core.YtmCore, key: str | None, desktop: desktop_mod.Desktop 
         user.add_to_history(song_id)
         return {"ok": True}
 
-    if desktop is not None:
-        _desktop_routes(app, desktop, check_key)
-
     return app
-
-
-def _desktop_routes(app: FastAPI, desktop: desktop_mod.Desktop, check_key) -> None:
-    """The desktop app's music and song cache on this computer (desktop.py)."""
-    key = [Depends(check_key)]
-
-    @app.get("/desktop/status", dependencies=key)
-    def desktop_status():
-        return desktop.status()
-
-    @app.put("/desktop/settings", dependencies=key)
-    def desktop_settings(body: dict):
-        return desktop.set_settings(body)
-
-    @app.post("/desktop/cache/clear", dependencies=key)
-    def desktop_clear():
-        return desktop.clear_cache()
-
-    @app.post("/desktop/music/rescan", dependencies=key)
-    def desktop_rescan():
-        desktop.rescan(wait=True)
-        return desktop.status()
-
-    @app.get("/desktop/library", dependencies=key)
-    def desktop_library():
-        return desktop.library()
-
-    @app.get("/desktop/library/summary", dependencies=key)
-    def desktop_summary():
-        return desktop.summary()
-
-    @app.get("/desktop/albums/{album_id}", dependencies=key)
-    def desktop_album(album_id: str):
-        return desktop.album(album_id)
-
-    @app.get("/desktop/artists/{artist_id}", dependencies=key)
-    def desktop_artist(artist_id: str):
-        return desktop.artist(artist_id)
-
-    @app.get("/desktop/files/audio/{song_id}", dependencies=key)
-    def desktop_audio(song_id: str, range: str | None = Header(default=None)):
-        status, headers, data = desktop.file(song_id, range)
-        return Response(data, status_code=status, headers=headers)
-
-    @app.get("/desktop/files/art/{song_id}", dependencies=key)
-    def desktop_art(song_id: str):
-        found = desktop.art(song_id)
-        if not found:
-            raise _ApiError(404, "not_found", "No cover")
-        data, mime = found
-        return Response(data, media_type=mime, headers={"Cache-Control": "max-age=86400"})
-
-    @app.post("/desktop/upload", dependencies=key)
-    def desktop_upload(body: dict):
-        desktop.upload(str(body.get("songId", "")), str(body.get("url", "")), str(body.get("secret", "")))
-        return {"ok": True}
 
 
 # Signed-in accounts kept ready (each holds a YTMusic session).
@@ -435,12 +375,7 @@ def main() -> None:
     ytm.warm_up()
     if os.environ.get("YTMP_YTM_UPDATE_DIR"):
         update.start()
-    # The desktop app: this computer's music and song cache (desktop.py).
-    folder = os.environ.get("YTMP_YTM_DESKTOP_DIR")
-    on_computer = desktop_mod.Desktop(
-        ytm, Path(folder), os.environ.get("YTMP_YTM_DEVICE", "computer"), os.environ.get("YTMP_YTM_FILES_BASE", ""),
-    ) if folder else None
-    app = create_app(ytm, os.environ.get("YTMP_MODULE_KEY") or None, on_computer)
+    app = create_app(ytm, os.environ.get("YTMP_MODULE_KEY") or None)
     uvicorn.run(
         app,
         host=os.environ.get("YTMP_YTM_HOST", "127.0.0.1"),

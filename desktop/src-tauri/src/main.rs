@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use module::Module;
+use module::{Kind, Sidecars};
 use tauri::ipc::CapabilityBuilder;
 use tauri::webview::NewWindowResponse;
 use tauri::{AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -32,11 +32,11 @@ struct Settings {
     device_secret: Option<String>,
 }
 
-/// Where the window reaches this computer's music and song cache (the `ytmpfiles` protocol).
+/// Where the window reaches this computer's host (the `ytmphost` protocol).
 #[cfg(windows)]
-pub(crate) const FILES_BASE: &str = "http://ytmpfiles.localhost/";
+pub(crate) const HOST_BASE: &str = "http://ytmphost.localhost/";
 #[cfg(not(windows))]
-pub(crate) const FILES_BASE: &str = "ytmpfiles://localhost/";
+pub(crate) const HOST_BASE: &str = "ytmphost://localhost/";
 
 fn random_hex(bytes: usize) -> String {
     let mut buffer = vec![0u8; bytes];
@@ -206,16 +206,25 @@ async fn pick_folder(app: AppHandle) -> Option<String> {
         .map(|path| path.to_string_lossy().into_owned())
 }
 
-/// `ytmpfiles://localhost/audio/<song>` (Windows: `http://ytmpfiles.localhost/…`): a piece of
-/// a song of this computer's music or song cache, or (`art/<song>`) its cover, from the
-/// module. Pages of the window may play them (it only shows the server you chose).
-fn files(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
-    let range = request.headers().get("range").and_then(|v| v.to_str().ok());
-    let (status, headers, body) = app.state::<module::Module>().file(request.uri().path(), range);
-    let mut response = tauri::http::Response::builder()
-        .status(status)
-        .header("Access-Control-Allow-Origin", "*")
-        .header("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges");
+/// `ytmphost://localhost/api/…` (Windows: `http://ytmphost.localhost/api/…`): the window's
+/// requests to this computer's host (desktop/host/), passed on with its key: this computer's
+/// music, the song cache. Pages of the window may use it (it only shows the server you chose).
+fn host_request(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
+    let cors = |builder: tauri::http::response::Builder| {
+        builder
+            .header("Access-Control-Allow-Origin", "*")
+            .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
+            .header("Access-Control-Allow-Headers", "Content-Type, Range")
+            .header("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges")
+    };
+    if request.method() == "OPTIONS" {
+        return cors(tauri::http::Response::builder().status(204)).body(vec![]).unwrap_or_default();
+    }
+    let header = |name: &str| request.headers().get(name).and_then(|v| v.to_str().ok());
+    let path = request.uri().path_and_query().map(|p| p.as_str()).unwrap_or("/");
+    let (status, headers, body) =
+        app.state::<Sidecars>().host.forward(request.method().as_str(), path, header("range"), header("content-type"), request.body());
+    let mut response = cors(tauri::http::Response::builder().status(status));
     for (name, value) in headers {
         response = response.header(name, value);
     }
@@ -234,7 +243,7 @@ fn bridge_script(app: &AppHandle) -> String {
     let platform = if cfg!(windows) { "windows" } else { "linux" };
     let updates = updates_on();
     let (device_id, device_secret) = device(app);
-    let files = FILES_BASE;
+    let host = HOST_BASE.trim_end_matches('/');
     #[cfg(windows)]
     let media = media::SCRIPT;
     #[cfg(not(windows))]
@@ -249,7 +258,7 @@ fn bridge_script(app: &AppHandle) -> String {
     moduleRequest: (path, method, body) => invoke('module_request', {{ path, method, body }}),
     changeServer: () => invoke('change_server'),
     updates: {updates},
-    files: {files:?},
+    host: {host:?},
     device: Object.freeze({{ id: {device_id:?}, secret: {device_secret:?} }}),
     pickFolder: () => invoke('pick_folder'),
   }});
@@ -318,7 +327,7 @@ async fn check_for_update(app: AppHandle) {
     let installed = match update.download(|_, _| {}, || {}).await {
         Ok(bytes) => {
             // The installer replaces the module's files: it mustn't be running then.
-            app.state::<Module>().stop();
+            app.state::<Sidecars>().stop();
             update.install(bytes)
         }
         Err(e) => Err(e),
@@ -352,11 +361,11 @@ fn main() {
         builder = builder.plugin(tauri_plugin_updater::Builder::new().pubkey(key).build());
     }
     let app = builder
-        .manage(Module::new())
+        .manage(Sidecars::new())
         .invoke_handler(tauri::generate_handler![open_saved, connect, change_server, media_update, pick_folder, module::module_request])
-        .register_asynchronous_uri_scheme_protocol("ytmpfiles", |ctx, request, responder| {
+        .register_asynchronous_uri_scheme_protocol("ytmphost", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
-            std::thread::spawn(move || responder.respond(files(&app, request)));
+            std::thread::spawn(move || responder.respond(host_request(&app, request)));
         })
         .setup(|app| {
             let handle = app.handle().clone();
@@ -365,7 +374,8 @@ fn main() {
                 .and_then(|text| serde_json::from_str(&text).ok())
                 .unwrap_or_default();
             app.manage(State { settings: Mutex::new(settings), allowed: Mutex::new(HashSet::new()) });
-            Module::start(&handle);
+            module::Module::start(&handle, Kind::Module);
+            module::Module::start(&handle, Kind::Host);
 
             let opener = handle.clone();
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
@@ -398,7 +408,7 @@ fn main() {
         .expect("YTMP couldn't start");
     app.run(|app, event| {
         if let RunEvent::Exit = event {
-            app.state::<Module>().stop();
+            app.state::<Sidecars>().stop();
         }
     });
 }

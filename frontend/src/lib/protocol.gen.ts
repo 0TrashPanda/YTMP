@@ -898,7 +898,7 @@ export interface ApiError {
   error: ErrorInfo;
 }
 
-export type HostKind = "server" | "phone";
+export type HostKind = "server" | "phone" | "computer";
 
 export interface AuthServerRef {
   url: string | null;

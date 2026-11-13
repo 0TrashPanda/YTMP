@@ -11,7 +11,7 @@ import type { RoomConnection } from './room.svelte';
 import { settings } from './settings.svelte';
 import { saved, type SongSource } from './storage';
 import { pickSource, SOURCE_NAMES } from './songSources';
-import { computerAudio } from './computer.svelte';
+import { computerAudio, tellComputer } from './computer.svelte';
 import { correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
 
 /** Plays the room's audio on this device. */
@@ -436,8 +436,13 @@ class WebPlayer implements RoomPlayer {
 		const here = this.computerFailed === now.item.itemId ? null : computerAudio(now.item.song);
 		this.fromComputer = !!here;
 		if (here) {
-			this.audio.src = here;
-			this.lookUpNext();
+			// The cache hears about it first, so asking for its audio fills the cache.
+			this.audio.removeAttribute('src');
+			void tellComputer(now.item.song, 'started').then(() => {
+				if (load !== this.loads) return;
+				this.audio.src = here;
+				this.lookUpNext();
+			});
 			return;
 		}
 		this.source = this.sourceFor(now);
@@ -480,7 +485,7 @@ class WebPlayer implements RoomPlayer {
 		const here = computerAudio(song);
 		if (here) {
 			this.lookedUpNext = song.id;
-			if (song.id.startsWith('ytm:')) fetch(here).catch(() => {});
+			if (song.id.startsWith('ytm:')) void tellComputer(song, 'known').then(() => fetch(here, { headers: { Range: 'bytes=0-1' } }).catch(() => {}));
 			return;
 		}
 		if (this.source !== 'own' || this.fromComputer) return;

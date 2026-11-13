@@ -1,5 +1,7 @@
 package dev.trashpanda.ytmp.server
 
+import dev.trashpanda.ytmp.host.RemoteSourceModule
+
 import dev.trashpanda.ytmp.core.RoomHooks
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.host.AccountTokens
