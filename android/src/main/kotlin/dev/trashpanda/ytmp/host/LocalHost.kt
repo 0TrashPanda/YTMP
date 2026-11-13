@@ -463,6 +463,8 @@ class LocalHost(private val context: Context) {
 
     /** Your rooms here and on your server (docs/features/room-sync.md). */
     private val sync: RoomSync by lazy { RoomSync(context, authLink, { rooms }, ::lanUrl, scope) }
+    /** Songs from your phone: the owner's computer copies this phone's songs (PhoneCopyLink). */
+    val phoneCopy: PhoneCopyLink by lazy { PhoneCopyLink(context, authLink, sync, ::lanUrl, scope) }
 
     /**
      * Songs played on this phone go into the owner's YouTube Music history, so its suggestions
@@ -551,6 +553,7 @@ class LocalHost(private val context: Context) {
                     onLocalAccount = { authLink.usedBy(it.id) },
                     deviceOwner = { authLink.ownerAccount },
                     cacheSettings = cacheControls,
+                    copyKeys = phoneCopy,
                 ),
                 webApp = webApp,
                 extraApi = {

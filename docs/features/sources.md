@@ -165,11 +165,19 @@ they play (one download, nothing extra), and the next song in the queue is fetch
 while the current one plays. Only music, nothing over an hour.
 
 **Songs from your phone** ✅ (the desktop app, *Settings → Song cache*): copies the songs your
-phone keeps in its song cache to the computer's over Wi-Fi, so they play from the computer
-without looking them up. Open YTMP on the phone on the same Wi-Fi, logged in with the same
-account as on the computer, and press *Copy its songs* next to it. Songs already on the
-computer are left alone; songs that don't fit in the computer's cache are left out (it says
-how many). The phone gives its songs only to its owner: logged in with the phone's account.
+phone keeps (its song cache, downloads, and its own music files that stand in for YouTube Music
+songs) to the computer's song cache over Wi-Fi, so they play from the computer. Only your own
+phones, and your phone only gives its songs to you.
+
+- **Copy from my phone** on the computer asks your phone through your server. With YTMP open on
+  the phone (logged in with the same account, on the same Wi-Fi) it answers at once and the
+  copy starts. The phone doesn't announce itself on the network otherwise, and doesn't check in
+  the background: with the app closed, open it.
+- **Send songs to my computer** on the phone (*Settings → Song cache and downloads*): shows the
+  phone on the Wi-Fi for 10 minutes. A computer that copied from it before copies by itself,
+  also when your server is down (the first copy gives the computer a key from the phone).
+- Songs already on the computer are left alone; songs that don't fit in what's left of its
+  cache are left out (it says how many).
 
 - **Songs are saved when that costs nothing extra**: a song the phone plays itself, or that
   the server or phone already streams (to speakers, or to players that stream through it),

@@ -8,6 +8,7 @@
 import { answer, ApiRequestError } from './api';
 import { nativeBridge } from './native';
 import type {
+	PhoneCopyState,
 	SongCacheStatus,
 	AccountInfo,
 	AccountSettings,
@@ -103,6 +104,9 @@ export const authServer = {
 		session.current = await call<SessionResponse>('/api/account/password', { currentPassword, newPassword });
 	},
 	hostToken: (origin: string) => call<HostTokenResponse>('/api/account/host-token', { origin }),
+	/** Songs from your phone (the desktop app): your phones that answered, and asking them. */
+	phoneCopy: () => call<PhoneCopyState>('/api/account/phone-copy'),
+	askPhones: () => call<PhoneCopyState>('/api/account/phone-copy/ask', {}),
 	/** Your YouTube Music sign-in kept in this account (only with a login here), to use it on your phone too. */
 	youtubeCookie: async () => (await call<YoutubeSignInRequest>('/api/account/youtube/cookie')).cookie,
 

@@ -773,6 +773,11 @@ export function setSongCache(settings: SongCacheSettings): Promise<SongCacheStat
 	return request('/api/cache', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
 }
 
+/** The phone's own page: shows the phone to your computer for 10 minutes (*Send songs to my computer*). */
+export async function showToComputer(): Promise<void> {
+	await request<unknown>('/api/cache/songs/show', { method: 'POST' });
+}
+
 export function clearSongCache(): Promise<SongCacheStatus> {
 	return request('/api/cache/clear', { method: 'POST' });
 }

@@ -61,19 +61,26 @@ class Nearby(context: Context) {
     }
 
     private var device: NsdManager.RegistrationListener? = null
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val hide = Runnable { hideDevice() }
 
     /**
-     * Announces this phone itself (`_ytmp-device._tcp`, named [name]) while the app runs, so the
-     * owner's desktop app finds it to copy its songs (it only gets them logged in as the owner).
+     * Shows this phone itself on its network (`_ytmp-device._tcp`, named [name]) for [forMs], so
+     * the owner's desktop app finds it ([id]: the phone's own) to copy its songs ([PhoneCopyLink]: only when asked, or by
+     * hand). [ownerMark] says whose phone it is without naming the account.
      */
     @Synchronized
-    fun announceDevice(name: String) {
+    fun announceDevice(id: String, name: String, ownerMark: String, forMs: Long) {
+        handler.removeCallbacks(hide)
+        handler.postDelayed(hide, forMs)
         if (device != null) return
         val info = NsdServiceInfo().apply {
             serviceName = name
             serviceType = DEVICE_SERVICE_TYPE
             port = LocalHost.PORT
             setAttribute("name", name)
+            setAttribute("id", id)
+            setAttribute("owner", ownerMark)
             setAttribute("v", PROTOCOL_VERSION.toString())
         }
         val listener = object : NsdManager.RegistrationListener {
@@ -88,6 +95,12 @@ class Nearby(context: Context) {
         }
         device = listener
         runCatching { nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener) }.onFailure { device = null }
+    }
+
+    @Synchronized
+    private fun hideDevice() {
+        device?.let { runCatching { nsd.unregisterService(it) } }
+        device = null
     }
 
     /** Looks for rooms while the app is visible. */

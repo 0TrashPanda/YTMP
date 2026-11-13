@@ -80,6 +80,37 @@ data class HostTokenRequest(
 @SerialName("HostTokenResponse")
 data class HostTokenResponse(val token: String, val expiresAt: Long, val account: AccountInfo)
 
+/**
+ * One of your phones, ready to give its songs to your computer (the desktop app's *Songs from
+ * your phone*): where it is on its network, from the phone itself.
+ */
+@Serializable
+@SerialName("MyPhone")
+data class MyPhone(
+    /** The phone's own id (it stays the same). */
+    val id: String,
+    val name: String,
+    /** e.g. `http://192.168.1.23:8765` */
+    val url: String,
+    /** When it said so (ms); the server sets it. */
+    val seenAt: Long = 0,
+)
+
+/** `GET /api/account/phone-copy` and `POST /api/account/phone-copy/ask`: your computer asked your phones until [askedUntil], and the ones that answered. */
+@Serializable
+@SerialName("PhoneCopyState")
+data class PhoneCopyState(val askedUntil: Long? = null, val phones: List<MyPhone> = emptyList())
+
+/**
+ * `GET /api/auth/phone-copy?after=&wait=` (a phone, with its owner's token): whether a computer
+ * asks for its songs now, newer than the ask the phone answered ([until] of that one). With
+ * `wait` (seconds) the server holds the answer until one comes (the open app waits like this,
+ * so it answers at once).
+ */
+@Serializable
+@SerialName("PhoneCopyAsked")
+data class PhoneCopyAsked(val asked: Boolean, val until: Long? = null)
+
 /** An account in the server admin's list. */
 @Serializable
 @SerialName("AdminAccountInfo")

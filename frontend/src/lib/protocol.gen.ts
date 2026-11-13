@@ -979,6 +979,18 @@ export interface HostTokenResponse {
   account: AccountInfo;
 }
 
+export interface MyPhone {
+  id: string;
+  name: string;
+  url: string;
+  seenAt: number;
+}
+
+export interface PhoneCopyState {
+  askedUntil: number | null;
+  phones: MyPhone[];
+}
+
 export interface AdminAccountInfo {
   id: string;
   username: string;

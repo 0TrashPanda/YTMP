@@ -99,12 +99,23 @@ class SongCacheTest {
         assertTrue(cache.take(song) { it.writeBytes(bytesOf("a")) })
         assertTrue(cache.has(song.id))
         assertEquals(listOf(CachedSongFile(song, bytesOf("a").size.toLong(), SongFiles.MP4)), cache.copyable())
+        // Downloads and the phone's own music files that are a YouTube Music song come too (they aren't cached).
+        val withDownloads = SongCache(File(dir, "dl"), 10_000_000, youtube, youtube, scope, coverOf = { null }, clock = { now }, downloads = object : DownloadedSongs {
+            override fun find(songId: String) = if (songId == "ytm:d") DownloadedSong(song("d"), "content://d", local = true) else null
+            override suspend fun all() = listOf(DownloadedSong(song("d"), "content://d", local = true))
+            override suspend fun respond(call: io.ktor.server.application.ApplicationCall, download: DownloadedSong, range: String?) = Unit
+        })
+        assertEquals(listOf(CachedSongFile(song("d"), null, null)), withDownloads.copyable())
         assertContentEquals(bytesOf("a"), cache.fileOf(song.id)!!.first.readBytes())
         // Here already, or not audio: not taken.
         assertFalse(cache.take(song) { it.writeBytes(bytesOf("a")) })
         assertFalse(cache.take(song("b")) { it.writeText("<html>not a song</html>") })
         assertFalse(cache.has("ytm:b"))
         assertEquals(emptyList(), youtube.lookups)
+        // A phone's own music files come as MP3, FLAC or Ogg.
+        assertTrue(cache.take(song("m")) { it.writeBytes(ByteArray(500).also { b -> "ID3".toByteArray().copyInto(b) }) })
+        assertTrue(cache.take(song("f")) { it.writeBytes(ByteArray(500).also { b -> "fLaC".toByteArray().copyInto(b) }) })
+        assertEquals("audio/flac", cache.fileOf("ytm:f")!!.second)
         // The cache off: nothing is taken.
         assertFalse(cache(maxBytes = 0, at = File(dir, "off")).take(song("c")) { it.writeBytes(bytesOf("c")) })
     }

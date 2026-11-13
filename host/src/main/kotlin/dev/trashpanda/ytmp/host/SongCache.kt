@@ -673,8 +673,28 @@ class SongCache(
 
     // --- copying between the owner's devices ---
 
-    /** The cached songs with their sizes (another of the owner's devices copies them: [CacheCopy]). */
-    fun copyable(): List<CachedSongFile> = synchronized(lock) { entries.values.map { CachedSongFile(it.song, it.size, it.type) } }
+    /**
+     * The songs here for another of the owner's devices to copy ([cacheCopyRoutes]): the cached
+     * ones with their sizes, then the downloads and the phone's own music files that are a
+     * YouTube Music song (they aren't cached again, so they'd be missing otherwise).
+     */
+    suspend fun copyable(): List<CachedSongFile> {
+        val cached = synchronized(lock) { entries.values.map { CachedSongFile(it.song, it.size, it.type) } }
+        val ids = cached.map { it.song.id }.toSet()
+        val others = downloads?.all().orEmpty().filter { it.song.id !in ids }.distinctBy { it.song.id }.map { CachedSongFile(it.song, null, null) }
+        return cached + others
+    }
+
+    /** Sends [songId]'s file for copying: the cached file, else the download or music file; false when neither is here. */
+    suspend fun respondCopy(call: ApplicationCall, songId: String, range: String?): Boolean {
+        fileOf(songId)?.let { (file, type) ->
+            respondFile(call, file, type, range)
+            return true
+        }
+        val download = downloads?.find(songId) ?: return false
+        downloads.respond(call, download, range)
+        return true
+    }
 
     /** [songId]'s file and type, when it's here whole. */
     fun fileOf(songId: String): Pair<File, String>? = synchronized(lock) { entries[songId]?.let { File(dir, it.file) to it.type } }
@@ -1055,16 +1075,24 @@ class SongCache(
             "audio/webm" -> "webm"
             "audio/mpeg" -> "mp3"
             "audio/ogg" -> "ogg"
+            "audio/flac" -> "flac"
             else -> "m4a"
         }
 
-        /** What a file is from its first bytes: MP4 (.m4a) or WebM, else null. */
+        /**
+         * What a file is from its first bytes: MP4 (.m4a) or WebM (YouTube's), or MP3, FLAC or Ogg
+         * (a phone's own music files, copied to a computer), else null.
+         */
         internal fun typeOf(file: File): String? {
             val head = ByteArray(12)
             val read = runCatching { file.inputStream().use { it.read(head) } }.getOrDefault(0)
+            fun starts(text: String) = read >= text.length && String(head, 0, text.length, Charsets.ISO_8859_1) == text
             return when {
                 read >= 8 && String(head, 4, 4, Charsets.ISO_8859_1) == "ftyp" -> SongFiles.MP4
                 read >= 4 && head[0] == 0x1A.toByte() && head[1] == 0x45.toByte() && head[2] == 0xDF.toByte() && head[3] == 0xA3.toByte() -> "audio/webm"
+                starts("ID3") || (read >= 2 && head[0] == 0xFF.toByte() && (head[1].toInt() and 0xE0) == 0xE0) -> "audio/mpeg"
+                starts("fLaC") -> "audio/flac"
+                starts("OggS") -> "audio/ogg"
                 else -> null
             }
         }

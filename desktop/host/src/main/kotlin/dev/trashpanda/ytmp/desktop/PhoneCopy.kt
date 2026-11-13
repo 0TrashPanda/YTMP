@@ -1,7 +1,8 @@
 package dev.trashpanda.ytmp.desktop
 
-import dev.trashpanda.ytmp.host.CachedSongFile
+import dev.trashpanda.ytmp.host.COPY_KEY_HEADER
 import dev.trashpanda.ytmp.host.CachedSongFiles
+import dev.trashpanda.ytmp.host.CopyKey
 import dev.trashpanda.ytmp.host.SongCache
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import kotlinx.coroutines.CancellationException
@@ -11,25 +12,37 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import org.slf4j.LoggerFactory
+import java.io.File
+import java.io.InputStream
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import javax.jmdns.JmmDNS
 import javax.jmdns.ServiceEvent
 import javax.jmdns.ServiceListener
 
 /**
- * Songs from your phone (docs/implementation/desktop-app.md#songs-from-your-phone): the phones
- * on this computer's network (they announce themselves as `_ytmp-device._tcp` while the app
- * runs), and copying a phone's song cache into this computer's, over Wi-Fi. The phone only
- * hands its songs to its owner: the window gets a token for it from your server.
+ * Songs from your phone (docs/implementation/desktop-app.md#songs-from-your-phone): copying a
+ * phone's songs (its song cache, downloads and own music files that are a YouTube Music song)
+ * into this computer's song cache, over Wi-Fi.
+ *
+ * Your phones only: the window gives the ones your server says are yours, or one shows itself on
+ * the network (asked, or with *Send songs to my computer* on it) with your account's mark. The
+ * phone gives its songs only to its owner: the first time with a login from your server, which
+ * also gets a key from the phone ([keys]); with that key it works without the server too, and a
+ * phone with a key that shows itself is copied from by itself.
  */
-class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope) {
+class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope, private val keysFile: File) {
     @Serializable
     data class Phone(val id: String, val name: String, val url: String)
 
@@ -38,7 +51,7 @@ class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope)
     data class Status(
         val phone: String,
         val running: Boolean,
-        /** Songs on the phone that aren't here yet (and fit), copied so far, and their size. */
+        /** Songs on the phone that aren't here yet, copied so far, and their size. */
         val total: Int = 0,
         val copied: Int = 0,
         val bytes: Long = 0,
@@ -48,18 +61,32 @@ class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope)
         val noRoom: Int = 0,
         val current: String? = null,
         val error: String? = null,
+        val finishedAt: Long? = null,
     )
 
+    /** A phone on the network: [owner] its account's mark, [keyed]: this computer has its key. */
     @Serializable
-    data class State(val phones: List<Phone>, val copy: Status?)
+    data class Found(val id: String, val name: String, val url: String, val owner: String?, val keyed: Boolean)
 
-    private val phones = java.util.concurrent.ConcurrentHashMap<String, Phone>()
+    @Serializable
+    data class State(val found: List<Found>, val copy: Status?)
+
+    /** Phones showing themselves on the network now, by id. */
+    private val shown = ConcurrentHashMap<String, Pair<Phone, String?>>()
+    /** Phone id → its key. */
+    private val keys = ConcurrentHashMap<String, String>(loadKeys())
     @Volatile private var status: Status? = null
     private var job: Job? = null
 
-    fun state() = State(phones.values.sortedBy { it.name }, status)
+    /** The phones on the network, only [account]'s (by its mark) or ones this computer has a key for. */
+    fun state(account: String?): State {
+        val mark = account?.let(::ownerMark)
+        val mine = shown.values.filter { (phone, owner) -> (mark != null && owner == mark) || keys.containsKey(phone.id) }
+            .map { (phone, owner) -> Found(phone.id, phone.name, phone.url, owner, keys.containsKey(phone.id)) }
+        return State(mine.sortedBy { it.name }, status)
+    }
 
-    /** Looks for phones on every network interface until the app ends. */
+    /** Looks for phones that show themselves, on every network interface, until the app ends. */
     fun discover() {
         JmmDNS.Factory.getInstance().addServiceListener(
             "_ytmp-device._tcp.local.",
@@ -69,91 +96,139 @@ class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope)
                 override fun serviceResolved(event: ServiceEvent) {
                     val info = event.info
                     val host = info.inet4Addresses.firstOrNull()?.hostAddress ?: return
-                    val name = info.getPropertyString("name") ?: info.name
-                    phones[info.name] = Phone(info.name, name, "http://$host:${info.port}")
-                    log.info("Found phone {} at {}", name, host)
+                    val id = info.getPropertyString("id") ?: return
+                    val phone = Phone(id, info.getPropertyString("name") ?: info.name, "http://$host:${info.port}")
+                    val before = shown.put(id, phone to info.getPropertyString("owner"))
+                    if (before == null) log.info("Phone {} shows itself at {}", phone.name, host)
+                    // Asked, or Send songs to my computer on the phone: with its key, copy at once.
+                    if (before == null && keys.containsKey(id)) start(phone, token = null)
                 }
 
                 override fun serviceRemoved(event: ServiceEvent) {
-                    phones.remove(event.name)
+                    shown.values.removeIf { it.first.name == event.name || it.first.id == event.info?.getPropertyString("id") }
                 }
             },
         )
     }
 
-    fun phone(id: String): Phone? = phones[id]
-
-    /** Copies [phone]'s songs that aren't here, as many as fit, with [token] (the owner's, for that phone). */
+    /**
+     * Copies [phone]'s songs that aren't here, as many as fit: with its key, else with [token]
+     * (your login for that phone, from your server), which also gets a key for next time.
+     */
     @Synchronized
-    fun start(phone: Phone, token: String): State {
-        if (job?.isActive == true) return state()
+    fun start(phone: Phone, token: String?): State {
+        if (job?.isActive == true) return state(null)
+        if (cache.maxBytes <= 0) {
+            status = Status(phone.name, running = false, error = "Turn the song cache on first", finishedAt = System.currentTimeMillis())
+            return state(null)
+        }
         status = Status(phone.name, running = true)
         job = scope.launch {
             try {
                 copy(phone, token)
             } catch (e: CancellationException) {
-                status = status?.copy(running = false, current = null)
+                status = status?.copy(running = false, current = null, finishedAt = System.currentTimeMillis())
                 throw e
             } catch (e: Exception) {
                 log.info("Copying from {} stopped: {}", phone.name, e.toString())
-                status = status?.copy(running = false, current = null, error = e.message ?: "The phone stopped answering")
+                status = status?.copy(running = false, current = null, error = e.message ?: "The phone stopped answering", finishedAt = System.currentTimeMillis())
             }
         }
-        return state()
+        return state(null)
     }
 
     @Synchronized
-    fun stop(): State {
+    fun stop() {
         job?.cancel()
-        return state()
     }
 
-    private suspend fun copy(phone: Phone, token: String) {
-        val list = withContext(Dispatchers.IO) { get(phone, "/api/cache/songs", token, HttpResponse.BodyHandlers.ofString()) }
-        val songs = ProtocolJson.decodeFromString(CachedSongFiles.serializer(), list.body()).songs
+    private suspend fun copy(phone: Phone, token: String?) {
+        val auth = withContext(Dispatchers.IO) { login(phone, token) }
+        val list = withContext(Dispatchers.IO) { get(phone, "/api/cache/songs", auth, HttpResponse.BodyHandlers.ofString()) }
+        val songs = ProtocolJson.decodeFromString(CachedSongFiles.serializer(), list.body()).songs.distinctBy { it.song.id }
         val here = songs.count { cache.has(it.song.id) }
-        // Newest first would need the phone's plays; its order is fine. Only what fits: the cache would push songs out otherwise.
-        var room = cache.maxBytes - cache.totalBytes
-        val wanted = ArrayList<CachedSongFile>()
-        var noRoom = 0
-        for (s in songs.filter { !cache.has(it.song.id) }) if (s.size <= room) { wanted += s; room -= s.size } else noRoom++
-        status = Status(phone.name, running = true, total = wanted.size, here = here, noRoom = noRoom)
-        log.info("Copying {} songs from {} ({} here already, {} don't fit)", wanted.size, phone.name, here, noRoom)
+        val wanted = songs.filter { !cache.has(it.song.id) }
+        status = Status(phone.name, running = true, total = wanted.size, here = here)
+        log.info("Copying up to {} songs from {} ({} here already)", wanted.size, phone.name, here)
         var copied = 0
         var bytes = 0L
+        var noRoom = 0
         for (s in wanted) {
             status = status?.copy(current = s.song.title)
-            val kept = cache.take(s.song) { file ->
-                withContext(Dispatchers.IO) {
-                    val answer = get(phone, "/api/cache/songs/" + URLEncoder.encode(s.song.id, "UTF-8"), token, HttpResponse.BodyHandlers.ofInputStream())
-                    answer.body().use { java.nio.file.Files.copy(it, file.toPath(), StandardCopyOption.REPLACE_EXISTING) }
-                }
+            val answer = withContext(Dispatchers.IO) {
+                get(phone, "/api/cache/songs/" + URLEncoder.encode(s.song.id, "UTF-8"), auth, HttpResponse.BodyHandlers.ofInputStream())
             }
+            val size = answer.headers().firstValueAsLong("Content-Length").orElse(s.size ?: 0)
+            // Only what fits in what's left: the cache would push songs out otherwise.
+            if (size <= 0 || size > cache.maxBytes - cache.totalBytes) {
+                withContext(Dispatchers.IO) { answer.body().close() }
+                noRoom++
+                status = status?.copy(noRoom = noRoom)
+                continue
+            }
+            val kept = cache.take(s.song) { file -> withContext(Dispatchers.IO) { answer.body().use { save(it, file) } } }
+            if (!kept) withContext(Dispatchers.IO) { answer.body().close() }
             if (kept) {
                 copied++
-                bytes += s.size
+                bytes += size
             }
             status = status?.copy(copied = copied, bytes = bytes)
         }
-        status = status?.copy(running = false, current = null)
-        log.info("Copied {} songs ({} MB) from {}", copied, bytes / (1024 * 1024), phone.name)
+        status = status?.copy(running = false, current = null, finishedAt = System.currentTimeMillis())
+        log.info("Copied {} songs ({} MB) from {}; {} didn't fit", copied, bytes / (1024 * 1024), phone.name, noRoom)
     }
 
-    private fun <T> get(phone: Phone, path: String, token: String, body: HttpResponse.BodyHandler<T>): HttpResponse<T> {
-        val request = HttpRequest.newBuilder(URI(phone.url + path))
-            .timeout(Duration.ofMinutes(2))
-            .header("Authorization", "Bearer $token")
-            .GET()
-            .build()
-        val answer = http.send(request, body)
+    private fun save(from: InputStream, to: File) {
+        Files.copy(from, to.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+
+    /** How to ask [phone]: its key when this computer has one, else [token], getting a key with it. */
+    private fun login(phone: Phone, token: String?): Pair<String, String> {
+        keys[phone.id]?.let { return COPY_KEY_HEADER to it }
+        token ?: throw IllegalStateException("Copy once while your server is up: the phone needs to know this computer first")
+        val bearer = "Authorization" to "Bearer $token"
+        // An older phone app has no keys: copy with the login this time.
+        val answer = send(phone, HttpRequest.newBuilder(URI(phone.url + "/api/cache/songs/key")).POST(HttpRequest.BodyPublishers.noBody()), bearer, HttpResponse.BodyHandlers.ofString())
         if (answer.statusCode() == 403) throw IllegalStateException("The phone only gives its songs to its owner: log in with the phone's account")
+        if (answer.statusCode() >= 400) return bearer
+        val key = ProtocolJson.decodeFromString(CopyKey.serializer(), answer.body())
+        keys[phone.id] = key.key
+        saveKeys()
+        return COPY_KEY_HEADER to key.key
+    }
+
+    private fun <T> get(phone: Phone, path: String, auth: Pair<String, String>, body: HttpResponse.BodyHandler<T>): HttpResponse<T> {
+        val answer = send(phone, HttpRequest.newBuilder(URI(phone.url + path)).GET(), auth, body)
+        if (answer.statusCode() == 403) {
+            // A key the phone forgot (its data cleared): ask with a login next time.
+            if (auth.first == COPY_KEY_HEADER && keys.remove(phone.id) != null) saveKeys()
+            throw IllegalStateException("The phone only gives its songs to its owner: log in with the phone's account")
+        }
         if (answer.statusCode() == 404 && path == "/api/cache/songs") throw IllegalStateException("Update YTMP on the phone first")
         if (answer.statusCode() >= 400) throw IllegalStateException("The phone answered ${answer.statusCode()}")
         return answer
     }
 
+    private fun <T> send(phone: Phone, request: HttpRequest.Builder, auth: Pair<String, String>, body: HttpResponse.BodyHandler<T>): HttpResponse<T> =
+        http.send(request.timeout(Duration.ofMinutes(2)).header(auth.first, auth.second).build(), body)
+            .also { if (it.statusCode() >= 500) log.info("{} answered {}", phone.name, it.statusCode()) }
+
+    private fun loadKeys(): Map<String, String> =
+        runCatching { ProtocolJson.decodeFromString(keysSerializer, keysFile.readText()) }.getOrDefault(emptyMap())
+
+    @Synchronized
+    private fun saveKeys() {
+        keysFile.parentFile?.mkdirs()
+        keysFile.writeText(ProtocolJson.encodeToString(keysSerializer, keys.toMap()))
+    }
+
     companion object {
         private val log = LoggerFactory.getLogger(PhoneCopy::class.java)
         private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
+        private val keysSerializer = MapSerializer(String.serializer(), String.serializer())
+
+        /** The same as the phone's (PhoneCopyLink.ownerMark): whose phone it is, without naming the account. */
+        fun ownerMark(account: String): String =
+            MessageDigest.getInstance("SHA-256").digest("ytmp-phone:$account".toByteArray()).joinToString("") { "%02x".format(it) }.take(16)
     }
 }

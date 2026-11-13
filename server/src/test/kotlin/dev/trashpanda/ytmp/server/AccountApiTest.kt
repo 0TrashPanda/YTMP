@@ -50,6 +50,14 @@ import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.host.PlayReporter
 import kotlinx.coroutines.launch
+import kotlin.test.assertFalse
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
+import dev.trashpanda.ytmp.protocol.PhoneCopyState
+import dev.trashpanda.ytmp.protocol.PhoneCopyAsked
+import dev.trashpanda.ytmp.protocol.MyPhone
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.Role
 import dev.trashpanda.ytmp.protocol.RoleTemplate
@@ -118,6 +126,34 @@ class AccountApiTest {
         contentType(ContentType.Application.Json)
         session?.let(::bearerAuth)
         setBody(body)
+    }
+
+    @Test
+    fun `your computer asks your phone through the server, and the waiting phone hears at once`() = testApplication {
+        setup(SignupMode.OPEN)
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>().sessionToken
+        val sam = client.postJson("/api/account/signup", SignupRequest("sam", "password123", "Sam")).body<SessionResponse>().sessionToken
+        val phone = client.postJson("/api/account/host-token", HostTokenRequest("http://192.168.1.23:8765"), anna).body<HostTokenResponse>().token
+        suspend fun asked(query: String = "") = client.get("/api/auth/phone-copy$query") { bearerAuth(phone) }.body<PhoneCopyAsked>()
+
+        assertFalse(asked().asked)
+        coroutineScope {
+            // The open app waits on the server; the computer asks.
+            val waiting = async { asked("?wait=20") }
+            delay(300)
+            val state = client.post("/api/account/phone-copy/ask") { bearerAuth(anna) }.body<PhoneCopyState>()
+            val heard = withTimeout(5_000) { waiting.await() }
+            assertTrue(heard.asked)
+            assertEquals(state.askedUntil, heard.until)
+            // Answered: not again for the same ask.
+            assertFalse(asked("?after=${heard.until}").asked)
+        }
+        // The phone says where it is: only its owner sees it.
+        assertEquals(HttpStatusCode.NoContent, client.postJson("/api/auth/phone-copy/here", MyPhone("p1", "Pixel", "http://192.168.1.23:8765"), phone).status)
+        assertEquals(listOf("Pixel"), client.get("/api/account/phone-copy") { bearerAuth(anna) }.body<PhoneCopyState>().phones.map { it.name })
+        assertEquals(emptyList(), client.get("/api/account/phone-copy") { bearerAuth(sam) }.body<PhoneCopyState>().phones)
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/auth/phone-copy").status)
     }
 
     @Test

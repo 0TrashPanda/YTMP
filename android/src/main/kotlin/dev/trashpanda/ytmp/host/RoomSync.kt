@@ -63,9 +63,9 @@ class RoomSync(
     private val prefs = context.getSharedPreferences("sync", Context.MODE_PRIVATE)
 
     /** This phone, as a place rooms live. */
-    private val hostId: String = prefs.getString("hostId", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("hostId", it).apply() }
+    internal val hostId: String = prefs.getString("hostId", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("hostId", it).apply() }
 
-    private val hostName: String
+    internal val hostName: String
         get() = Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)?.takeIf { it.isNotBlank() } ?: Build.MODEL
 
     private val home get() = RoomHome(HostKind.PHONE, hostId, hostName, lanUrl())
@@ -90,7 +90,7 @@ class RoomSync(
     private val sent = ConcurrentHashMap<String, SavedRoom>()
 
     /** The linked server, if [account] is one of its accounts. */
-    private fun serverFor(account: String?): String? {
+    internal fun serverFor(account: String?): String? {
         val server = authLink.auth.servers().firstOrNull() ?: return null
         return server.url?.takeIf { account != null && account.endsWith("@${server.issuer}") }
     }
@@ -221,11 +221,11 @@ class RoomSync(
     private fun errorMessage(body: String): String? = runCatching { JSONObject(body).getJSONObject("error").getString("message") }.getOrNull()
 
     /** One request to the server: status and body, or null when it can't be reached. */
-    private suspend fun call(method: String, url: String, token: String, json: String?): Pair<Int, String>? = withContext(Dispatchers.IO) {
+    internal suspend fun call(method: String, url: String, token: String, json: String?, readTimeoutMs: Int = 15_000): Pair<Int, String>? = withContext(Dispatchers.IO) {
         runCatching {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
             connection.connectTimeout = 10_000
-            connection.readTimeout = 15_000
+            connection.readTimeout = readTimeoutMs
             connection.requestMethod = method
             connection.setRequestProperty("Authorization", "Bearer $token")
             try {

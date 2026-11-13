@@ -161,6 +161,8 @@ data class HostOptions(
      * the hosting device itself. Null: they're fixed (a server's ytmp.toml).
      */
     val cacheSettings: CacheSettings? = null,
+    /** Keys for the owner's computers to copy this device's songs without a login (a phone). */
+    val copyKeys: CopyKeys? = null,
 )
 
 /** Where the song cache may be kept and how big it is, as a setting (a phone). */

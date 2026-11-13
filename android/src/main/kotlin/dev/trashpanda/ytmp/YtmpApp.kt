@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -57,11 +58,19 @@ class YtmpApp : Application() {
         host = LocalHost(this).also { it.start() }
         nearby = Nearby(this)
         scope.launch { host.rooms.list.collect { nearby.announce(it) } }
-        // This phone itself, for the owner's desktop app (copying its songs).
-        nearby.announceDevice(
-            runCatching { android.provider.Settings.Global.getString(contentResolver, android.provider.Settings.Global.DEVICE_NAME) }.getOrNull()
-                ?.takeIf { it.isNotBlank() } ?: android.os.Build.MODEL,
-        )
+        // Songs from your phone: the owner's computer asks through their server. While the app is
+        // on screen the phone waits on the server for that, so it answers at once.
+        host.phoneCopy.announce = nearby::announceDevice
+        scope.launch {
+            visible.collectLatest { shown ->
+                while (shown) {
+                    val started = System.currentTimeMillis()
+                    val asked = runCatching { host.phoneCopy.check(waitSeconds = 25) }.getOrDefault(false)
+                    // Back at once without an ask: no server, or it can't be reached. Not again right away.
+                    if (!asked && System.currentTimeMillis() - started < 5_000) kotlinx.coroutines.delay(15_000)
+                }
+            }
+        }
         Widget.start(this, scope)
         scope.launch {
             combine(host.rooms.hosting, host.rooms.playing, host.nearby.playing, ::Triple).distinctUntilChanged().collect { (rooms, playing, speakers) ->

@@ -781,6 +781,50 @@ class ApplicationTest {
     }
 
     @Test
+    fun `a computer that copied once with a login gets a key, and copies with it without one`() = testApplication {
+        val dir = Files.createTempDirectory("ytmp-copy").toFile()
+        val cache = SongCache(dir, 10_000_000, lookup = { "https://stream/$it" }, audio = null, scope = CoroutineScope(SupervisorJob()), coverOf = { null })
+        runBlocking { assertTrue(cache.take(song) { it.writeBytes(ByteArray(2_000).also { b -> "ID3".toByteArray().copyInto(b) }) }) }
+        var shown = 0
+        val keys = object : CopyKeys {
+            val made = mutableSetOf<String>()
+            override val deviceId = "phone-1"
+            override val name = "Pixel"
+            override fun make() = "key${made.size}".also { made += it }
+            override fun valid(key: String) = key in made
+            override fun showNow(): Boolean {
+                shown++
+                return true
+            }
+        }
+        application {
+            val rooms = RoomManager({ id -> "https://stream/$id" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(
+                rooms,
+                HostSources(search, cache = cache),
+                HostOptions(kind = HostKind.PHONE, isLocal = { it.request.headers["X-Remote"] == null }, auth = testAuth, deviceOwner = { "jonah@home" }, copyKeys = keys),
+            )
+        }
+        val client = jsonClient()
+        fun HttpRequestBuilder.remote() = header("X-Remote", "1")
+
+        // A key only with the owner's login, never with another key.
+        assertEquals(HttpStatusCode.Forbidden, client.post("/api/cache/songs/key") { remote(); header(HttpHeaders.Authorization, "Bearer token-sam") }.status)
+        val key = client.post("/api/cache/songs/key") { remote(); header(HttpHeaders.Authorization, "Bearer token-jonah") }.body<CopyKey>()
+        assertEquals("phone-1", key.deviceId)
+        assertEquals(HttpStatusCode.Forbidden, client.post("/api/cache/songs/key") { remote(); header(COPY_KEY_HEADER, key.key) }.status)
+        // With the key: the list and the songs (an MP3 here: a phone's own music file).
+        assertEquals(listOf(song.id), client.get("/api/cache/songs") { remote(); header(COPY_KEY_HEADER, key.key) }.body<CachedSongFiles>().songs.map { it.song.id })
+        assertEquals("audio/mpeg", client.get("/api/cache/songs/ytm:abc") { remote(); header(COPY_KEY_HEADER, key.key) }.headers[HttpHeaders.ContentType])
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/cache/songs") { remote(); header(COPY_KEY_HEADER, "made-up") }.status)
+        // Send songs to my computer: only the phone itself.
+        assertEquals(HttpStatusCode.Forbidden, client.post("/api/cache/songs/show") { remote() }.status)
+        assertEquals(HttpStatusCode.NoContent, client.post("/api/cache/songs/show").status)
+        assertEquals(1, shown)
+        dir.deleteRecursively()
+    }
+
+    @Test
     fun `the YouTube Music account of a phone's owner is only for the phone itself`() = testApplication {
         val owner = Owner(YoutubeAccount("Jonah", "@jonah", null))
         setupPhone(generalCatalog, owner)

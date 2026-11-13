@@ -5,6 +5,10 @@ import dev.trashpanda.ytmp.host.ApiException
 import dev.trashpanda.ytmp.host.bearerToken
 import dev.trashpanda.ytmp.host.normalizeOrigin
 import dev.trashpanda.ytmp.protocol.AccountInfo
+import dev.trashpanda.ytmp.protocol.MyPhone
+import kotlinx.coroutines.flow.first
+import dev.trashpanda.ytmp.protocol.PhoneCopyAsked
+import dev.trashpanda.ytmp.protocol.PhoneCopyState
 import dev.trashpanda.ytmp.protocol.AuthServerInfo
 import dev.trashpanda.ytmp.protocol.ChangePasswordRequest
 import dev.trashpanda.ytmp.protocol.ErrorCode
@@ -693,12 +697,51 @@ class AccountService(
             call.respond(scopedToken(call.account(), HISTORY_SCOPE))
         }
 
+        // Songs from your phone (the desktop app): the computer asks your phones through here; a
+        // phone looks now and then (open, or in the background on Wi-Fi), and answers with where
+        // it is. Only in memory: a request lasts PHONE_ASK_MS, an answer PHONE_SEEN_MS.
+        get("/account/phone-copy") { call.respond(phoneCopyState(call.account().username)) }
+        post("/account/phone-copy/ask") {
+            val username = call.account().username
+            phoneAsks.computeIfAbsent(username) { kotlinx.coroutines.flow.MutableStateFlow(0L) }.value = clock() + PHONE_ASK_MS
+            call.respond(phoneCopyState(username))
+        }
+        get("/auth/phone-copy") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            val after = call.request.queryParameters["after"]?.toLongOrNull() ?: 0
+            val waitMs = (call.request.queryParameters["wait"]?.toLongOrNull() ?: 0).coerceIn(0, 60) * 1000
+            val asks = phoneAsks.computeIfAbsent(claims.sub) { kotlinx.coroutines.flow.MutableStateFlow(0L) }
+            fun fresh(until: Long) = until > after && until > clock()
+            val until = kotlinx.coroutines.withTimeoutOrNull(waitMs) { asks.first { until -> fresh(until) } } ?: asks.value
+            call.respond(if (fresh(until)) PhoneCopyAsked(true, until) else PhoneCopyAsked(false))
+        }
+        post("/auth/phone-copy/here") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            val phone = call.receive<MyPhone>()
+            if (normalizeOrigin(phone.url) == null) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Not a web address")
+            phonesHere.compute(claims.sub) { _, known -> (known.orEmpty() + (phone.id to phone.copy(seenAt = clock()))).filterValues { clock() - it.seenAt < PHONE_SEEN_MS } }
+            call.respond(HttpStatusCode.NoContent)
+        }
+
         post("/account/host-token") {
             val account = call.account()
             val origin = normalizeOrigin(call.receive<HostTokenRequest>().origin)
                 ?: throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Not a web address")
             call.respond(hostToken(account, origin))
         }
+    }
+
+    /** Until when a computer asks each account's phones for their songs (username → ms). */
+    private val phoneAsks = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.flow.MutableStateFlow<Long>>()
+    /** The phones that answered, per account (username → phone id → phone). */
+    private val phonesHere = java.util.concurrent.ConcurrentHashMap<String, Map<String, MyPhone>>()
+
+    private fun phoneCopyState(username: String): PhoneCopyState {
+        val now = clock()
+        return PhoneCopyState(
+            askedUntil = phoneAsks[username]?.value?.takeIf { it > now },
+            phones = phonesHere[username].orEmpty().values.filter { now - it.seenAt < PHONE_SEEN_MS }.sortedBy { it.name },
+        )
     }
 
     /** The account of the login session in `Authorization: Bearer` (this server's own pages), if any. Not a host token. */
@@ -806,6 +849,9 @@ class AccountService(
     companion object {
         private val log = LoggerFactory.getLogger(AccountService::class.java)
         val HOST_TOKEN_LIFETIME = 30.days
+        /** A computer's request for a phone's songs lasts this long; a phone's answer counts this long. */
+        const val PHONE_ASK_MS = 30 * 60_000L
+        const val PHONE_SEEN_MS = 10 * 60_000L
         val INVITE_LIFETIME = 7.days
     }
 }

@@ -4,6 +4,7 @@
 	// Settings, with its size next to it.
 	import { onDestroy } from 'svelte';
 	import type { SongCacheSettings, SongCacheStatus } from '../../protocol.gen';
+	import { showToComputer } from '../../api';
 	import NumberField from '../NumberField.svelte';
 	import Choice from './Choice.svelte';
 	import LocalSongsSection from './LocalSongsSection.svelte';
@@ -217,6 +218,23 @@
 			{/if}
 			{#if status.localSongs != null}
 				<LocalSongsSection {status} {busy} {patch} {attempt} {onToast} />
+			{/if}
+			{#if status.mostPlayedPlaylists != null}
+				<!-- A phone: its songs to the owner's computer (the desktop app), also without the server. -->
+				<div class="flex items-center gap-3">
+					<div class="min-w-0 flex-1">
+						<p class="text-sm font-medium">Send songs to my computer</p>
+						<p class="text-xs text-muted">
+							Shows this phone on the Wi-Fi for 10 minutes, so your computer copies its songs (with YTMP open there, logged in with the same account). With the app open, your computer can also ask
+							for them itself: Copy from my phone.
+						</p>
+					</div>
+					<button
+						class="shrink-0 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line disabled:opacity-40"
+						disabled={busy}
+						onclick={() => attempt(async () => (await showToComputer(), status!), 'Your computer can find this phone now')}>Send</button
+					>
+				</div>
 			{/if}
 			{#if status.places.length > 1}
 				<Choice

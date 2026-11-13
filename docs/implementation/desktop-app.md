@@ -170,24 +170,38 @@ over its own connection (`FollowerSource`/`RoomFollower`, moved from the Android
 
 ## Songs from your phone ✅
 
-Copying a phone's song cache into the computer's over Wi-Fi.
+Copying a phone's songs into the computer's song cache over Wi-Fi, only between one account's
+devices, and without the phone announcing itself all the time.
 
-- **The phone announces itself** while the app runs: `_ytmp-device._tcp` (its Android device
-  name, `Nearby.announceDevice`), next to its public rooms' `_ytmp._tcp`.
-- **The phone's songs** (`CacheCopy.kt`, any host): `GET /api/cache/songs` (each cached song
-  with its size and type) and `GET /api/cache/songs/<id>` (the file, with ranges). Only the
-  device's own page or its owner on another device (`isDeviceOwner`: a host token of the
-  account the phone's own page is logged in with); others get 403.
-- **The login for the phone**: the window (on your server, logged in) asks the server for a
-  host token for the phone's address (`POST /api/account/host-token { origin }`, the same as
-  `/connect` makes), `aud` = `http://<phone>:<port>`, which the phone accepts as its own.
-- **The copy** (`PhoneCopy`, desktop host): finds the phones with jmDNS (with the speakers),
-  `GET /api/desktop/phones` (phones and the copy's progress), `POST …/phones/copy
-  { phoneId, token }`, `…/phones/stop`. It skips songs that are here and the ones that don't
-  fit in what's left of the cache (it would push others out), and fetches the rest one at a
-  time into `SongCache.take` (kept like a fetched song; not audio: dropped).
-- **The window**: *Settings → Song cache* (`ComputerCacheSection`, `computerPhones.ts`) lists
-  the phones and the progress, looking every 2 s.
+- **Asking through the server** (`AccountApi`, in memory): the window's *Copy from my phone*
+  `POST /api/account/phone-copy/ask` (login session) opens a 30-minute ask. The open phone app
+  waits on `GET /api/auth/phone-copy?after=&wait=25` (its owner's token, `PhoneCopyLink.check`,
+  looped while the app is on screen), which the server answers the moment the ask comes (a
+  `StateFlow` per account): no polling delay. Asked, the phone `POST`s `/api/auth/phone-copy/here`
+  `MyPhone { id, name, url }` and shows itself on its network for 10 minutes. The window reads
+  `GET /api/account/phone-copy` every second and starts the copy with the phone that answered.
+  There's no push to a phone whose app isn't running (Android only allows that through
+  Google's Firebase Cloud Messaging, which YTMP doesn't use), and no background check.
+- **By hand** (*Send songs to my computer*, the phone's `POST /api/cache/songs/show`, its own
+  page only): shows the phone for 10 minutes and tells the server when it can.
+- **Showing itself** (`Nearby.announceDevice`): `_ytmp-device._tcp` with `id`, `name` and
+  `owner` (the first 16 hex of SHA-256 of `ytmp-phone:<account>`, `PhoneCopyLink.ownerMark`).
+  The desktop host (`PhoneCopy`, jmDNS) lists only phones with the window's account's mark
+  (`GET /api/desktop/phones?account=`) or with a key here.
+- **The phone's songs** (`CacheCopy.kt`, any host): `GET /api/cache/songs` (the cached songs with
+  size and type, then the downloads and own music files that are a YouTube Music song:
+  `SongCache.copyable`) and `GET /api/cache/songs/<id>` (`respondCopy`: the cached file, else
+  the download's). Only for the device's own page, its owner on another device
+  (`isDeviceOwner`), or a computer with a key.
+- **Keys** (`CopyKeys`, the phone's `PhoneCopyLink`, hashed in its preferences): the first copy
+  uses a host token for the phone's address from the server (`/api/account/host-token`) and
+  gets a key with it (`POST /api/cache/songs/key`, only with a login); the desktop host keeps it
+  in `phone-keys.json` and uses it from then on (`X-Copy-Key`). A phone with a key that shows
+  itself is copied from at once, without the window or the server.
+- **The copy** (`PhoneCopy`): skips songs that are here; for each other song it reads the size
+  from the answer and leaves it out when it doesn't fit in what's left of the cache (it would
+  push others out), else `SongCache.take` (kept like a fetched song; MP3, FLAC and Ogg are
+  recognised too, for a phone's own files; not audio: dropped). The window shows the progress.
 - **Not tried yet** with a real phone: the phone part needs a new release on it.
 
 ## Why Tauri
