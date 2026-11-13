@@ -263,15 +263,26 @@ const viaYourServer = () => !!youtubeFrom?.personalize;
 let signedInHere = { home: false, search: false };
 // As it was last time: Home is asked for before the host says whether you're signed in, and
 // would otherwise come from your own module (signed out) on every start.
+let answered = false;
 try {
-	signedInHere = { home: false, search: false, ...JSON.parse(read('ytmp.youtubeHere') ?? '{}') };
+	const last = read('ytmp.youtubeHere');
+	if (last) signedInHere = { ...signedInHere, ...JSON.parse(last) };
+	answered = !!last;
 } catch {
 	// None kept.
 }
+// The first time (nothing kept), Home waits a moment for the host's answer instead of showing
+// the signed-out one first.
+let onAnswer = (): void => {};
+const signInKnown = answered ? Promise.resolve() : new Promise<void>((resolve) => (onAnswer = resolve));
+const ANSWER_WAIT_MS = 4000;
+
 /** Returns whether Home now comes from somewhere else (then the one shown and kept is forgotten: load it again). */
 export function useYoutubeHere(signedIn: boolean, personalize: boolean): boolean {
 	const now = { home: signedIn, search: signedIn && personalize };
 	const homeChanged = now.home !== signedInHere.home;
+	answered = true;
+	onAnswer();
 	if (now.search !== signedInHere.search) {
 		for (const key of [...cache.keys()]) if (key.startsWith('search:') || key.startsWith('suggest:')) cache.delete(key);
 	}
@@ -493,7 +504,9 @@ export async function setPodcastSaved(id: string, saved: boolean): Promise<void>
 }
 
 /** Suggestions for the home page: quick picks, new releases, mixes (yours, with your YouTube Music). */
-export function getHome(): Promise<HomePage> {
+export async function getHome(): Promise<HomePage> {
+	// Not known yet whether it's yours (first start): wait for the host's answer, not long.
+	if (!answered && !youtubeFrom && moduleUsable()) await Promise.race([signInKnown, new Promise((done) => setTimeout(done, ANSWER_WAIT_MS))]);
 	const path = youtubeFrom ? '/api/me/home' : `/api/home${refreshHome ? '?fresh=1' : ''}`;
 	const forced = refreshHome;
 	// Your own module keeps no Home of its own: always a new one, kept here as set in Settings → Home.

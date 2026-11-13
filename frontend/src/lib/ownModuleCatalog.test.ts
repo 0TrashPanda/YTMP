@@ -71,6 +71,7 @@ describe('search and pages with your own module', () => {
 		expect(await api.getPlaylistPart('VLPL1', 'tok')).toMatchObject({ from: 'module', path: 'playlists/VLPL1?more=tok' });
 		expect(await api.getPodcast('MPSP1')).toMatchObject({ from: 'module' });
 		expect(await api.getSong('ytm:abc')).toMatchObject({ from: 'module', path: 'songs/ytm%3Aabc' });
+		api.useYoutubeHere(false, false);
 		expect(await api.getHome()).toMatchObject({ from: 'module', path: 'home' });
 		expect(asked.every((a) => a.startsWith('module '))).toBe(true);
 	});
@@ -127,8 +128,30 @@ describe('search and pages with your own module', () => {
 		expect(await api.getArtist('UCabc')).toMatchObject({ from: 'module' });
 	});
 
+	it('wait for whether you’re signed in on a first start, and then ask Home there', async () => {
+		const { api } = await load();
+		const home = api.getHome();
+		api.useYoutubeHere(true, false);
+		expect(await home).toMatchObject({ from: 'host', path: '/api/home' });
+		expect(asked.every((a) => a.startsWith('host '))).toBe(true);
+	});
+
+	it('show the signed-out Home when the host doesn’t answer, and swap it when it does', async () => {
+		vi.useFakeTimers();
+		const { api } = await load();
+		const home = api.getHome();
+		await vi.advanceTimersByTimeAsync(4000);
+		vi.useRealTimers();
+		expect(await home).toMatchObject({ from: 'module' });
+		expect(api.useYoutubeHere(true, false)).toBe(true);
+		expect(await api.getHome()).toMatchObject({ from: 'host' });
+	});
+
 	it('ask Home where it came from last time, before the host says whether you’re signed in', async () => {
 		let { api } = await load();
+		stored.set('ytmp.youtubeHere', JSON.stringify({ home: false, search: false }));
+		vi.resetModules();
+		({ api } = await load());
 		expect(await api.getHome()).toMatchObject({ from: 'module' });
 		// The host then says you're signed in: the signed-out Home is forgotten and asked again.
 		expect(api.useYoutubeHere(true, false)).toBe(true);
