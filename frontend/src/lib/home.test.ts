@@ -17,7 +17,7 @@ const song = (id: string, podcast = false): SearchItem =>
 		},
 		video: false
 	}) as SearchItem;
-const section = (title: string, items: SearchItem[] = [song('a')]): HomeSection => ({ title, items });
+const section = (title: string, items: SearchItem[] = [song('a')]): HomeSection => ({ title, items, strapline: null });
 
 describe('home sections', () => {
 	it('puts new names after the one YTM shows before them', () => {

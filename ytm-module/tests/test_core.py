@@ -747,3 +747,11 @@ def test_unreadable_pages_are_kept(monkeypatch, tmp_path):
     # A genuine "not there" isn't kept.
     assert not keep.unreadable(core.NotFound("No such album"))
     keep.keep_in(None)
+
+
+def test_home_rows_keep_their_strapline(monkeypatch):
+    # "Similar to" over "Dr. Peacock": ytmusicapi drops it, core keeps it.
+    monkeypatch.setattr(core, "_parse_mixed_content", lambda rows: [{"title": "Dr. Peacock", "contents": []}] if rows else [])
+    row = {"musicCarouselShelfRenderer": {"header": {"musicCarouselShelfBasicHeaderRenderer": {"strapline": {"runs": [{"text": "Similar to"}]}}}}}
+    plain = {"musicCarouselShelfRenderer": {"header": {"musicCarouselShelfBasicHeaderRenderer": {}}}}
+    assert [s.get("strapline") for s in core._with_straplines([row, plain])] == ["Similar to", None]

@@ -197,6 +197,8 @@ data class HomeSection(
     /** e.g. "Quick picks", "New releases". */
     val title: String,
     val items: List<SearchItem>,
+    /** The small line YouTube Music shows above [title], e.g. "Similar to" over an artist's name. */
+    val strapline: String? = null,
 )
 
 /** A signed-in YouTube Music account. */

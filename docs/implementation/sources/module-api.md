@@ -158,7 +158,7 @@ module now answers `search`, `suggestions`, `stream`, `audio`, `radio`, `artist`
 | GET | `/podcasts/{id}` ✅ | A podcast: `PodcastPage` (`id, title, author, description, thumbnails, episodes: [{ song, date, description }]`). Episodes are `Song`s with `podcast: { id, name }` |
 | GET | `/playlists/{id}` | Public playlist with songs ✅ (`PlaylistPage`: `id, title, author, description, thumbnails, songs, songCount`), in parts like `/me/playlists/{id}`: the first (~100 songs) with `more`; `?more=…` answers with only the next songs |
 | GET | `/resolve?url=` | Turn a YTM/YT URL into `{ type, item }` (for links pasted in search) |
-| GET | `/home` ✅ | Home page: `{ sections: [{ title, items: [SearchItem] }] }` (quick picks, new releases, mixes, …). Songs there have no length (the stream has it). Personalised with credentials (later). The host: `GET /api/home`, cached 30 min |
+| GET | `/home` ✅ | Home page: `{ sections: [{ title, strapline?, items: [SearchItem] }] }` (quick picks, new releases, mixes, …; `strapline`: YTM's line above the title, e.g. "Similar to"). Songs there have no length (the stream has it). Personalised with credentials (later). The host: `GET /api/home`, cached 30 min |
 | GET | `/explore` | Explore page: new releases, charts, moods & genres |
 | GET | `/explore/{sectionId}` | One explore section, for example a mood or genre |
 

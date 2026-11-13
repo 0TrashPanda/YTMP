@@ -64,6 +64,7 @@
 	import { appUpdate } from '../../../lib/appUpdate.svelte';
 	import { ListenRequests } from '../../../lib/listenRequests';
 	import { nativeBridge } from '../../../lib/native';
+	import { desktopApp } from '../../../lib/ownModule.svelte';
 	import { identity, logInOnce, session } from '../../../lib/account';
 	import type { Participant } from '../../../lib/protocol.gen';
 	import { busy } from '../../../lib/busy.svelte';
@@ -466,6 +467,16 @@
 		return 'handled';
 	}
 
+	/** The desktop app: the mouse's back button and Alt+← go back like a phone's Back (not out of
+	 * the room, as the WebView would). */
+	function onDesktopBack(event: MouseEvent | KeyboardEvent) {
+		if (!desktopApp()) return;
+		const asked = event instanceof MouseEvent ? event.button === 3 : (event.altKey && event.key === 'ArrowLeft') || event.key === 'BrowserBack';
+		if (!asked) return;
+		event.preventDefault();
+		onBack();
+	}
+
 	/** Space plays or pauses the room, like YTM; not while typing, or on a control reached with Tab. */
 	function onKeydown(event: KeyboardEvent) {
 		if (event.key !== ' ' || event.ctrlKey || event.metaKey || event.altKey || !room?.state?.nowPlaying) return;
@@ -586,7 +597,7 @@
 </script>
 
 <svelte:document bind:visibilityState={visibility} />
-<svelte:window onkeydown={onKeydown} />
+<svelte:window onkeydown={(e) => (onDesktopBack(e), onKeydown(e))} onmouseup={onDesktopBack} />
 
 <svelte:head>
 	<title>{room?.state ? `${room.state.room.name} · YTMP` : 'YTMP'}</title>
@@ -803,7 +814,8 @@
 					<main class="mx-auto w-full max-w-7xl p-3 sm:p-6">
 						{#key top}
 						{#if view}
-							{#if stack.hasBackLink}
+							<!-- Outside the Android app (no Back button there, and a browser's leaves the room): on every page opened from another. -->
+							{#if stack.hasBackLink || (!nativeBridge && stack.pages.length > 1)}
 								<button class="mb-2 flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted hover:bg-raised hover:text-white" onclick={back}>
 									<Icon name="back" size={20} />
 									Back

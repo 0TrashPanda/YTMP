@@ -53,7 +53,10 @@ Like YTM:
 
 - **Home** ✅: the room opens on it. Rows of suggestions from the sources: quick picks
   (songs in a grid of four rows that scrolls sideways; tap = add to queue), new releases,
-  mixes and playlists (cards that scroll sideways and open their page). Without a linked
+  mixes and playlists (cards that scroll sideways and open their page). A row with songs and
+  albums or artists mixed shows them all as cards, in YouTube Music's order (a song's card
+  plays it like a tap). A row's small line above its title shows too, like *Similar to* over an
+  artist's name. Without a linked
   YouTube account these are YTM's general suggestions for the host's country; with one,
   your own (see [accounts](../accounts/accounts.md#linked-youtube-account)).
 - **Your own Home** ✅ (*Settings → Home*): **pin** a playlist (Liked
@@ -96,7 +99,9 @@ Like YTM:
 - Search results end with a link to search the same words **on YouTube Music**.
 - Pages stack up in the order you open them: search, find similar, artist, album, playlist,
   podcast, genre and folder pages. Going back shows the page before, **scrolled as you left
-  it**. Pages opened from other pages have a **Back** button.
+  it**. Pages opened from other pages have a **Back** button; outside the Android app (which
+  has its own Back), every page opened from Home, Library or Local has one too. In the desktop
+  app the mouse's back button and Alt+← go back the same way.
 - The bottom bar starts over: **Home** is the root (the pages opened before are gone), and
   **Library** and **Local** sit right on Home, so Back from them goes Home. The **YTMP logo**
   goes Home too (on Home: new suggestions).

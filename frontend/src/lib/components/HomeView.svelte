@@ -17,7 +17,9 @@
 	import FriendShares from './FriendShares.svelte';
 	import type { HomePage, SearchItem, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
-	import CardGrid from './CardGrid.svelte';
+	import CardGrid, { type Card } from './CardGrid.svelte';
+	import { artistNames } from '../format';
+	import { smallUrl, thumbUrl } from '../images.svelte';
 	import Icon from './Icon.svelte';
 	import PinContents from './PinContents.svelte';
 	import SongCarousel from './SongCarousel.svelte';
@@ -87,6 +89,23 @@
 
 	const songs = (items: SearchItem[]): Song[] => items.flatMap((i) => (i.kind === 'song' ? [i.song] : []));
 	const cards = (items: SearchItem[]) => items.flatMap((i) => itemCard(i, open) ?? []);
+	/** A row with songs and albums/artists/playlists mixed: all of them cards, in YTM's order (a
+	 * song's card plays it like a tap in a song list; ⋮ or right-click: the song menu). */
+	const mixedCards = (items: SearchItem[]): Card[] =>
+		items.flatMap((item, i) => {
+			if (item.kind !== 'song') return itemCard(item, open) ?? [];
+			const song = item.song;
+			const songMenu = (event: MouseEvent, atPointer: boolean) => onMenu({ song, place: 'search', ...menuAt(event.currentTarget as HTMLElement, event, atPointer) });
+			return {
+				key: `song:${song.id}:${i}`,
+				title: song.title,
+				subtitle: artistNames(song),
+				art: thumbUrl(song.thumbnails, 400),
+				small: smallUrl(song.thumbnails, 400),
+				open: () => tapSong(room, song, onToast),
+				songMenu
+			};
+		});
 
 	/** All the songs Home suggests, for a speed dial's *Random song*. */
 	const homeSongs = $derived(sections.flatMap((b) => (b.kind === 'ytm' ? songs(b.section.items) : [])));
@@ -162,7 +181,13 @@
 
 {#snippet header(block: Block, i: number)}
 	<div class="relative flex items-center gap-2 px-2">
-		<h2 class="min-w-0 flex-1 truncate text-xl font-bold sm:text-2xl">{block.title}</h2>
+		<div class="min-w-0 flex-1">
+			{#if block.kind === 'ytm' && block.section.strapline}
+				<!-- Like YTM: "Similar to" over an artist's name. -->
+				<p class="truncate text-xs font-medium tracking-wide text-muted uppercase">{block.section.strapline}</p>
+			{/if}
+			<h2 class="truncate text-xl font-bold sm:text-2xl">{block.title}</h2>
+		</div>
 		<!-- With a mouse, like YTM: ‹ › scroll the row a screen's width (phones swipe it). -->
 		{#if block.layout === 'carousel' && (block.kind === 'ytm' || block.kind === 'pin') && (scrolling[`${block.key}:songs`] || scrolling[`${block.key}:cards`])}
 			<div class="hidden shrink-0 gap-2 pointer-fine:flex">
@@ -256,12 +281,14 @@
 				{@const others = cards(block.section.items)}
 				{#if block.layout === 'dial'}
 					<SpeedDial tiles={[...songTiles(list, room, onToast, onMenu), ...cardTiles(others)]} extras={dialExtras(list)} />
+				{:else if list.length && others.length && block.layout === 'carousel'}
+					<CardGrid cards={mixedCards(block.section.items)} row onScrolls={(s) => (scrolling[`${block.key}:cards`] = s)} />
 				{:else if list.length && block.layout === 'list'}
 					<SongList {room} songs={list} {onToast} {onMenu} />
 				{:else if list.length}
 					<SongCarousel {room} songs={list} {onToast} {onMenu} onScrolls={(s) => (scrolling[`${block.key}:songs`] = s)} />
 				{/if}
-				{#if others.length && block.layout !== 'dial'}
+				{#if others.length && (block.layout === 'list' || (block.layout === 'carousel' && !list.length))}
 					<CardGrid cards={others} row={block.layout === 'carousel'} list={block.layout === 'list'} onScrolls={(s) => (scrolling[`${block.key}:cards`] = s)} />
 				{/if}
 			{/if}

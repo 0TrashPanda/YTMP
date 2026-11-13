@@ -15,6 +15,8 @@
 		prefetch?: () => void;
 		/** Its menu (hold, right-click, or ⋮ with a mouse): what it's for (cardMenu.svelte.ts). */
 		menu?: CardTarget;
+		/** A song as a card (Home's mixed rows): opens the song menu instead of [menu]. */
+		songMenu?: (event: MouseEvent, atPointer: boolean) => void;
 	}
 </script>
 
@@ -45,9 +47,11 @@
 
 	/** Hold or right-click a card ([atPointer]: the menu at the pointer), or its ⋮: its menu. */
 	function menu(event: MouseEvent, card: Card, atPointer: boolean) {
-		if (!card.menu) return;
+		if (!card.menu && !card.songMenu) return;
 		event.preventDefault();
 		event.stopPropagation();
+		if (card.songMenu) return card.songMenu(event, atPointer);
+		if (!card.menu) return;
 		openCardMenu({ ...card.menu, subtitle: card.menu.subtitle || card.subtitle }, menuAt(event.currentTarget as HTMLElement, event, atPointer));
 	}
 </script>
@@ -69,7 +73,7 @@
 					<p class="truncate text-sm text-muted">{card.subtitle}</p>
 				</div>
 			</button>
-			{#if card.menu}
+			{#if card.menu || card.songMenu}
 				<!-- With a mouse, like YTM: a ⋮ when you point at it (touch screens hold the card). -->
 				<button class="mr-1 hidden shrink-0 rounded-full p-2 text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-white focus-visible:opacity-100 pointer-fine:block" aria-label="More for {card.title}" onclick={(e) => menu(e, card, false)}>
 					<Icon name="more" size={20} />
@@ -104,7 +108,7 @@
 				<p class="truncate text-xs text-muted">{card.subtitle}</p>
 			</div>
 		</button>
-		{#if card.menu}
+		{#if card.menu || card.songMenu}
 			<!-- With a mouse, like YTM: a ⋮ on the picture when you point at it (touch screens hold the card). -->
 			<button
 				class="absolute top-1.5 right-1.5 hidden h-8 w-8 place-items-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 hover:bg-black/80 focus-visible:opacity-100 pointer-fine:grid"

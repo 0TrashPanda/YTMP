@@ -1468,6 +1468,7 @@ export interface PodcastPage {
 export interface HomeSection {
   title: string;
   items: SearchItem[];
+  strapline: string | null;
 }
 
 export interface HomePage {

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 import requests
 import yt_dlp
+import ytmusicapi.mixins.browsing
 import ytmusicapi.mixins.playlists
 from ytmusicapi import LikeStatus, YTMusic
 from ytmusicapi.continuations import CONTINUATION_ITEMS, get_continuation_token
@@ -616,7 +617,7 @@ class YtmCore:
         for s in home_sections:
             items = [item for c in s.get("contents") or [] if (item := parse.home_item(c))]
             if items:
-                sections.append({"title": s.get("title") or "", "items": items})
+                sections.append({"title": s.get("title") or "", "strapline": s.get("strapline"), "items": items})
         return {"sections": sections}
 
     def stream(self, song_id: str, fresh: bool = False) -> StreamInfo:
@@ -809,6 +810,24 @@ def _first_part_then_token(results, limit, request_func, parse_func):
 _first_part_only = _load_parts is not None
 if _first_part_only:
     ytmusicapi.mixins.playlists.get_continuations_2025 = _first_part_then_token
+
+
+def _with_straplines(rows: list) -> list:
+    """ytmusicapi's parse_mixed_content, keeping each row's strapline: the small line YouTube Music
+    shows above a row's title ("Similar to" over "Dr. Peacock", "More from" over an artist)."""
+    out = []
+    for row in rows:
+        parsed = _parse_mixed_content([row])
+        strap = nav(row, ["musicCarouselShelfRenderer", "header", "musicCarouselShelfBasicHeaderRenderer", "strapline", "runs"], True)
+        for section in parsed:
+            if strap:
+                section["strapline"] = "".join(r.get("text", "") for r in strap)
+        out.extend(parsed)
+    return out
+
+
+_parse_mixed_content = ytmusicapi.mixins.browsing.parse_mixed_content
+ytmusicapi.mixins.browsing.parse_mixed_content = _with_straplines
 
 
 def _account(user: YTMusic) -> dict:
