@@ -1,5 +1,7 @@
 package dev.trashpanda.ytmp
 
+import dev.trashpanda.ytmp.host.RoomLink
+import dev.trashpanda.ytmp.host.FollowerSource
 import android.Manifest
 import android.app.AlertDialog
 import android.app.PendingIntent

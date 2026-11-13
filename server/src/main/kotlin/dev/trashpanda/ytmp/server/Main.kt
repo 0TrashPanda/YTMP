@@ -9,6 +9,7 @@ import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.core.RoomTimeouts
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.YoutubeTvOutputs
+import dev.trashpanda.ytmp.host.discover
 import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.LyricsLookup
 import dev.trashpanda.ytmp.host.SongFiles

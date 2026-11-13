@@ -1,5 +1,7 @@
 package dev.trashpanda.ytmp
 
+import dev.trashpanda.ytmp.host.RoomLink
+import dev.trashpanda.ytmp.host.FollowedRoom
 import dev.trashpanda.ytmp.protocol.Participant
 import dev.trashpanda.ytmp.protocol.PlaybackStatus
 import dev.trashpanda.ytmp.protocol.RoomInfo

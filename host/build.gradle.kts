@@ -23,6 +23,8 @@ dependencies {
     // The YouTube Music module over HTTP (RemoteSourceModule): the server's, and the desktop app's own.
     api(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)
+    // Finding speakers with mDNS (NetworkDiscovery.kt): the server and the desktop app.
+    implementation(libs.jmdns)
 
     testImplementation(kotlin("test"))
     testImplementation(libs.ktor.server.test.host)

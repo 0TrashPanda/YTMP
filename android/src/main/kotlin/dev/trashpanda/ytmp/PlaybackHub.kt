@@ -1,5 +1,7 @@
 package dev.trashpanda.ytmp
 
+import dev.trashpanda.ytmp.host.RoomFollower
+import dev.trashpanda.ytmp.host.RoomLink
 import dev.trashpanda.ytmp.protocol.Song
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.Serializable
@@ -62,14 +64,6 @@ data class PlaybackTarget(
 @Serializable
 data class SleepSetting(val endsAt: Long? = null, val itemId: String? = null)
 
-/** Enough to attach to the room as the page's participant (`attach` in the protocol). */
-@Serializable
-data class RoomLink(
-    /** e.g. `http://127.0.0.1:8765` */
-    val hostUrl: String,
-    val code: String,
-    val guestToken: String,
-)
 
 @Serializable
 data class TargetItem(

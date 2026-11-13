@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { watchComputerSpeakerNotices } from '../../../lib/computerSpeakers';
 	import { scrollBehavior } from '../../../lib/motion.svelte';
 	import { positionNow } from '../../../lib/sync';
 	import { page } from '$app/state';
@@ -487,11 +488,14 @@
 		// Speakers near the phone that play this room (the app drives them) tell about problems here.
 		const onNearbyNotice = (text: string) => toast(text);
 		if (nativeBridge) window.__ytmpNative = { ...window.__ytmpNative, onBack, onNearbyNotice };
+		// In the desktop app: speakers near this computer (computerSpeakers.ts).
+		const stopSpeakerNotices = watchComputerSpeakerNotices(onNearbyNotice);
 		window.addEventListener('ytmp:settings', onSettings);
 		// A song another phone shared with this one (held against it, or Share → YTMP): its song screen.
 		const stopShared = onSharedSong((songId) => (sheet = { kind: 'shared', songId }));
 		return () => {
 			stopShared();
+			stopSpeakerNotices();
 			if (window.__ytmpNative?.onBack === onBack) window.__ytmpNative = { ...window.__ytmpNative, onBack: undefined };
 			if (window.__ytmpNative?.onNearbyNotice === onNearbyNotice) window.__ytmpNative = { ...window.__ytmpNative, onNearbyNotice: undefined };
 			window.removeEventListener('ytmp:settings', onSettings);

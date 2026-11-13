@@ -6,6 +6,7 @@
 	import { rememberOutput } from '../playOn';
 	import { castScreen, unlinkScreen } from '../api';
 	import { nativeBridge, type CastScreenState, type NearbyState } from '../native';
+	import { computerSpeakers, hasComputerSpeakers, playOnComputerSpeaker, setComputerSpeakerVolume, stopComputerSpeaker } from '../computerSpeakers';
 	import type { RoomPlayer } from '../player.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import { saved } from '../storage';
@@ -69,7 +70,22 @@
 		return null;
 	}
 	let near = $state(readNearby());
-	const canPlayNear = !!nativeBridge?.playNearby;
+	// The desktop app: its own host plays the room on speakers near this computer (computerSpeakers.ts).
+	const onDesktop = !nativeBridge && hasComputerSpeakers();
+	const canPlayNear = !!nativeBridge?.playNearby || onDesktop;
+	/** The party screen on a TV: only the phone app shows it. */
+	const canShowScreen = !!nativeBridge?.showCastScreen;
+	$effect(() => {
+		if (!onDesktop) return;
+		let open = true;
+		const look = () => computerSpeakers().then((state) => open && state && (near = state));
+		void look();
+		const timer = setInterval(look, LOOK_EVERY_MS);
+		return () => {
+			open = false;
+			clearInterval(timer);
+		};
+	});
 	const nearDevices = $derived(
 		room.can('listen_locally')
 			? (near?.devices ?? []).filter((d) => !outputs.some((o) => o.id === d.id) && (canPlayNear || d.kind === 'chromecast'))
@@ -109,7 +125,27 @@
 		return speaker ? { here: near?.playing?.roomCode === room.roomCode, volume: speaker.volume } : null;
 	}
 
+	/** Desktop: what the host does, with its answer as the new state, or why not. */
+	async function onComputer(change: Promise<NearbyState>) {
+		try {
+			near = await change;
+		} catch (e) {
+			onToast(e instanceof Error ? e.message : 'That speaker could not be reached');
+		}
+	}
+
+	function setNearVolume(deviceId: string, volume: number) {
+		if (onDesktop) void onComputer(setComputerSpeakerVolume(deviceId, volume));
+		else nativeBridge?.setNearbyVolume?.(deviceId, volume);
+	}
+
 	function playNear(device: { id: string }, on: boolean) {
+		if (onDesktop) {
+			const guestToken = saved.guestToken(room.roomCode);
+			if (on && !guestToken) return;
+			void onComputer(on && guestToken ? playOnComputerSpeaker(device.id, { hostUrl: location.origin, code: room.roomCode, guestToken }) : stopComputerSpeaker(device.id));
+			return;
+		}
 		if (!on) {
 			nativeBridge?.stopNearby?.(device.id);
 			return;
@@ -155,6 +191,8 @@
 	function nudgeSync(deltaMs: number) {
 		player.setSyncOffset(Math.max(-SYNC_RANGE_MS, Math.min(SYNC_RANGE_MS, player.syncOffsetMs + deltaMs)));
 	}
+
+	const LOOK_EVERY_MS = 2_000;
 </script>
 
 <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" role="presentation" onclick={onClose}>
@@ -341,7 +379,7 @@
 			</div>
 		{/each}
 		{#if nearDevices.length > 0}
-			<p class="-mb-1 mt-1 text-xs font-medium text-muted">Near this phone (it plays from here)</p>
+			<p class="-mb-1 mt-1 text-xs font-medium text-muted">Near this {onDesktop ? 'computer' : 'phone'} (it plays from here)</p>
 		{/if}
 		{#each nearDevices as device (device.id)}
 			{@const shown = shownHere(device.id)}
@@ -361,7 +399,7 @@
 						/>
 					</label>
 				{/if}
-				{#if device.kind === 'chromecast'}
+				{#if device.kind === 'chromecast' && canShowScreen}
 					<label class="flex items-center gap-3 {canPlayNear ? 'pl-8 text-sm' : ''}">
 						{#if !canPlayNear}<Icon name="tv" size={20} class={showsHere ? 'text-accent' : 'text-muted'} />{/if}
 						<span class="min-w-0 flex-1 {canPlayNear ? (showsHere ? 'text-white' : 'text-muted') : 'truncate'}">
@@ -387,7 +425,7 @@
 							value={plays.volume}
 							aria-label="Volume of {device.name}"
 							use:wheelAdjust
-							onchange={(e) => nativeBridge?.setNearbyVolume?.(device.id, Number(e.currentTarget.value))}
+							onchange={(e) => setNearVolume(device.id, Number(e.currentTarget.value))}
 						/>
 						<NumberField
 							value={Math.round(plays.volume * 100)}
@@ -396,7 +434,7 @@
 							unit="%"
 							label="Volume of {device.name} in percent"
 							class="bg-surface py-1.5"
-							onchange={(v) => nativeBridge?.setNearbyVolume?.(device.id, v / 100)}
+							onchange={(v) => setNearVolume(device.id, v / 100)}
 						/>
 					</div>
 				{/if}

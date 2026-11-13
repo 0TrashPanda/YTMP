@@ -23,7 +23,7 @@ Windows check below).
 ```
 
 - **A Kotlin host on the computer, but no rooms or accounts**: the phone's host code for the
-  song cache, local music and (later) speakers, see [this computer's host](#this-computers-host-).
+  song cache, local music and speakers, see [this computer's host](#this-computers-host-).
   It costs a Java runtime of its own (~95 MB on disk, ~190 MB of memory).
 - ✅ **The window loads the web app from the server**, like the Android app
   ([android-app.md](android-app.md#client-mode-milestone-2-)): the app and the server's UI
@@ -141,6 +141,32 @@ the disk without another lookup.
   database: at most 2 GB, a day unused, emptied when it starts, 500 MB a file at most.
 - **Not yet**: radio and autoplay from these songs (the server can't read them); their covers
   for others in the room (the cover link is the computer's own, so others see the placeholder).
+
+## Speakers near this computer ✅
+
+What the phone does for a room on a server ([chromecast](chromecast.md#speakers-near-the-phone-in-a-room-on-another-host-)),
+with the same code: the host has the speaker drivers (`CastOutputs`, `SonosOutputs`,
+`MpdOutputs`, `ZoneOutputs`, `YoutubeTvOutputs`) and `NearbySpeakers`, which follows the room
+over its own connection (`FollowerSource`/`RoomFollower`, moved from the Android app to
+`host/`) and plays it on them.
+
+- **Finding them**: always while the app runs, from 3 s after the host starts: mDNS with jmDNS
+  for Chromecasts, MPDs and zones files (`NetworkDiscovery.kt`, moved from `server/` to
+  `host/`), SSDP for Sonos and DIAL for YouTube TVs (the drivers' own `discover`). Tried on
+  Windows 10 on 2026-11-13: the living room's Chromecast was found in 10 s.
+- **The audio on the network** (`lanServer`): speakers fetch `/api/audio/<song>` from this
+  computer, so a second, tiny server listens on all addresses, without the key, with only
+  that route, and only for songs in the room the speakers play (`NearbySpeakers.plays`: now,
+  before, the queue, autoplay); anything else is a 404. It starts when a speaker first needs
+  its address (that's when Windows asks about the firewall) on a port kept in `desktop.json`
+  (`lanPort`), so the firewall's answer stays good.
+- **The window** (`computerSpeakers.ts`): `GET /api/desktop/nearby` (devices, what plays,
+  notices after `?after=`), `POST …/nearby/play { deviceId, hostUrl, code, guestToken }`,
+  `…/stop`, `…/volume`. *Play on* (`OutputsSheet`) looks every 2 s while it's open and shows
+  them under *Near this computer*, like the phone app's bridge `nearby`; the room page shows
+  the notices (looked at every 5 s). The party screen on a TV isn't offered on the computer.
+- **Not tried yet**: playing on a speaker from the app (it needs the owner's OK to play sound
+  at home), and the AppImage on Linux.
 
 ## Why Tauri
 
@@ -337,8 +363,8 @@ the module.
 7. ✅ Trying it on Windows, and the first release with it (0.44.0).
 8. ✅ The music on the computer and a song cache (see above).
 9. ✅ This computer's host (Kotlin, the phone's host code) instead of the module doing them.
-10. Next: speakers (Chromecast, Sonos, MPD) from the host, with always-on discovery in the app;
-    copying songs from a phone's cache over Wi-Fi.
+10. ✅ Speakers (Chromecast, Sonos, MPD, zones, YouTube TVs) from the host, with always-on
+    discovery in the app. Next: copying songs from a phone's cache over Wi-Fi.
 
 ## Open questions
 

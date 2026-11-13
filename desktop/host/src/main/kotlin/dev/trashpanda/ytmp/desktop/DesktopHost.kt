@@ -5,6 +5,17 @@ import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.host.ApiException
 import dev.trashpanda.ytmp.host.CacheSettings
 import dev.trashpanda.ytmp.host.CachedSource
+import dev.trashpanda.ytmp.host.CastOutputs
+import dev.trashpanda.ytmp.host.FollowerSource
+import dev.trashpanda.ytmp.host.MpdOutputs
+import dev.trashpanda.ytmp.host.NearbyPlaying
+import dev.trashpanda.ytmp.host.NearbySpeakers
+import dev.trashpanda.ytmp.host.OutputDrivers
+import dev.trashpanda.ytmp.host.RoomLink
+import dev.trashpanda.ytmp.host.SonosOutputs
+import dev.trashpanda.ytmp.host.YoutubeTvOutputs
+import dev.trashpanda.ytmp.host.ZoneOutputs
+import dev.trashpanda.ytmp.host.discover
 import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.HostSources
 import dev.trashpanda.ytmp.host.LocalMusic
@@ -14,6 +25,7 @@ import dev.trashpanda.ytmp.host.SongCache
 import dev.trashpanda.ytmp.host.ytmpModule
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.HostKind
+import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.SongCachePlace
@@ -40,14 +52,19 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
+import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.net.URI
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -92,6 +109,24 @@ class DesktopHost(private val config: Config) {
     @Volatile private var playing: Set<String> = emptySet()
     /** No rooms here, but the shared host API is built around a room manager. */
     private val rooms = RoomManager(local.streams(cache.streams), scope)
+    /** Songs' audio: this computer's music, the song cache, else YouTube through the module. */
+    private val audio = local.audio(cache.audio(ytm))
+
+    // Speakers and TVs on this computer's network, which your server can't reach: the room you're
+    // in plays there from this computer (NearbySpeakers, like the phone's). They fetch the audio
+    // from this computer on the network (lanServer).
+    private val audioBase = { localAddress: InetAddress -> "http://${localAddress.hostAddress}:${lanServer()}" }
+    private val casts = CastOutputs(scope, audioBaseUrl = audioBase)
+    private val sonos = SonosOutputs(scope, audioBase)
+    private val mpd = MpdOutputs(scope, audioBase)
+    private val zones = ZoneOutputs(scope, audioBase, mpd, local)
+    private val tvs = YoutubeTvOutputs(scope)
+    val outputs = OutputDrivers(scope, listOf(casts, sonos, mpd, zones, tvs))
+    val nearby = NearbySpeakers(scope, outputs.all)
+    /** Problems with the speakers (another app took one), numbered, for the window to show once. */
+    private val notices = ArrayDeque<NearbyNotice>()
+    private var noticeCount = 0
+    @Volatile private var lanPort = 0
 
     private val cacheControls = object : CacheSettings {
         override fun places() = listOf(SongCachePlace(PLACE, "This computer", cache.dir.let { it.mkdirs(); it.usableSpace }))
@@ -113,6 +148,25 @@ class DesktopHost(private val config: Config) {
     fun start() {
         cache.inUse = { playing }
         applyMusic()
+        scope.launch {
+            nearby.notices.collect { text ->
+                synchronized(notices) {
+                    notices.addLast(NearbyNotice(++noticeCount, text))
+                    while (notices.size > KEPT_NOTICES) notices.removeFirst()
+                }
+            }
+        }
+        // Always looking, so Play on lists them at once; a moment after the start, which matters more.
+        scope.launch {
+            delay(DISCOVERY_DELAY_MS)
+            runCatching {
+                casts.discover()
+                sonos.discover()
+                mpd.discover()
+                zones.discover()
+                tvs.discover()
+            }.onFailure { log.warn("Looking for speakers failed: {}", it.toString()) }
+        }
         embeddedServer(CIO, port = config.port, host = "127.0.0.1") { module() }.start(wait = true)
     }
 
@@ -150,9 +204,58 @@ class DesktopHost(private val config: Config) {
         )
     }
 
+    /**
+     * This computer on its network, for the speakers only: the audio of the songs in the room
+     * they play, nothing else. Started when a speaker first needs it (Windows asks once whether
+     * YTMP may use the network then); the port stays the same, so that answer keeps working.
+     */
+    @Synchronized
+    private fun lanServer(): Int {
+        if (lanPort != 0) return lanPort
+        val saved = settings.current.lanPort
+        val port = saved.takeIf { it in 1024..65535 && runCatching { ServerSocket(it).close() }.isSuccess } ?: ServerSocket(0).use { it.localPort }
+        embeddedServer(CIO, port = port, host = "0.0.0.0") {
+            routing {
+                get("/api/audio/{songId}") {
+                    val songId = call.parameters["songId"]!!
+                    if (!nearby.plays(songId)) return@get call.respond(HttpStatusCode.NotFound)
+                    audio.respond(call, songId, call.request.header(HttpHeaders.Range))
+                }
+            }
+        }.start(wait = false)
+        if (port != saved) settings.update { it.copy(lanPort = port) }
+        log.info("Speakers get the audio from port {}", port)
+        lanPort = port
+        return port
+    }
+
+    private fun nearbyState(after: Int): NearbyState {
+        val devices = outputs.devices.value.map { NearbyDevice(it.id, it.name, it.kind) }
+        return NearbyState(devices, nearby.playing.value, synchronized(notices) { notices.filter { it.id > after } }, noticeCount)
+    }
+
     private fun Route.desktopRoutes() {
         get("/health") { call.respondText("ok") }
         route("/desktop") {
+            // Play on: the speakers here and what plays on them (`?after=` the last notice seen).
+            get("/nearby") { call.respond(nearbyState(call.request.queryParameters["after"]?.toIntOrNull() ?: Int.MAX_VALUE)) }
+            post("/nearby/play") {
+                val play = call.receive<NearbyPlay>()
+                val device = outputs.devices.value.firstOrNull { it.id == play.deviceId }
+                    ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "That speaker isn't on this network now")
+                val link = RoomLink(play.hostUrl, play.code, play.guestToken)
+                nearby.turnOn(play.code, device.id, device.name) { FollowerSource(link) }
+                call.respond(nearbyState(Int.MAX_VALUE))
+            }
+            post("/nearby/stop") {
+                nearby.turnOff(call.receive<NearbyStop>().deviceId)
+                call.respond(nearbyState(Int.MAX_VALUE))
+            }
+            post("/nearby/volume") {
+                val change = call.receive<NearbyVolume>()
+                nearby.setVolume(change.deviceId, change.volume)
+                call.respond(nearbyState(Int.MAX_VALUE))
+            }
             get("/music") { call.respond(musicStatus()) }
             put("/music") {
                 val change = call.receive<MusicChange>()
@@ -223,18 +326,51 @@ class DesktopHost(private val config: Config) {
     @Serializable
     data class Upload(val songId: String, val url: String, val secret: String)
 
+    @Serializable
+    data class NearbyDevice(val id: String, val name: String, val kind: OutputKind)
+
+    @Serializable
+    data class NearbyNotice(val id: Int, val text: String)
+
+    /** Like the phone app's bridge `nearby` (shown: its party screens, none here), with the notices after the one asked for. */
+    @Serializable
+    data class NearbyState(
+        val devices: List<NearbyDevice>,
+        val playing: NearbyPlaying?,
+        val notices: List<NearbyNotice>,
+        val lastNotice: Int,
+        val shown: List<String> = emptyList(),
+    )
+
+    @Serializable
+    data class NearbyPlay(val deviceId: String, val hostUrl: String, val code: String, val guestToken: String)
+
+    @Serializable
+    data class NearbyStop(val deviceId: String)
+
+    @Serializable
+    data class NearbyVolume(val deviceId: String, val volume: Double)
+
     companion object {
         private val log = LoggerFactory.getLogger(DesktopHost::class.java)
         private val uploads = java.net.http.HttpClient.newBuilder().followRedirects(java.net.http.HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(10)).build()
         private const val PLACE = "computer"
         private const val KEPT_PLAYING = 3
+        private const val KEPT_NOTICES = 20
+        private const val DISCOVERY_DELAY_MS = 3_000L
     }
 }
 
 /** What's kept for this computer (`desktop.json`): the cache's size, and the music on it. Both off at first. */
 class DesktopSettings(private val file: File) {
     @Serializable
-    data class Values(val cacheBytes: Long = 0, val music: Boolean = false, val folders: List<String> = emptyList())
+    data class Values(
+        val cacheBytes: Long = 0,
+        val music: Boolean = false,
+        val folders: List<String> = emptyList(),
+        /** The port speakers get the audio from (DesktopHost.lanServer), kept so the firewall's answer keeps working. */
+        val lanPort: Int = 0,
+    )
 
     @Volatile var current: Values = runCatching { json.decodeFromString<Values>(file.readText()) }.getOrDefault(Values())
         private set

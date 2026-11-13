@@ -41,8 +41,9 @@ _None open right now._
     `js("window.__ytmpNative && window.__ytmpNative.onX && …")` out 21 times; one `emit()`
     would do. Further: generate `native.ts` from the `@JavascriptInterface` methods, as
     `protocol/` does for its types.
-  - **Speaker discovery on the server**: `CastDiscovery`, `MpdDiscovery` and `ZoneDiscovery`
-    each set up the same JmmDNS listener; one helper, like the phone's `NsdFinder`.
+  - **Speaker discovery on the server and the desktop app** (`host/…/NetworkDiscovery.kt`):
+    the Cast, MPD and zones finders each set up the same JmmDNS listener; one helper, like the
+    phone's `NsdFinder`.
   - Already shared well: the output drivers (`OutputDriver`, `DeviceDriver`), the phone's
     finders (`NsdFinder`), the web app's `request()` in `api.ts`, and `Setting`.
 

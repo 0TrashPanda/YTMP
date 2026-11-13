@@ -1,6 +1,5 @@
-package dev.trashpanda.ytmp
+package dev.trashpanda.ytmp.host
 
-import dev.trashpanda.ytmp.host.RoomSource
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
 import dev.trashpanda.ytmp.protocol.Event
@@ -34,6 +33,17 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
+
+/** Enough to attach to the room as the page's participant (`attach` in the protocol). */
+@Serializable
+data class RoomLink(
+    /** e.g. `http://127.0.0.1:8765` */
+    val hostUrl: String,
+    val code: String,
+    val guestToken: String,
+)
 
 /** The room as [RoomFollower] sees it. */
 data class FollowedRoom(
@@ -87,7 +97,7 @@ class RoomFollower {
     /** Follows the room in [link], or stops following with null. */
     fun follow(link: RoomLink?) {
         if (link == this.link) return
-        Log.d(TAG, if (link != null) "follow room ${link.code} at ${link.hostUrl}" else "stop following")
+        log.debug(if (link != null) "follow room ${link.code} at ${link.hostUrl}" else "stop following")
         this.link = link
         job?.cancel()
         session = null
@@ -128,7 +138,7 @@ class RoomFollower {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.d(TAG, "room ${link.code}: connection failed: $e")
+                log.debug("room ${link.code}: connection failed: $e")
                 false
             } finally {
                 session = null
@@ -171,7 +181,7 @@ class RoomFollower {
                     val message = try {
                         ProtocolJson.decodeFromString(ServerMessage.serializer(), text)
                     } catch (e: SerializationException) {
-                        Log.d(TAG, "room ${link.code}: skipping a message this app doesn't know: ${e.message?.take(120)}")
+                        log.debug("room ${link.code}: skipping a message this app doesn't know: ${e.message?.take(120)}")
                         if (state != null && !waitingForSnapshot) {
                             waitingForSnapshot = true
                             send(ClientMessage.RequestSnapshot)
@@ -180,12 +190,12 @@ class RoomFollower {
                     }
                     when (message) {
                         is ServerMessage.Welcome -> {
-                            Log.d(TAG, "room ${link.code}: following")
+                            log.debug("room ${link.code}: following")
                             onWelcome()
                             pending?.let { (json, at) ->
                                 pending = null
                                 if (System.currentTimeMillis() - at < PENDING_MAX_AGE_MS) {
-                                    Log.d(TAG, "room ${link.code}: sending $json pressed while away")
+                                    log.debug("room ${link.code}: sending $json pressed while away")
                                     sendCommand(json)
                                 }
                             }
@@ -235,10 +245,10 @@ class RoomFollower {
                                 publish()
                             }
                         }
-                        is ServerMessage.Result -> message.error?.let { Log.w(TAG, "room ${link.code}: command ${message.id}: ${it.message}") }
+                        is ServerMessage.Result -> message.error?.let { log.warn("room ${link.code}: command ${message.id}: ${it.message}") }
                         is ServerMessage.OwnerToken -> Unit
                         is ServerMessage.Rejected -> {
-                            Log.d(TAG, "room ${link.code}: rejected (${message.reason})")
+                            log.debug("room ${link.code}: rejected (${message.reason})")
                             rejected = true
                             break
                         }
@@ -255,7 +265,7 @@ class RoomFollower {
         send(Frame.Text(ProtocolJson.encodeToString(ClientMessage.serializer(), message)))
 
     companion object {
-        private const val TAG = "YtmpFollow"
+        private val log = LoggerFactory.getLogger(RoomFollower::class.java)
         private const val PENDING_MAX_AGE_MS = 15_000L
 
     }

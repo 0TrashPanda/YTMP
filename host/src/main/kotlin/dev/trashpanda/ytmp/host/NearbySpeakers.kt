@@ -86,6 +86,12 @@ class NearbySpeakers(
         room?.setVolume(deviceId, volume.coerceIn(0.0, 1.0))
     }
 
+    /**
+     * Whether [songId] is in the room the speakers play (now, next, before or later in the queue):
+     * the songs they may fetch from this device (the desktop app serves only those on its network).
+     */
+    fun plays(songId: String): Boolean = room?.has(songId) == true
+
     /** One followed room and the speakers it plays on. */
     private inner class Followed(override val code: String, private val source: RoomSource) : OutputRoom {
         /** Device id → (name, wanted volume). */
@@ -128,6 +134,12 @@ class NearbySpeakers(
         }
 
         fun isEmpty() = speakers.value.isEmpty()
+
+        fun has(songId: String): Boolean {
+            val state = last?.first ?: return false
+            return state.nowPlaying?.item?.song?.id == songId ||
+                (state.queue + state.history + state.autoplay).any { it.song.id == songId }
+        }
 
         fun speakerIds() = speakers.value.keys
 

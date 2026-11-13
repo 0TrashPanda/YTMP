@@ -235,6 +235,8 @@ Music, without Premium, and not tied to a single music service.
   your disk. Alone, nothing leaves your computer; a song goes to the server only when
   someone else in the room plays along.
 - Opens the room you were in, like the Android app.
+- Plays the room on the Chromecasts, Sonos speakers, MPDs and TVs on your computer's
+  network (*Play on → Near this computer*), also when your server can't reach them.
 
 ## What's next
 

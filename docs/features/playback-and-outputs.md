@@ -162,6 +162,13 @@ keeps playing while they play, and everyone sees *plays on Woonkamer* next to yo
 The phone must stay on that Wi-Fi with the app running (it shows a notification, like
 hosting); when it goes away, so do its speakers.
 
+**Speakers near your computer** ✅: the same in the desktop app, under *Near this computer*:
+the Chromecasts, Sonos speakers, MPDs, amplifier zones and YouTube TVs on your computer's
+network, found while the app runs. Switched on, the computer plays the room there, with the
+songs from your computer (its own music and song cache too). The first time, Windows asks
+whether YTMP may use the network: allow it on private networks, or the speakers can't get
+the songs. No party screen from the computer yet (the phone app shows it).
+
 **Amplifier zones** ✅: a house with a multi-room amplifier and a player on one of its inputs
 (say a Raspberry Pi) describes them once, in a file on its own network. Every phone or home
 server on that Wi-Fi then lists each room of the amp in *Play on* (*Keuken*, *Zithoek voor*),

@@ -23,6 +23,7 @@ import kotlinx.coroutines.withTimeout
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** A room on another host, played on speakers near the phone (the room here stands in for the server's). */
@@ -68,6 +69,9 @@ class NearbySpeakersTest {
             eventually { device.playerState == "PLAYING" }
             // Not the server's link (it only works on the server's connection): the phone's.
             assertEquals("http://127.0.0.1:8765/api/audio/ytm%3Aabc", device.contentId)
+            // Only the room's songs are served to the speakers (the desktop app's audio on its network).
+            assertTrue(nearby.plays("ytm:abc"))
+            assertFalse(nearby.plays("ytm:other"))
             eventually { Command.SetSpeakers(listOf("Woonkamer"), startsTogether = true) in source.commands }
             assertEquals(listOf(NearbySpeaker("cast:fake", "Woonkamer", 0.5)), nearby.playing.value?.speakers)
 
@@ -91,6 +95,7 @@ class NearbySpeakersTest {
             eventually { "STOP" in device.types(CastChannel.NS_RECEIVER) }
             assertEquals(emptyList(), (source.commands.last() as Command.SetSpeakers).names)
             eventually { source.closed }
+            assertFalse(nearby.plays("ytm:abc"))
         }
         scope.cancel()
     }

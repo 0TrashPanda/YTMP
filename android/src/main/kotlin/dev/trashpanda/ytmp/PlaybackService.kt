@@ -1,5 +1,8 @@
 package dev.trashpanda.ytmp
 
+import dev.trashpanda.ytmp.host.RoomFollower
+import dev.trashpanda.ytmp.host.RoomLink
+import dev.trashpanda.ytmp.host.FollowedRoom
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager

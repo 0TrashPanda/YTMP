@@ -1,5 +1,8 @@
 package dev.trashpanda.ytmp
 
+import dev.trashpanda.ytmp.host.RoomLink
+import dev.trashpanda.ytmp.host.FollowedRoom
+
 /**
  * This phone's media volume in the room it plays, so your other devices can see and set it
  * (docs/features/playback-and-outputs.md#your-devices). Like the web app's DeviceVolume: it

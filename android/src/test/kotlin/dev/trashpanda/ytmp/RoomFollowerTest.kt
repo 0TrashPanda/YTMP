@@ -1,5 +1,7 @@
 package dev.trashpanda.ytmp
 
+import dev.trashpanda.ytmp.host.RoomLink
+import dev.trashpanda.ytmp.host.FollowedRoom
 import dev.trashpanda.ytmp.protocol.apply
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.Event
