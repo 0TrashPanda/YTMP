@@ -127,6 +127,20 @@ describe('search and pages with your own module', () => {
 		expect(await api.getArtist('UCabc')).toMatchObject({ from: 'module' });
 	});
 
+	it('ask Home where it came from last time, before the host says whether you’re signed in', async () => {
+		let { api } = await load();
+		expect(await api.getHome()).toMatchObject({ from: 'module' });
+		// The host then says you're signed in: the signed-out Home is forgotten and asked again.
+		expect(api.useYoutubeHere(true, false)).toBe(true);
+		expect(await api.getHome()).toMatchObject({ from: 'host', path: '/api/home' });
+		expect(api.useYoutubeHere(true, false)).toBe(false);
+		// Next start: straight from the host, before it has said so again.
+		vi.resetModules();
+		({ api } = await load());
+		stored.delete('ytmp.last.:home');
+		expect(await api.getHome()).toMatchObject({ from: 'host' });
+	});
+
 	it('leave similar songs (radio) to the host', async () => {
 		const { api } = await load();
 		await api.similar('ytm:abc');

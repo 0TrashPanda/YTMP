@@ -261,8 +261,27 @@ const viaYourServer = () => !!youtubeFrom?.personalize;
  * then yours, and with [personalize] searches go through it too. Those stay with the host.
  */
 let signedInHere = { home: false, search: false };
-export function useYoutubeHere(signedIn: boolean, personalize: boolean): void {
-	signedInHere = { home: signedIn, search: signedIn && personalize };
+// As it was last time: Home is asked for before the host says whether you're signed in, and
+// would otherwise come from your own module (signed out) on every start.
+try {
+	signedInHere = { home: false, search: false, ...JSON.parse(read('ytmp.youtubeHere') ?? '{}') };
+} catch {
+	// None kept.
+}
+/** Returns whether Home now comes from somewhere else (then the one shown and kept is forgotten: load it again). */
+export function useYoutubeHere(signedIn: boolean, personalize: boolean): boolean {
+	const now = { home: signedIn, search: signedIn && personalize };
+	const homeChanged = now.home !== signedInHere.home;
+	if (now.search !== signedInHere.search) {
+		for (const key of [...cache.keys()]) if (key.startsWith('search:') || key.startsWith('suggest:')) cache.delete(key);
+	}
+	signedInHere = now;
+	write('ytmp.youtubeHere', JSON.stringify(now));
+	if (homeChanged) {
+		cache.delete('home');
+		write(lastKey('home'), 'null');
+	}
+	return homeChanged;
 }
 
 /** What asks YouTube Music: a search (or suggestions), Home, or a page or song by its ID (artist, album, playlist, podcast, lyrics). */

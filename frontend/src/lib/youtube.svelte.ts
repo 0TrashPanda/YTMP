@@ -81,7 +81,8 @@ class YoutubeSignIn {
 			this.history = status.history;
 			this.personalize = status.personalize;
 			// Signed in here: Home (and with personalize, search) stay with this host, not your own module.
-			useYoutubeHere(!!status.account && !this.from, status.personalize);
+			// Home was already asked for (from the wrong place) when that changed since last time: again.
+			if (useYoutubeHere(!!status.account && !this.from, status.personalize) && this.from === before) this.version++;
 			this.tellApp();
 		} catch {
 			// Offline, or an older host: no sign-in.
