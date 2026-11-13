@@ -59,15 +59,4 @@ page of the room, like an artist's; on the room list it shows inside Settings):
 - Works in every room where you're logged in with your YTMP account: on your server, in the
   app, and in rooms on other hosts (the songs come straight from your server).
 
-Implementation: `server/.../Social.kt` (the store), the `/api/account/friends`, `/groups` and
-`/shares` routes in `AccountApi.kt`, and in the web app `lib/friends.svelte.ts`,
-`SongShareSheet.svelte`, `FriendShares.svelte` (Home, and the songs on a friend's page),
-`FriendsView.svelte` (Settings → Friends) and `FriendPage.svelte`. They're reached like your
-listening history (see [auth](../implementation/auth.md#your-history-on-other-pages)), so the
-Android app's own host needs nothing of its own: it all lives on your account's server.
-
-- A friend's or group's songs: `GET /api/account/shares?from={username}` or `?group={id}` (also
-  the ones put away, at most 200). *Undo* of ×: `POST /api/account/shares/{id}/restore`.
-- *Show on Home*: `PUT /api/account/friends/{username}/home` or `/groups/{id}/home` with
-  `ShowOnHome`; the answer is the `FriendsOverview`, whose `hiddenFriends` and `hiddenGroups`
-  list who's off Home. `GET /api/account/shares` (Home) leaves their songs out.
+How it's built: [auth](../implementation/auth.md#friends-groups-and-shared-songs).

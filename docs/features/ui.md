@@ -121,7 +121,7 @@ Like YTM:
   standing still while paused.
 - **Next when the room votes to skip** ✅: for people who may only vote, Next votes (red
   while you've voted, pressed again takes it back) and shows the votes so far, like *1/2*.
-  See [vote to skip](queue.md#vote-to-skip).
+  See [vote to skip](queue.md#vote-to-skip-).
 - **Desktop** ✅: the player bar stays at the bottom (controls, the song, volume, repeat,
   shuffle, Play on, Play here, ˄ to open the full player); the full player opens above it. Like YTM,
   **clicking anywhere on the bar** (not on a button) opens or closes the full player,
@@ -450,7 +450,7 @@ song's menu on an album's or artist's page has no *Go to* that same page.
 | Save to playlist ✅ | YouTube Music playlist; only if a YouTube account is linked |
 | Go to artist | |
 | Go to album | |
-| Sleep timer ✅ | Only for the song that's playing: see [sleep timer](playback-and-outputs.md#sleep-timer) |
+| Sleep timer ✅ | Only for the song that's playing: see [sleep timer](playback-and-outputs.md#sleep-timer-) |
 | Download ✅ | Save the song as a plain music file (.m4a with its title, artist, album and cover). In a browser: a normal download. In the app: in the phone's *Music/YTMP* folder, so it shows in Local → *Music on this phone* and in other music apps. Not for local music. |
 | Share ✅ | Its YouTube Music link: send it, copy it, or hold another phone against yours ([sharing.md](sharing.md)), or send it to [friends and groups](friends.md) (on their Home) |
 | Open in YouTube Music | For YTM songs |
@@ -508,7 +508,7 @@ song's menu on an album's or artist's page has no *Go to* that same page.
     bottom).
   - **Playing**: **Playback** (next while paused, start radio, asking before interrupting a
     party, pause only stops it here, press play to play here, your other devices, skip silence in podcasts), **Adding
-    songs** (long playlists, see [queue](queue.md#long-playlists); when to say what's going
+    songs** (long playlists, see [queue](queue.md#long-playlists-); when to say what's going
     on, below) and **Sound** (equalizer, headphones, playing next to other apps).
   - **How it looks**: **Look** (image quality, video pictures, songs per page), **Player**
     (the tabs, the dislike button), **Home**, **Search** (the order of the results, the Library

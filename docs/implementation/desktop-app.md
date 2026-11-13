@@ -1,6 +1,6 @@
-# Desktop App (being built)
+# Desktop App
 
-Feature description: [features/platforms.md](../features/platforms.md#desktop-app-planned).
+Feature description: [features/platforms.md](../features/platforms.md#desktop-app-).
 
 A **client** for Windows and Linux: the web app in a native window, with the YouTube Music
 module running on the same computer. The room, accounts and room sync stay on the YTMP

@@ -35,6 +35,9 @@ The `[audio] proxy` setting decides that last row:
 With `lan`, a room on this server is for listening at home (and for friends who visit).
 Away from home, **host a room on your phone instead**: the YTMP app resolves the links on
 the phone itself, on whatever connection it has.
+The desktop app does the same on a computer. In a browser, run the YouTube Music module on
+your own computer and enter it under *Settings → Where songs play from*:
+`docker run -d -p 127.0.0.1:8401:8401 -e YTMP_MODULE_KEY=<a key you choose> ghcr.io/0trashpanda/ytmp-ytm`.
 
 ## What you need
 

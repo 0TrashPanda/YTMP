@@ -7,7 +7,7 @@ grown over time. The goal is for it to support more than just YouTube.
 The documentation is split into two parts:
 
 - **`features/`**: *what* YTMP does, from the user's point of view. No technology choices.
-- **`implementation/`**: *how* we plan to build it, including architecture, tech stack and modules.
+- **`implementation/`**: *how* it's built (and how planned parts will be), including architecture, tech stack and modules.
 
 Questions that are still open are collected in [`open-questions.md`](open-questions.md).
 
@@ -19,7 +19,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [features/rooms-and-roles.md](features/rooms-and-roles.md) | Host / client / solo, rooms, joining, visibility |
 | [features/joining.md](features/joining.md) | Room codes, finding hosts on the LAN (auto, QR, IP) |
 | [features/sharing.md](features/sharing.md) | Sharing rooms and songs: links, holding phones together (NFC), the song screen |
-| [features/platforms.md](features/platforms.md) | What each device type can do, Android app features, the desktop app (planned) |
+| [features/platforms.md](features/platforms.md) | What each device type can do, Android app features, the desktop app |
 | [features/room-lifecycle.md](features/room-lifecycle.md) | Admin leaving, changing the owner, cloning, migration, transfer, multiple solo rooms |
 | [features/room-sync.md](features/room-sync.md) | Your rooms on all your devices: one home, moving between phone and server |
 | [features/queue.md](features/queue.md) | Queue, autoplay queue, history, fair ordering, shuffle, repeat, vote to skip, limits |
@@ -50,8 +50,9 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [implementation/song-recognition-research.md](implementation/song-recognition-research.md) | Research: why YTMP can't reuse YouTube Music's own recognizer (keep Shazam) |
 | [implementation/storage.md](implementation/storage.md) | Database (SQLite/PostgreSQL), song graph storage, radio generation |
 | [implementation/android-app.md](implementation/android-app.md) | Android app structure, native audio playback, app updates |
-| [implementation/desktop-app.md](implementation/desktop-app.md) | Desktop app for Windows and Linux (planned): Tauri, the module on the computer, packaging |
+| [implementation/desktop-app.md](implementation/desktop-app.md) | Desktop app for Windows and Linux: Tauri, the module on the computer, packaging |
 | [implementation/playlist-converter.md](implementation/playlist-converter.md) | Playlist converter: readers, matching, stored jobs, writers |
+| [implementation/home-layout.md](implementation/home-layout.md) | Home on a computer: sections that fill the width, speed dial pages on a phone |
 | [implementation/downloads.md](implementation/downloads.md) | How downloads are made (tagging, formats) |
 | [implementation/song-cache.md](implementation/song-cache.md) | The song cache on server and phone: storing, serving, removing |
 | [implementation/chromecast.md](implementation/chromecast.md) | Chromecast output module |

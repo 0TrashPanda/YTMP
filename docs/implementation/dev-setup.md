@@ -58,6 +58,28 @@ tools/          smoke-test.py (checks a running phone or server), chrome90-test.
   be released on its own when YouTube breaks something, without a full YTMP release.
 - A module can be moved to its own repo later (with its history) if there's a reason to.
 
+## Running it locally
+
+| Part | Folder | Run |
+|------|--------|-----|
+| YTM module (Python 3.12+) | `ytm-module/` | `python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'`, then `YTMP_MODULE_KEY=dev YTMP_YTM_JS_RUNTIME=node .venv/bin/ytmp-ytm` |
+| Server (Kotlin, JDK 21 is downloaded by Gradle) | `server/`, `core/`, `protocol/` | `YTMP_MODULE_KEY=dev ./gradlew :server:run` |
+| Web app (Svelte, pnpm) | `frontend/` | `pnpm install && pnpm dev`, then open http://localhost:5173 |
+| Android app | `android/` | `./gradlew :android:installDebug`, then for the emulator: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080` |
+| Desktop app (Tauri; JDK 21 for its host) | `desktop/` | `python desktop/scripts/bundle_module.py` (once) and `python desktop/scripts/bundle_host.py` (after changing `host/` or `desktop/host/`), then `cd desktop && pnpm install && pnpm tauri dev`; see [desktop app](desktop-app.md#packaging-updates-and-releases) |
+
+- Tests: `./gradlew test`, `cd ytm-module && .venv/bin/pytest` and `cd frontend && pnpm test`.
+- Smoke test of a running phone or server (search, pages, radio, streaming; read-only):
+  `python3 tools/smoke-test.py URL`. For the app on a phone: `adb forward tcp:8765 tcp:8765`,
+  keep the app open, and use `http://127.0.0.1:8765`.
+- The web app in Chrome 90, the browser of older Chromecasts (party screen):
+  `node tools/chrome90-test.mjs` (after `pnpm build` and `./gradlew :server:installDist`; it
+  downloads Chromium 90 once).
+- After changing anything in `protocol/`, run `./gradlew :protocol:generateTs` to update the
+  web app's types (`frontend/src/lib/protocol.gen.ts`).
+- yt-dlp needs a JavaScript runtime for YouTube: Deno by default, or set
+  `YTMP_YTM_JS_RUNTIME=node` to use Node.
+
 ## Tooling
 
 | Topic | Decision |
@@ -118,4 +140,4 @@ The Android app is released through GitHub Actions (`.github/workflows/release.y
 3. **Android host**: hosting on the phone, solo rooms, LAN discovery and QR, on-device YTM.
 4. **Chromecast** output (chosen instead of Sonos, which moves to *everything else*).
 5. **Everything else**: accounts ✅, permissions and roles ✅, history ✅, radio ✅, Sonos ✅,
-   song graph, recap, party screen, …
+   song graph ✅, party screen ✅, the desktop app ✅, recap, …

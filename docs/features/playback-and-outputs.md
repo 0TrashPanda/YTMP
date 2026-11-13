@@ -139,7 +139,7 @@ The host can also send audio to **output modules**. Outputs are **modular**.
 | Sonos ✅ | Streams to Sonos speakers over HTTP (see [implementation](../implementation/sonos.md)) |
 | Chromecast ✅ | Casts to Chromecast / Google Cast devices: TVs, Nest speakers, speaker groups (see [implementation](../implementation/chromecast.md)). A TV or display can show the [party screen](ui.md#party-screen) while it plays |
 | MPD ✅ | Plays on MPD (Music Player Daemon), e.g. a Raspberry Pi on a speaker or an amplifier, wired or over Bluetooth (see [implementation](../implementation/mpd.md)) |
-| Amplifier zones ✅ | The rooms of a multi-room amplifier, each a speaker of its own, with a player (an MPD) on one of its inputs (see [below](#amplifier-zones) and [implementation](../implementation/zones.md)) |
+| Amplifier zones ✅ | The rooms of a multi-room amplifier, each a speaker of its own, with a player (an MPD) on one of its inputs (see below and [implementation](../implementation/zones.md)) |
 | TV with the YouTube app ✅ | TVs and projectors without Chromecast that phones cast to from the YouTube app: the room plays there in the TV's own YouTube app, with the video (YouTube songs only; see [implementation](../implementation/youtube-tv.md)) |
 | Snapcast | Future idea: precise multi-room sync through a Snapcast server (see [future ideas](future-ideas.md#snapcast-output)) |
 | Discord bot | Future idea: plays into a Discord voice channel (see [future ideas](future-ideas.md#discord-bot-output)) |

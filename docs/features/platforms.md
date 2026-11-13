@@ -5,10 +5,9 @@
 | **Linux server** | ✅ | — | Serves the web interface. Rooms are created and joined through the browser. |
 | **Android phone** | ✅ | ✅ | Can host (including solo) and join. Can work without a server. |
 | **Web browser** | via server | ✅ | A browser is always a client, but through a server it can *create* a room or solo room and become its admin. |
-| **Desktop app** (Windows, Linux) | via server | planned | Like a browser, but with its own window and it does its own YouTube Music lookups, see [below](#desktop-app-planned). |
+| **Desktop app** (Windows, Linux) | via server | ✅ | Like a browser, but with its own window and it does its own YouTube Music lookups, see [below](#desktop-app-). |
 
-Other platforms (macOS, and Windows and desktop Linux until the desktop app is there) use
-YTMP **through the web browser**. **iOS is not supported**: iPhones can open the web UI, but
+Other platforms (macOS) use YTMP **through the web browser**. **iOS is not supported**: iPhones can open the web UI, but
 playback in the background is unreliable in Safari and won't be worked around.
 
 The Android app needs **Android 11 or newer**.
@@ -49,10 +48,13 @@ The Android app needs **Android 11 or newer**.
   versions itself** when it starts and offers to download and install them (Update / Later /
   Skip this version). The settings (avatar → App) show the version and have **Check for
   updates**. ✅
+- **YouTube keeps working** ✅: when YouTube changes something, the app gets the fixed
+  yt-dlp (the part that talks to YouTube) within a day, without an app update, and goes back
+  to its own if the new one doesn't work.
 - **Logs**: the app keeps a log of the last 7 days (at most 20 MB, deleted by itself);
   **Send logs** in the settings shares it, to report a problem. ✅
 
-## Desktop app (planned)
+## Desktop app ✅
 
 An app for **Windows and Linux** that shows YTMP in its own window, next to the browser and
 the Android app. Rooms, accounts and your rooms on all your devices come from your YTMP
@@ -64,7 +66,7 @@ server, like in a browser; **everything YouTube** happens on your own computer:
 - **Search, Home and the pages** (artists, albums, playlists, podcasts, lyrics) come from
   your computer too, so they work the same when the server's YouTube is having a bad moment
   (or is blocked for a while). When your computer's lookups don't work, the server's are used.
-- **Your YouTube Music sign-in**: sign in in the app, or take the one from your account on
+- **Your YouTube Music sign-in** (next, not built yet): sign in in the app, or take the one from your account on
   the server (one confirm), like the Android app. It stays on your computer.
 - **Media keys and the system's media controls** (Windows' media overlay, the Linux
   desktop's media widget) show the song as YTMP and play, pause and skip, also when the
@@ -72,6 +74,11 @@ server, like in a browser; **everything YouTube** happens on your own computer:
 - **Your music files and a song cache** on the computer, both off by default, see
   [sources](sources.md#local-music-): they play from your own disk.
 - **Opens the room you were in** when it starts (*Settings → App*), like the Android app.
+- **Speakers near this computer**: *Play on → Near this computer* lists the Chromecasts,
+  Sonos speakers, MPDs and TVs on the computer's network, also when your server can't reach
+  them.
+- **Songs from your phone**: *Copy from my phone* (YTMP open on the phone), or *Send songs to
+  my computer* on the phone, copies the songs the phone keeps over Wi-Fi.
 - **The first start** asks for your server's address, like the Android app.
 - **Updates itself**: like the Android app, it finds new releases on GitHub and offers to
   install them (with the release notes). Its YouTube part updates itself more often,

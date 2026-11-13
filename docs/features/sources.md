@@ -68,7 +68,7 @@ phone**, if the room allows it (permission: *Send songs from own device*).
 |--------|--------|
 | YouTube Music | ✅ Built (server service and on the phone) |
 | YouTube | Planned |
-| Local music | ✅ A Raspberry Pi's music folder (with MPD) and the music on the hosting phone, in the [Local tab](#local-music-). Songs downloaded in the app are in the phone's music (*Music/YTMP*). Other folders: planned. |
+| Local music | ✅ A Raspberry Pi's music folder (with MPD) and the music on the hosting phone, in the [Local tab](#local-music-). Songs downloaded in the app are in the phone's music (*Music/YTMP*). The desktop app adds the music on the computer. Other folders: planned. |
 | Media servers (Plex, Jellyfin, Subsonic/Navidrome, file servers, …) | Planned, linked to an account |
 | Spotify | Future (see [Spotify module](future-ideas.md#spotify-module)) |
 | SoundCloud | Future |
@@ -95,7 +95,7 @@ computer: the left side). It shows when there's local music:
   Listening alone, nothing leaves the computer. Only when someone else in the room plays
   along, or a speaker does, does the app send that one song to the server for them (it keeps
   it a day at most). New files are found when the Local tab opens (at most every 10 minutes)
-  or with *Look again*. ([implementation](../implementation/desktop-app.md#music-and-songs-on-this-computer))
+  or with *Look again*. ([implementation](../implementation/desktop-app.md#music-and-songs-on-this-computer-))
 
 The tab is like YouTube Music's library: **Playlists** (first, in *Cached on this phone*, when
 playlists are all on the phone: [playlists offline](#playlists-offline)), **Albums** (the default, with covers), **Artists**,

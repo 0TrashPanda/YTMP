@@ -137,10 +137,27 @@ the page (`visibilitychange`, at most every 10 s) asks the account again, so a c
 another device shows up; what came in is announced with a `ytmp:settings` window event (the
 app's player and Home follow it).
 
+### Friends, groups and shared songs
+
 Friends, groups and shared songs ([friends](../features/friends.md)) work the same too
 (`/api/account/friends`, `/api/account/groups`, `/api/account/shares`, `Social.kt`), so sharing a
 song and *From your friends* on Home work in rooms everywhere. A host token for another host
 doesn't reach them.
+
+The code: `server/.../Social.kt` (the store), the `/api/account/friends`, `/groups` and
+`/shares` routes in `AccountApi.kt`, and in the web app `lib/friends.svelte.ts`,
+`SongShareSheet.svelte`, `FriendShares.svelte` (Home, and the songs on a friend's page),
+`FriendsView.svelte` (Settings → Friends) and `FriendPage.svelte`. They're reached like your
+listening history (see [above](#your-history-on-other-pages)), so the
+Android app's own host needs nothing of its own: it all lives on your account's server.
+
+- A friend's or group's songs: `GET /api/account/shares?from={username}` or `?group={id}` (also
+  the ones put away, at most 200). *Undo* of ×: `POST /api/account/shares/{id}/restore`.
+- *Show on Home*: `PUT /api/account/friends/{username}/home` or `/groups/{id}/home` with
+  `ShowOnHome`; the answer is the `FriendsOverview`, whose `hiddenFriends` and `hiddenGroups`
+  list who's off Home. `GET /api/account/shares` (Home) leaves their songs out.
+
+### Settings
 
 Settings (`frontend/src/lib/settings.svelte.ts`) are preferences with a device override: each
 `Setting` has its key in the preferences (the account's value), and a device that keeps its own

@@ -102,7 +102,7 @@ Settings → Local music → *Music on this phone* (bridge version 10: `phoneMus
 The desktop app's own host (`desktop/host/`, the same host code) has it as a library of
 kind `computer` (`ComputerLibrary`); the web app shows it next to the server's. The server only knows its songs' IDs
 (`local:dev-<device>:s:<key>`) and asks for a file when another player needs one. See
-[desktop-app.md](desktop-app.md#music-and-songs-on-this-computer).
+[desktop-app.md](desktop-app.md#music-and-songs-on-this-computer-).
 
 ## Not yet
 

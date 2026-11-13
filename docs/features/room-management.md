@@ -124,6 +124,6 @@ where the room opens from your other devices (owner, see [room sync](room-sync.m
   (see [queue](queue.md#ordering-modes))
 - Access control (see above)
 - Migration behaviour (see [room lifecycle](room-lifecycle.md#migration))
-- Vote to skip and its threshold (off by default, see [queue](queue.md#vote-to-skip))
-- Queue limits (off by default, see [queue](queue.md#queue-limits))
+- Vote to skip and its threshold (off by default, see [queue](queue.md#vote-to-skip-))
+- Queue limits (off by default, see [queue](queue.md#queue-limits-))
 - "Always on" (never delete the room; server-hosted rooms only, see [room lifecycle](room-lifecycle.md#server-hosted-room))

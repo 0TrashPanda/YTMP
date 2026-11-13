@@ -25,7 +25,7 @@ Edit the default roles and create your own. They are applied to rooms you create
 (see [roles](room-management.md#roles)).
 
 ### Playlists & preferences
-YTMP playlists, your [song menu](ui.md#customisable) layout ✅, your [theme](ui.md#themes)
+YTMP playlists, your [song menu](ui.md#customisable-) layout ✅, your [theme](ui.md#themes)
 and your room defaults are saved to your account.
 
 ### YTMP playlists
@@ -158,7 +158,7 @@ Who can create an account on a server is set in the **server config**: open sign
 invite only (the default), or only the server admin creates accounts. The **first account**
 made on a new server becomes the **server admin**, who makes invite links and accounts,
 can set someone's password (there is no e-mail) and can make other accounts server admin
-too (see the [admin page](server-admin.md#admin-page)).
+too (see the [admin page](server-admin.md#admin-page-)).
 
 Accounts are a **username and password**, shown as `username@server`. You always log in on
 your own server's page; a room on another host only gets proof of who you are, never your

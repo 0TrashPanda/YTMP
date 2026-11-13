@@ -3,285 +3,64 @@
 **A shared music queue for you and your friends.** Like Spotify Jam, but for YouTube
 Music, without Premium, and not tied to a single music service.
 
-> 🚧 **In development, already usable day to day.** Rooms, the Android app (with hosting on
-> the phone itself), Chromecast, Sonos and MPD, accounts, roles, radio, podcasts and a YouTube
-> Music–style app work. See [what works](#what-works-today) and [what's next](#whats-next).
-> The full design is in [`docs/`](docs/README.md).
+> 🚧 **In development, already usable day to day.** The full design is in
+> [`docs/`](docs/README.md).
 
-## What it does
-
-- **One queue, many people.** Someone hosts a room, others join with a short room code,
-  a QR code, or automatically on the same Wi-Fi, and add, remove and reorder songs together.
+- **One queue, many people.** Someone hosts a room; others join with a short code, a QR
+  code, or automatically on the same Wi-Fi, and add, remove and reorder songs together.
 - **Host anywhere.** On a Linux server (everyone joins from a browser), or on an Android
   phone with no server at all.
-- **Listen anywhere.** Every phone or browser can play along in sync, or the room plays on
-  Chromecast, Sonos and MPD speakers (say a Raspberry Pi on your stereo), or the rooms of a
+- **Listen anywhere.** Every phone and browser plays along in sync, or the room plays on
+  Chromecast, Sonos, MPD (say a Raspberry Pi on your stereo), TVs, or the rooms of a
   multi-room amplifier.
-- **Feels like YouTube Music.** Home with suggestions, search with chips, artist, album,
-  playlist and podcast pages, a mini player and a full player with Up next.
-- **Music and podcasts.** Episodes resume where you left off, with skip buttons.
-- **Your own music too.** A *Local* tab with the music on a Raspberry Pi at home or on your
-  phone, playing on every speaker.
-- **Radio & recommendations.** Start a radio, keep the party going with autoplay, or
-  browse similar songs.
-- **Permissions & roles.** Decide who can add, skip, remove or manage, per person or per
-  role.
-- **Optional accounts.** Listening history, your YouTube Music sign-in on your server, and
-  your rooms on all your devices; later playlists and recaps ("you listened 12 hours with
-  Sam").
+- **Feels like YouTube Music.** Home, search, artist, album, playlist and podcast pages, a
+  mini player and a full player with Up next.
 
 ## What works today
 
-**Rooms**
-- Party rooms that friends join from a browser or the app (room code, QR code, or rooms
-  nearby on the same Wi-Fi), and solo rooms just for you. Rooms survive restarts. A scanned
-  QR code or a room link opens in the app on an Android phone that has it. Pick your own
-  room code if you like (e.g. `PARTY`).
-- **Share by holding phones together** (Android with NFC): with a room's or song's Share
-  sheet open, hold another phone (Android or iPhone) against yours and it opens the room, or
-  the song. A song shared with you (or shared to YTMP from YouTube Music) gets a song screen
-  like YouTube Music's: Play now, Play next, Add to queue, Start radio, Like, Save to playlist;
-  with no room open it asks where (a new solo room, or a room of yours or nearby). Songs can be
-  sent with the share sheet too (*Share* in the song menu).
-- One shared queue: add, play next, drag to reorder, swipe to remove, jump to any song,
-  remove everything above or below a song, clear, or clear the whole room (song, queue and autoplay), with Undo. Played songs stay above the current one until you remove them; autoplay songs below.
-- Shuffle and repeat (queue or one song), fair order (one song per person per round),
-  vote to skip, and limits (songs per person, song length, no recent repeats).
-- A party screen for a TV, laptop or tablet: big album art in its colour, what's next and
-  who added it, and a QR code to join. A TV links with a code, like YouTube's, and a TV with
-  Chromecast shows it from *Play on* (it plays the music too), also a TV at your place in a
-  room on a server, from the app.
-- Long playlists (like Liked music) add at most 200 songs at once, the first or picked at
-  random, asking first above 100 with your own choices (*Add 100*, *Add 200*, *Add all*; all
-  set in *Settings → Adding songs*). What takes a moment
-  says so ("Adding Liked music…", then "Added 200 songs from Liked music").
-- Feels fast: the next song is looked up while one plays, playlists open after their first
-  part, the last Home shows right away, and pages show placeholders while they load.
-- Every setting that is a number can be typed in too (volumes, sync adjustment, limits,
-  songs per page, cache size, playback speed), next to its slider or choices.
-- Everyone who listens stays in sync, with a per-device sync adjustment (for Bluetooth). A
-  new song waits until every phone, browser, TV and speaker has it, so nobody misses its start.
-- Hand a room to someone else, clone it (here, onto your phone or onto your server), and
-  invite or move everyone to the clone, keeping their roles. Server rooms can be always on.
-
-**Finding music** (through YouTube Music, no Premium needed)
-- Home with YouTube Music's suggestions (quick picks, new releases, mixes), made your own:
-  pins (as tiles, or with their songs), sections hidden, moved, or shown as a list or speed
-  dial. On a computer the sections fill the width (quick picks without scrolling, even speed
-  dial rows); on a phone a speed dial shows full 3×3 pages.
-- Search with suggestions while typing and YouTube Music's chips: songs, videos, albums,
-  artists, playlists, podcasts, episodes. Put its sections in the order you like, with a
-  section for what matches in your own library (liked songs, playlists, podcasts); on the
-  Library tab the search bar searches only your library.
-- Paste a YouTube Music or YouTube link in the search box to open that song, album,
-  playlist, artist or podcast (or a YTMP room link to open the room).
-- Recognize a song like YouTube Music's song search: the microphone icon in the search box
-  listens and shows that exact song to play or queue (Shazam; in every room, a phone's too).
-- Artist, album, playlist and podcast pages. An artist's page has a section with their songs
-  you liked and their playlists and podcasts you saved, and its sections go in the order you like.
-- Lyrics, synced line by line (from LRCLIB or YouTube Music), and a karaoke mode that shows
-  them large on the party screen and in everyone's player.
-- Radio from a song (it can clear the songs that played before too, like YouTube Music),
-  autoplay when the queue runs out, find similar. With a YTMP account they
-  learn which songs you (and everyone on your server) play after each other, and mix those
-  in. *Radio from* chips above Up next: Mix, YouTube Music, Song graph, or only what's on
-  this device. A music file that is a YouTube Music song gets that song's radio; other files
-  get songs like them, never a shuffle.
-- Hold Start radio (or right-click it) to choose for one radio: where from, songs you know
-  or new ones, with or without your YouTube Music account. *Settings → Radio* has the
-  defaults, songs per artist, leave out songs you skip or just played, never-in-radios.
-- Import playlists from Spotify: pick Spotify's data export, and YTMP finds each song on
-  YouTube Music and makes the playlists there (liked songs and followed podcasts too), in the
-  background; the songs it wasn't sure about wait for you to check.
-- The song graph: import your YouTube Music history from Google Takeout, see the graph
-  (around a song, or your most played) and move sliders for how much each part counts.
-  *All your music* shows the whole graph at once (thousands of songs, drawn with WebGL),
-  your listening, everyone else's and YouTube Music's radios, any of them together, coloured by
-  group (songs often heard together, much like genres), artist, plays or when first heard.
-  Search it for a song or artist, typos and all, and it flies there.
-  Graph radios walk the graph and keep to the song's group.
-  The server (and the phone, also overnight while it charges) can slowly learn YouTube
-  Music's radios of your music; every radio is kept as it came, so the graph can be weighed
-  again without fetching anything.
-- Podcasts: subscribe, new episodes on Home, played marks and resume where you stopped (in
-  any room, with a YTMP account), playback speed for the room, exact episode lengths, back
-  10 s / ahead 30 s, no music radio after an episode.
-
-**The player**
-- A mini player that opens a full player (tap or swipe up): album art, controls, like,
-  save to playlist, and Up next / Related tabs.
-- Buttons and queue changes respond right away, without waiting for the room; if the room
-  says no, it goes back with a message saying why.
-- Play on this device, on Chromecasts (including speakers with Chromecast built in), on
-  Sonos speakers, on MPD (a Raspberry Pi on a speaker or amplifier), and on TVs and
-  projectors that only have the YouTube app, with their volume.
-  The rooms of a multi-room amplifier show up as speakers of their own, from a file the house
-  keeps on its network (see [zones](docs/implementation/zones.md)). In a room on a server, the app also plays on the
-  speakers near your phone (the phone looks the songs up and serves them).
-- Android: a home screen widget like YouTube Music's (the song's art in a circle, play/pause
-  and like, in your phone's colours).
-- Android: lock screen and notification controls, keeps playing with the screen off. Also
-  while the room plays on speakers or TVs and not on the phone, and then the volume buttons
-  change the speakers' volume (all together, keeping their balance).
-- In a party room, taking your earbuds out or pausing on the lock screen only stops the music
-  on your phone, and putting them back in (or Play) plays it there again; the lock screen's
-  Next is only there for whoever may skip. The others see who paused, skipped or switched a
-  speaker off, and guests (*Listener*) can't pause the party by default. Pause, seek, skip
-  or play something else while others listen asks first (*No*, *Just once*, *Always*), and
-  *Pause only stops it here* makes YTMP's Pause button stop it just on your device.
-- In a room of your own, Play starts the music on the device you pressed it on when it isn't
-  playing anywhere else (*Press play to play here*, on by default).
-- Your other devices in the room (signed in to your account) show in *Play on* with their
-  own volume slider: turn the laptop down from your phone. On a phone it's the media volume.
-  A checkbox switches *Play here* on or off there (a browser after one click on its page).
-- The player shows where the song comes from: YouTube, the server (or host phone), or this phone.
-- The app keeps its YouTube lookups working by itself: when YouTube changes something, it
-  gets the fixed yt-dlp within a day, without an app update (and goes back to its own if the
-  new one doesn't work).
-- A sleep timer (in the playing song's ⋮ menu): after some minutes or at the end of the
-  song the sound fades out, then a solo room pauses; in a party room only your device stops.
-- Solo rooms can leave out the party bits you don't need alone (room code, Play on, Karaoke,
-  Party screen…), in *Settings → Solo rooms*. Without the room code, search fills the top bar.
-- One Settings screen in YouTube Music's style, with the room's own settings at the top when
-  you're in a room. Your settings are kept on your YTMP account, so all your devices have them;
-  the phone icon next to one keeps it different on that device. *Search settings* finds any
-  setting as you type, and you can change it right in the results.
-- An equalizer (*Settings → Sound*): ten bands and presets (Bass boost, Spoken word, …).
-  In the app the phone's speaker, wired headphones and each Bluetooth device keep their own.
-- In the app, *Settings → Sound → Keep playing with other apps* lets music play at the same time
-  as an audiobook or a video: neither stops the other. Calls still make the music quiet.
-- A song menu (⋮, right-click or hold) you can arrange yourself (*Settings → Song menu*):
-  order, hide actions, dividers. On a phone it slides up from the bottom like YouTube
-  Music's, with three big buttons at the top that you pick. Hold an action for more:
-  where Add to queue puts it, Save to playlist straight into the last one, Dislike's
-  never-in-radios, remove all by an artist or everything above or below a song, keep a song offline; Shuffle, Next and Play on
-  can be held too. Each hold can be switched off or trimmed. Every list of songs has it:
-  search, artist, album, playlist and podcast pages, Home, your history, Local.
-- Play an album or playlist from a song, like YouTube Music: *Play from here* in its menu,
-  or just tap it when nothing is queued or playing (the songs before it are left out; a
-  setting in *Settings → Playback*).
-- Download a song or episode from its menu: a music file with its title, artist, album and
-  cover. In the app it goes to the phone's Music folder (and shows in the Local tab).
-- Music comes straight from YouTube, also when you listen to a server elsewhere: the app
-  looks songs up itself, and a browser can use a YouTube Music module on your own computer
-  (*Settings → Where songs play from*), instead of streaming through the server. In a
-  browser you choose the order (for example your own module first), and the room says so
-  while your module doesn't answer. With your own module, search, Home and the pages come
-  from it too (the server answers when it can't).
-- A *Local* tab with your own music: a Raspberry Pi's music folder (shared with MPD) and the
-  music on your phone, with albums, artists, songs, genres, folders, search and Shuffle all.
-  It remembers where you were.
-- A **song cache** on the server and the phone: songs you play are kept, so next time they
-  start at once without asking YouTube, and on the phone they play without internet (*Local →
-  Cached on this phone*, with your downloads). Songs streamed anyway are kept for free, others
-  from their second play; podcast episodes aren't. 5 GB on a server (admin page), 1 GB on a
-  phone (*Settings → Song cache and downloads*, on the phone or its SD card), with *Clear cache*. Optionally the
-  phone's own music that is also on YouTube Music is listed there too and plays offline. On the
-  phone it can also keep the songs you liked last, the songs in your YouTube Music history, and
-  the songs you played most from a Google Takeout export (how recent and how often is yours to
-  choose, with the number of songs shown as you choose).
-- **Playlists offline** in the app, like YouTube Music's downloads: *Keep offline* on a playlist
-  keeps its songs on the phone and keeps up with songs added later, and *Keep your most played
-  playlists* does that by itself for the ones you play most. Every playlist whose songs are all on
-  the phone (however they got there) shows in *Local → Cached on this phone → Playlists* and plays
-  without internet.
-
-**People and accounts**
-- Roles and permissions with a Discord-style editor (one role per person plus per-person
-  overrides), kicking and bans.
-- YTMP accounts (username and password) on a server, also usable in rooms on a phone that
-  is linked to that server.
-- Listening history (off by default) in the Library: play from it like any list, search,
-  remove songs; export and delete days on your account page.
-- Friends and groups (*Settings → Friends*): share a song (song menu → *Share*) with friends or
-  a whole group, like your hardcore friends; it shows on their Home under *From your friends*,
-  with your note (× takes it off, with Undo). Each friend and group has a page with everything
-  they shared with you, and a *Show on Home* switch.
-- **Sign in to YouTube Music on your phone:** your own Home, a Library with your playlists,
-  liked songs and podcasts (searchable), liking and saving to playlists, and search and radio that fit
-  your taste. The sign-in stays on the phone, and guests in a room on your phone never see it.
-- The same on a **server account**, in every browser you log in with; the phone and the
-  server can share one sign-in.
-- Thumbs up and down, and editing your own playlists (remove, move, rename, delete).
-- Your YouTube Music in rooms on someone else's phone or server too, straight from your
-  server (the host never gets your sign-in).
-- **Your rooms on all your devices:** rooms on your phone show up on your server and the
-  other way round; open one there or move it (with an account).
-- Log in once: the server's pages and the app's own pages share the login.
-- Open pages update themselves after a server update: they reload when the sound stops in
-  that browser and you're not typing, so you never need to clear your browser's cache.
-- **An admin page** for the server (*Settings → Server admin*): accounts (make someone admin,
-  rename, new password, log out everywhere, delete), invite links, server settings that work
-  right away (sign-up, guests, trusted servers, room codes, audio, song cache, logs), the
-  rooms (close one), and versions.
-
-**The app**
-- Checks for new versions when it starts and installs them; *Check for updates* and *Send
-  logs* in the settings.
-- Server and app keep logs that clean up after themselves (what happened when a song
-  stopped or buffered).
-- Less trouble with YouTube's "confirm you're not a bot" block: song lookups can carry a
-  token that says they come from a real YouTube player (on the server and in the app). When
-  YouTube blocks anyway, the room pauses on the song and YTMP waits a few minutes before
-  asking again.
-
-**The desktop app** (Windows and Linux)
-- YTMP in its own window, on your server: it looks songs, search, Home and pages up on your
-  own computer, so they come straight from YouTube on your connection (the server's when
-  that fails).
-- Media keys and Windows' media controls show the song as YTMP.
-- Your own music files (*Settings → Local music → Music on this computer*, off by default)
-  in the Local tab, and a song cache (*Settings → Song cache*, off by default): both play from
-  your disk. Alone, nothing leaves your computer; a song goes to the server only when
-  someone else in the room plays along.
-- Opens the room you were in, like the Android app.
-- Plays the room on the Chromecasts, Sonos speakers, MPDs and TVs on your computer's
-  network (*Play on → Near this computer*), also when your server can't reach them.
-- Copies the songs your phone keeps to the computer over Wi-Fi: *Copy from my phone* (YTMP
-  open on the phone), or *Send songs to my computer* on the phone, also when the server is down.
-- Updates itself: a new version is offered when it starts, or right away with *Settings → App
-  → Check for updates*.
+- **Rooms**: party and solo rooms, a shared queue with Undo, fair order, shuffle, repeat,
+  vote to skip and limits; a party screen for the TV; roles and permissions; handing over,
+  cloning and moving rooms. → [queue](docs/features/queue.md),
+  [rooms](docs/features/rooms-and-roles.md), [sharing](docs/features/sharing.md)
+- **Finding music**: YouTube Music's Home, search and pages, links pasted in search, song
+  recognition, synced lyrics with karaoke, radio and autoplay, podcasts that resume, a song
+  graph from your listening, Spotify playlist import.
+  → [UI](docs/features/ui.md), [history and recommendations](docs/features/history-and-recommendations.md),
+  [importing playlists](docs/features/importing-playlists.md)
+- **Playing**: in sync on every device, on Chromecast, Sonos, MPD, YouTube TVs and
+  amplifier zones; equalizer, sleep timer, downloads, a song cache and offline playlists on
+  the phone, a *Local* tab with your own music.
+  → [playback and outputs](docs/features/playback-and-outputs.md), [sources](docs/features/sources.md)
+- **People and accounts**: optional YTMP accounts with listening history, your YouTube Music
+  sign-in (on the phone or the server), friends and shared songs, your rooms on all your
+  devices, settings that follow you, an admin page for the server.
+  → [accounts](docs/features/accounts.md), [friends](docs/features/friends.md),
+  [server admin](docs/features/server-admin.md)
+- **Apps**: Android (lock screen, widget, hosting on the phone, updates itself) and a desktop
+  app for Windows and Linux (its own YouTube lookups, media keys, local music, speakers
+  nearby). → [platforms](docs/features/platforms.md)
 
 ## What's next
 
 - The desktop app: your YouTube Music sign-in in the app, and the bot-check token
-  ([status](docs/implementation/desktop-app.md))
+  ([status](docs/implementation/desktop-app.md#order-of-work))
 - More sources: YouTube, other music folders, Plex / Jellyfin
 - Recaps from your listening history ("you listened 12 hours with Sam")
 - Importing playlists from other exports (Google Takeout) and accounts, and into YTMP playlists
-- YTMP playlists, explore page
+- YTMP playlists, an Explore page
 
-## Known problems
+More ideas: [future ideas](docs/features/future-ideas.md).
 
-- **Firefox on Windows 10 freezes after a while of playing** (the music keeps going). It isn't
-  YTMP: a Windows service for Bluetooth headphone buttons, the *AVCTP service*, stops
-  answering, and Firefox and Windows itself get stuck waiting for it. Fix: in *Services*, stop
-  the **AVCTP service** and set it to **Disabled** (Bluetooth audio keeps working; only
-  headphone tap controls stop). Details:
-  [playback and outputs](docs/features/playback-and-outputs.md#known-problems).
+## Install
 
-## Platforms
+| Platform | |
+|----------|---|
+| **Android 11+** | The APK from the [latest release](https://github.com/0TrashPanda/YTMP/releases). Open it on your phone (allow installing apps when asked); after that the app updates itself. |
+| **Windows, Linux** | The desktop app from the [latest release](https://github.com/0TrashPanda/YTMP/releases): `…-windows-x64-setup.exe` (Windows warns once: *More info → Run anyway*) or `…-linux-x86_64.AppImage`. Or use a browser. |
+| **Any browser** | Join rooms, or host them through a server. |
+| **iOS** | Not supported (the web app may work, but not in the background). |
 
-| Platform | Status |
-|----------|--------|
-| Linux server (Docker) | ✅ Hosts rooms, serves the web app, accounts, listening history and YouTube Music sign-ins |
-| Android 11+ | ✅ Join rooms with native playback, lock screen controls and a home screen widget; host solo rooms or parties on the phone itself, with YouTube Music running on the phone (no server needed); sign in to YouTube Music; updates itself |
-| Web browser | ✅ Join rooms, or host through a server |
-| Windows, desktop Linux | ✅ The desktop app (installer, AppImage), or the browser |
-| iOS | Not supported (the web app may work, but background playback won't) |
-
-## Download
-
-**Windows and Linux:** the desktop app's `…-windows-x64-setup.exe` or `…-linux-x86_64.AppImage`
-from the [latest release](https://github.com/0TrashPanda/YTMP/releases). Windows warns once
-that it doesn't know the installer (*More info → Run anyway*).
-
-**Android:** get the APK from the [latest release](https://github.com/0TrashPanda/YTMP/releases)
-and open it on your phone (allow installing apps from your browser or file manager when
-asked). After that the app finds new releases itself and offers to install them; they keep
-your rooms and sign-ins.
-
-## Running a server
+### Running a server
 
 Needs Docker with Compose.
 
@@ -292,52 +71,22 @@ echo "YTMP_MODULE_KEY=$(openssl rand -hex 32)" > .env
 docker compose up -d
 ```
 
-Open `http://<server>:8080`. The images come from GitHub, and the server **updates itself**
-every night (Watchtower): new releases, and a new yt-dlp whenever YouTube breaks something.
-To update right away: `docker compose pull && docker compose up -d`. See
-[updating](deploy/proxmox.md#updating). For HTTPS, put a reverse proxy such as Caddy in front of it
-(`deploy/docker-compose.caddy.yml` does that for you), or use your own nginx.
+Open `http://<server>:8080`. The server updates itself every night. For HTTPS, your own
+domain, bandwidth (`[audio] proxy`) and updating by hand, follow the step-by-step guide:
+[running YTMP on Proxmox](deploy/proxmox.md).
 
-**Step-by-step guide:** [running YTMP on Proxmox](deploy/proxmox.md) (LXC container with
-Docker, your own domain with HTTPS through Caddy or your existing nginx).
+## Known problems
 
-**Bandwidth:** players stream straight from YouTube, but YouTube's links only work on the
-server's own internet connection. Elsewhere they fall back to streaming through the server.
-To keep music off a slow upload, set `[audio] proxy = "lan"` in `ytmp.toml`: then only
-devices on the server's network (like speakers at home) may do that. See the guide.
-The app doesn't need the server for that: it looks songs up itself. In a browser, run the
-YouTube Music module on your own computer and enter it under *Settings → Where songs play from*:
-`docker run -d -p 127.0.0.1:8401:8401 -e YTMP_MODULE_KEY=<a key you choose> ghcr.io/0trashpanda/ytmp-ytm`.
+- **Firefox on Windows 10 freezes after a while of playing** (the music keeps going). It's a
+  Windows service, not YTMP: stop and disable the **AVCTP service**.
+  [Details](docs/features/playback-and-outputs.md#firefox-on-windows-freezes-while-it-plays).
 
 ## Development
 
-| Part | Folder | Run |
-|------|--------|-----|
-| YTM module (Python 3.12+) | `ytm-module/` | `python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'`, then `YTMP_MODULE_KEY=dev YTMP_YTM_JS_RUNTIME=node .venv/bin/ytmp-ytm` |
-| Server (Kotlin, JDK 21 is downloaded by Gradle) | `server/`, `core/`, `protocol/` | `YTMP_MODULE_KEY=dev ./gradlew :server:run` |
-| Web app (Svelte, pnpm) | `frontend/` | `pnpm install && pnpm dev`, then open http://localhost:5173 |
-| Android app | `android/` | `./gradlew :android:installDebug`, then for the emulator: `adb shell am start -n dev.trashpanda.ytmp/.MainActivity --es server http://10.0.2.2:8080` |
-
-- Tests: `./gradlew test`, `cd ytm-module && .venv/bin/pytest` and `cd frontend && pnpm test`.
-- Smoke test of a running phone or server (search, pages, radio, streaming; read-only):
-  `python3 tools/smoke-test.py URL`. For the app on a phone: `adb forward tcp:8765 tcp:8765`,
-  keep the app open, and use `http://127.0.0.1:8765`.
-- The web app in Chrome 90, the browser of older Chromecasts (party screen):
-  `node tools/chrome90-test.mjs` (after `pnpm build` and `./gradlew :server:installDist`; it
-  downloads Chromium 90 once).
-- After changing anything in `protocol/`, run `./gradlew :protocol:generateTs` to update the
-  web app's types (`frontend/src/lib/protocol.gen.ts`).
-- Releases: push a tag like `v0.2.0` and GitHub Actions builds the signed APK and publishes
-  the release (`.github/workflows/release.yml`). See
-  [dev setup](docs/implementation/dev-setup.md#releases).
-- yt-dlp needs a JavaScript runtime for YouTube: Deno by default, or set
-  `YTMP_YTM_JS_RUNTIME=node` to use Node.
-
-## Documentation
-
-- [Features](docs/README.md#features): what YTMP does
-- [Implementation](docs/README.md#implementation): how it's built (Kotlin, Svelte, Python)
-- [Open questions](docs/open-questions.md)
+How to run each part, tests and checks: [dev setup](docs/implementation/dev-setup.md#running-it-locally).
+How it's built: [implementation docs](docs/README.md#implementation), starting with the
+[architecture](docs/implementation/architecture.md). Releases:
+[dev setup](docs/implementation/dev-setup.md#releases).
 
 ## License
 
