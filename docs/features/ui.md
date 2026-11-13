@@ -36,7 +36,8 @@ pages have *Play*, *Play next*, *Add to queue*; playlist pages have *Play*, *Pla
   ones load.
 - **The last Home and Library show right away** when the app starts, while the new ones load.
 - **Ahead of time**: the next song's stream is looked up while the current one plays (also
-  when you add a song to play next), and the lyrics while the full player is open. Pages you
+  when you add a song to play next, or autoplay finds one; also by your own module, in the
+  apps and the desktop app), and the lyrics while the full player is open. Pages you
   touch or hover start loading before they open.
 
 ## Home & Explore
@@ -536,9 +537,9 @@ song's menu on an album's or artist's page has no *Go to* that same page.
   week, or only by hand). **Pull Home or Library down** (or tap the logo on Home) to load new
   ones now (only a pull down: swiping a row sideways never refreshes). Your own changes (a new
   playlist, renaming) show right away. Rows that scroll sideways have **page dots**.
-- **Back where you were**: opening the app goes straight back into the solo room you were in
-  when you closed it (*Settings → App*, on by default); the same for party rooms is a separate
-  setting (off by default). Going to the room list yourself means it starts there next time.
+- **Back where you were**: opening the app (Android or desktop) goes straight back into the
+  solo room you were in when you closed it (*Settings → App*, on by default); the same for
+  party rooms is a separate setting (off by default). Going to the room list yourself means it starts there next time.
 - **Long lists** come in pages: playlists (Liked music and your own too) load more as you
   scroll down; songs in Local have **Load more**. How many songs a page has (100, 300 or 1000, or a
   number from 10 to 5000 typed in) is a setting in *Settings → Look*.

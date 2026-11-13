@@ -10,8 +10,10 @@ permissions say otherwise (permission: *Play audio locally*).
 - All playing clients stay **in sync** with the room's playback position.
 - **A new song starts together** ✅: it waits until every phone, browser, TV and speaker
   playing the room has loaded it, then starts for all of them from the beginning, so nobody
-  misses its first seconds. How long it waits at most is a room setting (*Starting a song*:
-  2 s by default, up to 10 s, or not at all); a slower one joins late.
+  misses its first seconds. How long it waits for everyone is a room setting (*Starting a
+  song*: 2 s by default, up to 10 s, or 0); a slower one joins late. It never starts before
+  at least one of them has it, however long that takes, so alone you always hear it from the
+  start. When none of them can play it, it's skipped (three in a row: the room pauses).
 - This is the main way to hear a **server-hosted** room, because the server may be a
   remote machine without speakers.
 - Each client can turn local playback on or off at any time, and controls its own

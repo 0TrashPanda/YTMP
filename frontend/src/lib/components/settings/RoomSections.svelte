@@ -277,15 +277,15 @@
 		<div>
 			<p class="text-sm font-medium">Starting a song</p>
 			<p class="mb-2 text-xs text-muted">
-				A new song waits until every phone, browser, TV and speaker playing the room has loaded it, so they all start it together. A slow one joins late after this.
+				A new song waits until every phone, browser, TV and speaker playing the room has loaded it, so they all start it together. Once one has it, a slow one joins late after this. It never starts before one has it; when none can play it, it's skipped.
 			</p>
 			<div class="flex items-center gap-3">
 				<select class="{input} min-w-0 flex-1" bind:value={startWaitSeconds} aria-label="Starting a song">
 					{#each choices([1, 2, 3, 5, 10], startWaitSeconds) as seconds (seconds)}
-						<option value={seconds}>{seconds === 0 ? "Don't wait (some miss the start)" : `Wait at most ${seconds} s`}</option>
+						<option value={seconds}>{seconds === 0 ? 'Start with the first one (others miss the start)' : `Wait at most ${seconds} s`}</option>
 					{/each}
 				</select>
-				<NumberField value={startWaitSeconds} min={0} max={MAX_START_WAIT_SECONDS} unit="s" label="Seconds to wait at most (0: don't wait)" class="bg-raised py-2" onchange={(v) => (startWaitSeconds = v)} />
+				<NumberField value={startWaitSeconds} min={0} max={MAX_START_WAIT_SECONDS} unit="s" label="Seconds to wait at most (0: start with the first one)" class="bg-raised py-2" onchange={(v) => (startWaitSeconds = v)} />
 			</div>
 		</div>
 

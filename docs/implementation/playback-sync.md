@@ -190,11 +190,17 @@ skipped, most on a TV. Now a new song waits for the players, like Sonos or Spoti
   and say so: `PlayerReady(itemId)` from a participant's player, `PlayerReady(itemId,
   speakers = true)` from a phone once all its speakers near it have it
   (`NearbySpeakers.outputReady`), and `OutputRoom.outputReady` from the host's own Chromecasts
-  and Sonos speakers. A player that can't play the song says so too, so nobody waits for it.
-- When everyone is ready, the song starts for all of them at that moment (`Room.startTogether`);
-  they start within the time a message takes, and the usual sync takes it from there. The
-  room waits at most `RoomSettings.startWaitSeconds` (2 s by default, 0–10; 0 doesn't wait)
-  for a slow player, which then joins late, as before.
+  and Sonos speakers. A player that can't play the song says so too (`PlayerReady(itemId,
+  failed = true)`), so nobody waits for it; the Android app says so only after its retries.
+- When everyone has answered, the song starts for all of them at that moment
+  (`Room.startWhenReady`, `startTogether`); they start within the time a message takes, and
+  the usual sync takes it from there. Once one player has it, the room waits at most
+  `RoomSettings.startWaitSeconds` (2 s by default, 0–10; 0: it starts with the first) for the
+  others, which then join late. Before that it waits as long as it takes: a lone player that
+  started late came in seconds into the song (the clock had run without it).
+- **Nobody can play it** (every player answered `failed`): the song is skipped
+  (`Room.playersFailed`), with a notice; after three such songs in a row the room pauses
+  instead, like when the host's own lookups fail.
 - **Who's waited for:** online participants listening with `SetListening(startsTogether =
   true)`, phones with `SetSpeakers(startsTogether = true)`, and the host's active outputs
   (not a TV showing the party screen: its page is a participant). Older apps don't send the

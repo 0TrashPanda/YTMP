@@ -7,6 +7,7 @@ import dev.trashpanda.ytmp.protocol.ErrorInfo
 import dev.trashpanda.ytmp.protocol.MAX_START_WAIT_SECONDS
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.PlaybackStatus
+import dev.trashpanda.ytmp.protocol.QueuePosition
 import dev.trashpanda.ytmp.protocol.RoomState
 import dev.trashpanda.ytmp.protocol.RoomVisibility
 import dev.trashpanda.ytmp.protocol.ServerMessage
@@ -168,9 +169,12 @@ class StartTogetherTest {
     fun `a player that doesn't load the song in time doesn't hold up the others for long`() = runTest {
         val room = newRoom()
         val owner = room.connect("Owner", owner = true)
+        val guest = room.connect("Guest")
         room.run(owner, Command.SetListening(true, startsTogether = true))
+        room.run(guest, Command.SetListening(true, startsTogether = true))
         room.run(owner, Command.PlayNow(song(1)))
         runCurrent()
+        room.run(owner, Command.PlayerReady(room.currentItem(owner)))
         // 2 s by default.
         advanceTimeBy(1_900)
         assertTrue(room.playback(owner).starting)
@@ -182,16 +186,85 @@ class StartTogetherTest {
     }
 
     @Test
-    fun `how long a new song waits is a room setting, and 0 doesn't wait`() = runTest {
+    fun `a song never starts before a player has it, however long that takes`() = runTest {
         val room = newRoom()
         val owner = room.connect("Owner", owner = true)
+        val guest = room.connect("Guest")
         room.run(owner, Command.SetListening(true, startsTogether = true))
+        room.run(guest, Command.SetListening(true, startsTogether = true))
+        room.run(owner, Command.PlayNow(song(1)))
+        runCurrent()
+        val item = room.currentItem(owner)
+        advanceTimeBy(60_000)
+        var playback = room.playback(owner)
+        assertTrue(playback.starting)
+        assertEquals(0, playback.positionMs)
+
+        // The first one has it, long after the room's 2 s: it starts at once, from the start.
+        room.run(guest, Command.PlayerReady(item))
+        playback = room.playback(owner)
+        assertTrue(playback.playing)
+        assertEquals(0, playback.positionMs)
+        assertEquals(testScheduler.currentTime, playback.hostTimeMs)
+    }
+
+    @Test
+    fun `a song no player can play is skipped, and the room pauses when that keeps happening`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        val guest = room.connect("Guest")
+        room.run(owner, Command.SetListening(true, startsTogether = true))
+        room.run(guest, Command.SetListening(true, startsTogether = true))
+        room.run(owner, Command.PlayNow(song(1)))
+        room.run(owner, Command.AddSongs((2..6).map(::song), QueuePosition.END))
+        runCurrent()
+        var item = room.currentItem(owner)
+
+        // One can't play it: the other one is still waited for.
+        room.run(owner, Command.PlayerReady(item, failed = true))
+        advanceTimeBy(5_000)
+        assertEquals(item, room.currentItem(owner))
+        assertTrue(room.playback(owner).starting)
+        // Neither can: on to the next song.
+        room.run(guest, Command.PlayerReady(item, failed = true))
+        runCurrent()
+        assertEquals("ytm:2", room.state(owner).nowPlaying!!.item.song.id)
+
+        // One player having it is enough: the one that can't catches up or stays quiet.
+        item = room.currentItem(owner)
+        room.run(owner, Command.PlayerReady(item, failed = true))
+        room.run(guest, Command.PlayerReady(item))
+        assertTrue(room.playback(owner).playing)
+
+        // Three songs in a row nobody can play: probably no internet there, so it pauses.
+        room.run(owner, Command.Skip())
+        repeat(3) {
+            runCurrent()
+            val next = room.currentItem(owner)
+            room.run(owner, Command.PlayerReady(next, failed = true))
+            room.run(guest, Command.PlayerReady(next, failed = true))
+        }
+        runCurrent()
+        val state = room.state(owner)
+        assertEquals("ytm:5", state.nowPlaying!!.item.song.id)
+        assertFalse(state.playback.playing)
+        assertFalse(state.playback.starting)
+    }
+
+    @Test
+    fun `how long a new song waits for everyone is a room setting, and 0 starts with the first player`() = runTest {
+        val room = newRoom()
+        val owner = room.connect("Owner", owner = true)
+        val guest = room.connect("Guest")
+        room.run(owner, Command.SetListening(true, startsTogether = true))
+        room.run(guest, Command.SetListening(true, startsTogether = true))
         assertEquals(2, room.state(owner).settings.startWaitSeconds)
         assertNotNull(room.run(owner, Command.UpdateSettings(startWaitSeconds = MAX_START_WAIT_SECONDS + 1)))
 
         assertNull(room.run(owner, Command.UpdateSettings(startWaitSeconds = 5)))
         room.run(owner, Command.PlayNow(song(1)))
         runCurrent()
+        room.run(owner, Command.PlayerReady(room.currentItem(owner)))
         advanceTimeBy(4_500)
         assertTrue(room.playback(owner).starting)
         advanceTimeBy(1_000)
@@ -199,6 +272,9 @@ class StartTogetherTest {
 
         assertNull(room.run(owner, Command.UpdateSettings(startWaitSeconds = 0)))
         room.run(owner, Command.PlayNow(song(2)))
+        runCurrent()
+        assertTrue(room.playback(owner).starting)
+        room.run(owner, Command.PlayerReady(room.currentItem(owner)))
         runCurrent()
         assertTrue(room.playback(owner).playing)
     }

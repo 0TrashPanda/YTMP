@@ -183,6 +183,7 @@ export interface CommandPlayerReady {
   kind: "PlayerReady";
   itemId: string;
   speakers: boolean;
+  failed: boolean;
 }
 
 export interface CommandPlayerStalled {

@@ -42,8 +42,8 @@ internal class PlaybackClock(private val clock: () -> Long) {
 
 /**
  * Starting a new song together (docs/features/playback-and-outputs.md): it waits until every
- * player that says so ([dev.trashpanda.ytmp.protocol.Command.PlayerReady]) has loaded it, then
- * everyone starts it at once. Who is waited for: a participant's player (their id), their
+ * player that says so ([dev.trashpanda.ytmp.protocol.Command.PlayerReady]) has loaded it (or
+ * can't play it), then everyone starts it at once. Who is waited for: a participant's player (their id), their
  * speakers (`id:speakers`), an output (`o:id`). Only used with the room locked.
  */
 internal class StartTogether(private val clock: () -> Long) {
@@ -52,22 +52,34 @@ internal class StartTogether(private val clock: () -> Long) {
         private set
     private var since = 0L
     private val ready = HashSet<String>()
+    private val failed = HashSet<String>()
     private var job: Job? = null
 
     /** How long it has waited. */
     val waitedMs: Long get() = clock() - since
 
-    /** Of the players that [expected] to load the song, the ones that haven't said so yet. */
-    fun missing(expected: List<String>): List<String> = expected.filter { it !in ready }
+    /** Of the players that [expected] to load the song, the ones that haven't answered yet. */
+    fun missing(expected: List<String>): List<String> = expected.filter { it !in ready && it !in failed }
 
-    fun has(who: String) {
-        ready += who
+    /** One of [expected] has the song. */
+    fun anyReady(expected: List<String>): Boolean = expected.any { it in ready }
+
+    /** [who] has the song, or ([cantPlay]) can't play it. */
+    fun has(who: String, cantPlay: Boolean = false) {
+        if (cantPlay) {
+            failed += who
+            ready -= who
+        } else {
+            ready += who
+            failed -= who
+        }
     }
 
     /** A new song: nobody has it yet, and nothing waits. */
     fun reset() {
         stop()
         ready.clear()
+        failed.clear()
     }
 
     /** Starts waiting; [check] runs (locked with [mutex]) every little while to see whether it's done. */

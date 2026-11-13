@@ -63,6 +63,10 @@ _PO_TOKEN_ARGS = {"player_client": ["visionos", "mweb"], "fetch_pot": ["always"]
 # yt-dlp's "initial data" is the watch page's other half (chapters, comments, heatmap): a
 # request of ~0.8 s for every song whose answer we never use.
 _PLAYER_SKIP = {"player_skip": ["initial_data"]}
+# Without PO tokens the usual player (no ads) goes first too: yt-dlp's own order asks the TV
+# player first, whose links come with an ad, so every song waited ~5 s for its link (the
+# desktop app). yt-dlp's other players stay behind it for songs it can't play.
+_PLAYER_CLIENTS = {"player_client": ["visionos", "default"]}
 # Waiting longer than this for an ad to end is not worth it: the song fails instead.
 _MAX_AD_WAIT_S = 60
 # After YouTube's bot check, no lookups for this long, longer each time it's still there:
@@ -162,7 +166,7 @@ class YtmCore:
         if js_runtime:
             self._ydl_opts["js_runtimes"] = {js_runtime: {}}
         self._pot_url = pot_url
-        self._ydl_opts["extractor_args"] = {"youtube": _PLAYER_SKIP}
+        self._ydl_opts["extractor_args"] = {"youtube": {**_PLAYER_SKIP, **_PLAYER_CLIENTS}}
         if pot_url:
             self._ydl_opts["extractor_args"]["youtubepot-bgutilhttp"] = {"base_url": [pot_url]}
         self._bot_check = _BotCheck()

@@ -120,7 +120,7 @@ Each command lists the permission it needs (see [room management](../features/ro
 | `SetDeviceListening` ✅ | `participantId`, `on`. Switches *Play here* on another participant **with the same account** that allows it; on only when it can start sound and may listen (`listen_locally`). Sets their `listenRequest` and bumps `listenRequests`; that device switches itself (`lib/listenRequests.ts`). See [your devices](../features/playback-and-outputs.md#your-devices) | — (only your own devices) |
 | `SetDeviceVolume` ✅ | `volume` (0–1), `participantId` (null: this device). A device says its own volume whenever it changes (`Participant.volume`); with the id of another participant **with the same account** it sets theirs, which bumps their `volumeChanges`, and that device turns its volume to it. See [your devices](../features/playback-and-outputs.md#your-devices) | — (only your own devices) |
 | `SetRoomCode` ✅ | `code` (3–12 letters and digits; the old codes keep leading to the room) | Change settings |
-| `PlayerReady` ✅ | `itemId`, `speakers` (this player, or all the phone's speakers, loaded a starting song; see [starting together](playback-sync.md#starting-a-song-together)) | — |
+| `PlayerReady` ✅ | `itemId`, `speakers`, `failed` (this player, or all the phone's speakers, loaded a starting song, or can't play it; see [starting together](playback-sync.md#starting-a-song-together)) | — |
 
 No command is needed for the proxied stream: when the direct URL fails, the client uses
 `/api/audio/{songId}` on the host.

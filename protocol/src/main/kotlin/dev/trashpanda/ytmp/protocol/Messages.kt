@@ -301,11 +301,12 @@ sealed interface Command {
 
     /**
      * This participant's player ([speakers]: its speakers, all of them) has loaded the song
-     * [itemId] and can start it. Only sent while the song is [PlaybackStatus.starting].
+     * [itemId] and can start it, or ([failed]) can't play it at all. Only sent while the song is
+     * [PlaybackStatus.starting]. When every player failed, the room skips the song.
      */
     @Serializable
     @SerialName("PlayerReady")
-    data class PlayerReady(val itemId: String, val speakers: Boolean = false) : Command
+    data class PlayerReady(val itemId: String, val speakers: Boolean = false, val failed: Boolean = false) : Command
 
     /**
      * This participant's player ran out of data in the middle of [itemId], at [positionMs] of the

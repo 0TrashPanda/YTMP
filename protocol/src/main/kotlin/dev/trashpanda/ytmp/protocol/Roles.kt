@@ -92,7 +92,8 @@ data class RoomSettings(
     val noDuplicates: Boolean = false,
     /**
      * A new song waits at most this many seconds for everyone's players to load it, so they
-     * start it together ([PlaybackStatus.starting]); 0: it doesn't wait.
+     * start it together ([PlaybackStatus.starting]). It always waits for the first player that
+     * has it, however long that takes; 0: it starts with that one.
      */
     val startWaitSeconds: Int = 2,
     /** Karaoke mode: the party screen and the full player show the song's lyrics large. */

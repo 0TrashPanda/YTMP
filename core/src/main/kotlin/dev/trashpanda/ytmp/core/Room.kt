@@ -204,7 +204,8 @@ class Room(
     private val playback = PlaybackClock(clock)
     /**
      * A new song waits for the players to load it ([Command.PlayerReady], [outputReady]), so
-     * nobody misses its start; then everyone starts it together. At most [RoomSettings.startWaitSeconds].
+     * nobody misses its start; then everyone starts it together. For everyone at most
+     * [RoomSettings.startWaitSeconds]; for the first one as long as it takes.
      */
     private val startGate = StartTogether(clock)
 
@@ -222,6 +223,8 @@ class Room(
 
     /** Songs in a row that couldn't load; after [MAX_FAILED_IN_A_ROW] the room pauses (likely no internet). */
     private var failedInARow = 0
+    /** Songs in a row that no player could play (see [playersFailed]). */
+    private var playersFailedInARow = 0
 
     /** Called (with the room locked, so it must not block) when a song finished playing. */
     @Volatile
@@ -1008,7 +1011,7 @@ class Room(
                 emit(Event.ParticipantUpdated(member.toParticipant()))
                 if (names.isNotEmpty()) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
-            is Command.PlayerReady -> ready(command.itemId, if (command.speakers) "${member.id}:speakers" else member.id)
+            is Command.PlayerReady -> ready(command.itemId, if (command.speakers) "${member.id}:speakers" else member.id, command.failed)
             is Command.PlayerStalled -> stalled(member, command.itemId, command.positionMs)
             is Command.SetOutput -> {
                 need(member, Permission.CHANGE_OUTPUTS)?.let { return it }
@@ -1630,29 +1633,62 @@ class Room(
         emitPlayback()
     }
 
-    /** The new song's stream is ready: wait for the players to load it, if any will say so. */
+    /**
+     * The new song's stream is ready: wait for the players to load it, if any will say so. Never
+     * started before one of them has it: a player that starts late comes in seconds into the
+     * song, and alone in a room that's all you'd hear.
+     */
     private fun waitForPlayers() {
         startGate.reset()
-        if (!wantPlaying || settings.startWaitSeconds <= 0 || notReady().isEmpty()) return
-        startGate.wait(scope, mutex) {
-            val late = notReady()
-            // Someone left or stopped listening (late is empty then), or it waited long enough.
-            if (startGate.waiting && (late.isEmpty() || startGate.waitedMs >= settings.startWaitSeconds * 1000L)) startTogether(late)
-        }
+        if (!wantPlaying || notReady().isEmpty()) return
+        startGate.wait(scope, mutex) { if (startGate.waiting) startWhenReady() }
     }
 
-    private fun ready(itemId: String, who: String) {
+    private fun ready(itemId: String, who: String, failed: Boolean = false) {
         if (!startGate.waiting || current?.itemId != itemId) return
-        startGate.has(who)
-        if (notReady().isEmpty()) startTogether(emptyList())
+        startGate.has(who, failed)
+        startWhenReady()
+    }
+
+    /**
+     * Everyone answered: it starts, or it's skipped when nobody could play it. Late players are
+     * waited for up to [RoomSettings.startWaitSeconds], once at least one has the song.
+     */
+    private fun startWhenReady() {
+        val players = players()
+        val late = startGate.missing(players)
+        val anyReady = startGate.anyReady(players)
+        when {
+            // Nobody left to wait for (they left or stopped listening).
+            players.isEmpty() -> startTogether(emptyList())
+            late.isEmpty() -> if (anyReady) startTogether(emptyList()) else playersFailed()
+            anyReady && startGate.waitedMs >= settings.startWaitSeconds * 1000L -> startTogether(late)
+        }
     }
 
     /** Everyone has the song (or it waited long enough for [late]): it starts now, for all of them. */
     private fun startTogether(late: List<String>) {
         log.info("Room {}: starts {} after {} ms{}", code, current?.song?.id, startGate.waitedMs, if (late.isEmpty()) "" else " without $late")
+        if (startGate.anyReady(players())) playersFailedInARow = 0
         startGate.stop()
         playback.resume()
         emitPlayback()
+    }
+
+    /** No player could play the new song: on to the next one, unless that keeps happening (no internet there?). */
+    private fun playersFailed() {
+        val item = current ?: return
+        log.info("Room {}: no player can play {} after {} ms", code, item.song.id, startGate.waitedMs)
+        startGate.stop()
+        if (++playersFailedInARow >= MAX_FAILED_IN_A_ROW) {
+            playersFailedInARow = 0
+            emit(Event.Notice("Couldn't play songs on the devices here. Paused: press play to try again."))
+            pausePlayback()
+            return
+        }
+        emit(Event.Notice("Couldn't play \"${item.song.title}\" here: skipped"))
+        retireCurrent(QueueItemResult.SKIPPED)
+        playNextFromQueue()
     }
 
     private fun retireCurrent(result: QueueItemResult) {

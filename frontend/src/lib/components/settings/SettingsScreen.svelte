@@ -241,7 +241,9 @@
 		return true;
 	}
 
+	/** Opens a page; a search that's open closes (on wide screens the list next to it stays clickable). */
 	function open(id: SettingsSection) {
+		if (searching) closeSearch();
 		section = id;
 		friendPage = null;
 		showingSection = true;
@@ -911,6 +913,16 @@
 			</div>
 			<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => desktop?.changeServer?.()}>Change server</button>
 		</div>
+		<Toggle
+			label="Open the solo room you were in"
+			hint="Opening the app goes straight back into the solo room you were in when you closed it, instead of the room list."
+			setting={settings.reopenSolo}
+		/>
+		<Toggle
+			label="Open the party room you were in"
+			hint="The same for party rooms (if the room is still there)."
+			setting={settings.reopenParty}
+		/>
 	{:else if id === 'app' && nativeBridge?.appVersion}
 		<div class="flex items-center gap-3">
 			<div class="flex-1">

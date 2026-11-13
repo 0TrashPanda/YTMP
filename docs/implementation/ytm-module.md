@@ -34,6 +34,9 @@ on 2026-10-18 with only 8–16 lookups an hour, so it's not only about the rate.
   That one comes with a pre-roll ad and only works once the ad would be over (a few seconds,
   yt-dlp's `available_at`): `stream()` waits that long (at most 60 s) before answering.
   The log line of each lookup names the player its link came from (`visionos` / `mweb`).
+  Without tokens (the desktop app) `visionos` goes first too (`_PLAYER_CLIENTS`: `visionos`,
+  then yt-dlp's defaults): yt-dlp's own order asks the TV player first, whose links come
+  with a ~5 s ad wait, so every song took ~7 s to look up instead of ~2 s.
 - **Server:** the [bgutil](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) plugin
   (`.[pot]` extra) asks the `pot` container (bgutil's server, ~180 MB of memory) for tokens:
   `YTMP_YTM_POT_URL=http://pot:4416` in [docker-compose.yml](../../deploy/docker-compose.yml).

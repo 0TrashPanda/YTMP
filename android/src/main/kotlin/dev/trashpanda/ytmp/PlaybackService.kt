@@ -123,6 +123,8 @@ class PlaybackService : MediaSessionService() {
     /** Stream links this phone looked up itself, by song ID. Main thread only. */
     private val ownLinks = mutableMapOf<String, String>()
     private val lookingUp = mutableSetOf<String>()
+    /** The next song [lookUpNext] last looked up ahead of time. */
+    private var lookedUpNext: String? = null
 
     /** How often the current song was tried again after it didn't play from anywhere, by item. */
     private val retries = mutableMapOf<String, Int>()
@@ -278,6 +280,8 @@ class PlaybackService : MediaSessionService() {
         scope.launch {
             combine(PlaybackHub.target, follower.room) { target, room -> merge(target, room) }.collect {
                 apply(it)
+                // A song added (or autoplay's next) after this one loaded: looked up now, not when it starts.
+                if (source == Source.OWN && loadedItemId != null) lookUpNext()
                 publishSession()
             }
         }
@@ -568,14 +572,17 @@ class PlaybackService : MediaSessionService() {
         PlaybackHub.command("""{"kind":"PlayerStalled","itemId":${JSONObject.quote(itemId)},"positionMs":$position}""")
     }
 
-    /** The room waits for its players to load a new song ([PlaybackTarget.starting]): this phone has it. */
-    private fun reportReady() {
+    /**
+     * The room waits for its players to load a new song ([PlaybackTarget.starting]): this phone
+     * has it, or ([failed]) can't play it (when no player can, the room skips it).
+     */
+    private fun reportReady(failed: Boolean = false) {
         val target = current ?: return
         val itemId = loadedItemId ?: return
         if (!target.enabled || !target.starting || target.item?.itemId != itemId || readySent == itemId) return
         readySent = itemId
-        Log.d(TAG, "ready to start $itemId")
-        PlaybackHub.command("""{"kind":"PlayerReady","itemId":${JSONObject.quote(itemId)}}""")
+        Log.d(TAG, if (failed) "can't start $itemId" else "ready to start $itemId")
+        PlaybackHub.command("""{"kind":"PlayerReady","itemId":${JSONObject.quote(itemId)},"failed":$failed}""")
     }
 
     private fun sourceFor(target: PlaybackTarget, item: TargetItem): Source = when {
@@ -630,6 +637,9 @@ class PlaybackService : MediaSessionService() {
     private fun lookUpNext() {
         val state = lastFollowed?.state ?: return
         val next = (state.queue.firstOrNull() ?: state.autoplay.firstOrNull())?.song?.id ?: return
+        // Once per song: one that fails isn't asked again with every change in the room.
+        if (next == lookedUpNext) return
+        lookedUpNext = next
         if (next.startsWith("ytm:") && ownLink(next) == null) lookUp(next)
     }
 
@@ -828,7 +838,7 @@ class PlaybackService : MediaSessionService() {
                 Log.i(TAG, "${item.songId} doesn't play from anywhere, trying again in ${wait / 1000} s")
                 report(target, "app: can't play ${item.songId} through the host either (${error.errorCodeName}), trying again in ${wait / 1000} s")
                 PlaybackHub.status("retrying")
-                reportReady()
+                // The room keeps waiting while it tries again: alone, you'd miss the start otherwise.
                 scope.launch {
                     delay(wait)
                     val now = current ?: return@launch
@@ -843,8 +853,8 @@ class PlaybackService : MediaSessionService() {
             } else {
                 report(target, "app: can't play ${target.item?.songId} through the host either (${error.errorCodeName}: ${error.message})")
                 PlaybackHub.status("error")
-                // It won't load: the room doesn't wait for it.
-                reportReady()
+                // It won't load: the room doesn't wait for it (and skips the song when no player can play it).
+                reportReady(failed = true)
             }
         }
 

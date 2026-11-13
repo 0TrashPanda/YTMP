@@ -125,7 +125,7 @@
 	async function reopen(): Promise<boolean> {
 		const last = saved.lastRoom;
 		saved.lastRoom = null;
-		if (!nativeBridge || !last || !(last.solo ? settings.reopenSolo.value : settings.reopenParty.value)) return false;
+		if (!(nativeBridge || window.YtmpDesktop) || !last || !(last.solo ? settings.reopenSolo.value : settings.reopenParty.value)) return false;
 		try {
 			const room = await getRoom(last.code);
 			await goto(`/room/${room.code}`, { replaceState: true });

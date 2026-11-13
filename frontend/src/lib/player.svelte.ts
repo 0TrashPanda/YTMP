@@ -319,6 +319,7 @@ class WebPlayer implements RoomPlayer {
 			return; // 'canplay' calls sync again.
 		}
 		if (this.audio.readyState < HTMLMediaElement.HAVE_METADATA) return;
+		this.lookUpNext();
 
 		const playback = state.playback;
 		const expectedMs = targetPosition(playback, this.room.hostNow(), this.syncOffsetMs);
@@ -437,9 +438,7 @@ class WebPlayer implements RoomPlayer {
 			(url) => {
 				if (load !== this.loads) return;
 				this.audio.src = url;
-				const state = this.room.state;
-				const next = state?.queue[0] ?? state?.autoplay[0];
-				if (next) prefetchOwnStream(next.song.id);
+				this.lookUpNext();
 			},
 			(e: Error) => {
 				if (load !== this.loads) return;
@@ -449,6 +448,22 @@ class WebPlayer implements RoomPlayer {
 				this.load(now, streamUrl);
 			}
 		);
+	}
+
+	/** The song the player last looked up ahead of time (see [lookUpNext]). */
+	private lookedUpNext: string | null = null;
+
+	/**
+	 * Playing from your own module: the next song's link is looked up while this one plays, also
+	 * when it's added (or autoplay finds it) later, so it starts without waiting. Once per song.
+	 */
+	private lookUpNext(): void {
+		if (this.source !== 'own') return;
+		const state = this.room.state;
+		const next = (state?.queue[0] ?? state?.autoplay[0])?.song.id;
+		if (!next || next === this.lookedUpNext) return;
+		this.lookedUpNext = next;
+		prefetchOwnStream(next);
 	}
 
 	/**
@@ -566,10 +581,10 @@ class WebPlayer implements RoomPlayer {
 	}
 
 	/** The room waits for its players to load a new song (`playback.starting`): this one has it (or can't play it). */
-	private reportReady(itemId: string): void {
+	private reportReady(itemId: string, failed = false): void {
 		if (!this.room.state?.playback.starting || this.readySent === itemId) return;
 		this.readySent = itemId;
-		this.room.run({ kind: 'PlayerReady', itemId, speakers: false });
+		this.room.run({ kind: 'PlayerReady', itemId, speakers: false, failed });
 	}
 
 	private onError(): void {
@@ -596,8 +611,8 @@ class WebPlayer implements RoomPlayer {
 			this.sync();
 		} else {
 			this.error = `Can't play "${now.item.song.title}" on this device.`;
-			// The room doesn't wait for it.
-			this.reportReady(now.item.itemId);
+			// The room doesn't wait for it (and skips the song when no player can play it).
+			this.reportReady(now.item.itemId, true);
 			// Nothing worked (the host may not stream to this network): the next song tries the
 			// room's link again, which often works, instead of failing the same way.
 			this.directFails = false;
