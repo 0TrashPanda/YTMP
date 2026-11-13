@@ -384,10 +384,11 @@ like YouTube Music's: **hold** the card on a touch screen, **right-click** it, o
 which shows on the picture when you point at it with a mouse. A sheet from the bottom on a
 phone (swipe it down to close it, like the song menu), a menu at the card on a computer.
 
-- **Album or playlist**: Play, Shuffle play, Play next, Add to queue (a playlist: Add to
-  autoplay, as on its page), Start radio (from its first song). These use the same limits as the
+- **Album, playlist or artist** (an artist: its top songs): Play, Shuffle play, Play next, Add
+  to queue, Add to autoplay, Start radio (from its first song). These use the same limits as a
   page's buttons (*Settings → Adding songs*: at most so many songs, or asked first).
-- **Artist**: Start radio, Shuffle songs (its top songs), Add top songs to the queue.
+- **Album**, signed in to YouTube Music: Save to playlist (all its songs, to one of your
+  playlists or a new one).
 - **Podcast**: Play the latest episode.
 - **All**: Pin to Home (or Unpin), Share (the phone's share sheet, or the YouTube Music link
   copied).

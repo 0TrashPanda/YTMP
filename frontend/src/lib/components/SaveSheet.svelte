@@ -9,7 +9,21 @@
 	import Art from './Art.svelte';
 	import Icon from './Icon.svelte';
 
-	let { song, onClose, onToast }: { song: Song; onClose: () => void; onToast: (text: string) => void } = $props();
+	let {
+		songs,
+		title,
+		onClose,
+		onToast
+	}: {
+		/** What's saved: a song, or an album's songs. */
+		songs: Song[];
+		/** Its name: the song's or the album's. */
+		title: string;
+		onClose: () => void;
+		onToast: (text: string) => void;
+	} = $props();
+
+	const ids = $derived(songs.map((s) => s.id));
 
 	let playlists = $state<PlaylistSummary[] | null>(null);
 	let error = $state<string | null>(null);
@@ -26,7 +40,7 @@
 		busy = true;
 		onClose();
 		try {
-			await whileBusy(`Saving to ${playlist.title}…`, saveToPlaylist(playlist.id, [song.id]));
+			await whileBusy(`Saving to ${playlist.title}…`, saveToPlaylist(playlist.id, ids));
 			settings.lastPlaylist.set({ id: playlist.id, title: playlist.title });
 			onToast(`Saved to ${playlist.title}`);
 		} catch (e) {
@@ -38,14 +52,14 @@
 
 	async function create(event: SubmitEvent) {
 		event.preventDefault();
-		const title = name.trim();
-		if (!title) return;
+		const named = name.trim();
+		if (!named) return;
 		busy = true;
 		onClose();
 		try {
-			const made = await whileBusy(`Making the playlist ${title}…`, createPlaylist(title, [song.id]));
-			settings.lastPlaylist.set({ id: made, title });
-			onToast(`Saved to ${title}`);
+			const made = await whileBusy(`Making the playlist ${named}…`, createPlaylist(named, ids));
+			settings.lastPlaylist.set({ id: made, title: named });
+			onToast(`Saved to ${named}`);
 		} catch (e) {
 			onToast(e instanceof Error ? e.message : "Couldn't make the playlist");
 		} finally {
@@ -66,10 +80,10 @@
 		use:modal={() => onClose()}
 	>
 		<div class="flex items-center gap-3 border-b border-line p-4">
-			<Art {song} size={96} class="h-10 w-10" />
+			<Art song={songs[0]} size={96} class="h-10 w-10" />
 			<div class="min-w-0 flex-1">
 				<p class="text-xs text-muted">Save to playlist</p>
-				<p class="truncate font-medium">{song.title}</p>
+				<p class="truncate font-medium">{title}</p>
 			</div>
 			<button class="rounded-full p-1 text-muted hover:bg-raised" aria-label="Close" onclick={onClose}><Icon name="close" /></button>
 		</div>

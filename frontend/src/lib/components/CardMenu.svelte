@@ -1,8 +1,9 @@
 <script lang="ts">
 	// The menu of an album, playlist, artist or podcast card, like YouTube Music's: hold the card,
 	// right-click it, or its ⋮ with a mouse (cardMenu.svelte.ts). A sheet from the bottom on a
-	// phone, a menu at the card on a computer. Play, Shuffle play, Play next and Add do what the
-	// page's buttons do, with the same limits (Settings → Adding songs).
+	// phone, a menu at the card on a computer. Play, Shuffle play, Play next, Add to queue and Add
+	// to autoplay (an artist: its top songs) do what a page's buttons do, with the same limits
+	// (Settings → Adding songs).
 	import { tick } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { getAlbum, getArtist, getPlaylist, getPlaylistPart, getPodcast, topSongs } from '../api';
@@ -15,12 +16,13 @@
 	import { swipeDown } from '../swipeDown';
 	import type { Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
-	import { addToQueue, playNow, startRadio } from '../songActions';
+	import { playNow, startRadio } from '../songActions';
 	import { youtube } from '../youtube.svelte';
 	import { fade, fly } from 'svelte/transition';
 	import type { IconName } from './Icon.svelte';
 	import Icon from './Icon.svelte';
 	import PlayAllButtons from './PlayAllButtons.svelte';
+	import SaveSheet from './SaveSheet.svelte';
 
 	let { room, onToast }: { room: RoomConnection; onToast: (text: string) => void } = $props();
 
@@ -34,8 +36,10 @@
 	 * The album's or playlist's songs for Play, Shuffle play, Play next and Add, handed to a
 	 * PlayAllButtons without buttons (it asks how many for a long one, and says when it loads).
 	 */
-	let runner = $state<{ songs: Song[]; total: number | null; whole?: (count: number) => Promise<Song[]>; name: string; toAutoplay: boolean } | null>(null);
+	let runner = $state<{ songs: Song[]; total: number | null; whole?: (count: number) => Promise<Song[]>; name: string } | null>(null);
 	let buttons = $state<PlayAllButtons>();
+	/** An album's songs being saved to one of your playlists (SaveSheet). */
+	let saving = $state<{ songs: Song[]; title: string } | null>(null);
 
 	/** A playlist: yours (private, through your sign-in) when it doesn't open otherwise, like its page. */
 	async function playlistPage(id: string) {
@@ -47,14 +51,19 @@
 		}
 	}
 
-	/** Loads the songs of [target] (an album or playlist) and does [action] with them. */
+	/** Loads the songs of [target] (an album, playlist, or an artist's top songs) and does [action] with them. */
 	async function withList(target: CardTarget, action: (b: PlayAllButtons) => Promise<void>) {
 		close();
 		try {
-			const songs = await whileBusy(`Loading ${target.title}…`, async () => {
+			const songs = await whileBusy(target.kind === 'artist' ? `Loading songs by ${target.title}…` : `Loading ${target.title}…`, async () => {
+				if (target.kind === 'artist') {
+					const top = await topSongs(await getArtist(target.id));
+					if (!top.length) throw new Error(`No songs by ${target.title}`);
+					return { songs: top, total: top.length, name: target.title };
+				}
 				if (target.kind === 'album') {
 					const album = await getAlbum(target.id);
-					return { songs: album.songs, total: album.songs.length, name: album.title, toAutoplay: false };
+					return { songs: album.songs, total: album.songs.length, name: album.title };
 				}
 				const { page, personal } = await playlistPage(target.id);
 				let list = page;
@@ -68,7 +77,7 @@
 							return list.songs;
 						}
 					: undefined;
-				return { songs: page.songs, total: page.songCount ?? null, whole, name: page.title, toAutoplay: true };
+				return { songs: page.songs, total: page.songCount ?? null, whole, name: page.title };
 			});
 			runner = songs;
 			await tick();
@@ -94,23 +103,13 @@
 		}
 	}
 
-	/** An artist's top songs: shuffled and played, or added to the queue. */
-	async function artistSongs(target: CardTarget, shuffle: boolean) {
+	/** Save to playlist: an album's songs, to one of your YouTube Music playlists or a new one. */
+	async function saveAlbum(target: CardTarget) {
 		close();
 		try {
-			const songs = await whileBusy(`Loading songs by ${target.title}…`, async () => topSongs(await getArtist(target.id)));
-			if (!songs.length) return onToast(`No songs by ${target.title}`);
-			const name = `${songs.length} songs by ${target.title}`;
-			if (!shuffle) return void (await addToQueue(room, songs, name, onToast));
-			const list = [...songs];
-			for (let i = list.length - 1; i > 0; i--) {
-				const j = Math.floor(Math.random() * (i + 1));
-				[list[i], list[j]] = [list[j], list[i]];
-			}
-			const [first, ...rest] = list;
-			let e = await room.run({ kind: 'PlayNow', song: first });
-			if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
-			if (e && !room.wasNoticed(e)) onToast(e.message);
+			const album = await whileBusy(`Loading ${target.title}…`, () => getAlbum(target.id));
+			if (album.songs.length) saving = { songs: album.songs, title: album.title };
+			else onToast(`${target.title} has no songs`);
 		} catch (e) {
 			onToast(e instanceof Error ? e.message : `Couldn't load ${target.title}`);
 		}
@@ -155,22 +154,18 @@
 		if (!t) return [];
 		const list: Entry[] = [];
 		const pinned = isPinned(t.kind, t.id);
-		if (t.kind === 'album' || t.kind === 'playlist') {
-			const toAutoplay = t.kind === 'playlist' && room.can('autoplay_from_here');
+		if (t.kind === 'album' || t.kind === 'playlist' || t.kind === 'artist') {
 			if (room.can('play_now')) {
 				list.push({ icon: 'play', label: 'Play', run: () => withList(t, (b) => b.playNow()) });
 				list.push({ icon: 'shuffle', label: 'Shuffle play', run: () => withList(t, (b) => b.shufflePlay()) });
 			}
 			if (room.can('add_songs')) {
 				list.push({ icon: 'playNext', label: 'Play next', run: () => withList(t, (b) => b.addAll('next')) });
-				if (toAutoplay) list.push({ icon: 'autoplay', label: 'Add to autoplay', run: () => withList(t, (b) => b.addToAutoplay()) });
-				else list.push({ icon: 'playlistAdd', label: 'Add to queue', run: () => withList(t, (b) => b.addAll('end')) });
+				list.push({ icon: 'playlistAdd', label: 'Add to queue', run: () => withList(t, (b) => b.addAll('end')) });
 			}
+			if (room.can('autoplay_from_here')) list.push({ icon: 'autoplay', label: 'Add to autoplay', run: () => withList(t, (b) => b.addToAutoplay()) });
 			if (room.can('start_radio')) list.push({ icon: 'radio', label: 'Start radio', run: () => radioFrom(t) });
-		} else if (t.kind === 'artist') {
-			if (room.can('start_radio')) list.push({ icon: 'radio', label: 'Start radio', run: () => radioFrom(t) });
-			if (room.can('play_now')) list.push({ icon: 'shuffle', label: 'Shuffle songs', run: () => artistSongs(t, true) });
-			if (room.can('add_songs')) list.push({ icon: 'playlistAdd', label: 'Add top songs to the queue', run: () => artistSongs(t, false) });
+			if (t.kind === 'album' && youtube.account) list.push({ icon: 'save', label: 'Save to playlist', run: () => saveAlbum(t) });
 		} else if (room.can('play_now')) {
 			list.push({ icon: 'play', label: 'Play the latest episode', run: () => latestEpisode(t) });
 		}
@@ -183,7 +178,11 @@
 </script>
 
 {#if runner}
-	<PlayAllButtons bind:this={buttons} {room} songs={runner.songs} total={runner.total} whole={runner.whole} name={runner.name} toAutoplay={runner.toAutoplay} {onToast} row={false} />
+	<PlayAllButtons bind:this={buttons} {room} songs={runner.songs} total={runner.total} whole={runner.whole} name={runner.name} {onToast} row={false} />
+{/if}
+
+{#if saving}
+	<SaveSheet songs={saving.songs} title={saving.title} onClose={() => (saving = null)} {onToast} />
 {/if}
 
 {#snippet items(big: boolean)}

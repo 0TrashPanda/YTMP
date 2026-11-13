@@ -401,7 +401,7 @@
 {:else if shared?.kind === 'share'}
 	<SongShareSheet song={shared.song} onClose={() => (shared = null)} onToast={showToast} />
 {:else if shared?.kind === 'save'}
-	<SaveSheet song={shared.song} onClose={() => (shared = null)} onToast={showToast} />
+	<SaveSheet songs={[shared.song]} title={shared.song.title} onClose={() => (shared = null)} onToast={showToast} />
 {/if}
 {#if askingClose}
 	{@const room = askingClose}

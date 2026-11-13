@@ -996,7 +996,7 @@
 	{:else if sheet?.kind === 'graph'}
 		<GraphView seed={sheet.song} onClose={() => close('graph')} onToast={toast} />
 	{:else if sheet?.kind === 'save'}
-		<SaveSheet song={sheet.song} onClose={() => close('save')} onToast={toast} />
+		<SaveSheet songs={[sheet.song]} title={sheet.song.title} onClose={() => close('save')} onToast={toast} />
 	{:else if sheet?.kind === 'clone' && room.state}
 		<CloneSheet {room} {host} onClose={() => close('clone')} onToast={toast} />
 	{:else if sheet?.kind === 'avatar'}
