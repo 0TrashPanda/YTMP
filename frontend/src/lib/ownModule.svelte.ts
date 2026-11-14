@@ -90,11 +90,18 @@ export interface DesktopApp {
 	/** The system's folder picker: the folder's path, or null. */
 	pickFolder?: () => Promise<string | null>;
 	/**
-	 * Looks for a new version now (also one you skipped): true when it offered one (its dialog
-	 * answered by then), false when this is the newest; rejects with why it couldn't look.
+	 * Looks for a new version now: true when there is one (it downloads, and the arrow in the
+	 * title bar offers it), false when this is the newest; rejects with why it couldn't look.
 	 * Absent before 0.47.
 	 */
 	checkUpdates?: () => Promise<boolean>;
+	/**
+	 * [handler] runs when the app closes or restarts for an update ([forUpdate]), before the
+	 * window goes (null: none). The app waits for it, a short while at most (appQuit.ts).
+	 */
+	onQuit?: (handler: ((forUpdate: boolean) => Promise<void>) | null) => void;
+	/** The window may start sound without a tap first (after a restart too). */
+	autoplay?: boolean;
 }
 
 declare global {

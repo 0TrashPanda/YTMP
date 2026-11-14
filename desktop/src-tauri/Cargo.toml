@@ -9,7 +9,8 @@ edition = "2021"
 tauri-build = { version = "=2.7.3", features = [] }
 
 [dependencies]
-tauri = { version = "=2.12.4", features = [] }
+# unstable: a window with more than one web view (the title bar above the page, frame.rs).
+tauri = { version = "=2.12.4", features = ["unstable"] }
 tauri-plugin-updater = "=2.14.0"
 tauri-plugin-dialog = "=2.8.3"
 tauri-plugin-opener = "=2.7.2"

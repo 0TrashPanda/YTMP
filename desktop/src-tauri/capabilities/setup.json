@@ -1,8 +1,23 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "setup",
-  "description": "The bundled setup page: connect to a server.",
-  "windows": ["main"],
+  "description": "The app's own pages: the setup page (connect to a server), the title bar, the splash window and the update popup.",
+  "windows": ["main", "splash", "update"],
   "local": true,
-  "permissions": ["core:default", "allow-open-saved", "allow-connect"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging",
+    "core:window:allow-internal-toggle-maximize",
+    "allow-open-saved",
+    "allow-connect",
+    "allow-quit-ready",
+    "allow-window-action",
+    "allow-frame-state",
+    "allow-splash-state",
+    "allow-update-info",
+    "allow-open-update",
+    "allow-close-update",
+    "allow-install-update"
+  ]
 }

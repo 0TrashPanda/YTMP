@@ -80,9 +80,15 @@ server, like in a browser; **everything YouTube** happens on your own computer:
 - **Songs from your phone**: *Copy from my phone* (YTMP open on the phone), or *Send songs to
   my computer* on the phone, copies the songs the phone keeps over Wi-Fi.
 - **The first start** asks for your server's address, like the Android app.
-- **Updates itself**: like the Android app, it finds new releases on GitHub and offers to
-  install them (with the release notes). Its YouTube part updates itself more often,
+- **Its own title bar**, dark like the rest of the app, with the window's buttons.
+- **Updates itself, like Discord**: when it starts, a small window checks for a new version
+  and installs it right away, with a progress bar, before the app opens. A new version that
+  comes out while the app is open downloads quietly; a green arrow in the title bar then
+  shows the release notes and *Restart now*. Its YouTube part updates itself more often,
   because YouTube changes often.
+- **Closing it stops playing here**: the room hears at once that this computer stopped (and
+  pauses when nothing else plays it), instead of playing on for a minute to nobody.
+  *Play here* stays on for next time; after an update it opens in the same room and plays on.
 - **Download**: an installer for Windows, and one file (AppImage) for Linux that runs on
   every distribution.
 

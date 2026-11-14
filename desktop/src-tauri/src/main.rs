@@ -3,9 +3,11 @@
 // YouTube request comes from here. A setup page (desktop/setup/) asks for the server first.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod frame;
 #[cfg(windows)]
 mod media;
 mod module;
+mod updates;
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -14,18 +16,16 @@ use std::time::Duration;
 
 use module::{Kind, Sidecars};
 use tauri::ipc::CapabilityBuilder;
-use tauri::webview::NewWindowResponse;
-use tauri::{AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
-use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_updater::UpdaterExt;
+use tauri::{AppHandle, Manager, RunEvent, Url, Webview};
+use tauri_plugin_dialog::DialogExt;
 
-/// What the app keeps: the server, a release you chose to skip, and this computer's id and
-/// secret for the server (it asks for a song of this computer's music with them).
+/// What the app keeps: the server, this computer's id and secret for the server (it asks for a
+/// song of this computer's music with them), and the version it was installing (updates.rs).
 #[derive(Default, serde::Serialize, serde::Deserialize)]
-struct Settings {
+pub(crate) struct Settings {
     server: Option<String>,
-    skipped_version: Option<String>,
+    #[serde(default)]
+    pub(crate) installing: Option<String>,
     #[serde(default)]
     device_id: Option<String>,
     #[serde(default)]
@@ -64,8 +64,8 @@ pub(crate) fn device(app: &AppHandle) -> (String, String) {
     (settings.device_id.clone().unwrap(), settings.device_secret.clone().unwrap())
 }
 
-struct State {
-    settings: Mutex<Settings>,
+pub(crate) struct State {
+    pub(crate) settings: Mutex<Settings>,
     /// Server origins that may call the app's commands (a capability each, added once).
     allowed: Mutex<HashSet<String>>,
 }
@@ -74,7 +74,7 @@ fn settings_file(app: &AppHandle) -> PathBuf {
     app.path().app_config_dir().unwrap_or_default().join("settings.json")
 }
 
-fn save(app: &AppHandle) {
+pub(crate) fn save(app: &AppHandle) {
     let file = settings_file(app);
     let _ = std::fs::create_dir_all(file.parent().unwrap());
     let state = app.state::<State>();
@@ -128,14 +128,15 @@ fn open_server(app: &AppHandle, url: &Url) {
             .permission("allow-change-server")
             .permission("allow-media-update")
             .permission("allow-pick-folder")
-            .permission("allow-check-updates");
+            .permission("allow-check-updates")
+            .permission("allow-quit-ready");
         if let Err(e) = app.add_capability(capability) {
             eprintln!("can't allow {origin}: {e}");
         }
     }
     drop(allowed);
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.navigate(url.clone());
+    if let Some(page) = app.get_webview("app") {
+        let _ = page.navigate(url.clone());
     }
 }
 
@@ -180,9 +181,9 @@ async fn connect(app: AppHandle, address: String) -> Result<(), String> {
 
 /// *Change server* in the web app: back to the setup page, with the address filled in.
 #[tauri::command]
-fn change_server(window: WebviewWindow) {
+fn change_server(page: Webview) {
     let setup = if cfg!(windows) { "http://tauri.localhost/index.html?change=1" } else { "tauri://localhost/index.html?change=1" };
-    let _ = window.navigate(Url::parse(setup).unwrap());
+    let _ = page.navigate(Url::parse(setup).unwrap());
 }
 
 /// The page's Media Session changed: on Windows the app shows it (media.rs); elsewhere the web view does that itself.
@@ -232,17 +233,12 @@ fn host_request(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> taur
     response.body(body).unwrap_or_default()
 }
 
-/// Builds with the updater key look for new versions (and the web app says so).
-fn updates_on() -> bool {
-    option_env!("YTMP_UPDATER_PUBKEY").is_some_and(|k| !k.is_empty())
-}
-
 /// window.YtmpDesktop for the web app (frontend/src/lib/ownModule.svelte.ts, native.ts), and on
 /// Windows the Media Session passed to the app (media.rs).
 fn bridge_script(app: &AppHandle) -> String {
     let version = app.package_info().version.to_string();
     let platform = if cfg!(windows) { "windows" } else { "linux" };
-    let updates = updates_on();
+    let updates = updates::on();
     let (device_id, device_secret) = device(app);
     let host = HOST_BASE.trim_end_matches('/');
     #[cfg(windows)]
@@ -253,6 +249,16 @@ fn bridge_script(app: &AppHandle) -> String {
         r#"(() => {{
   if (!/^https?:$/.test(location.protocol)) return;
   const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
+  // Closing (or restarting for an update): the page's handler first, a moment at most (frame.rs).
+  let quitHandler = null;
+  Object.defineProperty(window, '__ytmpQuit', {{ value: async (forUpdate) => {{
+    try {{
+      if (quitHandler) await Promise.race([quitHandler(forUpdate), new Promise((done) => setTimeout(done, 2000))]);
+    }} catch (e) {{
+      console.error(e);
+    }}
+    invoke('quit_ready');
+  }} }});
   window.YtmpDesktop = Object.freeze({{
     version: {version:?},
     platform: {platform:?},
@@ -263,186 +269,18 @@ fn bridge_script(app: &AppHandle) -> String {
     device: Object.freeze({{ id: {device_id:?}, secret: {device_secret:?} }}),
     pickFolder: () => invoke('pick_folder'),
     checkUpdates: () => invoke('check_updates'),
+    onQuit: (handler) => {{ quitHandler = handler; }},
+    autoplay: true,
   }});
   {media}
 }})();"#
     )
 }
 
-const RELEASES: &str = "https://github.com/0TrashPanda/YTMP/releases";
-
-/// The newest release with a desktop update (its latest.json) and its notes. From GitHub's
-/// list of releases, like the Android app (Updates.kt): 0.x releases are pre-releases, which
-/// GitHub's /releases/latest skips. GitHub's API allows 60 requests an hour per network without
-/// signing in, shared by everything on it; past that, the releases feed.
-fn newest_release() -> Result<(Url, String), String> {
-    newest_release_from_api().or_else(|api| {
-        newest_release_from_feed().map_err(|feed| format!("GitHub didn't answer ({api}; {feed})"))
-    })
-}
-
-fn get_text(url: &str) -> Result<String, String> {
-    ureq::get(url)
-        .set("User-Agent", "YTMP desktop")
-        .timeout(Duration::from_secs(15))
-        .call()
-        .map_err(|e| e.to_string())?
-        .into_string()
-        .map_err(|e| e.to_string())
-}
-
-fn newest_release_from_api() -> Result<(Url, String), String> {
-    let text = get_text("https://api.github.com/repos/0TrashPanda/YTMP/releases?per_page=10")?;
-    let releases: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-    for release in releases.as_array().into_iter().flatten().filter(|r| r["draft"] != true) {
-        let assets = release["assets"].as_array().into_iter().flatten();
-        if let Some(asset) = assets.into_iter().find(|a| a["name"] == "latest.json") {
-            let url = asset["browser_download_url"].as_str().unwrap_or_default().parse().map_err(|_| "bad URL".to_string())?;
-            return Ok((url, release["body"].as_str().unwrap_or_default().to_string()));
-        }
-    }
-    Err("no release with a desktop update".into())
-}
-
-/// The same from github.com/…/releases.atom (newest first, drafts left out): the first
-/// release whose latest.json is there.
-fn newest_release_from_feed() -> Result<(Url, String), String> {
-    let feed = get_text(&format!("{RELEASES}.atom"))?;
-    for entry in feed.split("<entry>").skip(1).take(10) {
-        let Some(tag) = between(entry, "/releases/tag/", "\"") else { continue };
-        let url = format!("{RELEASES}/download/{tag}/latest.json");
-        let there = matches!(ureq::head(&url).set("User-Agent", "YTMP desktop").timeout(Duration::from_secs(15)).call(), Ok(r) if r.status() == 200);
-        if there {
-            let notes = between(entry, "<content type=\"html\">", "</content>").map(|html| html_to_text(&unescape(html))).unwrap_or_default();
-            return Ok((url.parse().map_err(|_| "bad URL".to_string())?, notes));
-        }
-    }
-    Err("no release with a desktop update".into())
-}
-
-fn between<'a>(text: &'a str, start: &str, end: &str) -> Option<&'a str> {
-    let from = text.find(start)? + start.len();
-    let length = text[from..].find(end)?;
-    Some(&text[from..from + length])
-}
-
-fn unescape(text: &str) -> String {
-    text.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
-}
-
-/// Release notes from the feed's HTML as plain text for the dialog: headings and list items on
-/// lines of their own.
-fn html_to_text(html: &str) -> String {
-    let html = html.replace("<li>", "• ").replace('\n', " ");
-    let mut text = String::new();
-    let mut rest = html.as_str();
-    while let Some(open) = rest.find('<') {
-        text.push_str(&rest[..open]);
-        let Some(close) = rest[open..].find('>') else { break };
-        let tag = &rest[open + 1..open + close];
-        if matches!(tag, "/li" | "/p" | "/ul" | "/ol" | "br" | "br/" | "br /") || tag.starts_with("/h") {
-            text.push('\n');
-        }
-        if tag.starts_with("/h") || tag == "/p" || tag == "/ul" {
-            text.push('\n');
-        }
-        rest = &rest[open + close + 1..];
-    }
-    text.push_str(rest);
-    let text = unescape(&text);
-    let mut lines: Vec<&str> = Vec::new();
-    for line in text.lines().map(str::trim) {
-        // At most one empty line in a row.
-        if !(line.is_empty() && lines.last().is_some_and(|l| l.is_empty())) {
-            lines.push(line);
-        }
-    }
-    lines.join("\n").trim().to_string()
-}
-
-/// One check at a time (the one at the start and *Check for updates*).
-static CHECKING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-/// *Settings → App → Check for updates*: looks now, also for a version you skipped. True when it
-/// offered one (the dialog has been answered by then), false when this is the newest.
-#[tauri::command]
-async fn check_updates(app: AppHandle) -> Result<bool, String> {
-    if !updates_on() {
-        return Err("This build doesn't update itself.".into());
-    }
-    check_for_update(app, true).await
-}
-
-/// Looks for a new release and offers it with its release notes. True when it offered one.
-async fn check_for_update(app: AppHandle, by_hand: bool) -> Result<bool, String> {
-    use std::sync::atomic::Ordering;
-    if CHECKING.swap(true, Ordering::SeqCst) {
-        return Err("It's already looking.".into());
-    }
-    let result = offer_update(app, by_hand).await;
-    CHECKING.store(false, Ordering::SeqCst);
-    result
-}
-
-async fn offer_update(app: AppHandle, by_hand: bool) -> Result<bool, String> {
-    let (endpoint, notes) = tauri::async_runtime::spawn_blocking(newest_release).await.map_err(|e| e.to_string())??;
-    let updater = app.updater_builder().endpoints(vec![endpoint]).and_then(|b| b.build()).map_err(|e| e.to_string())?;
-    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else { return Ok(false) };
-    if !by_hand && app.state::<State>().settings.lock().unwrap().skipped_version.as_deref() == Some(update.version.as_str()) {
-        return Ok(false);
-    }
-    // The release's notes as they are now (edited after the release, see CLAUDE.md).
-    let notes = notes.replace("\r\n", "\n");
-    let answer = app
-        .dialog()
-        .message(format!("YTMP {} is out (you have {}).\n\n{}", update.version, update.current_version, notes.trim()))
-        .title("Update YTMP")
-        .buttons(MessageDialogButtons::YesNoCancelCustom("Update".into(), "Later".into(), "Skip this version".into()))
-        .blocking_show_with_result();
-    match answer {
-        MessageDialogResult::Custom(label) if label == "Update" => {}
-        MessageDialogResult::Yes => {}
-        MessageDialogResult::Custom(label) if label == "Skip this version" => {
-            app.state::<State>().settings.lock().unwrap().skipped_version = Some(update.version.clone());
-            save(&app);
-            return Ok(true);
-        }
-        _ => return Ok(true),
-    }
-    let installed = match update.download(|_, _| {}, || {}).await {
-        Ok(bytes) => {
-            // The installer replaces the module's files: it mustn't be running then.
-            app.state::<Sidecars>().stop();
-            update.install(bytes)
-        }
-        Err(e) => Err(e),
-    };
-    match installed {
-        Ok(()) => app.restart(),
-        Err(e) => {
-            app.dialog().message(format!("The update didn't install: {e}")).title("Update YTMP").blocking_show();
-            // The module was stopped for it: start over as this version.
-            app.restart();
-        }
-    }
-}
-
-/// A moment after starting: offers a new version, unless you skipped it.
-async fn check_at_start(app: AppHandle) {
-    tokio_sleep(Duration::from_secs(8)).await;
-    if let Err(e) = check_for_update(app, false).await {
-        eprintln!("update check: {e}");
-    }
-}
-
-async fn tokio_sleep(duration: Duration) {
-    let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(duration)).await;
-}
-
 fn main() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_window("main") {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
@@ -455,7 +293,25 @@ fn main() {
     }
     let app = builder
         .manage(Sidecars::new())
-        .invoke_handler(tauri::generate_handler![open_saved, connect, change_server, media_update, pick_folder, check_updates, module::module_request])
+        .manage(updates::Updates::default())
+        .manage(frame::QuitWait::default())
+        .invoke_handler(tauri::generate_handler![
+            open_saved,
+            connect,
+            change_server,
+            media_update,
+            pick_folder,
+            module::module_request,
+            frame::quit_ready,
+            frame::window_action,
+            frame::frame_state,
+            updates::check_updates,
+            updates::splash_state,
+            updates::update_info,
+            updates::open_update,
+            updates::close_update,
+            updates::install_update,
+        ])
         .register_asynchronous_uri_scheme_protocol("ytmphost", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             std::thread::spawn(move || responder.respond(host_request(&app, request)));
@@ -470,31 +326,32 @@ fn main() {
             module::Module::start(&handle, Kind::Module);
             module::Module::start(&handle, Kind::Host);
 
-            let opener = handle.clone();
-            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("YTMP")
-                .inner_size(1280.0, 820.0)
-                .min_inner_size(360.0, 560.0)
-                .initialization_script(&bridge_script(&handle))
-                // Links that open a new window (YouTube, GitHub, …) go to the browser.
-                .on_new_window(move |url, _| {
-                    let _ = opener.opener().open_url(url.as_str(), None::<&str>);
-                    NewWindowResponse::Deny
-                });
-            // WebView2's own media controls would show as "msedgewebview2.exe": the app shows them
-            // instead (media.rs). The first three are Tauri's defaults, which this replaces.
-            #[cfg(windows)]
-            let window = window.additional_browser_args(
-                "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,HardwareMediaKeyHandling",
-            );
-            let window = window.build()?;
-            #[cfg(windows)]
-            media::setup(&handle, &window);
-            #[cfg(not(windows))]
-            let _ = window;
-            if updates_on() {
-                tauri::async_runtime::spawn(check_at_start(handle));
-            }
+            // The splash window first (like Discord): a new version installs right there, before
+            // the window opens; otherwise it shows the app starting until the page has loaded.
+            let updated = updates::opened(&handle);
+            updates::open_splash(&handle, "Starting YTMP…");
+            tauri::async_runtime::spawn(async move {
+                // Just updated: no need to look again.
+                if updates::on() && updated.is_none() && updates::install_at_start(&handle).await {
+                    return;
+                }
+                updates::set_splash(&handle, "Starting YTMP…", None, updated.as_deref().unwrap_or(""));
+                let bridge = bridge_script(&handle);
+                match frame::open(&handle, &bridge) {
+                    #[cfg(windows)]
+                    Ok(window) => media::setup(&handle, &window),
+                    #[cfg(not(windows))]
+                    Ok(_) => {}
+                    Err(e) => {
+                        eprintln!("window: {e}");
+                        handle.dialog().message(format!("YTMP couldn't open its window: {e}")).title("YTMP").blocking_show();
+                        handle.exit(1);
+                    }
+                }
+                if updates::on() {
+                    updates::look_now_and_then(handle).await;
+                }
+            });
             Ok(())
         })
         .build(tauri::generate_context!())

@@ -51,7 +51,7 @@
     "updater": {
       "endpoints": [],
       "windows": {
-        "installMode": "passive"
+        "installMode": "quiet"
       }
     }
   }

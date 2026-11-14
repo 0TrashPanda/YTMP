@@ -8,6 +8,8 @@ type AutoplayNavigator = Navigator & {
 
 /** This browser lets a page start sound without any tap first (also right after a reload). */
 export function autoplayAllowed(): boolean {
+	// The desktop app's window may (main.rs): it opens playing where it left off.
+	if (typeof window !== 'undefined' && window.YtmpDesktop?.autoplay) return true;
 	try {
 		return (navigator as AutoplayNavigator).getAutoplayPolicy?.('mediaelement') === 'allowed';
 	} catch {

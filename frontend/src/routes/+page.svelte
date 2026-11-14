@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resumePending } from '../lib/appQuit';
 	import { modal } from '../lib/modal';
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
@@ -125,7 +126,9 @@
 	async function reopen(): Promise<boolean> {
 		const last = saved.lastRoom;
 		saved.lastRoom = null;
-		if (!(nativeBridge || window.YtmpDesktop) || !last || !(last.solo ? settings.reopenSolo.value : settings.reopenParty.value)) return false;
+		// Restarted for an update while it played there: always back (it plays on, appQuit.ts).
+		const wanted = last && (resumePending(last.code) || (last.solo ? settings.reopenSolo.value : settings.reopenParty.value));
+		if (!(nativeBridge || window.YtmpDesktop) || !last || !wanted) return false;
 		try {
 			const room = await getRoom(last.code);
 			await goto(`/room/${room.code}`, { replaceState: true });

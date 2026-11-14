@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig, SeekDirection};
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::{AppHandle, Manager, Window};
 
 pub struct Media(Mutex<Option<MediaControls>>);
 
@@ -32,7 +32,7 @@ pub struct State {
 }
 
 /// Sets up the controls for [window]; without them (an error) the media keys do nothing.
-pub fn setup(app: &AppHandle, window: &WebviewWindow) {
+pub fn setup(app: &AppHandle, window: &Window) {
     let controls = window.hwnd().map_err(|e| e.to_string()).and_then(|hwnd| {
         let config = PlatformConfig { display_name: "YTMP", dbus_name: "ytmp", hwnd: Some(hwnd.0 as *mut std::ffi::c_void) };
         MediaControls::new(config).map_err(|e| e.to_string())
@@ -61,9 +61,9 @@ pub fn setup(app: &AppHandle, window: &WebviewWindow) {
             MediaControlEvent::SetPosition(MediaPosition(at)) => ("seekto", Some(at.as_secs_f64())),
             _ => return,
         };
-        if let Some(window) = handle.get_webview_window("main") {
+        if let Some(page) = handle.get_webview("app") {
             let seconds = seconds.map_or("undefined".to_string(), |s| s.to_string());
-            let _ = window.eval(format!("window.__ytmpMediaAction && window.__ytmpMediaAction({action:?}, {seconds})"));
+            let _ = page.eval(format!("window.__ytmpMediaAction && window.__ytmpMediaAction({action:?}, {seconds})"));
         }
     });
     if let Err(e) = attached {

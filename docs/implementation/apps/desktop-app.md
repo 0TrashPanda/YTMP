@@ -33,6 +33,26 @@ Windows check below).
   start when it answers, else the setup page says why. *Settings → App → Change server* goes
   back to it. Links that open a new window go to the browser. One app at a time (a second
   start brings the first window up).
+- ✅ **Its own title bar** (`frame.rs`, `desktop/setup/titlebar.html`): the window has no
+  system frame (`decorations(false)`) and holds two web views (Tauri's `unstable` feature):
+  the title bar (32 px: logo, the update arrow, minimize / maximize / close; drag it to move,
+  double-click to maximize) and the page under it, laid out again on every resize. In the
+  page's own code it would have to move every fixed element down, and pages from an older
+  server wouldn't have it. Every web view gets the same WebView2 arguments (`BROWSER_ARGS`):
+  WebView2 refuses a second set in the same profile.
+- ✅ **Closing stops playing here** (`before_quit`, `frontend/src/lib/appQuit.ts`): a closed
+  app sends the room no goodbye. The host would only notice the lost connection after its
+  30 s timeout, and then keeps a device that played for another minute (`Room.holdPlayer`,
+  meant for a reload or a network drop), so the room played on to nobody for up to ~90 s,
+  also while an update installed. Now closing the window (or *Restart now*) first calls the
+  page's handler (`YtmpDesktop.onQuit`, 2 s at most): if it plays here it sends
+  `SetListening(off)`, and the room pauses at once when nothing else plays it. It doesn't
+  switch *Play here* off (`ytmp.listening` stays), and the window may start sound without a
+  tap (`--autoplay-policy=no-user-gesture-required`, `YtmpDesktop.autoplay`), so the next
+  start plays here again (before, it waited for a click, as in a browser). For an update it
+  also keeps the room and the song (`ytmp.resumeAfterAppUpdate`, 10 minutes): the new version
+  opens that room (also with *Open the party room you were in* off) and, if the room is still
+  paused on that song, plays on.
 - ✅ **The module is the browser's [own module](../outputs/playback-sync.md#known-risk-ip-bound-stream-urls)**,
   set up by the app (`desktop/src-tauri/src/module.rs`): the shell starts it
   (`python -m ytmp_ytm.http`) on `127.0.0.1` with a free port and a new random key on every
@@ -46,7 +66,7 @@ Windows check below).
   https page from fetching `http://127.0.0.1` (mixed content; "Load failed", the request
   never leaves; seen in the Linux check below), and Chrome's loopback exception doesn't
   exist there. An **initialization script** the shell runs on every page sets
-  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates, checkUpdates() }`
+  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates, checkUpdates(), onQuit(handler), autoplay }`
   (`updates`: the build looks for new versions, so *Settings → App* says so; missing before
   0.45); `moduleRequest` is a Tauri command
   that forwards the request to the module with its key and answers `{ status, body }`. The
@@ -304,17 +324,28 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
   `NO_STRIP=true pnpm tauri build --bundles appimage`.
   Built on the oldest Ubuntu GitHub has, so it runs on older distributions too. An AUR
   package that installs the same AppImage can come later.
-- ✅ **Updates**: Tauri's updater plugin. 8 s after starting, the app looks through GitHub's
-  list of releases (like the Android app: 0.x releases are pre-releases, which
-  `/releases/latest` skips) for the newest with a `latest.json`, checks it, and offers the
-  version with that release's notes as they are now (*Update* / *Later* / *Skip this
-  version*). GitHub's API allows only 60 requests an hour per network without signing in;
-  when it says no, the app reads the releases feed (`releases.atom`) instead and takes the
-  newest release whose `latest.json` is there. *Settings → App → Check for updates*
-  (`checkUpdates()` in `window.YtmpDesktop`, the `check_updates` command, from 0.47) looks
-  right away, also offers a version you skipped, and says when you have the newest or why it
-  couldn't look; one check runs at a time. *Update* downloads, stops the module (the installer replaces its files, which
-  Windows won't do while they run), installs (Windows: the installer, passive) and restarts.
+- ✅ **Updates** (`updates.rs`): Tauri's updater plugin, the way Discord does it. At every start
+  a splash window (`desktop/setup/splash.html`, 240×280, no frame) shows first; it looks
+  through GitHub's list of releases (like the Android app: 0.x releases are pre-releases,
+  which `/releases/latest` skips) for the newest with a `latest.json` (6 s at most per
+  request, so the app still opens quickly offline). A newer version downloads there with a
+  progress bar and installs at once, before the app's window opens; otherwise the splash
+  says *Starting YTMP…* until the page has loaded (20 s at most), then the window shows.
+  GitHub's API allows only 60 requests an hour per network without signing in; when it says
+  no, the app reads the releases feed (`releases.atom`) instead and takes the newest release
+  whose `latest.json` is there. While the app runs it looks again every 6 hours; a new
+  version downloads quietly and a green arrow shows in the title bar (`frame.rs`). The arrow
+  opens a popup under it (`update.html`: the release notes without their *Install* part,
+  *Restart now* / *Later*, closes when you click elsewhere). *Settings → App → Check for
+  updates* (`checkUpdates()`, from 0.47) looks right away: true when there's one (it
+  downloads, then the arrow shows), false when this is the newest; one look runs at a time.
+  Installing: the page stops playing the room first (`before_quit`, below), the splash says
+  *Installing…*, the module and the host stop (the installer replaces their files, which
+  Windows won't do while they run), and the installer runs: on Windows quietly (`/S`, no
+  NSIS window) and it starts the new version itself. The version being installed is kept in
+  `settings.json` (`installing`), so the new version's splash says *Updated to …* and
+  doesn't look again right away. Up to 0.48 the app asked in a system dialog (*Update* /
+  *Later* / *Skip this version*), and installed with NSIS's own progress window.
   Updates are signed with an updater key of their own (separate from the APK's): the public
   key in `desktop/updater.pub`, built in through `YTMP_UPDATER_PUBKEY`; the private key and
   its password in the secrets `TAURI_SIGNING_PRIVATE_KEY` / `…_PASSWORD`. Builds without the

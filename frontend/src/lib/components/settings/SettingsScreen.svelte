@@ -135,8 +135,10 @@
 		checkingUpdates = true;
 		updateCheck = '';
 		try {
-			const offered = await desktop?.checkUpdates?.();
-			if (offered === false) updateCheck = 'You have the newest version.';
+			const found = await desktop?.checkUpdates?.();
+			if (found === false) updateCheck = 'You have the newest version.';
+			// Older apps asked in a dialog; newer ones download it and show an arrow at the top.
+			else if (found && desktop?.onQuit) updateCheck = "A new version is downloading. When it's ready, the green arrow at the top installs it.";
 		} catch (e) {
 			updateCheck = `Couldn't look for updates. ${e instanceof Error ? e.message : String(e)}`;
 		} finally {
@@ -921,7 +923,7 @@
 		<div class="flex items-center gap-3">
 			<div class="flex-1">
 				<p class="text-sm font-medium">Version</p>
-				<p class="text-xs text-muted">YTMP {desktop.version} for {desktop.platform === 'windows' ? 'Windows' : 'Linux'}.{desktop.updates ? ' New versions are offered when the app starts.' : ''}</p>
+				<p class="text-xs text-muted">YTMP {desktop.version} for {desktop.platform === 'windows' ? 'Windows' : 'Linux'}.{desktop.updates ? (desktop.onQuit ? ' New versions install when the app starts.' : ' New versions are offered when the app starts.') : ''}</p>
 				{#if updateCheck}<p class="text-xs text-muted" aria-live="polite">{updateCheck}</p>{/if}
 			</div>
 			{#if desktop.updates && desktop.checkUpdates}

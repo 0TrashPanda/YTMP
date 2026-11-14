@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>YTMP</title>
+		<style>
+			:root { color-scheme: dark; }
+			html, body { margin: 0; height: 100%; overflow: hidden; }
+			body {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 14px;
+				background: #0f0f0f;
+				color: #fff;
+				font: 13px Roboto, 'Segoe UI', system-ui, sans-serif;
+				user-select: none;
+				-webkit-user-select: none;
+				cursor: default;
+			}
+			.logo { width: 76px; height: 76px; animation: pulse 1.6s ease-in-out infinite; }
+			@keyframes pulse { 50% { transform: scale(0.92); } }
+			#text { margin-top: 6px; color: #ddd; }
+			.bar { width: 150px; height: 4px; border-radius: 2px; background: #2a2a2a; overflow: hidden; }
+			#fill { height: 100%; width: 35%; border-radius: 2px; background: #ff0033; }
+			/* Unknown progress: a stretch sliding back and forth. */
+			.bar.busy #fill { animation: slide 1.2s ease-in-out infinite alternate; }
+			@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+			#detail { min-height: 16px; font-size: 11px; color: #888; text-align: center; padding: 0 16px; }
+			@media (prefers-reduced-motion: reduce) { .logo, .bar.busy #fill { animation: none; } }
+		</style>
+	</head>
+	<body data-tauri-drag-region>
+		<!-- The desktop app's start and update window (desktop/src-tauri/src/updates.rs). -->
+		<svg class="logo" viewBox="0 0 16 16" aria-hidden="true" data-tauri-drag-region>
+			<circle cx="8" cy="8" r="8" fill="#ff0033" />
+			<path d="M6.3 4.9v6.2L11.2 8z" fill="#fff" />
+		</svg>
+		<div id="text" aria-live="polite">Starting YTMP…</div>
+		<div class="bar busy" id="bar"><div id="fill"></div></div>
+		<div id="detail"></div>
+		<script>
+			const text = document.getElementById('text');
+			const bar = document.getElementById('bar');
+			const fill = document.getElementById('fill');
+			const detail = document.getElementById('detail');
+			// Called by the app: what it's doing, how far ([progress] 0–1, or null when it can't tell), and a line under it.
+			window.show = (what, progress, under) => {
+				text.textContent = what;
+				bar.classList.toggle('busy', progress == null);
+				fill.style.width = progress == null ? '35%' : `${Math.round(progress * 100)}%`;
+				detail.textContent = under || '';
+			};
+			// What it said before this page had loaded.
+			window.__TAURI_INTERNALS__.invoke('splash_state').then((s) => window.show(s.what, s.progress, s.under));
+		</script>
+	</body>
+</html>

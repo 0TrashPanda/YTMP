@@ -65,6 +65,7 @@
 	import { ListenRequests } from '../../../lib/listenRequests';
 	import { nativeBridge } from '../../../lib/native';
 	import { desktopApp } from '../../../lib/ownModule.svelte';
+	import { leaveForQuit, playsOn, takeResume } from '../../../lib/appQuit';
 	import { identity, logInOnce, session } from '../../../lib/account';
 	import type { Participant } from '../../../lib/protocol.gen';
 	import { busy } from '../../../lib/busy.svelte';
@@ -323,15 +324,31 @@
 		const visibility = room?.state?.room.visibility;
 		if (room?.status !== 'connected' || !player || !visibility || autoStarted) return;
 		autoStarted = true;
+		// The desktop app restarted for an update while it played here: it plays on (appQuit.ts).
+		const resume = takeResume(code);
 		// Reloaded between two songs for a new version: it played here, so it plays on.
 		const wanted =
-			appUpdate.resumes(code) || (visibility === 'private' ? !saved.soloOff(code) : player.canStartWithoutGesture && saved.listening);
+			!!resume || appUpdate.resumes(code) || (visibility === 'private' ? !saved.soloOff(code) : player.canStartWithoutGesture && saved.listening);
 		if (!wanted) return;
 		untrack(() => {
 			if (player!.enabled) return;
-			if (player!.canStartWithoutGesture) player!.enable();
-			else startOnFirstGesture();
+			if (player!.canStartWithoutGesture) {
+				const opened = room!;
+				void player!.enable().then(() => {
+					if (resume && playsOn(resume, opened)) void opened.run({ kind: 'Play' }, false);
+				});
+			} else startOnFirstGesture();
 		});
+	});
+
+	// The desktop app closing (or restarting for an update): this device stops playing the room
+	// first, so the room doesn't play on for nobody (appQuit.ts).
+	$effect(() => {
+		const app = desktopApp();
+		if (!app?.onQuit || !room || !player) return;
+		const [opened, playing] = [room, player];
+		app.onQuit((forUpdate) => leaveForQuit(opened, playing, forUpdate));
+		return () => app.onQuit?.(null);
 	});
 
 	// Back after the connection dropped (a network hiccup): the host forgets this device plays

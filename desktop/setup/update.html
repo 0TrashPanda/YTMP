@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Update YTMP</title>
+		<style>
+			:root { color-scheme: dark; }
+			html, body { margin: 0; height: 100%; overflow: hidden; }
+			body {
+				box-sizing: border-box;
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				padding: 14px 16px;
+				background: #1f1f1f;
+				border: 1px solid #2a2a2a;
+				color: #fff;
+				font: 13px Roboto, 'Segoe UI', system-ui, sans-serif;
+				user-select: none;
+				-webkit-user-select: none;
+				cursor: default;
+			}
+			h1 { margin: 0; font-size: 14px; font-weight: 500; }
+			#notes { flex: 1; overflow: auto; margin: 0; color: #aaa; font-size: 12px; line-height: 1.5; }
+			#notes p { margin: 0 0 4px; }
+			.buttons { display: flex; gap: 8px; align-items: center; }
+			button { border: 0; border-radius: 999px; padding: 7px 14px; font: inherit; font-weight: 500; }
+			#now { background: #fff; color: #000; }
+			#now:hover { background: #ddd; }
+			#later { background: transparent; color: #aaa; }
+			#later:hover { color: #fff; }
+		</style>
+	</head>
+	<body>
+		<!-- What the arrow in the title bar opens (desktop/src-tauri/src/updates.rs). -->
+		<h1 id="title">A new version is ready</h1>
+		<div id="notes"></div>
+		<div class="buttons">
+			<button id="now">Restart now</button>
+			<button id="later">Later</button>
+		</div>
+		<script>
+			const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
+			const close = () => invoke('close_update');
+			document.getElementById('later').addEventListener('click', close);
+			document.getElementById('now').addEventListener('click', () => invoke('install_update'));
+			addEventListener('keydown', (e) => e.key === 'Escape' && close());
+			// Clicked somewhere else: it goes, like a menu.
+			addEventListener('blur', close);
+			// The release notes (Markdown) as short lines, without how to install it.
+			const lines = (notes) =>
+				notes
+					.split(/\r?\n/)
+					.map((line) => line.trim())
+					.filter((line, i, all) => !all.slice(0, i + 1).some((l) => /^#*\s*install\b/i.test(l)))
+					.filter((line) => line && !line.startsWith('#'))
+					.map((line) => line.replace(/^[-*]\s+/, '• ').replace(/\*\*|__|`/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'));
+			invoke('update_info').then((info) => {
+				if (!info) return close();
+				document.getElementById('title').textContent = `YTMP ${info.version} is ready`;
+				const notes = document.getElementById('notes');
+				for (const line of lines(info.notes)) {
+					const p = document.createElement('p');
+					p.textContent = line;
+					notes.append(p);
+				}
+				if (!notes.childElementCount) notes.textContent = `You have ${info.current}.`;
+			});
+		</script>
+	</body>
+</html>

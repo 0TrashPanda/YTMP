@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>YTMP</title>
+		<style>
+			:root { color-scheme: dark; }
+			html, body { margin: 0; height: 100%; overflow: hidden; }
+			body {
+				display: flex;
+				align-items: center;
+				background: #030303;
+				color: #aaa;
+				font: 12px Roboto, 'Segoe UI', system-ui, sans-serif;
+				user-select: none;
+				-webkit-user-select: none;
+			}
+			.title { flex: 1; height: 100%; display: flex; align-items: center; gap: 8px; padding-left: 12px; }
+			.logo { width: 16px; height: 16px; flex: none; }
+			.title b { color: #fff; font-weight: 500; }
+			button {
+				width: 46px;
+				height: 100%;
+				border: 0;
+				padding: 0;
+				background: transparent;
+				color: #ddd;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			button:hover { background: #1f1f1f; }
+			button:active { background: #2a2a2a; }
+			button.close:hover { background: #e81123; color: #fff; }
+			button svg { width: 10px; height: 10px; pointer-events: none; }
+			#update { color: #23a55a; display: none; }
+			#update.ready { display: flex; animation: pop 0.25s ease-out; }
+			#update svg { width: 18px; height: 18px; }
+			@keyframes pop { from { transform: scale(0.6); opacity: 0; } }
+		</style>
+	</head>
+	<body>
+		<!-- The desktop app's own title bar (desktop/src-tauri/src/frame.rs): drag it to move the
+		     window, double-click to maximize. -->
+		<div class="title" data-tauri-drag-region>
+			<svg class="logo" viewBox="0 0 16 16" aria-hidden="true">
+				<circle cx="8" cy="8" r="8" fill="#ff0033" />
+				<path d="M6.3 4.9v6.2L11.2 8z" fill="#fff" />
+			</svg>
+			<b data-tauri-drag-region>YTMP</b>
+		</div>
+		<button id="update" title="Update ready" aria-label="Update ready">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />
+			</svg>
+		</button>
+		<button id="minimize" aria-label="Minimize">
+			<svg viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor" /></svg>
+		</button>
+		<button id="maximize" aria-label="Maximize">
+			<svg viewBox="0 0 10 10" id="max-icon"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" /></svg>
+		</button>
+		<button id="close" class="close" aria-label="Close">
+			<svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" /></svg>
+		</button>
+		<script>
+			const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
+			const update = document.getElementById('update');
+			for (const action of ['minimize', 'maximize', 'close']) {
+				document.getElementById(action).addEventListener('click', () => invoke('window_action', { action }));
+			}
+			update.addEventListener('click', () => {
+				const box = update.getBoundingClientRect();
+				invoke('open_update', { x: box.left + box.width / 2 });
+			});
+			// Called by the app (frame.rs): a new version is downloaded and ready to install.
+			window.updateReady = (version) => {
+				update.title = `YTMP ${version} is ready: restart to update`;
+				update.setAttribute('aria-label', update.title);
+				update.classList.add('ready');
+			};
+			// Called by the app when the window is maximized or restored.
+			window.maximized = (on) => {
+				document.getElementById('maximize').setAttribute('aria-label', on ? 'Restore' : 'Maximize');
+				document.getElementById('max-icon').innerHTML = on
+					? '<path d="M2.5 2.5V0.5h7v7h-2M0.5 2.5h7v7h-7z" fill="none" stroke="currentColor"/>'
+					: '<rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor"/>';
+			};
+			invoke('frame_state').then((state) => {
+				if (state.update) window.updateReady(state.update);
+				window.maximized(state.maximized);
+			});
+		</script>
+	</body>
+</html>
