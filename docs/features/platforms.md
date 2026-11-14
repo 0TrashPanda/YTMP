@@ -74,6 +74,9 @@ server, like in a browser; **everything YouTube** happens on your own computer:
 - **Your music files and a song cache** on the computer, both off by default, see
   [sources](music/sources.md#local-music-): they play from your own disk.
 - **Opens the room you were in** when it starts (*Settings → App*), like the Android app.
+- **Logs** (*Settings → App*): *Open logs folder* shows the folder with this start's logs in the
+  file manager; *Copy logs* puts them on the clipboard (the app's version, its host's and its
+  module's log), to paste where you report a problem. Song names and requests, no passwords.
 - **Speakers near this computer**: *Play on → Near this computer* lists the Chromecasts,
   Sonos speakers, MPDs and TVs on the computer's network, also when your server can't reach
   them.

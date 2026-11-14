@@ -18,6 +18,7 @@ use module::{Kind, Sidecars};
 use tauri::ipc::CapabilityBuilder;
 use tauri::{AppHandle, Manager, RunEvent, Url, Webview};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 
 /// What the app keeps: the server, this computer's id and secret for the server (it asks for a
 /// song of this computer's music with them), and the version it was installing (updates.rs).
@@ -128,6 +129,8 @@ fn open_server(app: &AppHandle, url: &Url) {
             .permission("allow-change-server")
             .permission("allow-media-update")
             .permission("allow-pick-folder")
+            .permission("allow-open-logs")
+            .permission("allow-read-logs")
             .permission("allow-check-updates")
             .permission("allow-quit-ready");
         if let Err(e) = app.add_capability(capability) {
@@ -208,6 +211,45 @@ async fn pick_folder(app: AppHandle) -> Option<String> {
         .map(|path| path.to_string_lossy().into_owned())
 }
 
+/// The logs of this start of the app (module.rs: `host.log`, `module.log`), in the app's log folder.
+fn log_dir(app: &AppHandle) -> PathBuf {
+    app.path().app_log_dir().unwrap_or_else(|_| std::env::temp_dir())
+}
+
+/// Settings → App → *Open logs folder*: the log folder in the system's file manager.
+#[tauri::command]
+fn open_logs(app: AppHandle) -> Result<(), String> {
+    let dir = log_dir(&app);
+    let _ = std::fs::create_dir_all(&dir);
+    app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())
+}
+
+/// A log longer than this: only its end is copied (the clipboard and a chat take that much).
+const COPIED_LOG_BYTES: usize = 2 * 1024 * 1024;
+
+/// Settings → App → *Copy logs*: the app's version and this start's logs as text, for the window
+/// to put on the clipboard. Song names and requests, no passwords or sign-ins.
+#[tauri::command]
+fn read_logs(app: AppHandle) -> String {
+    let dir = log_dir(&app);
+    let mut text = format!("YTMP {} ({})
+", app.package_info().version, if cfg!(windows) { "Windows" } else { "Linux" });
+    for name in ["host.log", "module.log"] {
+        let Ok(bytes) = std::fs::read(dir.join(name)) else {
+            text.push_str(&format!("
+===== {name}: none =====
+"));
+            continue;
+        };
+        let start = bytes.len().saturating_sub(COPIED_LOG_BYTES);
+        text.push_str(&format!("
+===== {name}{} =====
+", if start > 0 { " (its end)" } else { "" }));
+        text.push_str(&String::from_utf8_lossy(&bytes[start..]));
+    }
+    text
+}
+
 /// `ytmphost://localhost/api/…` (Windows: `http://ytmphost.localhost/api/…`): the window's
 /// requests to this computer's host (desktop/host/), passed on with its key: this computer's
 /// music, the song cache. Pages of the window may use it (it only shows the server you chose).
@@ -268,6 +310,8 @@ fn bridge_script(app: &AppHandle) -> String {
     host: {host:?},
     device: Object.freeze({{ id: {device_id:?}, secret: {device_secret:?} }}),
     pickFolder: () => invoke('pick_folder'),
+    openLogs: () => invoke('open_logs'),
+    readLogs: () => invoke('read_logs'),
     checkUpdates: () => invoke('check_updates'),
     onQuit: (handler) => {{ quitHandler = handler; }},
     autoplay: true,
@@ -301,6 +345,8 @@ fn main() {
             change_server,
             media_update,
             pick_folder,
+            open_logs,
+            read_logs,
             module::module_request,
             frame::quit_ready,
             frame::window_action,

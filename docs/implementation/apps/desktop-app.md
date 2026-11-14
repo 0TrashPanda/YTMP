@@ -66,9 +66,11 @@ Windows check below).
   https page from fetching `http://127.0.0.1` (mixed content; "Load failed", the request
   never leaves; seen in the Linux check below), and Chrome's loopback exception doesn't
   exist there. An **initialization script** the shell runs on every page sets
-  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates, checkUpdates(), onQuit(handler), autoplay }`
+  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates, checkUpdates(), onQuit(handler), autoplay, openLogs(), readLogs() }`
   (`updates`: the build looks for new versions, so *Settings → App* says so; missing before
-  0.45); `moduleRequest` is a Tauri command
+  0.45; `openLogs`/`readLogs` for *Settings → App → Logs*: the app's log folder with `host.log`
+  and `module.log`, opened with the opener plugin, or their text (the last 2 MB of each) for the
+  clipboard; missing before 0.51); `moduleRequest` is a Tauri command
   that forwards the request to the module with its key and answers `{ status, body }`. The
   page never sees the module's port or key. The server's origin gets a Tauri capability for
   the command at runtime: the origin the entered address ends up on after redirects, and

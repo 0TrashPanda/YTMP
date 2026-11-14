@@ -89,6 +89,10 @@ export interface DesktopApp {
 	device?: { id: string; secret: string };
 	/** The system's folder picker: the folder's path, or null. */
 	pickFolder?: () => Promise<string | null>;
+	/** The app's log folder in the system's file manager (absent before 0.51). */
+	openLogs?: () => Promise<void>;
+	/** The app's version and this start's logs (its host, its module), as text to copy. */
+	readLogs?: () => Promise<string>;
 	/**
 	 * Looks for a new version now: true when there is one (it downloads, and the arrow in the
 	 * title bar offers it), false when this is the newest; rejects with why it couldn't look.

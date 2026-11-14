@@ -145,6 +145,16 @@
 			checkingUpdates = false;
 		}
 	}
+	/** *Copy logs* in the desktop app: this start's logs on the clipboard, to paste where you need them. */
+	async function copyDesktopLogs() {
+		try {
+			const text = await desktop!.readLogs!();
+			await navigator.clipboard.writeText(text);
+			onToast('Logs copied');
+		} catch (e) {
+			onToast(`Couldn't copy the logs: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
 	const here = inApp ? 'phone' : 'device';
 	/** On the phone's own pages (its room list and rooms), which keep the phone's song cache. */
 	const onThisPhone = $derived(inApp && host?.kind === 'phone' && ['127.0.0.1', 'localhost'].includes(location.hostname));
@@ -937,6 +947,24 @@
 			</div>
 			<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => desktop?.changeServer?.()}>Change server</button>
 		</div>
+		{#if desktop.openLogs || desktop.readLogs}
+			<div class="flex flex-col gap-2">
+				<div>
+					<p class="text-sm font-medium">Logs</p>
+					<p class="text-xs text-muted">What the app did since it started, to send when something goes wrong. Song names and requests, no passwords.</p>
+				</div>
+				<div class="flex flex-wrap gap-2">
+					{#if desktop.openLogs}
+						<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={() => desktop?.openLogs?.().catch((e) => onToast(`Couldn't open the folder: ${e}`))}
+							>Open logs folder</button
+						>
+					{/if}
+					{#if desktop.readLogs}
+						<button class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line" onclick={copyDesktopLogs}>Copy logs</button>
+					{/if}
+				</div>
+			</div>
+		{/if}
 		<Toggle
 			label="Open the solo room you were in"
 			hint="Opening the app goes straight back into the solo room you were in when you closed it, instead of the room list."
