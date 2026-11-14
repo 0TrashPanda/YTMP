@@ -76,7 +76,7 @@
 	];
 	/** Picked here before the host answered: shown at once. */
 	let whichPicked = $state<CopyWhich | null>(null);
-	const which = $derived(whichPicked ?? now?.which ?? 'cache');
+	const which = $derived(whichPicked ?? now?.which ?? 'both');
 
 	function copyText(c: PhoneCopyStatus): string {
 		const left = [c.here ? `${c.here} were here already` : '', c.noRoom ? `${c.noRoom} didn't fit (make the cache bigger for them)` : ''].filter(Boolean).join(', ');

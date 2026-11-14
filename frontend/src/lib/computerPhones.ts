@@ -63,7 +63,7 @@ export async function phonesNow(): Promise<PhonesNow> {
 	const phones = new Map<string, { id: string; name: string; url: string; seenAt: number }>();
 	for (const p of here.found) phones.set(p.id, { id: p.id, name: p.name, url: p.url, seenAt: 0 });
 	for (const p of server?.phones ?? []) phones.set(p.id, p);
-	return { phones: [...phones.values()].sort((a, b) => a.name.localeCompare(b.name)), copy: here.copy, askedUntil: server?.askedUntil ?? null, which: here.which ?? 'cache' };
+	return { phones: [...phones.values()].sort((a, b) => a.name.localeCompare(b.name)), copy: here.copy, askedUntil: server?.askedUntil ?? null, which: here.which ?? 'both' };
 }
 
 /** How long your server waits for your phone after you ask (AccountApi.PHONE_ASK_MS). */

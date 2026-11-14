@@ -95,15 +95,15 @@ class PhoneCopy(
     data class Found(val id: String, val name: String, val url: String, val owner: String?, val keyed: Boolean)
 
     @Serializable
-    data class State(val found: List<Found>, val copy: Status?, val which: Which = Which.CACHE)
+    data class State(val found: List<Found>, val copy: Status?, val which: Which = Which.BOTH)
 
     /** Phones showing themselves on the network now, by id. */
     private val shown = ConcurrentHashMap<String, Pair<Phone, String?>>()
     /** Phone id → its key. */
     private val keys = ConcurrentHashMap<String, String>(loadKeys())
     @Volatile private var status: Status? = null
-    /** Only the song cache unless you pick otherwise: a phone's own files are often many, and big. */
-    @Volatile var which: Which = runCatching { Which.valueOf(whichFile.readText().trim()) }.getOrDefault(Which.CACHE)
+    /** Cache and local unless you pick otherwise: every song the phone keeps, also one it had downloaded before it was cached. */
+    @Volatile var which: Which = runCatching { Which.valueOf(whichFile.readText().trim()) }.getOrDefault(Which.BOTH)
         private set
     private var job: Job? = null
 
