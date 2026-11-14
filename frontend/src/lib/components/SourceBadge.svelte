@@ -43,7 +43,7 @@
 </script>
 
 {#if shown}
-	<span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] leading-none text-muted {className}" title={shown.title}>
+	<span class="inline-flex shrink-0 items-center whitespace-nowrap gap-1 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] leading-none text-muted {className}" title={shown.title}>
 		<Icon name={shown.icon} size={11} />
 		{shown.label}
 	</span>

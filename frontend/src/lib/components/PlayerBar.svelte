@@ -319,21 +319,22 @@
 						<div class="truncate font-medium {current ? '' : 'text-muted'}">{current?.item.song.title ?? 'Search for a song to start'}</div>
 						{#if current}
 							{@const song = current.item.song}
-							<div class="truncate text-sm text-muted">
+							<!-- The album shortens ("…"), the names stay whole (unless one is longer than the line). Not one truncated line: a too-long button in it vanishes whole and leaves a gap. -->
+							<div class="flex min-w-0 overflow-hidden text-sm whitespace-pre text-muted">
 								{#if song.podcast}
 									{@const podcast = song.podcast}
-									<button class="hover:text-white hover:underline" onclick={() => onPodcast(podcast)} onpointerenter={() => prefetch('podcast', podcast.id)}>{podcast.name}</button>
+									<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => onPodcast(podcast)} onpointerenter={() => prefetch('podcast', podcast.id)}>{podcast.name}</button>
 								{/if}
 								{#each song.artists as artist, i (i)}
-									{#if i > 0}{', '}{/if}<button class="hover:text-white hover:underline" onclick={() => onArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}
+									{#if i > 0}<span class="shrink-0">, </span>{/if}<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => onArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}
 										>{artist.name}</button
 									>
 								{/each}
 								{#if song.album}
 									{@const album = song.album}
-									• <button class="hover:text-white hover:underline" onclick={() => onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
+									<span class="shrink-0"> • </span><button class="min-w-0 truncate hover:text-white hover:underline" onclick={() => onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
 								{/if}
-								{#if year}• {year}{/if}{status}
+								<span class="shrink-0">{#if year} • {year}{/if}{status}</span>
 							</div>
 						{/if}
 					</div>
