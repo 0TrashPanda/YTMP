@@ -26,6 +26,16 @@ class SyncCorrection {
     private var checkLeadAfterSeek = false
 
     /**
+     * Starting to play with others (a song the room starts, or after a pause): sound comes out
+     * this long after play, so it starts this far ahead of where the room is. Learned like
+     * [seekLeadMs]; without it the phone started ~0.5 s behind and then jumped (you heard it).
+     */
+    var startLeadMs = INITIAL_START_LEAD_MS
+        private set
+
+    private var checkLeadAfterStart = false
+
+    /**
      * How to fix [driftMs] (positive = ahead of the room) while playing at [speed]; [targetMs]
      * is where the room is. Called with every reading once playback has settled.
      */
@@ -33,7 +43,11 @@ class SyncCorrection {
         val size = abs(driftMs)
         // Nobody to stay in sync with: only fix what's clearly wrong (a seek, a long stall).
         if (alone) return if (size > ALONE_TOLERANCE_MS) seek(targetMs) else Fix(NORMAL)
-        if (checkLeadAfterSeek) {
+        if (checkLeadAfterStart) {
+            // How far off this start ended up: adjust the start lead for the next one.
+            startLeadMs = (startLeadMs - driftMs / 2).coerceIn(0, MAX_START_LEAD_MS)
+            checkLeadAfterStart = false
+        } else if (checkLeadAfterSeek) {
             // After our last seek we ended up [driftMs] off: adjust the lead for next time,
             // by half the error, so one unlucky seek doesn't make it swing back and forth.
             seekLeadMs = (seekLeadMs - driftMs / 2).coerceIn(0, MAX_SEEK_LEAD_MS)
@@ -56,6 +70,15 @@ class SyncCorrection {
     /** The player was (re)loaded at a position from [seekLeadMs]; check how well it landed. */
     fun onLoaded() {
         checkLeadAfterSeek = true
+    }
+
+    /**
+     * It starts playing now from [startLeadMs] ahead (with others): the next reading tells how
+     * well that worked, and isn't taken as a seek's (a start's delay made the seek lead too big).
+     */
+    fun onStarted() {
+        checkLeadAfterStart = true
+        checkLeadAfterSeek = false
     }
 
     companion object {
@@ -108,6 +131,8 @@ class SyncCorrection {
 
         const val INITIAL_SEEK_LEAD_MS = 250L
         const val MAX_SEEK_LEAD_MS = 1500L
+        const val INITIAL_START_LEAD_MS = 250L
+        const val MAX_START_LEAD_MS = 1000L
 
         /**
          * Where this device's player should be. [PlaybackTarget.syncOffsetMs] is the device's

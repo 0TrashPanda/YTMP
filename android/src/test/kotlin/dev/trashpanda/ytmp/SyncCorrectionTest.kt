@@ -46,6 +46,21 @@ class SyncCorrectionTest {
     }
 
     @Test
+    fun `a start learns its own lead, and doesn't change the seek lead`() {
+        val sync = SyncCorrection()
+        sync.onLoaded()
+        sync.onStarted()
+        // Started 100 ms behind the room: the next start begins half of that further ahead.
+        assertEquals(Fix(NORMAL + SyncCorrection.CORRECTION_RATE), sync.onDrift(driftMs = -100, targetMs = 1_000, speed = NORMAL))
+        assertEquals(SyncCorrection.INITIAL_START_LEAD_MS + 50, sync.startLeadMs)
+        assertEquals(SyncCorrection.INITIAL_SEEK_LEAD_MS, sync.seekLeadMs)
+        // A start that was far off (a slow phone) is fixed with a seek; its error goes to the start lead.
+        sync.onStarted()
+        assertEquals(Fix(NORMAL, 2_000 + sync.seekLeadMs), sync.onDrift(driftMs = -600, targetMs = 2_000, speed = NORMAL))
+        assertEquals(SyncCorrection.INITIAL_START_LEAD_MS + 350, sync.startLeadMs)
+    }
+
+    @Test
     fun `sync adjustment moves the target earlier`() {
         val target = PlaybackTarget(
             enabled = true, item = null, streamUrl = null, proxyUrl = null,

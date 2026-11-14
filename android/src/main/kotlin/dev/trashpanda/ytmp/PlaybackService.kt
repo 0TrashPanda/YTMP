@@ -742,6 +742,15 @@ class PlaybackService : MediaSessionService() {
             settledAt = maxOf(settledAt, SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS)
             return
         }
+        if (!exo.playWhenReady && !target.alone && exo.playbackState == Player.STATE_READY) {
+            // Starting with others (a song the room starts, or after a pause): sound comes out a
+            // moment after play, so start that far ahead, in step with the room, rather than
+            // behind it and then jumping. Alone, the room follows this device instead.
+            Log.d(TAG, "start at ${expected + sync.startLeadMs} ms (lead ${sync.startLeadMs} ms)")
+            exo.seekTo(expected + sync.startLeadMs)
+            sync.onStarted()
+            settledAt = SystemClock.elapsedRealtime() + SyncCorrection.SETTLE_MS
+        }
         exo.playWhenReady = true
         if (exo.playbackState == Player.STATE_ENDED) {
             // At the end, but the room started the song over (repeat one): from where the room is.
