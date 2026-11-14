@@ -12,7 +12,7 @@ use tauri::window::WindowBuilder;
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewBuilder, WebviewUrl, Window, WindowEvent};
 use tauri_plugin_opener::OpenerExt;
 
-use crate::updates;
+use crate::{save, updates, State};
 
 /// The title bar's height (logical pixels).
 pub const BAR: f64 = 32.0;
@@ -44,7 +44,8 @@ pub fn open(app: &AppHandle, bridge: &str) -> tauri::Result<Window> {
         .title("YTMP")
         .inner_size(width, height)
         .min_inner_size(360.0, 560.0)
-        .decorations(false)
+        // Without YTMP's title bar, the system's own frame (frame::show_title_bar).
+        .decorations(!title_bar_shown(app))
         .visible(false)
         .build()?;
 
@@ -71,6 +72,11 @@ pub fn open(app: &AppHandle, bridge: &str) -> tauri::Result<Window> {
     window.add_child(page, LogicalPosition::new(0.0, BAR), LogicalSize::new(width, height - BAR))?;
     #[cfg(target_os = "linux")]
     pin_title_bar(app);
+    if !title_bar_shown(app) {
+        if let Some(title) = app.get_webview("titlebar") {
+            let _ = title.hide();
+        }
+    }
     layout(&window);
 
     let resized = window.clone();
@@ -114,7 +120,8 @@ fn show(app: &AppHandle) {
 /// On Linux, Tauri puts a window's web views in a GTK box that shares the height between them
 /// (`set_position`/`set_size` do nothing there), so the title bar's view got as much room as
 /// the page, with the bar in its middle. The title bar's view gets its 32 px and no more; the
-/// page under it takes the rest.
+/// page under it takes the rest. Showing the window shows all its views (GTK's `show_all`), a
+/// hidden title bar too (*Show the title bar* off): only `show_title_bar` shows or hides it.
 #[cfg(target_os = "linux")]
 fn pin_title_bar(app: &AppHandle) {
     use gtk::prelude::*;
@@ -123,17 +130,49 @@ fn pin_title_bar(app: &AppHandle) {
         let view = webview.inner();
         view.set_size_request(-1, BAR as i32);
         view.set_vexpand(false);
+        view.set_no_show_all(true);
         if let Some(parent) = view.parent().and_then(|p| p.downcast::<gtk::Box>().ok()) {
             parent.set_child_packing(&view, false, true, 0, gtk::PackType::Start);
         }
     });
 }
 
-/// The title bar over the full width at the top, the page under it.
+/// Whether YTMP's own title bar shows (*Settings → App → Show the title bar*).
+fn title_bar_shown(app: &AppHandle) -> bool {
+    !app.state::<State>().settings.lock().unwrap().hide_title_bar
+}
+
+/// *Settings → App → Show the title bar*: [on] shows YTMP's title bar or hides it, at once;
+/// says whether it shows. Hidden, the page takes the whole window and the window gets the
+/// system's own frame: Windows' title bar, or on Linux what the desktop draws (nothing on tiling
+/// desktops like Hyprland, which move and close windows with keys).
+#[tauri::command]
+pub fn show_title_bar(app: AppHandle, on: Option<bool>) -> bool {
+    let Some(on) = on else { return title_bar_shown(&app) };
+    app.state::<State>().settings.lock().unwrap().hide_title_bar = !on;
+    save(&app);
+    if let Some(title) = app.get_webview("titlebar") {
+        // Tauri shows a view with GTK's `show_all`, which skips the title bar (pin_title_bar).
+        #[cfg(target_os = "linux")]
+        let _ = title.with_webview(move |webview| {
+            use gtk::prelude::*;
+            if on { webview.inner().show() } else { webview.inner().hide() }
+        });
+        #[cfg(not(target_os = "linux"))]
+        let _ = if on { title.show() } else { title.hide() };
+    }
+    if let Some(window) = app.get_window("main") {
+        let _ = window.set_decorations(!on);
+        layout(&window);
+    }
+    on
+}
+
+/// The title bar over the full width at the top, the page under it (the whole window without it).
 fn layout(window: &Window) {
     let Ok(size) = window.inner_size() else { return };
     let scale = window.scale_factor().unwrap_or(1.0);
-    let bar = (BAR * scale).round() as u32;
+    let bar = if title_bar_shown(window.app_handle()) { (BAR * scale).round() as u32 } else { 0 };
     let app = window.app_handle();
     if let Some(title) = app.get_webview("titlebar") {
         let _ = title.set_position(PhysicalPosition::new(0, 0));

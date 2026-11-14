@@ -21,7 +21,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 /// What the app keeps: the server, this computer's id and secret for the server (it asks for a
-/// song of this computer's music with them), and the version it was installing, and whether it asks before updating (updates.rs).
+/// song of this computer's music with them), and the version it was installing, whether it asks before updating (updates.rs) and whether it shows its title bar (frame.rs).
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Settings {
     server: Option<String>,
@@ -30,6 +30,9 @@ pub(crate) struct Settings {
     /// A new version found at the start is offered (with *Later*), not installed right away.
     #[serde(default)]
     pub(crate) ask_before_updating: bool,
+    /// *Show the title bar* off: no YTMP title bar, the system's own window frame instead (frame.rs).
+    #[serde(default)]
+    pub(crate) hide_title_bar: bool,
     #[serde(default)]
     device_id: Option<String>,
     #[serde(default)]
@@ -136,6 +139,7 @@ fn open_server(app: &AppHandle, url: &Url) {
             .permission("allow-read-logs")
             .permission("allow-check-updates")
             .permission("allow-ask-before-updating")
+            .permission("allow-show-title-bar")
             .permission("allow-quit-ready");
         if let Err(e) = app.add_capability(capability) {
             eprintln!("can't allow {origin}: {e}");
@@ -318,6 +322,7 @@ fn bridge_script(app: &AppHandle) -> String {
     readLogs: () => invoke('read_logs'),
     checkUpdates: (quiet) => invoke('check_updates', {{ quiet: !!quiet }}),
     askBeforeUpdating: (on) => invoke('ask_before_updating', {{ on: on ?? null }}),
+    showTitleBar: (on) => invoke('show_title_bar', {{ on: on ?? null }}),
     onQuit: (handler) => {{ quitHandler = handler; }},
     autoplay: true,
   }});
@@ -363,6 +368,7 @@ fn main() {
             updates::close_update,
             updates::install_update,
             updates::ask_before_updating,
+            frame::show_title_bar,
         ])
         .register_asynchronous_uri_scheme_protocol("ytmphost", |ctx, request, responder| {
             let app = ctx.app_handle().clone();

@@ -43,6 +43,14 @@ Windows check below).
   the window's top half and the page's bottom was cut off): `pin_title_bar` gives the title
   bar's view its 32 px and lets the page take the rest. Every web view gets the same WebView2
   arguments (`BROWSER_ARGS`): WebView2 refuses a second set in the same profile.
+- ✅ **Hiding the title bar** (*Settings → App → Show the title bar*, `show_title_bar`,
+  `hide_title_bar` in `settings.json`, from 0.53): hidden, the title bar's view goes, the page
+  takes the whole window and the window gets the system's frame (`decorations(true)`): Windows'
+  title bar, on Linux what the desktop draws (nothing on Hyprland and other tiling desktops, and
+  GTK draws none there either). It switches at once. On Linux showing the window runs GTK's
+  `show_all`, which would show a hidden title bar again, so its view has `no_show_all` and
+  `show_title_bar` shows and hides it through GTK itself. Without the bar, the update arrow
+  isn't there: after *Later*, *Check for updates* offers the new version again.
 - ✅ **Closing stops playing here** (`before_quit`, `frontend/src/lib/appQuit.ts`): a closed
   app sends the room no goodbye. The host would only notice the lost connection after its
   30 s timeout, and then keeps a device that played for another minute (`Room.holdPlayer`,
@@ -69,7 +77,7 @@ Windows check below).
   https page from fetching `http://127.0.0.1` (mixed content; "Load failed", the request
   never leaves; seen in the Linux check below), and Chrome's loopback exception doesn't
   exist there. An **initialization script** the shell runs on every page sets
-  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates, checkUpdates(quiet), askBeforeUpdating(on), onQuit(handler), autoplay, openLogs(), readLogs() }`
+  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates, checkUpdates(quiet), askBeforeUpdating(on), showTitleBar(on), onQuit(handler), autoplay, openLogs(), readLogs() }`
   (`updates`: the build looks for new versions, so *Settings → App* says so; missing before
   0.45; `openLogs`/`readLogs` for *Settings → App → Logs*: the app's log folder with `host.log`
   and `module.log`, opened with the opener plugin, or their text (the last 2 MB of each) for the

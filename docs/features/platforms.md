@@ -83,7 +83,9 @@ server, like in a browser; **everything YouTube** happens on your own computer:
 - **Songs from your phone**: *Copy from my phone* (YTMP open on the phone), or *Send songs to
   my computer* on the phone, copies the songs the phone keeps over Wi-Fi.
 - **The first start** asks for your server's address, like the Android app.
-- **Its own title bar**, dark like the rest of the app, with the window's buttons.
+- **Its own title bar**, dark like the rest of the app, with the window's buttons. *Settings →
+  App → Show the title bar* can hide it: the window then gets the system's own frame (Windows'
+  title bar; on tiling desktops like Hyprland none at all).
 - **Updates itself, like Discord**: when it starts, a small window checks for a new version
   and installs it right away, with a progress bar, before the app opens; with *Settings → App
   → Ask before updating* on, the app opens and asks first. A new version found while the app

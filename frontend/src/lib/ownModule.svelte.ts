@@ -105,6 +105,11 @@ export interface DesktopApp {
 	 */
 	askBeforeUpdating?: (on?: boolean) => Promise<boolean>;
 	/**
+	 * *Show the title bar*: with [on] shows YTMP's own title bar or hides it (the system's own
+	 * window frame instead); says whether it shows. Absent before 0.53.
+	 */
+	showTitleBar?: (on?: boolean) => Promise<boolean>;
+	/**
 	 * [handler] runs when the app closes or restarts for an update ([forUpdate]), before the
 	 * window goes (null: none). The app waits for it, a short while at most (appQuit.ts).
 	 */

@@ -157,6 +157,18 @@
 		askBeforeUpdating = on;
 		desktop?.askBeforeUpdating?.(on).catch(() => (askBeforeUpdating = !on));
 	}
+	/** *Show the title bar* in the desktop app (null: this app can't hide it). */
+	let showTitleBar = $state<boolean | null>(null);
+	if (desktop?.showTitleBar) {
+		desktop
+			.showTitleBar()
+			.then((on) => (showTitleBar = on))
+			.catch(() => {});
+	}
+	function setShowTitleBar(on: boolean) {
+		showTitleBar = on;
+		desktop?.showTitleBar?.(on).catch(() => (showTitleBar = !on));
+	}
 	/** *Copy logs* in the desktop app: this start's logs on the clipboard, to paste where you need them. */
 	async function copyDesktopLogs() {
 		try {
@@ -958,6 +970,18 @@
 				hint={askBeforeUpdating ? 'A new version is offered when the app starts: restart now or later.' : 'A new version installs when the app starts.'}
 				checked={askBeforeUpdating}
 				onchange={setAskBeforeUpdating}
+			/>
+		{/if}
+		{#if showTitleBar !== null}
+			<Toggle
+				label="Show the title bar"
+				hint={showTitleBar
+					? "YTMP's own bar at the top, with minimize, maximize and close."
+					: desktop.platform === 'windows'
+						? "Windows' own title bar instead."
+						: 'No bar at the top: your desktop moves and closes the window. After Later, Check for updates offers a new version again.'}
+				checked={showTitleBar}
+				onchange={setShowTitleBar}
 			/>
 		{/if}
 		<div class="flex items-center gap-3">
