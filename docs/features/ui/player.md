@@ -64,8 +64,9 @@ Like YTM:
   Often the small one is there already, from a list or the player bar. Not on Low quality.
   Settings → Look → **Small pictures first**: **Small** (default, 120 px), **Tiny** (60 px:
   quickest, blurrier at first) or **Off** (wait for the sharp one).
-- **Dislike button in the player bar** ✅ (Settings → Player): Normal, Dimmed
-  (darker until you point at it) or Hidden.
+- **Dislike button in the player** ✅ (Settings → Player): in the full player (next to like
+  and save, beside the artist) and the player bar on computers. Hidden (the default: it's in
+  the ⋮ menu), Dimmed (darker until you point at it) or Normal.
 - **Swiping up on the player's tabs** ✅ (Settings → Player): opens **that tab**
   (default) or **always Up next**, wherever on the tabs you swipe.
 - **Order of the player's tabs** ✅ (Settings → Player): **Up next first** (default,

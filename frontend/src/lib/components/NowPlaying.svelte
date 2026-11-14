@@ -425,7 +425,7 @@
 				<div class="flex w-full max-w-[36rem] min-w-0 shrink-0 flex-col lg:hidden" role="presentation" oncontextmenu={onSongMenu}>
 					<h1 class="text-2xl font-bold"><Marquee text={song.title} /></h1>
 					<!-- The title gets the whole width; like, dislike and save sit next to the artist and "Added by". -->
-					<div class="flex min-w-0 items-center gap-2">
+					<div class="flex min-w-0 items-center gap-1">
 						<div class="min-w-0 flex-1">
 							<!-- The album shortens ("…"), the names stay whole (unless one is longer than the line). Not one truncated line: a too-long button in it vanishes whole. -->
 							<p class="flex min-w-0 overflow-hidden whitespace-pre text-muted">
@@ -451,23 +451,29 @@
 						</div>
 						{#if youtube.account && isYoutubeSong(song.id)}
 							{@const shown = song}
-							<div class="flex shrink-0 items-center rounded-full bg-white/10">
-								<button class="rounded-l-full py-2 pr-2.5 pl-3.5 hover:bg-white/15 disabled:opacity-40" disabled={liked === null} aria-label={liked ? 'Remove like' : 'Like'} aria-pressed={!!liked} onclick={toggleLike}>
-									<Icon name={liked ? 'liked' : 'like'} size={22} />
-								</button>
-								<span class="h-5 w-px bg-white/20"></span>
+							<button
+							class="shrink-0 rounded-full p-2.5 hover:bg-white/10 disabled:opacity-40"
+								disabled={liked === null}
+								aria-label={liked ? 'Remove like' : 'Like'}
+								aria-pressed={!!liked}
+								onclick={toggleLike}
+							>
+								<Icon name={liked ? 'liked' : 'like'} size={26} />
+							</button>
+							<!-- Settings → Player: dimmed, or hidden (the default; it's in the ⋮ menu). -->
+							{#if images.dislikeButton !== 'hidden'}
 								<button
-									class="rounded-r-full py-2 pr-3.5 pl-2.5 hover:bg-white/15 disabled:opacity-40"
+									class="shrink-0 rounded-full p-2.5 hover:bg-white/10 disabled:opacity-40 {images.dislikeButton === 'dim' ? 'opacity-35 hover:opacity-100' : ''}"
 									disabled={rating === null}
 									aria-label={rating === 'dislike' ? 'Remove dislike' : 'Dislike'}
 									aria-pressed={rating === 'dislike'}
 									onclick={toggleDislike}
 								>
-									<Icon name={rating === 'dislike' ? 'disliked' : 'dislike'} size={22} />
+									<Icon name={rating === 'dislike' ? 'disliked' : 'dislike'} size={26} />
 								</button>
-							</div>
-							<button class="shrink-0 rounded-full bg-white/10 p-2 hover:bg-white/15" aria-label="Save to playlist" onclick={() => onSave(shown)}>
-								<Icon name="save" size={22} />
+							{/if}
+							<button class="shrink-0 rounded-full p-2.5 hover:bg-white/10" aria-label="Save to playlist" onclick={() => onSave(shown)}>
+								<Icon name="save" size={26} />
 							</button>
 						{/if}
 					</div>

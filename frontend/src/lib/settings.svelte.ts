@@ -256,7 +256,7 @@ export const settings = {
 	videoArt: new Setting('videoArt', 'crop' as VideoArt, videoArt, word('ytmp.videoArt', videoArt)),
 	/** How many songs a long list shows at first, and adds each time for more. */
 	pageSize: new Setting('pageSize', 300, pageSize, { key: 'ytmp.pageSize', parse: (raw) => pageSize(Number(raw)) }),
-	dislikeButton: new Setting('dislikeButton', 'normal' as DislikeButton, dislikeButton, word('ytmp.dislikeButton', dislikeButton)),
+	dislikeButton: new Setting('dislikeButton', 'hidden' as DislikeButton, dislikeButton, word('ytmp.dislikeButton', dislikeButton)),
 	swipeOpens: new Setting('swipeOpens', 'tab' as SwipeOpens, swipeOpens, word('ytmp.swipeOpens', swipeOpens)),
 	tabOrder: new Setting('tabOrder', 'upnext' as TabOrder, tabOrder, word('ytmp.tabOrder', tabOrder)),
 	/** The full player on a big screen taller than wide: the art above Up next, or next to it. */

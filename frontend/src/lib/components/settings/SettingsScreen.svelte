@@ -861,8 +861,8 @@
 			setting={settings.upNextSongRow}
 		/>
 		<Choice
-			label="Dislike button in the player bar"
-			hint="Thumbs down next to thumbs up at the bottom (computers). Dimmed: still there, but darker, so you don't hit it by accident."
+			label="Dislike button in the player"
+			hint="Thumbs down next to thumbs up, in the player and the player bar on computers. Dimmed: still there, but darker, so you don't hit it by accident. Hidden: it's in the ⋮ menu."
 			setting={settings.dislikeButton}
 			options={[
 				['normal', 'Normal'],
