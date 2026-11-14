@@ -503,14 +503,17 @@ class PlaybackService : MediaSessionService() {
             val keep = item.song?.takeIf { from != Source.SAVED && cache.takes(it) }
             if (keep != null) copying[keep.id] = keep
             Log.i(TAG, "load ${item.songId} \"${item.title}\" ${from.label} (${describe(url)})")
+            val throughHost = from == Source.HOST || (from == Source.DIRECT && target.streamUrl?.startsWith("/") == true)
             PlaybackHub.audioSource(
                 when {
                     from == Source.SAVED || url.startsWith(LocalHost.LOCAL_URL) -> "device"
-                    from == Source.HOST || (from == Source.DIRECT && target.streamUrl?.startsWith("/") == true) -> "host"
+                    throughHost -> "host"
+                    from == Source.OWN -> "module"
                     else -> "youtube"
                 },
                 item.itemId,
             )
+            if (throughHost && !url.startsWith(LocalHost.LOCAL_URL)) checkHostSaved(url, item.itemId)
             if (from == Source.OWN) lookUpNext()
             bufferingSince = null
             exo.setMediaItem(
@@ -623,6 +626,31 @@ class PlaybackService : MediaSessionService() {
         Source.DIRECT -> target.streamUrl?.let { if (it.startsWith("/")) (target.room?.hostUrl ?: LocalHost.LOCAL_URL).trimEnd('/') + it else it }
         Source.HOST -> target.proxyUrl
         Source.OWN -> ownLink(item.songId) ?: run { lookUp(item.songId); null }
+    }
+
+    /**
+     * Playing through the room's host ([url]: its `/api/audio/…`): asks whether it has the song
+     * saved; when it gets it from YouTube now, the page's badge says so ("hostYoutube"). An older
+     * host doesn't say: "host" stays.
+     */
+    private fun checkHostSaved(url: String, itemId: String) {
+        if (!url.contains("/api/audio/")) return
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                runCatching {
+                    val connection = java.net.URL(url.substringBefore('?').trimEnd('/') + "/saved").openConnection() as java.net.HttpURLConnection
+                    try {
+                        connection.connectTimeout = 5_000
+                        connection.readTimeout = 5_000
+                        if (connection.responseCode != 200) null
+                        else JSONObject(connection.inputStream.bufferedReader().use { it.readText() }).optBoolean("saved", true)
+                    } finally {
+                        connection.disconnect()
+                    }
+                }.getOrNull()
+            }
+            if (saved == false && loadedItemId == itemId && source != Source.SAVED) PlaybackHub.audioSource("hostYoutube", itemId)
+        }
     }
 
     /** A YouTube song in a room on another host: this phone's own links work better there. */

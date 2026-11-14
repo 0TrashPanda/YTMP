@@ -25,13 +25,18 @@
 
 	const shown = $derived.by(() => {
 		if (source === 'youtube') return { icon: 'play', label: 'YouTube', title: 'Streams from YouTube' } as const;
+		if (source === 'module') return { icon: 'play', label: 'Your module', title: 'Streams from YouTube, with a link your own module looked up (not the server)' } as const;
 		if (source === 'computerModule')
-			return { icon: 'play', label: 'YouTube', title: "Streams from YouTube with this computer's module; its song cache keeps it as it plays" } as const;
+			return { icon: 'play', label: 'Your module', title: "Streams from YouTube with this computer's module; its song cache keeps it as it plays" } as const;
 		if (source === 'device' && window.YtmpDesktop) return { icon: 'computer', label: 'This computer', title: 'Plays from this computer: its song cache, or its own music' } as const;
 		if (source === 'device') return { icon: 'phone', label: 'This phone', title: 'Plays from this phone: saved on it, or its own music' } as const;
 		if (source === 'host') {
 			const label = hostKind === 'phone' ? 'Host phone' : 'Server';
-			return { icon: 'server', label, title: `Streams from the ${hostKind === 'phone' ? "host's phone" : 'server'}: saved there, or YouTube through it` } as const;
+			return { icon: 'server', label, title: `Plays from the ${hostKind === 'phone' ? "host's phone" : 'server'}: saved there (its song cache, downloads or music files)` } as const;
+		}
+		if (source === 'hostYoutube') {
+			const via = hostKind === 'phone' ? 'host phone' : 'server';
+			return { icon: 'server', label: `YouTube via ${via}`, title: `The ${via} gets it from YouTube now and streams it here` } as const;
 		}
 		return null;
 	});

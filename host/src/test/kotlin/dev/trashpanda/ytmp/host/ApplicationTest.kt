@@ -424,6 +424,16 @@ class ApplicationTest {
     }
 
     @Test
+    fun `the host says whether it has a song saved, or gets it from YouTube`() = testApplication {
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, HostSources(search), HostOptions(kind = HostKind.SERVER))
+        }
+        assertEquals("""{"saved":false}""", client.get("/api/audio/ytm:abc/saved").bodyAsText())
+        assertEquals("""{"saved":true}""", client.get("/api/audio/local%3Adev-abcdef12%3As%3A0123/saved").bodyAsText())
+    }
+
+    @Test
     fun `a download is the song as a file, named after it`() = testApplication {
         val asked = mutableListOf<String>()
         application {

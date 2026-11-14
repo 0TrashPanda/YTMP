@@ -38,8 +38,14 @@ const nativeLookups = (bridge: NativeBridge): OwnLookups => {
 };
 
 /** Where the sound playing here comes from: YouTube, the host streaming it, or this phone itself. */
-/** `computerModule`: the desktop app looks the song up with its own module now (its song cache keeps it as it plays). */
-export type AudioSource = 'youtube' | 'host' | 'device' | 'computerModule';
+/**
+ * Where the sound playing here comes from (SourceBadge): `youtube` the room's YouTube link;
+ * `module` a link from your own module (this browser's or phone's); `computerModule` the desktop
+ * app's module looks it up now (its song cache keeps it as it plays); `host` the host has it saved
+ * (song cache, download, music files); `hostYoutube` the host gets it from YouTube now; `device`
+ * on this phone or computer.
+ */
+export type AudioSource = 'youtube' | 'module' | 'host' | 'hostYoutube' | 'device' | 'computerModule';
 
 export interface RoomPlayer {
 	readonly enabled: boolean;
@@ -176,6 +182,8 @@ class WebPlayer implements RoomPlayer {
 	private source = $state<Source>('direct');
 	/** The song loaded plays from this computer itself (the desktop app: its music, or its song cache). */
 	private fromComputer = $state(false);
+	/** Playing through the host: false when it gets the song from YouTube now (not saved there); null: not known. */
+	private hostSaved = $state<boolean | null>(null);
 	/** Playing from this computer: false while its module looks the song up (not in its song cache yet). */
 	private computerHas = $state(true);
 	/** The song that didn't play from this computer: it plays the usual way now. */
@@ -238,10 +246,10 @@ class WebPlayer implements RoomPlayer {
 		const now = this.room.state?.nowPlaying;
 		if (!this.enabled || !now?.streamUrl) return null;
 		if (this.fromComputer) return this.computerHas ? 'device' : 'computerModule';
-		if (this.source === 'host') return 'host';
-		if (this.source === 'own') return 'youtube';
-		// The room's link: YouTube's, or the host's own (`/api/audio/…`: saved there, music files).
-		return now.streamUrl.startsWith('/') ? 'host' : 'youtube';
+		if (this.source === 'own') return 'module';
+		// Through the host (its `/api/audio/…`): saved there, or it gets the song from YouTube now.
+		if (this.source === 'host' || now.streamUrl.startsWith('/')) return this.hostSaved === false ? 'hostYoutube' : 'host';
+		return 'youtube';
 	}
 
 	async enable(): Promise<void> {
@@ -501,8 +509,18 @@ class WebPlayer implements RoomPlayer {
 			return;
 		}
 		this.source = this.sourceFor(now);
+		this.hostSaved = null;
 		if (this.source !== 'own') {
-			this.audio.src = this.source === 'host' ? proxiedAudioUrl(songId) : streamUrl;
+			const src = this.source === 'host' ? proxiedAudioUrl(songId) : streamUrl;
+			this.audio.src = src;
+			// Through the host: whether it has the song saved (an older host doesn't say).
+			if (src.startsWith('/api/audio/'))
+				void fetch(`${src.split('?')[0]}/saved`)
+					.then((r) => (r.ok ? r.json() : null))
+					.then((a: { saved?: boolean } | null) => {
+						if (load === this.loads && typeof a?.saved === 'boolean') this.hostSaved = a.saved;
+					})
+					.catch(() => {});
 			return;
 		}
 		// Nothing plays while your module looks the song up, not even the last one.

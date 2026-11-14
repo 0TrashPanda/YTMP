@@ -106,6 +106,12 @@ permissions say otherwise (permission: *Play audio locally*).
     speaker plays the room), the server doesn't look them up at all; and when the server
     can't look a song up (say YouTube stopped it for a while), the room plays on for those
     who can look it up themselves instead of pausing.
+  - **The badge** ✅ next to the song (in the player bar and the full player) says where the
+    sound playing on your device comes from: *YouTube* (the room's link), *Your module* (your
+    phone, browser or computer looked the song up itself), *Server* / *Host phone* (saved there:
+    its song cache, downloads or music files), *YouTube via server* / *YouTube via host phone*
+    (the server gets it from YouTube right now and streams it to you), *This phone* or *This
+    computer* (on your device). No badge when it plays on a speaker.
   - **Search and pages from your own module** ✅: with your own module on, search (and
     the suggestions while typing), Home, artist, album, playlist and podcast pages, pasted
     links and YouTube Music's lyrics come from it too, so YouTube sees your computer rather

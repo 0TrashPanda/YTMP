@@ -26,6 +26,7 @@ import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import kotlinx.serialization.Serializable
 import java.net.URLEncoder
 import org.slf4j.LoggerFactory
 
@@ -131,6 +132,12 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
         call.respond(page)
     }
 
+    // Whether the host has [songId] saved (its song cache, a download, music files, a computer's
+    // song): else its audio route gets it from YouTube now. For the badge of where the sound comes from.
+    get("/audio/{songId}/saved") {
+        val songId = call.parameters["songId"]!!
+        call.respond(AudioSaved(LocalMusic.isLocal(songId) || sources.cache?.here(songId) == true))
+    }
     get("/audio/{songId}") {
         val proxy = sources.audio ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No audio source")
         val songId = call.parameters["songId"]!!
@@ -170,6 +177,10 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
         }
     }
 }
+
+/** What `GET /api/audio/<song>/saved` answers. */
+@Serializable
+data class AudioSaved(val saved: Boolean)
 
 /** A Content-Disposition for [name], also when it isn't plain ASCII (RFC 6266). */
 private fun attachment(name: String): String {

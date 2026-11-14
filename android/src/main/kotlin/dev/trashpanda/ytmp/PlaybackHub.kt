@@ -166,7 +166,8 @@ object PlaybackHub {
 
     /**
      * Where the song loaded here comes from, for the page's player: `kind:itemId`, with kind
-     * "youtube", "host" or "device" and the queue item it's about (the page shows it only for
+     * "youtube", "module" (this phone's own lookup), "host" (saved there), "hostYoutube" (the host
+     * gets it from YouTube now) or "device", and the queue item it's about (the page shows it only for
      * that song: the next one may take seconds to load); null: nothing loaded.
      */
     @Volatile
