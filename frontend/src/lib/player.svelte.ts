@@ -6,7 +6,7 @@ import { artUrl, artistNames } from './format';
 import { EQ_BANDS, EQ_Q, eqHeadroom, equalizer, type EqSettings } from './equalizer.svelte';
 import { nativeBridge, type NativeBridge } from './native';
 import { forgetOwnStream, isYoutubeSong, moduleUsable, ownStreamUrl, prefetchOwnStream } from './ownModule.svelte';
-import type { NowPlaying } from './protocol.gen';
+import type { NowPlaying, OwnLookups } from './protocol.gen';
 import type { RoomConnection } from './room.svelte';
 import { settings } from './settings.svelte';
 import { saved, type SongSource } from './storage';
@@ -14,7 +14,21 @@ import { pickSource, SOURCE_NAMES } from './songSources';
 import { computerAudio, tellComputer } from './computer.svelte';
 import { correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
 
-/** Plays the room's audio on this device. */
+/**
+ * Whether this browser looks YouTube songs up itself (see OwnLookups): with its own module, in
+ * the order of Settings → Where songs play from. The room's host then needn't (first), or plays
+ * on when its own lookup fails (fallback).
+ */
+export function ownLookups(): OwnLookups {
+	if (!moduleUsable()) return 'none';
+	const at = saved.songSources.indexOf('own');
+	if (at < 0) return 'none';
+	return at === 0 ? 'first' : 'fallback';
+}
+
+/** The Android app plays the room's link first, and looks a song up on the phone when that doesn't play (PlaybackService). */
+const NATIVE_LOOKUPS: OwnLookups = 'fallback';
+
 /** Where the sound playing here comes from: YouTube, the host streaming it, or this phone itself. */
 export type AudioSource = 'youtube' | 'host' | 'device';
 
@@ -231,11 +245,23 @@ class WebPlayer implements RoomPlayer {
 		clearInterval(this.timer);
 		this.timer = setInterval(() => this.sync(), 500);
 		// New songs wait for this player to load them (see reportReady).
-		await this.room.run({ kind: 'SetListening', on: true, startsTogether: true });
+		this.sentLookups = ownLookups();
+		await this.room.run({ kind: 'SetListening', on: true, startsTogether: true, ownLookups: this.sentLookups });
 	}
 
 	reconnected(): void {
-		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: true });
+		this.sentLookups = ownLookups();
+		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: true, ownLookups: this.sentLookups });
+	}
+
+	/** What the room last heard about this player's own lookups: sent again when it changes (the module starts, the order changes). */
+	private sentLookups: OwnLookups = 'none';
+
+	private tellLookups(): void {
+		const now = ownLookups();
+		if (now === this.sentLookups) return;
+		this.sentLookups = now;
+		this.room.run({ kind: 'SetListening', on: true, startsTogether: true, ownLookups: now });
 	}
 
 	disable(chosen = true): void {
@@ -246,7 +272,7 @@ class WebPlayer implements RoomPlayer {
 		clearInterval(this.timer);
 		this.audio.pause();
 		this.setMediaKeys(false);
-		this.room.run({ kind: 'SetListening', on: false, startsTogether: false });
+		this.room.run({ kind: 'SetListening', on: false, startsTogether: false, ownLookups: 'none' });
 	}
 
 	setVolume(value: number): void {
@@ -303,6 +329,7 @@ class WebPlayer implements RoomPlayer {
 	sync(): void {
 		this.followVolume();
 		if (!this.enabled) return;
+		this.tellLookups();
 		if (this.loose) this.reportStalls();
 		const state = this.room.state;
 		const now = state?.nowPlaying;
@@ -733,11 +760,11 @@ class NativePlayer implements RoomPlayer {
 		saved.setSoloOff(this.room.roomCode, false);
 		this.sync();
 		// The app says when it has loaded a new song (bridge version 9), so new songs wait for it.
-		await this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9 });
+		await this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: NATIVE_LOOKUPS });
 	}
 
 	reconnected(): void {
-		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9 });
+		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: NATIVE_LOOKUPS });
 	}
 
 	disable(chosen = true): void {
@@ -745,7 +772,7 @@ class NativePlayer implements RoomPlayer {
 		saved.listening = false;
 		if (chosen && this.room.state?.room.visibility === 'private') saved.setSoloOff(this.room.roomCode, true);
 		this.sync();
-		this.room.run({ kind: 'SetListening', on: false, startsTogether: false });
+		this.room.run({ kind: 'SetListening', on: false, startsTogether: false, ownLookups: 'none' });
 	}
 
 	setVolume(value: number): void {

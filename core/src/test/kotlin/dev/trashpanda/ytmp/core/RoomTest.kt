@@ -14,6 +14,7 @@ import dev.trashpanda.ytmp.protocol.ItemList
 import dev.trashpanda.ytmp.protocol.RepeatMode
 import dev.trashpanda.ytmp.protocol.ClientMessage
 import dev.trashpanda.ytmp.protocol.Command
+import dev.trashpanda.ytmp.protocol.OwnLookups
 import dev.trashpanda.ytmp.protocol.Event
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.QueueItemResult
@@ -428,6 +429,42 @@ class RoomTest {
         runCurrent()
         assertEquals("ytm:song1", client.state.nowPlaying?.item?.song?.id)
         assertTrue(client.state.playback.playing)
+    }
+
+    @Test
+    fun `when the host's lookup fails, a listener that looks songs up itself plays on`() = runTest {
+        class Blocked : Exception("bot check"), SourceBlocked
+        val room = Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { throw Blocked() }, backgroundScope) {
+            testScheduler.currentTime
+        }
+        val client = room.connect()
+        room.run(client, Command.SetListening(true, ownLookups = OwnLookups.FALLBACK))
+        room.run(client, Command.AddSongs(listOf(song(1)), QueuePosition.END))
+        runCurrent()
+
+        assertEquals("/api/audio/ytm%3Asong1", client.state.nowPlaying?.streamUrl)
+        assertTrue(client.events.none { it is Event.Notice })
+    }
+
+    @Test
+    fun `when everyone looks songs up first, the host doesn't, unless a speaker plays`() = runTest {
+        val lookups = mutableListOf<String>()
+        val room = Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> lookups += id; "https://stream/$id" }, backgroundScope) {
+            testScheduler.currentTime
+        }
+        val client = room.connect()
+        room.run(client, Command.SetListening(true, ownLookups = OwnLookups.FIRST))
+        room.run(client, Command.AddSongs(listOf(song(1), song(2)), QueuePosition.END))
+        runCurrent()
+        assertEquals("/api/audio/ytm%3Asong1", client.state.nowPlaying?.streamUrl)
+        assertEquals(emptyList(), lookups)
+
+        // Speakers near the phone play the host's link: the host looks the next song up again.
+        room.run(client, Command.SetSpeakers(listOf("Kitchen")))
+        room.run(client, Command.Skip())
+        runCurrent()
+        assertEquals("https://stream/ytm:song2", client.state.nowPlaying?.streamUrl)
+        assertEquals(listOf("ytm:song2"), lookups)
     }
 
     @Test

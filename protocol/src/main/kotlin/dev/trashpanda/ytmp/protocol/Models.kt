@@ -229,6 +229,23 @@ data class OutputInfo(
     val screen: Boolean = false,
 )
 
+/**
+ * Whether a player looks YouTube songs up itself, with its own module (the desktop app, a
+ * browser with one), instead of playing the link the room's host looked up.
+ */
+@Serializable
+@SerialName("OwnLookups")
+enum class OwnLookups {
+    /** It plays the room's link (or through the host). */
+    @SerialName("none") NONE,
+
+    /** The room's link first; its own module when that doesn't work. */
+    @SerialName("fallback") FALLBACK,
+
+    /** Its own module first: the host doesn't need to look the song up for it. */
+    @SerialName("first") FIRST,
+}
+
 @Serializable
 @SerialName("RepeatMode")
 enum class RepeatMode {

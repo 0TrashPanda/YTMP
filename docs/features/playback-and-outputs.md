@@ -96,6 +96,10 @@ permissions say otherwise (permission: *Play audio locally*).
     tried first: the room's link, your own module or through the server (for example your
     module first). When one doesn't work for a song, the next one is tried; through the
     server is always the last try.
+    The room follows that ✅: when everyone playing along looks songs up first (and no
+    speaker plays the room), the server doesn't look them up at all; and when the server
+    can't look a song up (say YouTube stopped it for a while), the room plays on for those
+    who can look it up themselves instead of pausing.
   - **Search and pages from your own module** ✅: with your own module on, search (and
     the suggestions while typing), Home, artist, album, playlist and podcast pages, pasted
     links and YouTube Music's lyrics come from it too, so YouTube sees your computer rather

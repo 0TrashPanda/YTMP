@@ -38,7 +38,7 @@ describe('appQuit', () => {
 		const storage = memory();
 		const { connection, sent } = room(true);
 		await leaveForQuit(connection, playingHere, false, storage);
-		expect(sent).toEqual([{ kind: 'SetListening', on: false, startsTogether: false }]);
+		expect(sent).toEqual([{ kind: 'SetListening', on: false, startsTogether: false, ownLookups: 'none' }]);
 		expect(takeResume('ROOM', storage)).toBeNull();
 	});
 

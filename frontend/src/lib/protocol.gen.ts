@@ -248,10 +248,13 @@ export interface CommandSetDeviceVolume {
   participantId: string | null;
 }
 
+export type OwnLookups = "none" | "fallback" | "first";
+
 export interface CommandSetListening {
   kind: "SetListening";
   on: boolean;
   startsTogether: boolean;
+  ownLookups: OwnLookups;
 }
 
 export type RoomOpenMode = "ask" | "move" | "move_if_away";

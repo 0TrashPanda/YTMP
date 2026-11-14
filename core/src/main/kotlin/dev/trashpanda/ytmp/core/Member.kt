@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.core
 
 import dev.trashpanda.ytmp.protocol.BanInfo
+import dev.trashpanda.ytmp.protocol.OwnLookups
 import dev.trashpanda.ytmp.protocol.Participant
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.RejectReason
@@ -18,6 +19,8 @@ internal class Member(
     var listening: Boolean = false,
     /** Their player says when it has a new song (Command.PlayerReady): songs wait for it. */
     var startsTogether: Boolean = false,
+    /** Their player looks YouTube songs up itself (Command.SetListening.ownLookups). */
+    var ownLookups: OwnLookups = OwnLookups.NONE,
     /** Speakers near their phone that they play the room on (Command.SetSpeakers). */
     var speakers: List<String> = emptyList(),
     var speakersStartTogether: Boolean = false,

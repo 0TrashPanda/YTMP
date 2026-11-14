@@ -39,7 +39,7 @@ export async function leaveForQuit(room: RoomConnection, player: RoomPlayer, for
 			// Not kept: it opens with "Playing here" as saved, without playing on.
 		}
 	}
-	await room.run({ kind: 'SetListening', on: false, startsTogether: false }, false);
+	await room.run({ kind: 'SetListening', on: false, startsTogether: false, ownLookups: 'none' }, false);
 }
 
 /** The app restarted for an update while it played [roomCode]: it goes back into that room (not asked away). */

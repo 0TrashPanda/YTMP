@@ -17,6 +17,7 @@ import dev.trashpanda.ytmp.protocol.MigrationMode
 import dev.trashpanda.ytmp.protocol.MigrationOffer
 import dev.trashpanda.ytmp.protocol.NowPlaying
 import dev.trashpanda.ytmp.protocol.OutputKind
+import dev.trashpanda.ytmp.protocol.OwnLookups
 import dev.trashpanda.ytmp.protocol.PROTOCOL_VERSION
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.PlaybackStatus
@@ -37,6 +38,7 @@ import dev.trashpanda.ytmp.protocol.ServerMessage
 import dev.trashpanda.ytmp.protocol.SkipVotes
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.isEpisodeSpeed
+import java.net.URLEncoder
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -1006,6 +1008,7 @@ class Room(
                 if (command.on) need(member, Permission.LISTEN_LOCALLY)?.let { return it }
                 member.listening = command.on
                 member.startsTogether = command.on && command.startsTogether
+                member.ownLookups = if (command.on) command.ownLookups else OwnLookups.NONE
                 member.heldUntil = null
                 emit(Event.ParticipantUpdated(member.toParticipant()))
                 if (command.on) emptyJob?.cancel() else pauseWhenNobodyHears(0)
@@ -1799,9 +1802,14 @@ class Room(
         }
     }
 
-    /** Resolves the stream of the current [item], then starts it (or skips it if it can't play). */
+    /**
+     * Resolves the stream of the current [item], then starts it (or skips it if it can't play).
+     * When everyone playing the room looks songs up themselves first, the host doesn't: they get
+     * [ownLookupLink]. When the host's lookup fails and someone playing can look it up, too.
+     */
     private fun resolve(item: QueueItem) {
         resolveJob?.cancel()
+        val theirsFirst = listenersLookUp(item.song, first = true)
         // An episode: where whoever added it stopped, looked up while the stream loads.
         val bookmarkToken = item.song.takeIf { it.podcast != null && bookmarks != null }?.let { members[item.addedBy]?.accountToken }
         resolveJob = scope.launch {
@@ -1818,7 +1826,8 @@ class Room(
                 }
             }
             val started = System.nanoTime()
-            val stream = runCatching { streams.resolve(item.song.id) }
+            val stream = if (theirsFirst) Result.success(ResolvedStream(ownLookupLink(item.song.id), durationMs = null))
+                else runCatching { streams.resolve(item.song.id) }
             val took = (System.nanoTime() - started) / 1_000_000
             stream.onSuccess { log.info("Room {}: {} \"{}\" ready in {} ms", code, item.song.id, item.song.title, took) }
                 .onFailure { if (it !is CancellationException) log.warn("Room {}: {} \"{}\" can't play after {} ms: {}", code, item.song.id, item.song.title, took, it.message) }
@@ -1826,7 +1835,14 @@ class Room(
             val saved = progress?.await()
             val next = mutex.withLock {
                 if (current?.itemId != item.itemId) return@withLock null
-                stream.onSuccess {
+                val failed = stream.exceptionOrNull()
+                val usable = if (failed != null && failed !is CancellationException && listenersLookUp(item.song, first = false)) {
+                    log.info("Room {}: {} plays from the listeners' own lookups (the host's failed: {})", code, item.song.id, failed.message)
+                    Result.success(ResolvedStream(ownLookupLink(item.song.id), durationMs = null))
+                } else {
+                    stream
+                }
+                usable.onSuccess {
                     failedInARow = 0
                     exactDuration(item, it.durationMs)
                     resumeFrom(saved, current ?: item)
@@ -1854,7 +1870,8 @@ class Room(
                     retireCurrent(QueueItemResult.SKIPPED)
                     playNextFromQueue()
                 }
-                queue.firstOrNull()
+                // Not when the listeners look it up themselves.
+                queue.firstOrNull()?.takeIf { !listenersLookUp(it.song, first = true) }
             }
             // Warm up the next song so it starts quickly.
             if (next != null) {
@@ -2201,6 +2218,26 @@ class Room(
 
     // --- helpers ----------------------------------------------------------------------
 
+    /**
+     * Whether those playing the room look [song] up themselves, with their own module
+     * ([OwnLookups]). [first]: everyone playing does, before the room's link, and no speaker
+     * plays it, so the host needn't look it up at all. Otherwise: at least one of them can,
+     * after the host's lookup failed.
+     */
+    private fun listenersLookUp(song: Song, first: Boolean): Boolean {
+        if (!song.id.startsWith("ytm:")) return false
+        val listeners = members.values.filter { (it.online || it.heldUntil != null) && it.listening }
+        if (!first) return listeners.any { it.ownLookups != OwnLookups.NONE }
+        val speakers = outputs.active.isNotEmpty() || members.values.any { (it.online || it.heldUntil != null) && it.speakers.isNotEmpty() }
+        return !speakers && listeners.isNotEmpty() && listeners.all { it.ownLookups == OwnLookups.FIRST }
+    }
+
+    /**
+     * The room's link for a song its listeners look up themselves: the host's proxy
+     * (`/api/audio/…`), which looks it up only for a player or speaker that asks for it.
+     */
+    private fun ownLookupLink(songId: String) = "/api/audio/" + URLEncoder.encode(songId, "UTF-8")
+
     private fun playbackStatus() = PlaybackStatus(
         playing = playingNow(),
         positionMs = position(),
@@ -2260,7 +2297,7 @@ class Room(
             val next = mutex.withLock {
                 warmUpPending = false
                 val next = queue.firstOrNull()?.song
-                if (next == null || streamUrl == null || next.id == warmedUp) return@launch
+                if (next == null || streamUrl == null || next.id == warmedUp || listenersLookUp(next, first = true)) return@launch
                 warmedUp = next.id
                 next
             }

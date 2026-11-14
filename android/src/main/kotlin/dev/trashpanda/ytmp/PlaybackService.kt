@@ -1096,7 +1096,7 @@ class PlaybackService : MediaSessionService() {
         stoppedHere = false
         resumedHere = true
         follower.follow(room)
-        follower.command("""{"kind":"SetListening","on":true,"startsTogether":true}""")
+        follower.command("""{"kind":"SetListening","on":true,"startsTogether":true,"ownLookups":"fallback"}""")
         PlaybackHub.status("resumed")
         merge(target, follower.room.value)?.let(::apply)
     }

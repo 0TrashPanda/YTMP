@@ -84,6 +84,17 @@ song whose own link fails too. Songs that aren't YouTube's (`ytm:` IDs) keep the
   Chrome's private network preflight; see [module API](../sources/module-api.md)).
 - A lookup that fails (module unreachable, wrong key, unavailable) is reported to the host
   log and the song goes to the next way in the order.
+- **The room knows** ✅ (`Command.SetListening.ownLookups`, `OwnLookups`, `Room.listenersLookUp`):
+  a player says whether it looks songs up itself, `first` (own module first in its order and
+  usable: `ownLookups()` in `player.svelte.ts`, sent again from `sync()` when that changes),
+  `fallback` (own module later in the order; the Android app, which plays the room's link
+  first) or `none`. When everyone playing a YouTube song is `first` and no speaker plays
+  the room, the host doesn't look it up (nor warms it up): the room's link is the host's
+  proxy (`/api/audio/…`), which only looks the song up for a player that asks for it (its
+  own lookup failed). When the host's lookup fails (also YouTube's bot check) and someone
+  playing is `first` or `fallback`, the room plays on with that link instead of pausing or
+  skipping. Before, the room only started a song once the host had looked it up, so a
+  server stopped by the bot check paused a room whose only listener could look it up fine.
 
 **Fetching in pieces** ✅: YouTube sends a request for the whole rest of a file (no end to its
 `Range`) only about as fast as the song plays, so a player's buffer runs dry: short pauses
