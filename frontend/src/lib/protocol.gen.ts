@@ -184,6 +184,12 @@ export interface CommandPlayNow {
   song: Song;
 }
 
+export interface CommandPlayerEnded {
+  kind: "PlayerEnded";
+  itemId: string;
+  positionMs: number;
+}
+
 export interface CommandPlayerReady {
   kind: "PlayerReady";
   itemId: string;
@@ -425,6 +431,7 @@ export type Command =
   | CommandPause
   | CommandPlay
   | CommandPlayNow
+  | CommandPlayerEnded
   | CommandPlayerReady
   | CommandPlayerStalled
   | CommandPrevious

@@ -562,6 +562,23 @@ class PlaybackService : MediaSessionService() {
 
     private var stallJob: Job? = null
 
+    /** The song this phone told the room it played to the end ([reportEnded]). */
+    private var endedSent: String? = null
+
+    /**
+     * The song played to its end here: the room moves on now (PlayerEnded), rather than at a
+     * length it may not know or have rounded up. The room checks it's where it is too.
+     */
+    private fun reportEnded() {
+        val target = current ?: return
+        val itemId = loadedItemId ?: return
+        if (!target.enabled || !target.playing || target.item?.itemId != itemId || endedSent == itemId) return
+        endedSent = itemId
+        val position = maxOf(0L, exo.currentPosition - target.syncOffsetMs)
+        Log.d(TAG, "played $itemId to its end at $position ms")
+        PlaybackHub.command("""{"kind":"PlayerEnded","itemId":${JSONObject.quote(itemId)},"positionMs":$position}""")
+    }
+
     /**
      * The player ran out of data in the middle of a song and still has none: if it plays alone,
      * the room waits at this position ([PlayerReady] follows when there is data again), so
@@ -896,7 +913,11 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             PlaybackHub.status(if (playbackState == Player.STATE_BUFFERING) "buffering" else "ready")
-            if (playbackState == Player.STATE_READY) reportReady()
+            if (playbackState == Player.STATE_READY) {
+                endedSent = null
+                reportReady()
+            }
+            if (playbackState == Player.STATE_ENDED) reportEnded()
             val now = SystemClock.elapsedRealtime()
             stallJob?.cancel()
             if (playbackState == Player.STATE_BUFFERING) {

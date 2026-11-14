@@ -248,6 +248,26 @@ a new song: `reportReady` / `reportStall` in `PlaybackService`, `reportStall` in
 The wait ends after `Room.STALL_WAIT_MS` (30 s) if the player never answers. With other players,
 nothing changes: they go on and the stalled one catches up as before.
 
+## Ending a song ✅
+
+The room ends a song on its own clock at the length it knows (`Room.scheduleEnd`), or when a
+player played it to its end (`Command.PlayerEnded`, `Room.playerEnded`), whichever comes first.
+The length can be wrong: listings round it or leave it out (0: the song played on until
+skipped), and without its own lookup (see own lookups above) the host has no exact one. The
+players send theirs (`PlayerReady.durationMs`, taken within 250 ms for a song the host didn't
+look up), and their end:
+
+- **Web player** (desktop app, browsers, the party screen): on the audio's `ended`, and when
+  it pauses at the end because the room is past the audio's length (`sync()`). Once per song;
+  again after `playing` (repeat one).
+- **Android app** (`PlaybackService.reportEnded`): on `STATE_ENDED`, once until `STATE_READY`.
+- **The room takes it** only for the current song, from a member who listens, while it
+  plays, when the player's position is within `PLAYER_END_MATCH_MS` (5 s) of the room's, and
+  with a known length only in its last 10%: a player that's behind or whose stream broke off
+  early can't skip the song for everyone. Repeat one plays it again, as at the clock's end.
+- Speakers move on by themselves already (`outputSkipped`); older players don't send it and
+  older hosts ignore it (an unreadable message is dropped), so the clock ends songs there.
+
 For sub-millisecond multi-room sync, the plan is a [Snapcast output](../../features/future-ideas.md#snapcast-output)
 rather than building it into YTMP.
 

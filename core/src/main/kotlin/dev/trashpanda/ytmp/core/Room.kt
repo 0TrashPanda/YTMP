@@ -1029,6 +1029,7 @@ class Room(
                 ready(command.itemId, if (command.speakers) "${member.id}:speakers" else member.id, command.failed)
             }
             is Command.PlayerStalled -> stalled(member, command.itemId, command.positionMs)
+            is Command.PlayerEnded -> playerEnded(member, command.itemId, command.positionMs)
             is Command.SetOutput -> {
                 need(member, Permission.CHANGE_OUTPUTS)?.let { return it }
                 val device = outputs.device(command.outputId) ?: return ErrorInfo(ErrorCode.NOT_FOUND, "That speaker isn't available")
@@ -1897,12 +1898,39 @@ class Room(
         val item = current?.takeIf { it.itemId == itemId } ?: return
         if (durationMs == null || streamUrl != ownLookupLink(item.song.id)) return
         val before = item.song.durationMs
-        exactDuration(item, durationMs)
+        // The player's length is the audio it plays: exactly, so the song doesn't end a moment early.
+        exactDuration(item, durationMs, toleranceMs = PLAYER_LENGTH_TOLERANCE_MS)
         if (current?.song?.durationMs != before) emitPlayback()
     }
 
-    private fun exactDuration(item: QueueItem, durationMs: Long?) {
-        if (durationMs == null || durationMs <= 0 || abs(durationMs - item.song.durationMs) < DURATION_TOLERANCE_MS) return
+    /**
+     * A player played the current song to its end ([Command.PlayerEnded]): the room moves on now,
+     * as when its own clock gets there ([scheduleEnd]). Only from someone playing along, while
+     * the room plays, when the player is where the room is, and (with a known length) in the
+     * song's last part: a player that's behind, or one whose audio broke off early, can't skip
+     * the song for everyone. Without a known length that's the only way the song ends by itself.
+     */
+    private fun playerEnded(member: Member, itemId: String, positionMs: Long) {
+        val item = current ?: return
+        if (item.itemId != itemId || !member.listening || !playingNow()) return
+        val at = position()
+        val length = item.song.durationMs
+        if (abs(positionMs - at) > PLAYER_END_MATCH_MS || (length > 0 && positionMs < length * 9 / 10)) {
+            log.info("Room {}: {}'s player ended {} at {} ms, the room is at {} of {} ms: not taken", code, member.name, item.song.id, positionMs, at, length)
+            return
+        }
+        log.info("Room {}: {}'s player ended {} at {} ms (the room at {} of {} ms)", code, member.name, item.song.id, positionMs, at, length)
+        endJob?.cancel()
+        if (repeat == RepeatMode.ONE) {
+            replayCurrent()
+            return
+        }
+        retireCurrent(QueueItemResult.PLAYED)
+        playNextFromQueue()
+    }
+
+    private fun exactDuration(item: QueueItem, durationMs: Long?, toleranceMs: Long = DURATION_TOLERANCE_MS) {
+        if (durationMs == null || durationMs <= 0 || abs(durationMs - item.song.durationMs) < toleranceMs) return
         val exact = item.copy(song = item.song.copy(durationMs = durationMs))
         current = exact
         // Clients take it as the same song (same item ID) with a new length; the stream follows.
@@ -2363,6 +2391,10 @@ class Room(
         const val END_GRACE_MS = 5_000L
         /** A stream length this close to the listed one is the same; no need to update it. */
         const val DURATION_TOLERANCE_MS = 1_500L
+        /** A player's length ([Command.PlayerReady.durationMs]) is taken unless it's this close already. */
+        const val PLAYER_LENGTH_TOLERANCE_MS = 250L
+        /** A player's end ([Command.PlayerEnded]) counts only this close to the room's own position. */
+        const val PLAYER_END_MATCH_MS = 5_000L
 
         /** Songs that fail to load in a row before the room pauses instead of skipping on. */
         const val MAX_FAILED_IN_A_ROW = 3

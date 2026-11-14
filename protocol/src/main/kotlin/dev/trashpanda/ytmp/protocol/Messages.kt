@@ -333,6 +333,17 @@ sealed interface Command {
     data class PlayerStalled(val itemId: String, val positionMs: Long) : Command
 
     /**
+     * This participant's player played the song [itemId] to its end, at [positionMs] (its own
+     * position). The room moves on then, rather than at the length it knows, which may be too
+     * long (listings round it) or unknown (0: it would play on until skipped). Taken only from a
+     * player that plays along, while the room plays, near the room's own position, and (when the
+     * length is known) near the end (see Room.playerEnded).
+     */
+    @Serializable
+    @SerialName("PlayerEnded")
+    data class PlayerEnded(val itemId: String, val positionMs: Long) : Command
+
+    /**
      * Plays the room on a speaker or TV, or stops playing on it. [screen]: a TV or display
      * with Chromecast shows the party screen too, which plays the music itself.
      */

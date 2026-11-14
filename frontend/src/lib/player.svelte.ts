@@ -209,6 +209,8 @@ class WebPlayer implements RoomPlayer {
 		});
 		this.audio.addEventListener('playing', () => {
 			this.unlocked = true;
+			// Playing again (repeat one): it can end again.
+			this.endedSent = null;
 			this.buffering = false;
 			clearTimeout(this.stallTimer);
 			// It plays after all (e.g. after a tap): the "tap to allow audio" is done.
@@ -218,6 +220,7 @@ class WebPlayer implements RoomPlayer {
 		// Paused while waiting: that time isn't buffering.
 		this.audio.addEventListener('pause', () => (this.waitingSince = null));
 		this.audio.addEventListener('canplay', () => this.sync());
+		this.audio.addEventListener('ended', () => this.reportEnded());
 		this.audio.addEventListener('error', () => this.onError());
 		// Not on a Chromecast (the TV's party screen).
 		if (!loose) this.stopEqualizer = equalizer.listen((settings) => this.setEqualizer(settings));
@@ -380,6 +383,8 @@ class WebPlayer implements RoomPlayer {
 		if (Number.isFinite(lengthMs) && expectedMs >= lengthMs - 100) {
 			if (!this.audio.paused) this.audio.pause();
 			this.buffering = false;
+			// Paused a moment before the audio's own end: it ended all the same.
+			this.reportEnded();
 			return;
 		}
 
@@ -650,6 +655,22 @@ class WebPlayer implements RoomPlayer {
 		// Ready again (`PlayerReady`) when it has data: the room goes on from here.
 		this.readySent = null;
 		this.room.run({ kind: 'PlayerStalled', itemId: now.item.itemId, positionMs: Math.max(0, Math.round(this.audio.currentTime * 1000 - this.syncOffsetMs)) });
+	}
+
+	/** The song this player told the room it played to the end. */
+	private endedSent: string | null = null;
+
+	/**
+	 * The song played to its end here: the room moves on now (`PlayerEnded`), rather than at a
+	 * length it may not know or have rounded up. The room checks it's where it is too.
+	 */
+	private reportEnded(): void {
+		const state = this.room.state;
+		const now = state?.nowPlaying;
+		if (!this.enabled || !now || this.loadedItemId !== now.item.itemId || this.endedSent === now.item.itemId) return;
+		if (!state?.playback.playing) return;
+		this.endedSent = now.item.itemId;
+		this.room.run({ kind: 'PlayerEnded', itemId: now.item.itemId, positionMs: Math.max(0, Math.round(this.audio.currentTime * 1000 - this.syncOffsetMs)) });
 	}
 
 	/** The room waits for its players to load a new song (`playback.starting`): this one has it (or can't play it). */

@@ -492,6 +492,67 @@ class RoomTest {
     }
 
     @Test
+    fun `a player that played the song to its end moves the room on, when it's where the room is`() = runTest {
+        val room = Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> "https://stream/$id" }, backgroundScope) {
+            testScheduler.currentTime
+        }
+        val client = room.connect()
+        room.run(client, Command.SetListening(true))
+        // The listing says 3:30; the audio is 3:20.
+        room.run(client, Command.AddSongs(listOf(song(1).copy(durationMs = 210_000), song(2), song(3).copy(durationMs = 0), song(4)), QueuePosition.END))
+        runCurrent()
+        val first = client.state.nowPlaying!!.item.itemId
+
+        // Early (a stream that broke off): not taken.
+        advanceTimeBy(60_000)
+        room.run(client, Command.PlayerEnded(first, 60_000))
+        runCurrent()
+        assertEquals(first, client.state.nowPlaying?.item?.itemId)
+        // Far from where the room is: not taken either.
+        room.run(client, Command.PlayerEnded(first, 200_000))
+        runCurrent()
+        assertEquals(first, client.state.nowPlaying?.item?.itemId)
+
+        advanceTimeBy(140_000)
+        room.run(client, Command.PlayerEnded(first, 200_000))
+        runCurrent()
+        assertEquals("ytm:song2", client.state.nowPlaying?.item?.song?.id)
+        assertEquals(QueueItemResult.PLAYED, client.state.history.last().result)
+
+        // Without a length, the player's end is how the song ends.
+        room.run(client, Command.Skip())
+        runCurrent()
+        val noLength = client.state.nowPlaying!!.item
+        assertEquals("ytm:song3", noLength.song.id)
+        advanceTimeBy(30_000)
+        room.run(client, Command.PlayerEnded(noLength.itemId, 30_000))
+        runCurrent()
+        assertEquals("ytm:song4", client.state.nowPlaying?.item?.song?.id)
+    }
+
+    @Test
+    fun `a player's end only counts from someone playing along, and repeat one plays it again`() = runTest {
+        val room = Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> "https://stream/$id" }, backgroundScope) {
+            testScheduler.currentTime
+        }
+        val client = room.connect()
+        room.run(client, Command.AddSongs(listOf(song(1).copy(durationMs = 0), song(2)), QueuePosition.END))
+        runCurrent()
+        val item = client.state.nowPlaying!!.item.itemId
+        advanceTimeBy(30_000)
+        room.run(client, Command.PlayerEnded(item, 30_000))
+        runCurrent()
+        assertEquals(item, client.state.nowPlaying?.item?.itemId)
+
+        room.run(client, Command.SetListening(true))
+        room.run(client, Command.SetRepeat(RepeatMode.ONE))
+        room.run(client, Command.PlayerEnded(item, 30_000))
+        runCurrent()
+        assertEquals(item, client.state.nowPlaying?.item?.itemId)
+        assertTrue(client.state.playback.positionMs < 1_000)
+    }
+
+    @Test
     fun `only the hosting device can join a private room until it is made public`() = runTest {
         val room = Room("ABCD", "Solo", "owner-token", RoomVisibility.PRIVATE, { "x" }, backgroundScope) { testScheduler.currentTime }
         val owner = FakeClient()

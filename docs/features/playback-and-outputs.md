@@ -14,6 +14,11 @@ permissions say otherwise (permission: *Play audio locally*).
   song*: 2 s by default, up to 10 s, or 0); a slower one joins late. It never starts before
   at least one of them has it, however long that takes, so alone you always hear it from the
   start. When none of them can play it, it's skipped (three in a row: the room pauses).
+- **A song ends when its audio ends** ✅: a phone, browser or the desktop app that plays a
+  song to its end tells the room, and the next one starts for everyone, also when the
+  listing's length was wrong or missing (the room used to wait for that length, or play on
+  until someone skipped). Only near the end of the song and where the room is, so a device
+  that's behind or whose song broke off can't skip it for the others.
 - This is the main way to hear a **server-hosted** room, because the server may be a
   remote machine without speakers.
 - Each client can turn local playback on or off at any time, and controls its own
