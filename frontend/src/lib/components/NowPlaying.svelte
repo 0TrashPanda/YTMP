@@ -425,17 +425,18 @@
 				<div class="flex w-full max-w-[36rem] min-w-0 shrink-0 items-center gap-1 lg:hidden" role="presentation" oncontextmenu={onSongMenu}>
 				<div class="min-w-0 flex-1">
 					<h1 class="text-2xl font-bold"><Marquee text={song.title} /></h1>
-					<p class="truncate text-muted">
+					<!-- The album shortens ("…"), the names stay whole (unless one is longer than the line). Not one truncated line: a too-long button in it vanishes whole. -->
+					<p class="flex min-w-0 overflow-hidden whitespace-pre text-muted">
 						{#if song.podcast}
 							{@const podcast = song.podcast}
-							<button class="hover:text-white hover:underline" onclick={() => open.onPodcast(podcast)} onpointerenter={() => prefetch('podcast', podcast.id)}>{podcast.name}</button>
+							<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => open.onPodcast(podcast)} onpointerenter={() => prefetch('podcast', podcast.id)}>{podcast.name}</button>
 						{/if}
 						{#each song.artists as artist, i (i)}
-							{#if i > 0}{', '}{/if}<button class="hover:text-white hover:underline" onclick={() => open.onArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}>{artist.name}</button>
+							{#if i > 0}<span class="shrink-0">{', '}</span>{/if}<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => open.onArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}>{artist.name}</button>
 						{/each}
 						{#if song.album}
 							{@const album = song.album}
-							• <button class="hover:text-white hover:underline" onclick={() => open.onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
+							<span class="shrink-0">{' • '}</span><button class="min-w-0 truncate hover:text-white hover:underline" onclick={() => open.onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
 						{/if}
 					</p>
 					<p class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted">
