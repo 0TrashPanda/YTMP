@@ -288,11 +288,14 @@ class DesktopHost(private val config: Config) {
                 call.respond(musicStatus())
             }
             // The window plays [song] (it counts as a play, like a room's) or has it next.
+            // `here`: the song cache has it whole (else this computer's module looks it up, and the
+            // cache keeps it as it plays): the window says where the sound comes from.
             post("/started") {
                 val song = call.receive<Song>()
+                val here = cache.has(song.id)
                 playing = (playing + song.id).toList().takeLast(KEPT_PLAYING).toSet()
                 cache.started(song)
-                call.respond(HttpStatusCode.NoContent)
+                call.respond(Started(here))
             }
             post("/known") {
                 val song = call.receive<Song>()
@@ -348,6 +351,10 @@ class DesktopHost(private val config: Config) {
 
     @Serializable
     data class PhoneCopyRequest(val phone: PhoneCopy.Phone, val token: String? = null, val which: Set<PhoneCopy.Which>? = null)
+
+    /** What `/api/desktop/started` answers: whether the song cache has the song already. */
+    @Serializable
+    data class Started(val here: Boolean)
 
     @Serializable
     data class PhoneCopyWhich(val which: Set<PhoneCopy.Which>)

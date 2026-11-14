@@ -150,7 +150,10 @@ the disk without another lookup.
   artist pages of its own device to the host (`computer.svelte.ts`, `isMine`).
 - **Playing**: the web player (`player.svelte.ts`) plays from the host when the song is this
   computer's, or when the cache is on and it's a YouTube Music song (not a podcast, at most an
-  hour): `computerAudio`. If that fails it plays the usual way. The badge says *This computer*.
+  hour): `computerAudio`. If that fails it plays the usual way. The badge says *This computer*
+  when the song is here already (its own music, or `POST /api/desktop/started` answers
+  `{ here: true }`: the cache has it), and *YouTube* while this computer's module looks it up
+  (the cache keeps it as it plays, so next time it's *This computer*).
 - **Sent only when needed** (`DeviceSongs` in `host/`, on the server): the room's stream link
   for these songs is the server's `/api/audio/<song>`. Nobody asks for it while the computer
   plays alone. When another player or a speaker does, the server marks the song wanted and

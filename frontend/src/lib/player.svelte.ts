@@ -38,7 +38,8 @@ const nativeLookups = (bridge: NativeBridge): OwnLookups => {
 };
 
 /** Where the sound playing here comes from: YouTube, the host streaming it, or this phone itself. */
-export type AudioSource = 'youtube' | 'host' | 'device';
+/** `computerModule`: the desktop app looks the song up with its own module now (its song cache keeps it as it plays). */
+export type AudioSource = 'youtube' | 'host' | 'device' | 'computerModule';
 
 export interface RoomPlayer {
 	readonly enabled: boolean;
@@ -175,6 +176,8 @@ class WebPlayer implements RoomPlayer {
 	private source = $state<Source>('direct');
 	/** The song loaded plays from this computer itself (the desktop app: its music, or its song cache). */
 	private fromComputer = $state(false);
+	/** Playing from this computer: false while its module looks the song up (not in its song cache yet). */
+	private computerHas = $state(true);
 	/** The song that didn't play from this computer: it plays the usual way now. */
 	private computerFailed: string | null = null;
 	/** The ways already tried for this item (the next one in the order comes after a failure). */
@@ -234,7 +237,7 @@ class WebPlayer implements RoomPlayer {
 	get audioSource(): AudioSource | null {
 		const now = this.room.state?.nowPlaying;
 		if (!this.enabled || !now?.streamUrl) return null;
-		if (this.fromComputer) return 'device';
+		if (this.fromComputer) return this.computerHas ? 'device' : 'computerModule';
 		if (this.source === 'host') return 'host';
 		if (this.source === 'own') return 'youtube';
 		// The room's link: YouTube's, or the host's own (`/api/audio/…`: saved there, music files).
@@ -485,11 +488,13 @@ class WebPlayer implements RoomPlayer {
 		// which keeps a YouTube song as it plays). Nothing goes through the server then.
 		const here = this.computerFailed === now.item.itemId ? null : computerAudio(now.item.song);
 		this.fromComputer = !!here;
+		this.computerHas = true;
 		if (here) {
 			// The cache hears about it first, so asking for its audio fills the cache.
 			this.audio.removeAttribute('src');
-			void tellComputer(now.item.song, 'started').then(() => {
+			void tellComputer(now.item.song, 'started').then((has) => {
 				if (load !== this.loads) return;
+				this.computerHas = has !== false;
 				this.audio.src = here;
 				this.lookUpNext();
 			});

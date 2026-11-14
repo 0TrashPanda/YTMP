@@ -154,11 +154,16 @@ export function computerAudio(song: Song): string | null {
 
 /**
  * Before the window asks for [song]'s audio: the cache hears about it (`started`: it plays now
- * and counts as a play; `known`: it's next), so the request fills the cache.
+ * and counts as a play; `known`: it's next), so the request fills the cache. For `started`: true
+ * when the song is on this computer already (its own music, or the cache has it), false when
+ * this computer's module looks it up now (the cache keeps it as it plays), null when unknown (an
+ * older app's host doesn't say).
  */
-export async function tellComputer(song: Song, how: 'started' | 'known'): Promise<void> {
-	if (!cacheTakes(song)) return;
-	await ask(`/api/desktop/${how}`, 'POST', song).catch(() => {});
+export async function tellComputer(song: Song, how: 'started' | 'known'): Promise<boolean | null> {
+	if (isMine(song.id)) return true;
+	if (!cacheTakes(song)) return null;
+	const answer = await ask<{ here?: boolean } | null>(`/api/desktop/${how}`, 'POST', song).catch(() => null);
+	return typeof answer?.here === 'boolean' ? answer.here : null;
 }
 
 let watching = false;
