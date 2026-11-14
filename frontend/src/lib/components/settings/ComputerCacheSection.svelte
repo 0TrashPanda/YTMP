@@ -1,24 +1,32 @@
 <script lang="ts">
 	// Settings → Song cache (the desktop app): songs this computer plays, kept on its disk so they
-	// start at once next time, without a lookup. Off by default.
+	// start at once next time, without a lookup. Off by default. The same settings as the phone's
+	// (CacheSection: size, which songs are kept, likes, history, Takeout, playlists offline), and
+	// copying the phone's songs here.
 	import { onMount } from 'svelte';
-	import { clearComputerCache, changeComputer, computer, loadComputer } from '../../computer.svelte';
-	import Choice from './Choice.svelte';
+	import { computer, loadComputer } from '../../computer.svelte';
+	import { clearSongCache, getSongCache, setSongCache } from '../../api';
+	import type { SongCacheSettings, SongCacheStatus } from '../../protocol.gen';
+	import CacheSection from './CacheSection.svelte';
 	import Toggle from './Toggle.svelte';
-	import NumberField from '../NumberField.svelte';
 	import { askMyPhones, chooseWhich, copyFrom, phonesNow, stopCopying, type CopyWhich, type PhoneCopyStatus, type PhonesNow } from '../../computerPhones';
 
 	let { onToast }: { onToast: (text: string) => void } = $props();
 
-	const sizes: [string, string][] = [
-		['0', 'Off'],
-		['500', '500 MB'],
-		['1024', '1 GB'],
-		['2048', '2 GB'],
-		['5120', '5 GB'],
-		['10240', '10 GB']
-	];
 	let busy = $state(false);
+
+	// The cache's settings, and this computer's numbers again after (whether songs play from here).
+	async function changeCache(settings: SongCacheSettings): Promise<SongCacheStatus> {
+		const status = await setSongCache(settings);
+		void loadComputer();
+		return status;
+	}
+
+	async function clearCache(): Promise<SongCacheStatus> {
+		const status = await clearSongCache();
+		void loadComputer();
+		return status;
+	}
 
 	onMount(() => void loadComputer());
 
@@ -95,9 +103,6 @@
 	}
 
 	const status = $derived(computer.status);
-	const size = $derived(String(status?.cacheMb ?? 0));
-	const options = sizes;
-	const used = $derived(status ? `${status.cacheSongs} ${status.cacheSongs === 1 ? 'song' : 'songs'}, ${formatSize(status.cacheBytes)}` : '');
 
 	function formatSize(bytes: number): string {
 		return bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
@@ -119,34 +124,7 @@
 	{#if !status}
 		<p class="text-sm text-muted">Asking this app's YouTube Music module…</p>
 	{:else}
-		<Choice
-			label="Song cache"
-			hint="Songs played on this computer are kept on it, so they start at once next time without looking them up on YouTube. Only music: no podcasts, nothing over an hour. When it's full, the songs you played least lately go first."
-			{options}
-			value={size}
-			onchange={(v) => run(() => changeComputer({ cacheMb: Number(v) }), "The size didn't change")}
-		>
-			<NumberField
-				value={status.cacheMb / 1024}
-				min={0}
-				max={10000}
-				step={0.1}
-				unit="GB"
-				label="Size in GB (0: off)"
-				onchange={(v) => run(() => changeComputer({ cacheMb: Math.round(v * 1024) }), "The size didn't change")}
-			/>
-		</Choice>
-		<div class="flex items-center gap-3">
-			<div class="min-w-0 flex-1">
-				<p class="text-sm font-medium">Kept now</p>
-				<p class="text-xs text-muted">{used}</p>
-			</div>
-			<button
-				class="rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line disabled:opacity-50"
-				disabled={busy || !status.cacheSongs}
-				onclick={() => run(clearComputerCache, "The cache wasn't cleared")}>Clear cache</button
-			>
-		</div>
+		<CacheSection load={getSongCache} clear={clearCache} change={changeCache} device="computer" {onToast} />
 		<div class="flex flex-col gap-3">
 			<div class="flex items-center gap-3">
 				<div class="min-w-0 flex-1">

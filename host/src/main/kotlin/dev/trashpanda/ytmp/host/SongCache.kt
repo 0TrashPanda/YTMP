@@ -75,8 +75,9 @@ data class LocalMatch(val sig: String, val song: Song? = null, val why: String? 
  * (that route answers from the file).
  *
  * It fills itself: with what the host streams anyway ([audio], for speakers and players that
- * stream through it), with what a phone's own player plays ([copy]), and from a song's 2nd play
- * in 30 days by fetching it ([started]). Podcast episodes aren't kept. When it gets over
+ * stream through it), with what a phone's own player plays ([copy]), and by fetching a song
+ * ([started]); but only songs played [keepPlays] times in [keepDays] days (a setting) are kept.
+ * Others stream through a file that goes again ([passing]). Podcast episodes aren't kept. When it gets over
  * [maxBytes], the songs with the lowest keep score go (see [trim]).
  */
 class SongCache(
@@ -104,6 +105,15 @@ class SongCache(
     /** 0: off (nothing new is kept). */
     @Volatile
     var maxBytes: Long = maxBytes
+        private set
+
+    /** A song is kept from this many plays in [keepDays] days (the setting; see [setKeepRule]). */
+    @Volatile
+    var keepPlays: Int = DEFAULT_KEEP_PLAYS
+        private set
+
+    @Volatile
+    var keepDays: Int = DEFAULT_KEEP_DAYS
         private set
 
     /** Being moved to another folder ([moveTo]): nothing new is kept meanwhile. */
@@ -134,6 +144,12 @@ class SongCache(
     private var version = 0
 
     private val fills = ConcurrentHashMap<String, Fill>()
+    /**
+     * Songs fetched whole for the audio route that aren't kept (not played enough yet, or only
+     * fetched ahead as the next song): served from their file while they play, then it goes.
+     * A few at a time; one that gets its plays while here is kept after all ([started]).
+     */
+    private val passing = LinkedHashMap<String, Fill>()
     private val copies = ConcurrentHashMap<String, Copy>()
     private val fetches = Channel<Song>(Channel.UNLIMITED)
     private val queued = ConcurrentHashMap.newKeySet<String>()
@@ -181,6 +197,30 @@ class SongCache(
      */
     fun hadBefore(songId: String): Boolean = synchronized(lock) { songId in entries && songId !in ahead }
 
+    private fun isAhead(songId: String): Boolean = synchronized(lock) { songId in ahead }
+
+    private fun isPassing(songId: String): Boolean = synchronized(passing) { songId in passing }
+
+    /** [fill] came in but isn't kept: it serves its file a while, the oldest go ([PASSING_KEPT] at a time). */
+    private suspend fun pass(fill: Fill) {
+        log.info("Song cache: {} not kept (fewer than {} plays in {} days): its file goes after it played", fill.song.id, keepPlays, keepDays)
+        synchronized(passing) { passing[fill.song.id] = fill }
+        trimPassing()
+    }
+
+    private suspend fun trimPassing() {
+        val keep = runCatching { inUse() }.getOrDefault(emptySet()) + setOfNotNull(playingHere)
+        synchronized(passing) {
+            val old = passing.values.filter { it.song.id !in keep }.dropLast(PASSING_KEPT)
+            for (fill in old) if (fill.discard()) passing.remove(fill.song.id)
+        }
+    }
+
+    /** All of [passing] goes (the cache is cleared, off or moved). */
+    private fun dropPassing() = synchronized(passing) {
+        passing.values.removeAll { it.discard() }
+    }
+
     /** [songId] is on the phone: cached, downloaded or one of its own songs (a phone). */
     fun here(songId: String): Boolean = has(songId) || downloads?.find(songId) != null
 
@@ -207,12 +247,13 @@ class SongCache(
 
     /**
      * A room (or a phone's player in a room elsewhere) started [song]: it counts as a play,
-     * and from the 2nd in [WORTH_WINDOW_MS] a song that isn't here yet is fetched, after a
-     * moment (it may come in for free meanwhile, or be skipped: see [finished]).
+     * and once it's [worth] it a song that isn't here yet is fetched, after a moment (it may
+     * come in for free meanwhile, or be skipped: see [finished]).
      */
     fun started(song: Song) {
         if (!takes(song)) return
         val now = clock()
+        var keep = false
         val fetch = synchronized(lock) {
             known[song.id] = song
             ahead.remove(song.id)
@@ -220,13 +261,19 @@ class SongCache(
             val times = plays.getOrPut(song.id) { mutableListOf() }
             times += now
             times.removeAll { it < now - PLAYS_KEPT_MS }
-            song.id !in entries && worthLocked(song.id, now)
+            keep = song.id !in entries && keepsLocked(song.id, now)
+            keep && worthLocked(song.id, now)
         }
         saveSoon()
+        // Streamed here before without being kept (fetched ahead, say): with this play it's kept after all.
+        if (keep) synchronized(passing) { passing.remove(song.id) }?.let { fill ->
+            scope.launch(Dispatchers.IO) { fill.keep() }
+            return
+        }
         if (fetch && audio != null && downloads?.find(song.id) == null) {
             scope.launch {
                 delay(fetchDelayMs)
-                if (worth(song.id) && !has(song.id) && !fills.containsKey(song.id) && !copies.containsKey(song.id)) fetchLater(song)
+                if (worth(song.id) && !has(song.id) && !fills.containsKey(song.id) && !copies.containsKey(song.id) && !isPassing(song.id)) fetchLater(song)
             }
         }
     }
@@ -277,11 +324,26 @@ class SongCache(
     /** The keys that have a check stored. */
     fun localMatchKeys(): Set<String> = synchronized(lock) { localMatches.keys.toSet() }
 
-    /** Played at least [WORTH_PLAYS] times in [WORTH_WINDOW_MS]: worth an extra download. */
+    /** Played at least [keepPlays] times in [keepDays] days (1: every song): what comes in is kept. */
+    fun keeps(songId: String): Boolean = synchronized(lock) { keepsLocked(songId, clock()) }
+
+    private fun keepsLocked(songId: String, now: Long) =
+        keepPlays <= 1 || (plays[songId]?.count { it >= now - keepDays * DAY_MS } ?: 0) >= keepPlays
+
+    /**
+     * Worth an extra download (fetched on purpose, not only kept as it streams): it [keeps], and
+     * was played at least twice ([WORTH_PLAYS] in [WORTH_WINDOW_MS], or as the setting asks).
+     */
     fun worth(songId: String): Boolean = synchronized(lock) { worthLocked(songId, clock()) }
 
     private fun worthLocked(songId: String, now: Long) =
-        (plays[songId]?.count { it >= now - WORTH_WINDOW_MS } ?: 0) >= WORTH_PLAYS
+        keepsLocked(songId, now) && (keepPlays >= WORTH_PLAYS || (plays[songId]?.count { it >= now - WORTH_WINDOW_MS } ?: 0) >= WORTH_PLAYS)
+
+    /** The setting: songs are kept from their [plays]th play in [days] days. Songs here already stay. */
+    fun setKeepRule(plays: Int, days: Int) {
+        keepPlays = plays.coerceIn(1, MAX_KEEP_PLAYS)
+        keepDays = days.coerceIn(1, MAX_KEEP_DAYS)
+    }
 
     /** The app downloaded [song]: it plays from the download now, so its copy here goes; its cover stays for the list. */
     fun downloaded(song: Song) {
@@ -332,8 +394,9 @@ class SongCache(
     }
 
     /**
-     * The host's audio route: a download or cached file; else a song that may be kept is fetched
-     * once, served while it comes in and kept; anything else goes to [inner].
+     * The host's audio route: a download or cached file; else a YouTube Music song is fetched
+     * once and served while it comes in, kept when it was played enough ([keeps]), else
+     * [passing]; anything else goes to [inner].
      */
     fun audio(inner: AudioProxy?): AudioProxy = AudioProxy { call, songId, range ->
         downloads?.find(songId)?.let { return@AudioProxy downloads.respond(call, it, range) }
@@ -343,6 +406,7 @@ class SongCache(
             log.debug("Song cache: {} from the cache", songId)
             return@AudioProxy respondFile(call, file, entry.type, range)
         }
+        synchronized(passing) { passing[songId] }?.let { return@AudioProxy it.respond(call, range, inner) }
         val song = synchronized(lock) { known[songId] }?.takeIf { takes(it) && audio != null }
         if (song == null) return@AudioProxy inner?.respond(call, songId, range) ?: call.respond(HttpStatusCode.NotFound)
         val fill = fills.computeIfAbsent(songId) { Fill(song) }.also { it.start() }
@@ -453,6 +517,9 @@ class SongCache(
             if (type == null) {
                 log.info("Song cache: {} played here isn't audio we know, not kept", song.id)
                 temp.delete()
+            } else if (!keeps(song.id)) {
+                log.info("Song cache: {} played here, not kept (fewer than {} plays in {} days)", song.id, keepPlays, keepDays)
+                temp.delete()
             } else {
                 log.info("Song cache: {} \"{}\" kept as it played ({} KB)", song.id, song.title, size / 1024)
                 commit(song, temp, type)
@@ -549,8 +616,8 @@ class SongCache(
     /**
      * Plays heard elsewhere (the account's YouTube Music history): [song] at about [at]. A day
      * that already has a play of the song isn't counted again (plays here go into that history
-     * too, and the history is read again later). They count like plays here: from the 2nd in
-     * [WORTH_WINDOW_MS] a song is [worth] keeping, and they keep songs longer.
+     * too, and the history is read again later). They count like plays here: with enough of
+     * them ([keepPlays] in [keepDays]) a song [keeps], and they keep songs longer.
      */
     fun importPlays(heard: List<Pair<Song, Long>>): Int {
         val now = clock()
@@ -595,7 +662,7 @@ class SongCache(
                     val type = audio!!.download(song.id, temp) { type, size -> head.complete(type to size) }
                     head.complete(type to temp.length())
                     log.info("Song cache: {} \"{}\" in while streaming it ({} KB in {} ms)", song.id, song.title, temp.length() / 1024, (System.nanoTime() - started) / 1_000_000)
-                    commit(song, temp, type)
+                    if (keeps(song.id)) commit(song, temp, type) else pass(this@Fill)
                     done.complete(true)
                 } catch (e: Throwable) {
                     head.completeExceptionally(if (e is CancellationException) IOException("Stopped") else e)
@@ -610,6 +677,16 @@ class SongCache(
         }
 
         fun cancel() = job?.cancel()
+
+        /** Was [passing], played enough now: kept. */
+        fun keep() {
+            val type = runCatching { head.getCompleted().first }.getOrNull() ?: return
+            log.info("Song cache: {} \"{}\" played enough now, kept", song.id, song.title)
+            commit(song, temp, type)
+        }
+
+        /** Was [passing]: its file goes, unless someone is reading it right now (false). */
+        fun discard(): Boolean = readers.get() == 0 && (temp.delete() || !temp.exists())
 
         suspend fun respond(call: ApplicationCall, range: String?, inner: AudioProxy?) {
             readers.incrementAndGet()
@@ -634,7 +711,8 @@ class SongCache(
                 if (readers.decrementAndGet() == 0) scope.launch {
                     // Nobody listens any more (a skip): keep it coming only when it's worth it.
                     delay(ABANDON_MS)
-                    if (readers.get() == 0 && !done.isCompleted && !worth(song.id)) {
+                    // The next song (fetched ahead) comes in all the same, so it starts at once.
+                    if (readers.get() == 0 && !done.isCompleted && !keeps(song.id) && !isAhead(song.id)) {
                         log.info("Song cache: {} not listened to any more, not kept", song.id)
                         cancel()
                     }
@@ -842,6 +920,7 @@ class SongCache(
         val keep = protectedSongs() + if (everything) emptySet() else runCatching { kept() }.getOrDefault(emptySet())
         val all = synchronized(lock) { entries.keys.toList() }
         all.filter { it !in keep }.forEach(::remove)
+        dropPassing()
         log.info("Song cache cleared ({} kept: playing, or in a playlist kept offline)", all.count { it in keep })
     }
 
@@ -872,6 +951,7 @@ class SongCache(
         try {
             fills.values.forEach { it.cancel() }
             copies.values.toList().forEach { it.drop() }
+            dropPassing()
             to.mkdirs()
             val all = synchronized(lock) { entries.values.toList() }
             var moved = 0
@@ -915,6 +995,9 @@ class SongCache(
         downloads = downloads?.let { runCatching { it.all().count { d -> !d.local } }.getOrDefault(0) } ?: 0,
         local = downloads?.let { runCatching { it.all().count { d -> d.local } }.getOrDefault(0) } ?: 0,
         moving = moving,
+        keepPlays = keepPlays,
+        keepDays = keepDays,
+        keepRule = true,
     )
 
     // --- "Cached on this phone" ---
@@ -1061,9 +1144,18 @@ class SongCache(
 
         /** Plays are counted this long (the keep score's "recent plays"). */
         const val PLAYS_KEPT_MS = 90L * 24 * 3600 * 1000
-        /** A song is worth an extra download from [WORTH_PLAYS] plays in this long. */
+        /** By default every song that comes in is kept (the desktop app: from the 2nd play in 3 months). */
+        const val DEFAULT_KEEP_PLAYS = 1
+        const val DEFAULT_KEEP_DAYS = 90
+        /** Fetched on purpose from the 2nd play in 30 days (data nobody asked for otherwise). */
         const val WORTH_WINDOW_MS = 30L * 24 * 3600 * 1000
         const val WORTH_PLAYS = 2
+        const val MAX_KEEP_PLAYS = 10
+        /** Plays are only remembered [PLAYS_KEPT_MS]. */
+        const val MAX_KEEP_DAYS = 90
+        private const val DAY_MS = 24L * 3600 * 1000
+        /** Songs not kept keep their file a while (the one playing, the next, the last). */
+        private const val PASSING_KEPT = 3
         /** Each other recent play counts as this much more recent in the keep score. */
         private const val PLAY_WORTH_MS = 7L * 24 * 3600 * 1000
         /** Longer "songs" (hour-long mixes, whole concerts) aren't kept. */

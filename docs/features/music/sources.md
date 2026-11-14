@@ -157,12 +157,23 @@ Implementation details: [implementation/ytm-module.md](../../implementation/sour
 > too, and a test server; not yet with an SD card.
 
 Songs you play are kept, so they start at once next time, need no YouTube lookup, and play
-without internet on the phone. It works by itself: there is nothing to pick.
+without internet on the phone. It works by itself.
+
+**Which songs are kept** ✅ (*Songs you play are kept*, on the phone and in the desktop app):
+every song (the phone's default), or only from its 2nd, 3rd or 5th play (or a number you type)
+in the last week, month or 3 months (or a number of days, at most 90). A song played fewer times
+streams as usual and isn't kept; it's kept on the play that gets it there. Plays from your
+YouTube Music history and Takeout count too.
 
 **The desktop app** has one of its own, off by default (*Settings → Song cache*: Off, 500 MB
-up to 10 GB, or any size typed in GB; *Clear cache*): YouTube Music songs the computer plays are kept on its disk as
-they play (one download, nothing extra), and the next song in the queue is fetched into it
-while the current one plays. Only music, nothing over an hour.
+up to 10 GB, or any size typed in GB; *Clear cache*), with the same settings as the phone's
+(below): which songs are kept (by default from the 2nd play in 3 months), your recent likes,
+your YouTube Music history, Google Takeout and playlists kept offline. YouTube Music songs the
+computer plays stream through its cache (one download, nothing extra), and the next song in the
+queue is fetched while the current one plays, so it starts at once; both are only kept when the
+setting says so, otherwise the file goes again after it played. Only music, nothing over an
+hour. Your YouTube Music sign-in comes from your server account (the app passes it on), so the
+likes, history and your playlists work once you're signed in there.
 
 **Songs from your phone** ✅ (the desktop app, *Settings → Song cache*): copies the songs your
 phone keeps (its song cache, downloads, and its own music files that stand in for YouTube Music
@@ -191,10 +202,10 @@ phones, and your phone only gives its songs to you.
   the server or phone already streams (to speakers, or to players that stream through it),
   is kept as it passes.
 - **Songs played elsewhere are fetched only once they're played again**: from the 2nd play
-  in 30 days. So one-off radio and autoplay songs don't cost an extra download each (and
+  in 30 days (or as *Songs you play are kept* says, when that asks for more). So one-off radio and autoplay songs don't cost an extra download each (and
   extra YouTube traffic), but your favourites end up cached.
-- **From your YouTube Music** (on the phone; all off by default, in *Settings → Song cache and
-  downloads*):
+- **From your YouTube Music** (on the phone and in the desktop app; all off by default, in
+  *Settings → Song cache and downloads*, the desktop app's *Settings → Song cache*):
   - **Keep your recent likes**: the songs you liked last (Off, 50, 100, 250, 500 or a number you
     type) are downloaded to keep, so they start at once and play offline.
   - **Songs from your YouTube Music history**: the songs in that history (also from other
@@ -268,8 +279,8 @@ phones, and your phone only gives its songs to you.
 > Tried on the emulator with a public playlist (downloading, Local, airplane mode); with a
 > signed-in account (your library, most played) only in tests.
 
-- **Keep offline** on a playlist's page (the app, on the phone's own pages; any playlist, yours
-  or someone else's): its songs come into the song cache one by one and stay. The button shows how
+- **Keep offline** on a playlist's page (the app, on the phone's own pages, and the desktop app;
+  any playlist, yours or someone else's): its songs come into the song cache one by one and stay. The button shows how
   far it is ("Offline · 4/7"), then *Offline* with a check. Songs added to the playlist later
   come in too: at once when you add them in the app, otherwise within a day. Tap it again to stop:
   the songs stay cached like other songs until room is needed.

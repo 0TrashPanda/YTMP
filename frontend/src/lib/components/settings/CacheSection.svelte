@@ -16,6 +16,7 @@
 		clear,
 		change,
 		card = false,
+		device = 'phone',
 		onToast
 	}: {
 		load: () => Promise<SongCacheStatus>;
@@ -23,8 +24,11 @@
 		change?: (settings: SongCacheSettings) => Promise<SongCacheStatus>;
 		/** In a card of its own (Settings → Server admin): a heading like the other cards'. */
 		card?: boolean;
+		/** Whose cache: the phone's, or the desktop app's computer. */
+		device?: 'phone' | 'computer';
 		onToast: (text: string) => void;
 	} = $props();
+	const here = $derived(device === 'computer' ? 'this computer' : 'this phone');
 
 	let status = $state<SongCacheStatus | null>(null);
 	let busy = $state(false);
@@ -36,7 +40,8 @@
 		[String(GB / 2), '500 MB'],
 		[String(GB), '1 GB'],
 		[String(2 * GB), '2 GB'],
-		[String(5 * GB), '5 GB']
+		[String(5 * GB), '5 GB'],
+		[String(10 * GB), '10 GB']
 	];
 
 	async function refresh() {
@@ -92,6 +97,8 @@
 			takeoutMinPlays: null,
 			takeoutRules: null,
 			mostPlayedPlaylists: null,
+			keepPlays: null,
+			keepDays: null,
 			...changes
 		});
 	}
@@ -102,6 +109,18 @@
 		if (bytes < 1024 ** 2) return `${Math.ceil(bytes / 1024)} KB`;
 		return `${Math.round(bytes / 1024 ** 2)} MB`;
 	}
+
+	const keepPlays: [string, string][] = [
+		['1', 'Every song'],
+		['2', 'From the 2nd play'],
+		['3', 'From the 3rd play'],
+		['5', 'From the 5th play']
+	];
+	const keepDays: [string, string][] = [
+		['7', 'Last week'],
+		['30', 'Last month'],
+		['90', 'Last 3 months']
+	];
 
 	const likedSizes: [string, string][] = [
 		['0', 'Off'],
@@ -140,7 +159,11 @@
 		<p class={card ? 'font-bold' : 'text-sm font-medium'}>Song cache</p>
 		<p class="text-xs text-muted">
 			{#if status?.settable}
-				Songs you play are kept on this phone, so they start at once and play without internet (in Local → Cached on this phone). Podcast episodes aren't kept.
+				{#if device === 'computer'}
+					Songs played on this computer are kept on it, so they start at once next time without looking them up on YouTube. Podcast episodes and anything over an hour aren't kept.
+				{:else}
+					Songs you play are kept on this phone, so they start at once and play without internet (in Local → Cached on this phone). Podcast episodes aren't kept.
+				{/if}
 			{:else}
 				Songs played on this server are kept, so they start at once without asking YouTube. Podcast episodes aren't kept.
 			{/if}
@@ -177,20 +200,45 @@
 			>
 				<NumberField value={status.maxBytes / GB} min={0} max={1000} step={0.1} unit="GB" label="Size in GB (0: off)" onchange={(v) => setSize(Math.round(v * GB))} />
 			</Choice>
-			<Choice
-				label="Keep songs in the background"
-				hint="Songs you play a 2nd time are downloaded to keep. That's data nobody asked for, so by default only on Wi-Fi."
-				options={[['1', 'Only on Wi-Fi'], ['0', 'Also on mobile data']]}
-				value={status.fetchWifiOnly === false ? '0' : '1'}
-				onchange={(v) => attempt(() => patch({ fetchWifiOnly: v === '1' }))}
-			/>
-			<Choice
-				label="Downloads"
-				hint="The Download in a song's menu (to the Music folder)."
-				options={[['0', 'Right away'], ['1', 'Wait for Wi-Fi']]}
-				value={status.downloadsWifiOnly ? '1' : '0'}
-				onchange={(v) => attempt(() => patch({ downloadsWifiOnly: v === '1' }))}
-			/>
+			{#if status.keepRule}
+				<Choice
+					label="Songs you play are kept"
+					hint={`A song you play streams as usual; it's kept on ${here} once you played it this often. The next song is fetched ahead so it starts at once, but only kept by the same rule.`}
+					options={keepPlays}
+					value={String(status.keepPlays)}
+					onchange={(v) => attempt(() => patch({ keepPlays: Number(v) }))}
+				>
+					<NumberField value={status.keepPlays} min={1} max={10} step={1} unit="plays" label="Kept from this play" onchange={(v) => attempt(() => patch({ keepPlays: Math.round(v) }))} />
+				</Choice>
+				{#if status.keepPlays > 1}
+					<Choice
+						label="Plays counted in the"
+						options={keepDays}
+						value={String(status.keepDays)}
+						onchange={(v) => attempt(() => patch({ keepDays: Number(v) }))}
+					>
+						<NumberField value={status.keepDays} min={1} max={90} step={1} unit="days" label="Days back" onchange={(v) => attempt(() => patch({ keepDays: Math.round(v) }))} />
+					</Choice>
+				{/if}
+			{/if}
+			{#if status.fetchWifiOnly != null}
+				<Choice
+					label="Keep songs in the background"
+					hint="Songs you play a 2nd time are downloaded to keep. That's data nobody asked for, so by default only on Wi-Fi."
+					options={[['1', 'Only on Wi-Fi'], ['0', 'Also on mobile data']]}
+					value={status.fetchWifiOnly === false ? '0' : '1'}
+					onchange={(v) => attempt(() => patch({ fetchWifiOnly: v === '1' }))}
+				/>
+			{/if}
+			{#if status.downloadsWifiOnly != null}
+				<Choice
+					label="Downloads"
+					hint="The Download in a song's menu (to the Music folder)."
+					options={[['0', 'Right away'], ['1', 'Wait for Wi-Fi']]}
+					value={status.downloadsWifiOnly ? '1' : '0'}
+					onchange={(v) => attempt(() => patch({ downloadsWifiOnly: v === '1' }))}
+				/>
+			{/if}
 			{#if status.keepLiked != null}
 				<Choice
 					label="Keep your recent likes"
@@ -208,18 +256,18 @@
 					value={status.fromHistory ? '1' : '0'}
 					onchange={(v) => attempt(() => patch({ fromHistory: v === '1' }))}
 				/>
-				<TakeoutSection {status} {busy} {patch} {attempt} {size} />
+				<TakeoutSection {status} {busy} {patch} {attempt} {size} {here} />
 				{#if (status.keepLiked || status.fromHistory) && !status.fromTakeout && fromYoutubeNote(status)}
 					<p class="-mt-1 text-xs text-muted">{fromYoutubeNote(status)}</p>
 				{/if}
 			{/if}
 			{#if status.mostPlayedPlaylists != null}
-				<PlaylistsOfflineSection {status} {busy} {patch} {attempt} {onToast} />
+				<PlaylistsOfflineSection {status} {busy} {patch} {attempt} {onToast} {device} />
 			{/if}
 			{#if status.localSongs != null}
 				<LocalSongsSection {status} {busy} {patch} {attempt} {onToast} />
 			{/if}
-			{#if status.mostPlayedPlaylists != null}
+			{#if status.mostPlayedPlaylists != null && device === 'phone'}
 				<!-- A phone: its songs to the owner's computer (the desktop app), also without the server. -->
 				<div class="flex items-center gap-3">
 					<div class="min-w-0 flex-1">

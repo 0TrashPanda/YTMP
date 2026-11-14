@@ -302,6 +302,11 @@ class LocalHost(private val context: Context) {
         cacheSettings.getString(CACHE_TAKEOUT_RULES, null)?.let { runCatching { ProtocolJson.decodeFromString<List<TakeoutRule>>(it) }.getOrNull() }
             ?: listOf(TakeoutRule(cacheSettings.getInt(CACHE_TAKEOUT_DAYS, CachePrefill.DEFAULT_TAKEOUT_DAYS), cacheSettings.getInt(CACHE_TAKEOUT_MIN_PLAYS, CachePrefill.DEFAULT_TAKEOUT_MIN_PLAYS)))
 
+    /** Which songs the cache keeps: from their Nth play in so many days (by default every one). */
+    private fun applyKeepRule() = cache.setKeepRule(
+        cacheSettings.getInt(CACHE_KEEP_PLAYS, SongCache.DEFAULT_KEEP_PLAYS), cacheSettings.getInt(CACHE_KEEP_DAYS, SongCache.DEFAULT_KEEP_DAYS),
+    )
+
     /** The setting is on and Android lets us read the music. */
     private fun localSongsOn() = cacheSettings.getBoolean(CACHE_LOCAL, false) && phoneMusicOn
 
@@ -443,7 +448,10 @@ class LocalHost(private val context: Context) {
                 } else null
                 rules?.let { putString(CACHE_TAKEOUT_RULES, ProtocolJson.encodeToString(CachePrefill.cleanRules(it))) }
                 settings.mostPlayedPlaylists?.let { putInt(CACHE_MOST_PLAYED, it.coerceIn(0, KeptPlaylists.MAX_MOST_PLAYED)) }
+                settings.keepPlays?.let { putInt(CACHE_KEEP_PLAYS, it.coerceIn(1, SongCache.MAX_KEEP_PLAYS)) }
+                settings.keepDays?.let { putInt(CACHE_KEEP_DAYS, it.coerceIn(1, SongCache.MAX_KEEP_DAYS)) }
             }
+            applyKeepRule()
             settings.fetchWifiOnly?.let { dataRules.fetchWifiOnly = it }
             settings.downloadsWifiOnly?.let { dataRules.downloadsWifiOnly = it }
             settings.localWifiOnly?.let { dataRules.localWifiOnly = it }
@@ -501,6 +509,7 @@ class LocalHost(private val context: Context) {
         outputs.attach(rooms)
         if (phoneMusicOn) local.add(phoneLibrary)
         cache.inUse = { rooms.songsInUse() }
+        applyKeepRule()
         cache.fetchGate = dataRules::awaitFetch
         downloads.onSaved = cache::downloaded
         cache.kept = keptPlaylists::keptSongs
@@ -653,6 +662,8 @@ class LocalHost(private val context: Context) {
         private const val CACHE_TAKEOUT_MIN_PLAYS = "takeoutMinPlays"
         private const val CACHE_TAKEOUT_RULES = "takeoutRules"
         private const val CACHE_MOST_PLAYED = "mostPlayedPlaylists"
+        private const val CACHE_KEEP_PLAYS = "keepPlays"
+        private const val CACHE_KEEP_DAYS = "keepDays"
         private const val PLACE_PHONE = "phone"
         private const val PLACE_SD = "sd"
         /** About 250 songs. */

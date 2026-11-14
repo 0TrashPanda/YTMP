@@ -424,6 +424,11 @@ data class SongCacheStatus(
     val moving: Boolean = false,
     /** How many of your most played playlists are kept offline (0: off); null where that isn't a setting (a server). */
     val mostPlayedPlaylists: Int? = null,
+    /** Songs are kept from their [keepPlays]th play in [keepDays] days; others play without being kept. */
+    val keepPlays: Int = 1,
+    val keepDays: Int = 90,
+    /** [keepPlays] and [keepDays] can be changed here (an older host doesn't have them). */
+    val keepRule: Boolean = false,
 )
 
 @Serializable
@@ -450,6 +455,9 @@ data class SongCacheSettings(
     val takeoutRules: List<TakeoutRule>? = null,
     /** How many of your most played playlists are kept offline (0: off). */
     val mostPlayedPlaylists: Int? = null,
+    /** Songs are kept from their [keepPlays]th play in [keepDays] days (at most 90). */
+    val keepPlays: Int? = null,
+    val keepDays: Int? = null,
 )
 
 /**

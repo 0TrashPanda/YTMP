@@ -1,13 +1,17 @@
-// Playlists kept offline on the phone (docs/features/music/sources.md#playlists-offline): Keep offline on
-// a playlist's page, and the list in Settings → Song cache and downloads. Only on the phone's own
-// pages, where its song cache is.
+// Playlists kept offline on the phone or computer (docs/features/music/sources.md#playlists-offline): Keep
+// offline on a playlist's page, and the list in Settings → Song cache. Only on the phone's own
+// pages and in the desktop app, where a song cache is.
 
 import { getOfflinePlaylists, keepPlaylist } from './api';
+import { onComputer } from './computer.svelte';
 import { nativeBridge } from './native';
 import type { OfflinePlaylist, OfflinePlaylists, Thumbnail } from './protocol.gen';
 
 /** On the phone's own pages, which keep its song cache. */
 export const onThisPhone = () => !!nativeBridge && ['127.0.0.1', 'localhost'].includes(location.hostname);
+
+/** Where playlists can be kept offline: the phone's own pages, or the desktop app (its host's song cache). */
+export const keepsOffline = () => onThisPhone() || onComputer();
 
 export const offline = $state<{ list: OfflinePlaylists | null }>({ list: null });
 

@@ -217,6 +217,13 @@ class RemoteSourceModule(
             if (more != null) parameter("more", more)
         }.orThrow().body()
 
+    /** The account's YouTube Music history, newest first: each song and about how many days ago (null: not known). */
+    suspend fun myHistory(cookie: String): List<Pair<Song, Int?>> =
+        client.get("$baseUrl/me/history") { me(cookie) }.orThrow().body<List<HistoryEntry>>().map { it.song to it.daysAgo }
+
+    @kotlinx.serialization.Serializable
+    private class HistoryEntry(val song: Song, val daysAgo: Int? = null)
+
     suspend fun myPlaylists(cookie: String): List<PlaylistSummary> = client.get("$baseUrl/me/playlists") { me(cookie) }.orThrow().body()
 
     suspend fun myNewPlaylist(cookie: String, title: String, songIds: List<String>): String =

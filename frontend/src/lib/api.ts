@@ -1,4 +1,4 @@
-import { computerAlbum, computerArtist, computerLibraryPage, isComputerLibrary, isMine } from './computer.svelte';
+import { computerAlbum, computerArtist, computerLibraryPage, isComputerLibrary, isMine, onComputer } from './computer.svelte';
 import type {
 	DownloadItems,
 	LocalLinkRequest,
@@ -68,7 +68,7 @@ import type {
 } from './protocol.gen';
 
 import { identity } from './account';
-import { askOwnModule, moduleUsable, ModuleError } from './ownModule.svelte';
+import { askOwnModule, desktopApp, moduleUsable, ModuleError } from './ownModule.svelte';
 import { settings } from './settings.svelte';
 import { read, saved, write } from './storage';
 
@@ -795,14 +795,20 @@ export async function downloadFile(song: Song): Promise<{ blob: Blob; dispositio
 	return { blob: await response.blob(), disposition: response.headers.get('Content-Disposition') };
 }
 
-// --- the song cache of the phone this page is on (Settings → Playback) ---
+// --- the song cache of the phone this page is on, or of the desktop app's computer (Settings → Song cache) ---
+
+/** The cache's own host: the phone's page itself, or the desktop app's host on this computer. */
+async function cacheRequest<T>(path: string, init?: RequestInit): Promise<T> {
+	const host = onComputer() ? desktopApp()?.host : null;
+	return host ? answer<T>(await fetch(host + path, init)) : request<T>(path, init);
+}
 
 export function getSongCache(): Promise<SongCacheStatus> {
-	return request('/api/cache');
+	return cacheRequest('/api/cache');
 }
 
 export function setSongCache(settings: SongCacheSettings): Promise<SongCacheStatus> {
-	return request('/api/cache', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
+	return cacheRequest('/api/cache', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
 }
 
 /** The phone's own page: shows the phone to your computer for 10 minutes (*Send songs to my computer*). */
@@ -811,31 +817,31 @@ export async function showToComputer(): Promise<void> {
 }
 
 export function clearSongCache(): Promise<SongCacheStatus> {
-	return request('/api/cache/clear', { method: 'POST' });
+	return cacheRequest('/api/cache/clear', { method: 'POST' });
 }
 
 /** A Google Takeout export (the zip, or the watch history in it): its YouTube Music plays, for the song cache. */
 export function importTakeout(file: File): Promise<SongCacheStatus> {
-	return request('/api/cache/takeout', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+	return cacheRequest('/api/cache/takeout', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
 }
 
 export function forgetTakeout(): Promise<SongCacheStatus> {
-	return request('/api/cache/takeout', { method: 'DELETE' });
+	return cacheRequest('/api/cache/takeout', { method: 'DELETE' });
 }
 
-/** The phone's playlists kept offline, its most played ones and the ones that are all on it (docs/implementation/sources/song-cache.md#playlists-offline). */
+/** The playlists kept offline, the most played ones and the ones that are all here (docs/implementation/sources/song-cache.md#playlists-offline). */
 export function getOfflinePlaylists(): Promise<OfflinePlaylists> {
-	return request('/api/cache/playlists');
+	return cacheRequest('/api/cache/playlists');
 }
 
-/** Keeps a playlist offline on the phone (its songs come in and stay), or stops. */
+/** Keeps a playlist offline on the phone or computer (its songs come in and stay), or stops. */
 export function keepPlaylist(keep: KeepPlaylistRequest): Promise<OfflinePlaylists> {
-	return request('/api/cache/playlists/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(keep) });
+	return cacheRequest('/api/cache/playlists/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(keep) });
 }
 
 /** Which Takeout songs [rules] would keep (a song that fits several, once). */
 export function previewTakeout(rules: TakeoutRule[]): Promise<TakeoutPreview> {
-	return request('/api/cache/takeout/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rules }) });
+	return cacheRequest('/api/cache/takeout/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rules }) });
 }
 
 export function getDownloadQueue(): Promise<DownloadItems> {

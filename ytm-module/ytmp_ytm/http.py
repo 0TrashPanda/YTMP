@@ -338,6 +338,10 @@ def create_app(ytm: core.YtmCore, key: str | None) -> FastAPI:
         user.set_podcast_saved(podcast_id, bool(body.get("saved")))
         return {"ok": True}
 
+    @app.get("/me/history", dependencies=[Depends(check_key)])
+    def my_history(user: core.YtmCore = Depends(me)):
+        return user.history()
+
     @app.post("/me/history/{song_id}", dependencies=[Depends(check_key)])
     def my_history_add(song_id: str, user: core.YtmCore = Depends(me)):
         user.add_to_history(song_id)

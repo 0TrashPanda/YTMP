@@ -1578,6 +1578,9 @@ export interface SongCacheStatus {
   settable: boolean;
   moving: boolean;
   mostPlayedPlaylists: number | null;
+  keepPlays: number;
+  keepDays: number;
+  keepRule: boolean;
 }
 
 export interface SongCacheSettings {
@@ -1596,6 +1599,8 @@ export interface SongCacheSettings {
   takeoutMinPlays: number | null;
   takeoutRules: TakeoutRule[] | null;
   mostPlayedPlaylists: number | null;
+  keepPlays: number | null;
+  keepDays: number | null;
 }
 
 export interface TakeoutPreviewRequest {

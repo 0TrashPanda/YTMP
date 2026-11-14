@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Settings → Song cache and downloads (the phone): your most played playlists kept offline by
+	// Settings → Song cache (the phone, the desktop app): your most played playlists kept offline by
 	// themselves, and the playlists kept offline (Keep offline on a playlist's page), with how far
 	// along they are.
 	import { offline, offlineLine, offlineNote, setKept, watchOffline } from '../../offlinePlaylists.svelte';
@@ -14,13 +14,15 @@
 		busy,
 		patch,
 		attempt,
-		onToast
+		onToast,
+		device = 'phone'
 	}: {
 		status: SongCacheStatus;
 		busy: boolean;
 		patch: (changes: Partial<SongCacheSettings>) => Promise<SongCacheStatus>;
 		attempt: (action: () => Promise<SongCacheStatus>, done?: string) => Promise<void>;
 		onToast: (text: string) => void;
+		device?: 'phone' | 'computer';
 	} = $props();
 
 	$effect(() => watchOffline());
@@ -59,8 +61,12 @@
 	<div>
 		<p class="text-sm font-medium">Playlists kept offline</p>
 		<p class="text-xs text-muted">
-			Keep offline on a playlist's page keeps its songs on this phone, also songs added later. A playlist whose songs are all here (however they got here) shows in Local → Cached on this
-			phone → Playlists, and plays from the phone, also without internet.
+			{#if device === 'computer'}
+				Keep offline on a playlist's page keeps its songs on this computer, also songs added later, so they play from here.
+			{:else}
+				Keep offline on a playlist's page keeps its songs on this phone, also songs added later. A playlist whose songs are all here (however they got here) shows in Local → Cached on this
+				phone → Playlists, and plays from the phone, also without internet.
+			{/if}
 		</p>
 	</div>
 	{#if listed.length}

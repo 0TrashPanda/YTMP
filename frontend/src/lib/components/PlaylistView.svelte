@@ -14,7 +14,7 @@
 	import type { RoomConnection } from '../room.svelte';
 	import PinButton from './PinButton.svelte';
 	import KeepOfflineButton from './KeepOfflineButton.svelte';
-	import { onThisPhone } from '../offlinePlaylists.svelte';
+	import { keepsOffline } from '../offlinePlaylists.svelte';
 	import PlayAllButtons from './PlayAllButtons.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
 	import SongList from './SongList.svelte';
@@ -41,8 +41,8 @@
 	} = $props();
 
 	let playlist = $state<PlaylistPage | null>(null);
-	/** On the phone's own pages: Keep offline. */
-	const phone = onThisPhone();
+	/** On the phone's own pages and in the desktop app: Keep offline. */
+	const phone = keepsOffline();
 	/** It came through your sign-in (its next parts do too). */
 	let throughYou = false;
 	let error = $state<string | null>(null);

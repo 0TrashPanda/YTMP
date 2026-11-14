@@ -3,7 +3,10 @@ package dev.trashpanda.ytmp.desktop
 import dev.trashpanda.ytmp.core.RadioSource
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.host.ApiException
+import dev.trashpanda.ytmp.host.CachePrefill
 import dev.trashpanda.ytmp.host.CacheSettings
+import dev.trashpanda.ytmp.host.KeptPlaylists
+import dev.trashpanda.ytmp.host.TakeoutHistory
 import dev.trashpanda.ytmp.host.CachedSource
 import dev.trashpanda.ytmp.host.CastOutputs
 import dev.trashpanda.ytmp.host.FollowerSource
@@ -30,6 +33,7 @@ import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.SongCachePlace
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
+import dev.trashpanda.ytmp.protocol.TakeoutRule
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO as ClientCIO
 import io.ktor.client.plugins.HttpTimeout
@@ -105,6 +109,39 @@ class DesktopHost(private val config: Config) {
     val library = ComputerLibrary(config.device, File(config.dir, "music-index.json"), config.windowBase.trimEnd('/'), scope)
     val local = LocalMusic()
     val cache = SongCache(File(config.dir, "song-cache"), settings.cacheBytes, lookup = ytm, audio = ytm, scope = scope)
+    /** Your YouTube Music sign-in (from your server account), for likes, history and playlists offline. */
+    val youtube = DesktopYoutube(File(config.dir, "youtube.json"), ytm)
+
+    /** Songs from your YouTube Music: recent likes, from its history, and from a Google Takeout export (Settings → Song cache). */
+    private val prefill = CachePrefill(
+        cache,
+        likes = { count -> youtube.recentLikes(count) },
+        history = { youtube.history() },
+        signedIn = { youtube.signedIn },
+        scope = scope,
+        takeout = TakeoutHistory(File(config.dir, "takeout-history.json")),
+        songInfo = { id -> ytm.song(id) },
+    )
+
+    /** Playlists kept offline, and the most played ones (Settings → Song cache; Keep offline on a playlist). */
+    private val keptPlaylists = KeptPlaylists(
+        cache,
+        File(config.dir, "offline-playlists.json"),
+        library = { youtube.playlists() },
+        // Through your sign-in (your private playlists too), else as anyone.
+        part = { id, more ->
+            if (youtube.signedIn) runCatching { youtube.playlist(id, more) }.getOrElse { e -> if (e is kotlinx.coroutines.CancellationException) throw e; cached.playlist(id, more) }
+            else cached.playlist(id, more)
+        },
+        scope = scope,
+    )
+
+    private fun applyCacheRules() {
+        val s = settings.current
+        cache.setKeepRule(s.keepPlays, s.keepDays)
+        prefill.set(s.keepLiked, s.fromHistory, s.fromTakeout, s.takeoutRules ?: listOf(CachePrefill.DEFAULT_TAKEOUT_RULE))
+    }
+
     /** Songs the window plays now or next: the cache doesn't remove them. */
     @Volatile private var playing: Set<String> = emptySet()
     /** No rooms here, but the shared host API is built around a room manager. */
@@ -135,9 +172,30 @@ class DesktopHost(private val config: Config) {
 
         override fun place() = PLACE
 
+        override fun fromYoutube() = prefill
+
+        override fun playlists() = keptPlaylists
+
         override suspend fun change(settings: SongCacheSettings) {
-            this@DesktopHost.settings.update { it.copy(cacheBytes = settings.maxBytes.coerceAtLeast(0)) }
+            // One rule from an older web app replaces them all.
+            val rules = settings.takeoutRules ?: if (settings.takeoutDays != null || settings.takeoutMinPlays != null) {
+                listOf(TakeoutRule(settings.takeoutDays ?: CachePrefill.DEFAULT_TAKEOUT_DAYS, settings.takeoutMinPlays ?: CachePrefill.DEFAULT_TAKEOUT_MIN_PLAYS))
+            } else null
+            this@DesktopHost.settings.update { s ->
+                s.copy(
+                    cacheBytes = settings.maxBytes.coerceAtLeast(0),
+                    keepPlays = settings.keepPlays?.coerceIn(1, SongCache.MAX_KEEP_PLAYS) ?: s.keepPlays,
+                    keepDays = settings.keepDays?.coerceIn(1, SongCache.MAX_KEEP_DAYS) ?: s.keepDays,
+                    keepLiked = settings.keepLiked?.coerceIn(0, CachePrefill.MAX_LIKED) ?: s.keepLiked,
+                    fromHistory = settings.fromHistory ?: s.fromHistory,
+                    fromTakeout = settings.fromTakeout ?: s.fromTakeout,
+                    takeoutRules = rules?.let(CachePrefill::cleanRules) ?: s.takeoutRules,
+                    mostPlayedPlaylists = settings.mostPlayedPlaylists?.coerceIn(0, KeptPlaylists.MAX_MOST_PLAYED) ?: s.mostPlayedPlaylists,
+                )
+            }
             cache.setMaxBytes(settings.maxBytes.coerceAtLeast(0))
+            applyCacheRules()
+            settings.mostPlayedPlaylists?.let { keptPlaylists.set(this@DesktopHost.settings.current.mostPlayedPlaylists) }
         }
     }
 
@@ -149,6 +207,11 @@ class DesktopHost(private val config: Config) {
 
     fun start() {
         cache.inUse = { playing }
+        cache.kept = keptPlaylists::keptSongs
+        cache.playlists = { keptPlaylists.complete() }
+        applyCacheRules()
+        keptPlaylists.set(settings.current.mostPlayedPlaylists)
+        keptPlaylists.start()
         applyMusic()
         scope.launch {
             nearby.notices.collect { text ->
@@ -304,6 +367,16 @@ class DesktopHost(private val config: Config) {
                 cache.know(song)
                 call.respond(HttpStatusCode.NoContent)
             }
+            // Your YouTube Music sign-in, from your server account (null: none there): for the song
+            // cache's likes, history and playlists offline.
+            put("/youtube") {
+                val sign = call.receive<YoutubeSign>()
+                if (youtube.set(sign.cookie)) {
+                    applyCacheRules()
+                    keptPlaylists.set(settings.current.mostPlayedPlaylists)
+                }
+                call.respond(YoutubeSigned(youtube.signedIn))
+            }
             // The server asked for one of this computer's songs, for another player in a room.
             post("/upload") {
                 val upload = call.receive<Upload>()
@@ -353,6 +426,12 @@ class DesktopHost(private val config: Config) {
     @Serializable
     data class PhoneCopyRequest(val phone: PhoneCopy.Phone, val token: String? = null, val which: Set<PhoneCopy.Which>? = null)
 
+    @Serializable
+    data class YoutubeSign(val cookie: String? = null)
+
+    @Serializable
+    data class YoutubeSigned(val signedIn: Boolean)
+
     /** What `/api/desktop/started` answers: whether the song cache has the song already. */
     @Serializable
     data class Started(val here: Boolean)
@@ -395,7 +474,10 @@ class DesktopHost(private val config: Config) {
     }
 }
 
-/** What's kept for this computer (`desktop.json`): the cache's size, and the music on it. Both off at first. */
+/**
+ * What's kept for this computer (`desktop.json`): the cache's size and what it keeps, and the
+ * music on it. The cache and the music are off at first; songs are kept from their 2nd play in 3 months.
+ */
 class DesktopSettings(private val file: File) {
     @Serializable
     data class Values(
@@ -404,6 +486,16 @@ class DesktopSettings(private val file: File) {
         val folders: List<String> = emptyList(),
         /** The port speakers get the audio from (DesktopHost.lanServer), kept so the firewall's answer keeps working. */
         val lanPort: Int = 0,
+        /** Songs are kept from their [keepPlays]th play in [keepDays] days (SongCache.setKeepRule). */
+        val keepPlays: Int = 2,
+        val keepDays: Int = 90,
+        /** From your YouTube Music (CachePrefill): recent likes, your history, a Takeout export. */
+        val keepLiked: Int = 0,
+        val fromHistory: Boolean = false,
+        val fromTakeout: Boolean = false,
+        val takeoutRules: List<TakeoutRule>? = null,
+        /** How many of your most played playlists are kept offline (KeptPlaylists). */
+        val mostPlayedPlaylists: Int = 0,
     )
 
     @Volatile var current: Values = runCatching { json.decodeFromString<Values>(file.readText()) }.getOrDefault(Values())

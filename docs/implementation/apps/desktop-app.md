@@ -143,7 +143,18 @@ the disk without another lookup.
   `host/song-cache` (*Settings → Song cache*: `GET/PUT /api/cache`, `POST /api/cache/clear`).
   The window tells it about a song first (`POST /api/desktop/started`: it plays now and counts
   as a play; `…/known`: it's next), so asking for its audio (`/api/audio/…`) fetches it once
-  into the cache as it plays (`Fill`), and the next one ahead of time.
+  as it plays (`Fill`), and the next one ahead of time. Kept only by the setting
+  (`SongCache.setKeepRule`, `keepPlays`/`keepDays` in `desktop.json`, from the 2nd play in 90
+  days by default); otherwise the file is `passing`: served while it plays, gone a few songs
+  later, kept after all when a later play gets it there.
+- **The phone's cache settings** (`SettingsScreen` shows the phone's `CacheSection` with
+  `device="computer"`; the web app's `/api/cache…` calls go to this host in the desktop app):
+  recent likes, YouTube Music history and Takeout (`CachePrefill`, `takeout-history.json`) and
+  playlists kept offline (`KeptPlaylists`, `offline-playlists.json`), kept in `desktop.json`.
+  Your YouTube Music sign-in is on your server account: the window gets it there
+  (`GET /api/account/youtube/cookie`) and passes it on (`PUT /api/desktop/youtube`, kept in
+  `youtube.json`; `DesktopYoutube`), on start and when the settings open. The module reads with
+  it (`/me/playlists/LM` for likes, `GET /me/history`, `/me/library`).
 - **IDs**: this computer's id and secret are made once and kept in the app's `settings.json`
   (`device_id`, `device_secret`). Songs `local:dev-<id>:s:<key>` (key: from the file's path),
   albums `…:a:…`, artists `…:r:…`. The web app sends the Local tab's library and album and

@@ -14,7 +14,8 @@
 		busy,
 		patch,
 		attempt,
-		size
+		size,
+		here = 'this phone'
 	}: {
 		status: SongCacheStatus;
 		busy: boolean;
@@ -22,6 +23,8 @@
 		attempt: (action: () => Promise<SongCacheStatus>, done?: string) => Promise<void>;
 		/** 1536 MB -> "1.5 GB". */
 		size: (bytes: number) => string;
+		/** Where the cache is: "this phone", "this computer". */
+		here?: string;
 	} = $props();
 
 	let reading = $state(false);
@@ -140,7 +143,7 @@
 		<div class="min-w-0 flex-1">
 			<p class="text-sm font-medium">Songs from Google Takeout</p>
 			<p class="text-xs text-muted">
-				Your whole YouTube Music history, years back, so you can keep the songs you play most. Get it at takeout.google.com (only <em>YouTube and YouTube Music</em>, with its history) and choose the zip here. It stays on this phone.
+				Your whole YouTube Music history, years back, so you can keep the songs you play most. Get it at takeout.google.com (only <em>YouTube and YouTube Music</em>, with its history) and choose the zip here. It stays on {here}.
 			</p>
 		</div>
 		{#if status.takeout}

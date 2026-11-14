@@ -5,6 +5,8 @@
 // needs ([watchForRequests]).
 import type { AlbumPage, ArtistPage, LocalLibraries, LocalLibraryPage, LocalLibrarySummary, Song, SongCacheStatus } from './protocol.gen';
 import { desktopApp } from './ownModule.svelte';
+import { authServer, session } from './account';
+import { ApiRequestError } from './api';
 
 export interface ComputerStatus {
 	libraryId: string;
@@ -76,10 +78,28 @@ export async function loadComputer(): Promise<ComputerStatus | null> {
 		const [music, cache] = await Promise.all([ask<MusicStatus>('/api/desktop/music'), ask<SongCacheStatus>('/api/cache')]);
 		computer.status = combine(music, cache);
 		watchForRequests();
+		void passYoutube();
 	} catch {
 		// The host is starting: the settings ask again.
 	}
 	return computer.status;
+}
+
+/**
+ * Your YouTube Music sign-in (on your server account) to this computer's host, for the song
+ * cache's recent likes, history and playlists offline (Settings → Song cache). None there: the
+ * host forgets its copy. The server not answering: it keeps what it has.
+ */
+async function passYoutube(): Promise<void> {
+	if (!session.current?.sessionToken) return;
+	let cookie: string | null;
+	try {
+		cookie = await authServer.youtubeCookie();
+	} catch (e) {
+		if (!(e instanceof ApiRequestError) || e.status !== 404) return;
+		cookie = null;
+	}
+	await ask('/api/desktop/youtube', 'PUT', { cookie }).catch(() => {});
 }
 
 export async function changeComputer(changes: { cacheMb?: number; music?: boolean; folders?: string[] }): Promise<void> {

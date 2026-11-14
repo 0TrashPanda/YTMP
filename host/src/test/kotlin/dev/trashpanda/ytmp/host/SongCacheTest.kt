@@ -326,6 +326,43 @@ class SongCacheTest {
     }
 
     @Test
+    fun `with the setting, a song is only kept from its 2nd play, also what the audio route streams`() = testApplication {
+        val youtube = FakeYoutube()
+        val cache = cache(youtube)
+        cache.setKeepRule(plays = 2, days = 90)
+        val inner = AudioProxy { call, _, _ -> call.respondText("from youtube") }
+        application {
+            val rooms = RoomManager(cache.streams, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, HostSources(search = { _, _ -> error("no search") }, audio = cache.audio(inner), cache = cache), HostOptions(kind = HostKind.SERVER))
+        }
+        val song = song("k")
+        // Next in the room (fetched ahead) and then its first play: it streams, but isn't kept.
+        cache.know(song)
+        assertContentEquals(bytesOf("k"), client.get("/api/audio/ytm:k").bodyAsBytes())
+        cache.started(song)
+        assertContentEquals(bytesOf("k"), client.get("/api/audio/ytm:k").bodyAsBytes())
+        delay(200)
+        assertFalse(cache.has(song.id))
+        assertEquals(0, cache.status().songs)
+
+        // Its 2nd play: kept now, from the file it streamed from (no second download).
+        now += 24 * 3600_000L
+        cache.started(song)
+        eventually { cache.has(song.id) }
+        assertEquals(listOf(song.id), youtube.downloads.toList())
+
+        // What the phone's player plays: the same rule.
+        val other = song("p")
+        cache.started(other)
+        play(cache, other, listOf(0 to 50_000))
+        assertFalse(cache.has(other.id))
+        now += 3600_000L
+        cache.started(other)
+        play(cache, other, listOf(0 to 50_000))
+        assertTrue(cache.has(other.id))
+    }
+
+    @Test
     fun `a device that may not stream through the host gets YouTube's link for a cached song`() = testApplication {
         val youtube = FakeYoutube()
         val cache = cache(youtube)

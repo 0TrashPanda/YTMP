@@ -28,8 +28,8 @@ Music, without Premium, and not tied to a single music service.
   → [UI](docs/features/ui/README.md), [history and recommendations](docs/features/music/history-and-recommendations.md),
   [importing playlists](docs/features/music/importing-playlists.md)
 - **Playing**: in sync on every device, on Chromecast, Sonos, MPD, YouTube TVs and
-  amplifier zones; equalizer, sleep timer, downloads, a song cache and offline playlists on
-  the phone, a *Local* tab with your own music.
+  amplifier zones; equalizer, sleep timer, downloads on the phone, a song cache and offline
+  playlists on the phone and the computer, a *Local* tab with your own music.
   → [playback and outputs](docs/features/playback-and-outputs.md), [sources](docs/features/music/sources.md)
 - **People and accounts**: optional YTMP accounts with listening history, your YouTube Music
   sign-in (on the phone or the server), friends and shared songs, your rooms on all your
