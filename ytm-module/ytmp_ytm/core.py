@@ -669,7 +669,7 @@ class YtmCore:
             expires_at=float(expires) if expires else time.time() + 3600,
             mime_type="audio/mp4" if info.get("ext") == "m4a" else f"audio/{info.get('ext', 'webm')}",
             bitrate=info.get("abr"),
-            duration_ms=int(info["duration"] * 1000) if info.get("duration") else None,
+            duration_ms=_exact_length(query, info),
             http_headers=dict(info.get("http_headers") or {}),
         )
         self._bot_check.passed()
@@ -885,6 +885,19 @@ class _BotCheck:
     def passed(self) -> None:
         with self._lock:
             self._times = 0
+
+
+def _exact_length(query: dict, info: dict) -> int | None:
+    """The audio's length in ms: exact from the link (its `dur`, e.g. 2103.426), else yt-dlp's
+    whole seconds, which can be shorter than the audio (the room then ended an episode up to
+    a second early)."""
+    try:
+        exact = float(query.get("dur", [""])[0])
+        if exact > 0:
+            return round(exact * 1000)
+    except ValueError:
+        pass
+    return int(info["duration"] * 1000) if info.get("duration") else None
 
 
 def _clean_error(message: str) -> str:

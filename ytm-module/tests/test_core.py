@@ -69,7 +69,7 @@ class FakeYdl:
     def extract_info(self, _url, download):
         if isinstance(FakeYdl.result, Exception):
             raise FakeYdl.result
-        return {"url": FakeYdl.result, "ext": "m4a", "available_at": FakeYdl.available_at}
+        return {"url": FakeYdl.result, "ext": "m4a", "available_at": FakeYdl.available_at, "duration": getattr(FakeYdl, "duration", None)}
 
 
 def test_fresh_stream_skips_the_cache(monkeypatch):
@@ -757,3 +757,15 @@ def test_home_rows_keep_their_strapline(monkeypatch):
     row = {"musicCarouselShelfRenderer": {"header": {"musicCarouselShelfBasicHeaderRenderer": {"strapline": {"runs": [{"text": "Similar to"}]}}}}}
     plain = {"musicCarouselShelfRenderer": {"header": {"musicCarouselShelfBasicHeaderRenderer": {}}}}
     assert [s.get("strapline") for s in core._with_straplines([row, plain])] == ["Similar to", None]
+
+
+def test_stream_length_is_exact_from_the_link(monkeypatch):
+    ytm = _bare_core()
+    monkeypatch.setattr(core.yt_dlp, "YoutubeDL", FakeYdl)
+    # yt-dlp's whole seconds are shorter than the audio; the link's dur is exact.
+    monkeypatch.setattr(FakeYdl, "result", "https://x/videoplayback?expire=9999999999&dur=2103.426")
+    monkeypatch.setattr(FakeYdl, "duration", 2103, raising=False)
+    assert ytm.stream("ytm:ep1").duration_ms == 2103426
+    # No dur in the link: yt-dlp's length.
+    monkeypatch.setattr(FakeYdl, "result", "https://x/videoplayback?expire=9999999999")
+    assert ytm.stream("ytm:ep2").duration_ms == 2103000
