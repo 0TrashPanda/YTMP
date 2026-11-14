@@ -29,6 +29,8 @@ strip = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+# The title bar's web view keeps its height on Linux (frame.rs, pin_title_bar).
+gtk = "0.18"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects"] }

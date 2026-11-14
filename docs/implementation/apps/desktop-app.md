@@ -38,8 +38,11 @@ Windows check below).
   the title bar (32 px: logo, the update arrow, minimize / maximize / close; drag it to move,
   double-click to maximize) and the page under it, laid out again on every resize. In the
   page's own code it would have to move every fixed element down, and pages from an older
-  server wouldn't have it. Every web view gets the same WebView2 arguments (`BROWSER_ARGS`):
-  WebView2 refuses a second set in the same profile.
+  server wouldn't have it. On Linux Tauri puts both web views in a GTK box that shares the
+  height between them and ignores their positions and sizes (up to 0.52.4 the bar floated in
+  the window's top half and the page's bottom was cut off): `pin_title_bar` gives the title
+  bar's view its 32 px and lets the page take the rest. Every web view gets the same WebView2
+  arguments (`BROWSER_ARGS`): WebView2 refuses a second set in the same profile.
 - ✅ **Closing stops playing here** (`before_quit`, `frontend/src/lib/appQuit.ts`): a closed
   app sends the room no goodbye. The host would only notice the lost connection after its
   30 s timeout, and then keeps a device that played for another minute (`Room.holdPlayer`,

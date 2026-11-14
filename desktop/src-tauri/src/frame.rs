@@ -69,6 +69,8 @@ pub fn open(app: &AppHandle, bridge: &str) -> tauri::Result<Window> {
     #[cfg(windows)]
     let page = page.additional_browser_args(BROWSER_ARGS);
     window.add_child(page, LogicalPosition::new(0.0, BAR), LogicalSize::new(width, height - BAR))?;
+    #[cfg(target_os = "linux")]
+    pin_title_bar(app);
     layout(&window);
 
     let resized = window.clone();
@@ -107,6 +109,24 @@ fn show(app: &AppHandle) {
         let _ = window.set_focus();
     }
     updates::close_splash(app);
+}
+
+/// On Linux, Tauri puts a window's web views in a GTK box that shares the height between them
+/// (`set_position`/`set_size` do nothing there), so the title bar's view got as much room as
+/// the page, with the bar in its middle. The title bar's view gets its 32 px and no more; the
+/// page under it takes the rest.
+#[cfg(target_os = "linux")]
+fn pin_title_bar(app: &AppHandle) {
+    use gtk::prelude::*;
+    let Some(title) = app.get_webview("titlebar") else { return };
+    let _ = title.with_webview(|webview| {
+        let view = webview.inner();
+        view.set_size_request(-1, BAR as i32);
+        view.set_vexpand(false);
+        if let Some(parent) = view.parent().and_then(|p| p.downcast::<gtk::Box>().ok()) {
+            parent.set_child_packing(&view, false, true, 0, gtk::PackType::Start);
+        }
+    });
 }
 
 /// The title bar over the full width at the top, the page under it.
