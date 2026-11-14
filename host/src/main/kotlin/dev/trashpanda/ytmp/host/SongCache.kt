@@ -120,6 +120,11 @@ class SongCache(
     private val known = object : LinkedHashMap<String, Song>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Song>) = size > KNOWN_SONGS
     }
+    /**
+     * Songs that weren't here when they came up next ([know]): kept ahead of their play, they
+     * weren't on this computer before ([hadBefore]). Until they start.
+     */
+    private val ahead = LinkedHashSet<String>()
     /** What the app knew of songs it downloaded (richer than their tags), by song ID. */
     private val downloadedSongs = HashMap<String, Song>()
     /** Phone music checked against YouTube Music, by the track's key (see [LocalMatcher]). */
@@ -169,6 +174,13 @@ class SongCache(
 
     fun has(songId: String): Boolean = synchronized(lock) { songId in entries }
 
+    /**
+     * [songId] is here, and was before it came up next: not only fetched ahead of this play
+     * (the desktop app has the next song's audio fetched while one plays). The badge says
+     * *This computer* for these, *Your module* for one you never heard.
+     */
+    fun hadBefore(songId: String): Boolean = synchronized(lock) { songId in entries && songId !in ahead }
+
     /** [songId] is on the phone: cached, downloaded or one of its own songs (a phone). */
     fun here(songId: String): Boolean = has(songId) || downloads?.find(songId) != null
 
@@ -203,6 +215,7 @@ class SongCache(
         val now = clock()
         val fetch = synchronized(lock) {
             known[song.id] = song
+            ahead.remove(song.id)
             entries[song.id]?.let { entries[song.id] = it.copy(lastPlayed = now) }
             val times = plays.getOrPut(song.id) { mutableListOf() }
             times += now
@@ -224,7 +237,13 @@ class SongCache(
      */
     fun know(song: Song) {
         if (!takes(song)) return
-        synchronized(lock) { known[song.id] = song }
+        synchronized(lock) {
+            known[song.id] = song
+            if (song.id !in entries) {
+                ahead += song.id
+                if (ahead.size > KNOWN_SONGS) ahead.remove(ahead.first())
+            }
+        }
     }
 
     /** A song a room played ended: skipped within 30 s, it doesn't count as a play (like YouTube's). */

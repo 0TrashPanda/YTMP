@@ -113,7 +113,8 @@ permissions say otherwise (permission: *Play audio locally*).
     (the server gets it from YouTube right now and streams it to you), *This phone* or *This
     computer* (on your device: saved there or its own music). A song your phone or computer
     gets from YouTube right now, also in a room on your phone, says *Your module*: its song
-    cache keeps it as it plays, so next time it says *This phone* / *This computer*. No badge
+    cache keeps it as it plays, so next time it says *This phone* / *This computer*. So does
+    the next song the computer fetched while one played: you hadn't heard it yet. No badge
     when it plays on a speaker.
   - **Search and pages from your own module** ✅: with your own module on, search (and
     the suggestions while typing), Home, artist, album, playlist and podcast pages, pasted

@@ -288,11 +288,12 @@ class DesktopHost(private val config: Config) {
                 call.respond(musicStatus())
             }
             // The window plays [song] (it counts as a play, like a room's) or has it next.
-            // `here`: the song cache has it whole (else this computer's module looks it up, and the
-            // cache keeps it as it plays): the window says where the sound comes from.
+            // `here`: the song cache had it whole before it came up next (else this computer's module
+            // looks it up, or did just now as the song before played, and the cache keeps it): the
+            // window says where the sound comes from.
             post("/started") {
                 val song = call.receive<Song>()
-                val here = cache.has(song.id)
+                val here = cache.hadBefore(song.id)
                 playing = (playing + song.id).toList().takeLast(KEPT_PLAYING).toSet()
                 cache.started(song)
                 call.respond(Started(here))

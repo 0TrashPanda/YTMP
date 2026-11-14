@@ -142,6 +142,22 @@ class SongCacheTest {
     }
 
     @Test
+    fun `a song fetched ahead of its first play wasn't here before, one played before was`() = runBlocking {
+        val cache = cache()
+        val next = song("n")
+        // Next in the room: fetched while the song before plays.
+        cache.know(next)
+        assertTrue(cache.take(next) { it.writeBytes(bytesOf("n")) })
+        assertTrue(cache.has(next.id))
+        assertFalse(cache.hadBefore(next.id))
+        cache.started(next)
+        // Played once: here from then on, also when it comes up next again.
+        cache.know(next)
+        assertTrue(cache.hadBefore(next.id))
+        assertFalse(cache.hadBefore("ytm:other"))
+    }
+
+    @Test
     fun `a song kept without its length gets it from YouTube once`() = runBlocking {
         // A listing left out the length of an hour-long DJ set: played from the cache without
         // one, the room had nothing to end it by (and seeks went back to 0 s).
