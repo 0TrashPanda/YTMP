@@ -220,8 +220,11 @@ devices, and without the phone announcing itself all the time.
   in `phone-keys.json` and uses it from then on (`X-Copy-Key`). A phone with a key that shows
   itself is copied from at once, without the window or the server.
 - **Which songs** (`PhoneCopy.Which`, kept in `phone-copy-songs.txt`, `POST /api/desktop/phones/which`
-  or `which` with the copy): `cache`, `both` (default) or `local`. The phone's list tells them
-  apart without a phone update: cached songs come with their size, downloads and own files without.
+  or `which` with the copy): a set of three groups that don't overlap, `cache` (cached, not
+  local), `both` (cached and local) and `local` (local, not cached); by default `cache` and
+  `both`. The phone's list says the group: a cached song has its size and `local` (whether it's
+  also a download or music file), a local one no size. An older phone leaves `local` out: its
+  cached songs count as `cache`.
 - **The copy** (`PhoneCopy`): skips songs that are here; for each other song it reads the size
   from the answer and leaves it out when it doesn't fit in what's left of the cache (it would
   push others out), else `SongCache.take` (kept like a fetched song; MP3, FLAC and Ogg are

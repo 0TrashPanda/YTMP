@@ -174,10 +174,13 @@ phones, and your phone only gives its songs to you.
   copy starts. When more than one of your phones answers, you pick which one to copy from.
   The phone doesn't announce itself on the network otherwise, and doesn't check in the
   background: with the app closed, open it.
-- **Which songs**: *Cache and local* (the default: every song the phone keeps, also one it
-  had downloaded before it played it), *Only cache* (what the phone kept as it played), or
-  *Only local* (its downloads and own music files). The computer remembers it,
-  also for the copies that start by themselves.
+- **Which songs**: three switches, one for each group of the phone's songs (a song is in
+  exactly one; "local" means its downloads and its own music files): *Cached only* (in its song
+  cache, not local), *Cached and local* (in the cache and local), *Local only* (local, not in the
+  cache). Turn on any of them: all three copies everything. By default the first two are on:
+  every song in the phone's cache. The computer remembers them, also for the copies that start
+  by themselves. A phone with an older YTMP doesn't say which cached songs are local too: those
+  count as *Cached only*.
 - **Send songs to my computer** on the phone (*Settings → Song cache and downloads*): shows the
   phone on the Wi-Fi for 10 minutes. A computer that copied from it before copies by itself,
   also when your server is down (the first copy gives the computer a key from the phone).

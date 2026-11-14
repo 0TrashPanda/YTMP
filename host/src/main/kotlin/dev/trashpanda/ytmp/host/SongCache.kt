@@ -676,13 +676,16 @@ class SongCache(
     /**
      * The songs here for another of the owner's devices to copy ([cacheCopyRoutes]): the cached
      * ones with their sizes, then the downloads and the phone's own music files that are a
-     * YouTube Music song (they aren't cached again, so they'd be missing otherwise).
+     * YouTube Music song (they aren't cached again, so they'd be missing otherwise). Each song
+     * once; a cached one says whether it's local too, so the other device can copy only the songs
+     * in the cache, only the local ones, or the ones that are both.
      */
     suspend fun copyable(): List<CachedSongFile> {
-        val cached = synchronized(lock) { entries.values.map { CachedSongFile(it.song, it.size, it.type) } }
+        val local = downloads?.all().orEmpty().distinctBy { it.song.id }
+        val localIds = local.map { it.song.id }.toSet()
+        val cached = synchronized(lock) { entries.values.map { CachedSongFile(it.song, it.size, it.type, local = it.song.id in localIds) } }
         val ids = cached.map { it.song.id }.toSet()
-        val others = downloads?.all().orEmpty().filter { it.song.id !in ids }.distinctBy { it.song.id }.map { CachedSongFile(it.song, null, null) }
-        return cached + others
+        return cached + local.filter { it.song.id !in ids }.map { CachedSongFile(it.song, null, null, local = true) }
     }
 
     /** Sends [songId]'s file for copying: the cached file, else the download or music file; false when neither is here. */

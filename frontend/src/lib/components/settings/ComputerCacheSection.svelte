@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { clearComputerCache, changeComputer, computer, loadComputer } from '../../computer.svelte';
 	import Choice from './Choice.svelte';
+	import Toggle from './Toggle.svelte';
 	import NumberField from '../NumberField.svelte';
 	import { askMyPhones, chooseWhich, copyFrom, phonesNow, stopCopying, type CopyWhich, type PhoneCopyStatus, type PhonesNow } from '../../computerPhones';
 
@@ -69,14 +70,22 @@
 		void run(() => copyFrom(phone), "Copying didn't start");
 	}
 
-	const whichOptions: [CopyWhich, string][] = [
-		['cache', 'Only cache'],
-		['both', 'Cache and local'],
-		['local', 'Only local']
+	// The phone's songs in three groups that don't overlap; the copy takes the ones turned on.
+	// Local: the phone's downloads and its own music files.
+	const groups: [CopyWhich, string, string][] = [
+		['cache', 'Cached only', 'Songs your phone kept as it played them, that aren’t a download or music file on it.'],
+		['both', 'Cached and local', 'Songs in the cache that are also a download or music file on your phone.'],
+		['local', 'Local only', 'Downloads and music files on your phone that aren’t in its cache.']
 	];
-	/** Picked here before the host answered: shown at once. */
-	let whichPicked = $state<CopyWhich | null>(null);
-	const which = $derived(whichPicked ?? now?.which ?? 'both');
+	/** Turned on or off here before the host answered: shown at once. */
+	let whichPicked = $state<CopyWhich[] | null>(null);
+	const which = $derived(whichPicked ?? now?.which ?? ['cache', 'both']);
+
+	function turn(group: CopyWhich, on: boolean) {
+		const next = groups.map(([g]) => g).filter((g) => (g === group ? on : which.includes(g)));
+		whichPicked = next;
+		void run(async () => void (await chooseWhich(next)), "The choice wasn't kept");
+	}
 
 	function copyText(c: PhoneCopyStatus): string {
 		const left = [c.here ? `${c.here} were here already` : '', c.noRoom ? `${c.noRoom} didn't fit (make the cache bigger for them)` : ''].filter(Boolean).join(', ');
@@ -150,21 +159,20 @@
 				</div>
 				<button
 					class="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/90 disabled:opacity-50"
-					disabled={busy || !!copy?.running || askedAt !== null || !status.cacheMb}
+					disabled={busy || !!copy?.running || askedAt !== null || !status.cacheMb || which.length === 0}
 					title={status.cacheMb ? undefined : 'Turn the song cache on first'}
 					onclick={() => run(ask, "Your phone couldn't be asked")}>Copy from my phone</button
 				>
 			</div>
-			<Choice
-				label="Which songs"
-				hint="Cache: the songs your phone kept as it played them. Local: its downloads and its own music files that are a YouTube Music song."
-				options={whichOptions}
-				value={which}
-				onchange={(v) => {
-					whichPicked = v;
-					void run(async () => void (await chooseWhich(v)), "The choice wasn't kept");
-				}}
-			/>
+			<div class="flex flex-col gap-3">
+				<p class="text-xs text-muted">Which songs: each song is in one of these, so turn on the ones you want (all three: everything).</p>
+				{#each groups as [group, label, hint] (group)}
+					<Toggle {label} {hint} checked={which.includes(group)} onchange={(on) => turn(group, on)} />
+				{/each}
+				{#if which.length === 0}
+					<p class="text-xs text-red-400">Turn on at least one to copy.</p>
+				{/if}
+			</div>
 			{#if askedAt !== null}
 				<p class="text-xs text-muted">Waiting for your phone… open YTMP on it, on the same Wi-Fi.</p>
 			{/if}

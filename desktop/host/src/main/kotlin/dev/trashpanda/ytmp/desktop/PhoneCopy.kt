@@ -55,20 +55,30 @@ class PhoneCopy(
     data class Phone(val id: String, val name: String, val url: String)
 
     /**
-     * Which of the phone's songs to copy: its song cache, its local songs (downloads and its own
-     * music files that are a YouTube Music song), or both. The phone's list tells them apart:
-     * a cached song comes with its size, a local one without ([CachedSongFile]).
+     * The phone's songs in three groups that don't overlap; a copy takes the ones you turned on
+     * (any of them). Local: its downloads and its own music files that are a YouTube Music song.
+     * The phone's list tells them apart ([CachedSongFile]): a cached song comes with its size and
+     * whether it's local too, a local one only without a size. An older phone doesn't say whether
+     * a cached song is local too: those count as only in the cache.
      */
     @Serializable
     enum class Which {
+        /** In the phone's song cache, not local. */
         @SerialName("cache") CACHE,
+        /** In the cache and local. */
         @SerialName("both") BOTH,
+        /** Local, not in the cache. */
         @SerialName("local") LOCAL;
 
-        fun takes(song: CachedSongFile): Boolean = when (this) {
-            CACHE -> song.size != null
-            LOCAL -> song.size == null
-            BOTH -> true
+        companion object {
+            fun of(song: CachedSongFile): Which = when {
+                song.size == null -> LOCAL
+                song.local == true -> BOTH
+                else -> CACHE
+            }
+
+            /** By default every song in the phone's cache, local or not. */
+            val DEFAULT: Set<Which> = setOf(CACHE, BOTH)
         }
     }
 
@@ -95,15 +105,17 @@ class PhoneCopy(
     data class Found(val id: String, val name: String, val url: String, val owner: String?, val keyed: Boolean)
 
     @Serializable
-    data class State(val found: List<Found>, val copy: Status?, val which: Which = Which.BOTH)
+    data class State(val found: List<Found>, val copy: Status?, val which: Set<Which> = Which.DEFAULT)
 
     /** Phones showing themselves on the network now, by id. */
     private val shown = ConcurrentHashMap<String, Pair<Phone, String?>>()
     /** Phone id → its key. */
     private val keys = ConcurrentHashMap<String, String>(loadKeys())
     @Volatile private var status: Status? = null
-    /** Cache and local unless you pick otherwise: every song the phone keeps, also one it had downloaded before it was cached. */
-    @Volatile var which: Which = runCatching { Which.valueOf(whichFile.readText().trim()) }.getOrDefault(Which.BOTH)
+    /** The groups to copy; by default every song in the phone's cache (local too or not). */
+    @Volatile var which: Set<Which> = runCatching {
+        whichFile.readText().split(',').map(String::trim).filter(String::isNotEmpty).map(Which::valueOf).toSet()
+    }.getOrDefault(Which.DEFAULT)
         private set
     private var job: Job? = null
 
@@ -145,9 +157,13 @@ class PhoneCopy(
      * (your login for that phone, from your server), which also gets a key for next time.
      */
     @Synchronized
-    fun start(phone: Phone, token: String?, which: Which? = null): State {
+    fun start(phone: Phone, token: String?, which: Set<Which>? = null): State {
         if (job?.isActive == true) return state(null)
         which?.let(::choose)
+        if (this.which.isEmpty()) {
+            status = Status(phone.name, running = false, error = "Turn on at least one kind of song to copy", finishedAt = System.currentTimeMillis())
+            return state(null)
+        }
         if (cache.maxBytes <= 0) {
             status = Status(phone.name, running = false, error = "Turn the song cache on first", finishedAt = System.currentTimeMillis())
             return state(null)
@@ -169,11 +185,11 @@ class PhoneCopy(
 
     /** Which songs to copy from now on (also when a phone with a key shows itself). */
     @Synchronized
-    fun choose(which: Which) {
+    fun choose(which: Set<Which>) {
         this.which = which
         runCatching {
             whichFile.parentFile?.mkdirs()
-            whichFile.writeText(which.name)
+            whichFile.writeText(which.joinToString(",") { it.name })
         }
     }
 
@@ -186,7 +202,7 @@ class PhoneCopy(
         val auth = withContext(Dispatchers.IO) { login(phone, token) }
         val list = withContext(Dispatchers.IO) { get(phone, "/api/cache/songs", auth, HttpResponse.BodyHandlers.ofString()) }
         val which = which
-        val songs = ProtocolJson.decodeFromString(CachedSongFiles.serializer(), list.body()).songs.distinctBy { it.song.id }.filter(which::takes)
+        val songs = ProtocolJson.decodeFromString(CachedSongFiles.serializer(), list.body()).songs.distinctBy { it.song.id }.filter { Which.of(it) in which }
         val here = songs.count { cache.has(it.song.id) }
         val wanted = songs.filter { !cache.has(it.song.id) }
         status = Status(phone.name, running = true, total = wanted.size, here = here)

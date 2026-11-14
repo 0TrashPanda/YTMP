@@ -98,14 +98,17 @@ class SongCacheTest {
         val song = song("a")
         assertTrue(cache.take(song) { it.writeBytes(bytesOf("a")) })
         assertTrue(cache.has(song.id))
-        assertEquals(listOf(CachedSongFile(song, bytesOf("a").size.toLong(), SongFiles.MP4)), cache.copyable())
+        assertEquals(listOf(CachedSongFile(song, bytesOf("a").size.toLong(), SongFiles.MP4, local = false)), cache.copyable())
         // Downloads and the phone's own music files that are a YouTube Music song come too (they aren't cached).
         val withDownloads = SongCache(File(dir, "dl"), 10_000_000, youtube, youtube, scope, coverOf = { null }, clock = { now }, downloads = object : DownloadedSongs {
             override fun find(songId: String) = if (songId == "ytm:d") DownloadedSong(song("d"), "content://d", local = true) else null
             override suspend fun all() = listOf(DownloadedSong(song("d"), "content://d", local = true))
             override suspend fun respond(call: io.ktor.server.application.ApplicationCall, download: DownloadedSong, range: String?) = Unit
         })
-        assertEquals(listOf(CachedSongFile(song("d"), null, null)), withDownloads.copyable())
+        assertEquals(listOf(CachedSongFile(song("d"), null, null, local = true)), withDownloads.copyable())
+        // Cached and local too: listed once, as both.
+        assertTrue(withDownloads.take(song("d")) { it.writeBytes(bytesOf("d")) })
+        assertEquals(listOf(CachedSongFile(song("d"), bytesOf("d").size.toLong(), SongFiles.MP4, local = true)), withDownloads.copyable())
         assertContentEquals(bytesOf("a"), cache.fileOf(song.id)!!.first.readBytes())
         // Here already, or not audio: not taken.
         assertFalse(cache.take(song) { it.writeBytes(bytesOf("a")) })

@@ -22,13 +22,13 @@ export interface PhoneCopyStatus {
 	finishedAt: number | null;
 }
 
-/** Which of the phone's songs to copy: its song cache, its local songs (downloads and own music files), or both. */
+/** The phone's songs in three groups that don't overlap (PhoneCopy.Which): cached only, cached and local, local only (local: its downloads and own music files). */
 export type CopyWhich = 'cache' | 'both' | 'local';
 
 interface HostPhones {
 	found: { id: string; name: string; url: string; owner: string | null; keyed: boolean }[];
 	copy: PhoneCopyStatus | null;
-	which: CopyWhich;
+	which: CopyWhich[];
 }
 
 export interface PhonesNow {
@@ -37,7 +37,7 @@ export interface PhonesNow {
 	copy: PhoneCopyStatus | null;
 	/** Your server still waits for your phone to answer (until then, ms). */
 	askedUntil: number | null;
-	which: CopyWhich;
+	which: CopyWhich[];
 }
 
 async function host<T>(path: string, body?: unknown): Promise<T> {
@@ -63,7 +63,7 @@ export async function phonesNow(): Promise<PhonesNow> {
 	const phones = new Map<string, { id: string; name: string; url: string; seenAt: number }>();
 	for (const p of here.found) phones.set(p.id, { id: p.id, name: p.name, url: p.url, seenAt: 0 });
 	for (const p of server?.phones ?? []) phones.set(p.id, p);
-	return { phones: [...phones.values()].sort((a, b) => a.name.localeCompare(b.name)), copy: here.copy, askedUntil: server?.askedUntil ?? null, which: here.which ?? 'both' };
+	return { phones: [...phones.values()].sort((a, b) => a.name.localeCompare(b.name)), copy: here.copy, askedUntil: server?.askedUntil ?? null, which: here.which ?? ['cache', 'both'] };
 }
 
 /** How long your server waits for your phone after you ask (AccountApi.PHONE_ASK_MS). */
@@ -83,6 +83,6 @@ export async function copyFrom(phone: MyPhone | { id: string; name: string; url:
 }
 
 /** Which songs to copy from now on (also the copies that start by themselves). */
-export const chooseWhich = (which: CopyWhich) => host('/api/desktop/phones/which', { which });
+export const chooseWhich = (which: CopyWhich[]) => host('/api/desktop/phones/which', { which });
 
 export const stopCopying = () => host('/api/desktop/phones/stop', {});

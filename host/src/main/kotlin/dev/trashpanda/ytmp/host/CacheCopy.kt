@@ -13,9 +13,14 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
 
-/** A song here, for another of the owner's devices to copy; [size] and [type] are null for a download or music file (not known before it's sent). */
+/**
+ * A song here, for another of the owner's devices to copy; [size] and [type] are null for a
+ * download or music file that isn't cached (not known before it's sent). [local]: also a download
+ * or music file here (a cached song that's local too: true; one only in the cache: false; null
+ * from an older phone, which doesn't say).
+ */
 @Serializable
-data class CachedSongFile(val song: Song, val size: Long?, val type: String?)
+data class CachedSongFile(val song: Song, val size: Long?, val type: String?, val local: Boolean? = null)
 
 @Serializable
 data class CachedSongFiles(val songs: List<CachedSongFile>)
