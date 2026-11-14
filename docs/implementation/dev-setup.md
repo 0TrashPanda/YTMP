@@ -76,7 +76,9 @@ tools/          smoke-test.py (checks a running phone or server), chrome90-test.
   `node tools/chrome90-test.mjs` (after `pnpm build` and `./gradlew :server:installDist`; it
   downloads Chromium 90 once).
 - The web player playing real audio with a fake room (song lengths, PlayerReady, PlayerEnded,
-  waiting at the end; from this computer, your own module and the host): `cd frontend &&
+  waiting at the end, repeat one, pause, speed, a jump while starting, skipping while this
+  computer answers, and falling back when your module or the room's link fails; from this
+  computer, your own module and the host): `cd frontend &&
   pnpm test:player` (`scripts/player-test.mjs` and `tests/player/harness.ts`; needs Chromium,
   Chrome or Edge, or `YTMP_CHROME`; headless and muted).
 - After changing anything in `protocol/`, run `./gradlew :protocol:generateTs` to update the

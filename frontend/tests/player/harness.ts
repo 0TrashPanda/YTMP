@@ -33,6 +33,10 @@ class FakeRoom {
 	startedAt = new Map<string, number>();
 	/** PlayerEnded moves on to the next song in the queue. */
 	movesOn = true;
+	/** Repeat one: PlayerEnded starts the same song over (like the room's replayCurrent). */
+	repeatOne = false;
+	/** The room's speed (an episode played faster or slower). */
+	speed = 1;
 	state: RoomState = {
 		room: { visibility: 'private' },
 		participants: [],
@@ -71,8 +75,18 @@ class FakeRoom {
 		this.apply(
 			{ kind: 'NowPlayingChanged', item },
 			{ kind: 'StreamReady', itemId: item.itemId, streamUrl },
-			{ kind: 'PlaybackChanged', playback: { playing: false, positionMs: 0, hostTimeMs: Date.now(), starting: true, speed: 1, loading: false } }
+			{ kind: 'PlaybackChanged', playback: this.playback(false, 0, true) }
 		);
+	}
+
+	playback(playing: boolean, positionMs: number, starting = false) {
+		return { playing, positionMs, hostTimeMs: Date.now(), starting, speed: this.speed, loading: false };
+	}
+
+	/** Where the room is now (ms). */
+	position(): number {
+		const p = this.state.playback;
+		return p.playing ? p.positionMs + (Date.now() - p.hostTimeMs) * (p.speed ?? 1) : p.positionMs;
 	}
 
 	streams = new Map<string, string>();
@@ -85,7 +99,12 @@ class FakeRoom {
 				this.apply({ kind: 'NowPlayingChanged', item: { ...now.item, song: { ...now.item.song, durationMs: command.durationMs } } });
 			}
 			this.startedAt.set(command.itemId, this.now());
-			this.apply({ kind: 'PlaybackChanged', playback: { playing: true, positionMs: 0, hostTimeMs: Date.now(), starting: false, speed: 1, loading: false } });
+			this.apply({ kind: 'PlaybackChanged', playback: this.playback(true, this.state.playback.positionMs) });
+		}
+		if (command.kind === 'PlayerEnded' && now?.item.itemId === command.itemId && this.repeatOne) {
+			this.startedAt.set(command.itemId, this.now());
+			this.apply({ kind: 'PlaybackChanged', playback: this.playback(true, 0) });
+			return;
 		}
 		if (command.kind === 'PlayerEnded' && now?.item.itemId === command.itemId && this.movesOn) {
 			const next = this.state.queue[0];
@@ -100,10 +119,10 @@ class FakeRoom {
 
 let ids = 0;
 /** A song whose audio file is [seconds] long; the room thinks it's [roomMs] (it doesn't know yet). */
-function item(seconds: number, roomMs = 0): QueueItem {
+function item(seconds: number, roomMs = 0, tag = ''): QueueItem {
 	const n = ++ids;
 	const song: Song = {
-		id: `ytm:len${seconds}-${n}-${Math.random().toString(36).slice(2, 8)}`,
+		id: `ytm:len${seconds}-${n}${tag}-${Math.random().toString(36).slice(2, 8)}`,
 		title: `Test ${seconds} s (${n})`,
 		artists: [],
 		album: null,
@@ -140,7 +159,7 @@ const roomLink = (song: Song) => `/api/audio/${encodeURIComponent(song.id)}`;
 function watchAudio(player: RoomPlayer): { audio: HTMLAudioElement; events: { at: number; type: string }[] } {
 	const audio = (player as unknown as { audio: HTMLAudioElement }).audio;
 	const events: { at: number; type: string }[] = [];
-	for (const type of ['loadstart', 'emptied', 'waiting', 'playing', 'pause', 'seeking', 'ended', 'durationchange']) {
+	for (const type of ['loadstart', 'emptied', 'waiting', 'playing', 'pause', 'seeking', 'ended', 'durationchange', 'error']) {
 		audio.addEventListener(type, () => events.push({ at: performance.now(), type }));
 	}
 	return { audio, events };
@@ -267,12 +286,160 @@ function sameItemNewLength(): Promise<Result[]> {
 	});
 }
 
+/** How far the audio is from the room (ms; positive: ahead). */
+const drift = (room: FakeRoom, audio: HTMLAudioElement) => Math.round(audio.currentTime * 1000 - room.position());
+
+/** Repeat one: the room starts the same song over at its end; the player plays it again, and ends it again. */
+function repeatOne(): Promise<Result[]> {
+	return withPlayer('host', async (room, player) => {
+		room.repeatOne = true;
+		const a = item(3);
+		const { audio, events } = watchAudio(player);
+		room.play(a, roomLink(a.song));
+		const twice = await waitFor(() => room.of('PlayerEnded').length >= 2, 12_000);
+		await sleep(800);
+		const ended = room.of('PlayerEnded');
+		const loads = events.filter((e) => e.type === 'loadstart').length;
+		return [
+			{ name: 'repeat one: ends twice, at the end each time', ok: twice && ended.every((s) => near(s.command.positionMs, 3000, 400)), detail: `PlayerEnded at ${ended.map((s) => s.command.positionMs).join(', ') || 'never'}` },
+			{ name: 'repeat one: plays again from the start', ok: !audio.paused && audio.currentTime < 1.5, detail: `paused ${audio.paused} at ${audio.currentTime.toFixed(2)} s` },
+			{ name: 'repeat one: not loaded again', ok: loads === 1, detail: `${loads} loads` },
+			{ name: 'repeat one: PlayerReady once', ok: room.of('PlayerReady').length === 1, detail: room.sent.map((s) => s.command.kind).join(', ') }
+		];
+	});
+}
+
+/** Pause and play: the audio stops where the room paused, and goes on from there. */
+function pauseAndPlay(): Promise<Result[]> {
+	return withPlayer('host', async (room, player) => {
+		room.movesOn = false;
+		const a = item(5, 5000);
+		const { audio } = watchAudio(player);
+		room.play(a, roomLink(a.song));
+		await waitFor(() => !audio.paused && audio.currentTime > 1, 6000);
+		const at = Math.round(room.position());
+		room.apply({ kind: 'PlaybackChanged', playback: room.playback(false, at) });
+		await sleep(800);
+		const pausedAt = audio.currentTime;
+		const paused = audio.paused && Math.abs(pausedAt * 1000 - at) < 250;
+		await sleep(700);
+		const stayed = Math.abs(audio.currentTime - pausedAt) < 0.01;
+		room.apply({ kind: 'PlaybackChanged', playback: room.playback(true, at) });
+		await sleep(1000);
+		const d = drift(room, audio);
+		return [
+			{ name: 'pause: stops where the room paused', ok: paused && stayed, detail: `room ${at} ms, audio ${pausedAt.toFixed(3)} s then ${audio.currentTime.toFixed(3)} s` },
+			{ name: 'play: goes on from there, in sync', ok: !audio.paused && Math.abs(d) < 250, detail: `drift ${d} ms` },
+			{ name: 'pause and play: nothing sent', ok: room.sent.filter((s) => s.command.kind !== 'SetListening' && s.command.kind !== 'PlayerReady').length === 0, detail: room.sent.map((s) => s.command.kind).join(', ') }
+		];
+	});
+}
+
+/** A jump while the song starts (the room plays from there at once): the audio starts there. */
+function jumpWhileStarting(): Promise<Result[]> {
+	return withPlayer('host', async (room, player) => {
+		room.movesOn = false;
+		const a = item(5, 5000);
+		const { audio } = watchAudio(player);
+		room.play(a, roomLink(a.song));
+		room.apply({ kind: 'PlaybackChanged', playback: room.playback(true, 2500) });
+		await waitFor(() => !audio.paused && audio.currentTime > 2.5, 5000);
+		await sleep(600);
+		const d = drift(room, audio);
+		return [{ name: 'jump while starting: plays from there, in sync', ok: !audio.paused && audio.currentTime > 2.5 && Math.abs(d) < 250, detail: `at ${audio.currentTime.toFixed(2)} s, drift ${d} ms` }];
+	});
+}
+
+/** An episode at 1.5×: the audio plays at the room's speed, in sync. */
+function speed(): Promise<Result[]> {
+	return withPlayer('host', async (room, player) => {
+		room.movesOn = false;
+		room.speed = 1.5;
+		const a = item(5, 5000);
+		const { audio } = watchAudio(player);
+		room.play(a, roomLink(a.song));
+		await waitFor(() => !audio.paused && audio.currentTime > 1, 6000);
+		await sleep(800);
+		const d = drift(room, audio);
+		return [{ name: '1.5×: plays at 1.5, in sync', ok: Math.abs(audio.playbackRate - 1.5) < 0.06 && Math.abs(d) < 250, detail: `rate ${audio.playbackRate}, drift ${d} ms` }];
+	});
+}
+
+/**
+ * The room moves on twice while this computer's host is still answering (late) about the
+ * first: the late answer is for a song no longer there, and must not load it.
+ */
+function skipWhileComputerAnswers(): Promise<Result[]> {
+	return withPlayer('computer', async (room, player) => {
+		room.movesOn = false;
+		const b = item(5);
+		const c = item(3);
+		const { audio } = watchAudio(player);
+		const sources: string[] = [];
+		audio.addEventListener('loadstart', () => audio.currentSrc && sources.push(new URL(audio.currentSrc).pathname));
+		room.play(b, roomLink(b.song));
+		await sleep(300);
+		room.play(c, roomLink(c.song));
+		await waitFor(() => room.of('PlayerReady').some((s) => s.command.itemId === c.itemId), 8000);
+		// B's late answer comes in meanwhile.
+		await sleep(1500);
+		const ready = room.of('PlayerReady');
+		const loadedB = sources.filter((s) => s.includes(encodeURIComponent(b.song.id)));
+		return [
+			{ name: 'skip while this computer answers: only the song now loads', ok: loadedB.length === 0 && sources.length >= 1, detail: `loaded ${sources.join(', ')}` },
+			{ name: 'skip while this computer answers: PlayerReady only for it, with its length', ok: ready.length === 1 && ready[0].command.itemId === c.itemId && near(ready[0].command.durationMs, 3000, 100), detail: JSON.stringify(ready.map((s) => s.command)) },
+			{ name: 'skip while this computer answers: it plays', ok: !audio.paused && near(audio.duration * 1000, 3000, 100), detail: `paused ${audio.paused}, ${audio.duration} s` }
+		];
+	});
+}
+
+/** Your own module can't get a song (it answers an error): the player plays it the next way, with its length. */
+function ownModuleFails(): Promise<Result[]> {
+	return withPlayer('own', async (room, player) => {
+		room.movesOn = false;
+		const a = item(3, 0, '-fail');
+		const { audio } = watchAudio(player);
+		room.play(a, roomLink(a.song));
+		await waitFor(() => !audio.paused && audio.currentTime > 0.5, 8000);
+		const ready = room.of('PlayerReady');
+		return [
+			{ name: "own module fails: plays the room's way", ok: !audio.paused && new URL(audio.currentSrc).pathname.startsWith('/api/audio/'), detail: `paused ${audio.paused}, ${audio.currentSrc}` },
+			{ name: 'own module fails: PlayerReady once, with its length', ok: ready.length === 1 && !ready[0].command.failed && near(ready[0].command.durationMs, 3000, 100), detail: JSON.stringify(ready.map((s) => s.command)) }
+		];
+	});
+}
+
+/** The room's link doesn't play here (404): the player goes through the host, with the right length. */
+function linkFails(): Promise<Result[]> {
+	return withPlayer('host', async (room, player) => {
+		room.movesOn = false;
+		const a = item(3);
+		const { audio, events } = watchAudio(player);
+		room.play(a, `/broken/${encodeURIComponent(a.song.id)}`);
+		await waitFor(() => !audio.paused && audio.currentTime > 0.5, 8000);
+		const ready = room.of('PlayerReady');
+		const errors = events.filter((e) => e.type === 'error').length;
+		return [
+			{ name: 'link fails: plays through the host', ok: !audio.paused && new URL(audio.currentSrc).pathname.startsWith('/api/audio/'), detail: `paused ${audio.paused}, ${audio.currentSrc}` },
+			{ name: 'link fails: PlayerReady once, with its length (not failed)', ok: ready.length === 1 && !ready[0].command.failed && near(ready[0].command.durationMs, 3000, 100), detail: JSON.stringify(ready.map((s) => s.command)) },
+			{ name: 'link fails: one failed try', ok: errors <= 1, detail: `${errors} errors` }
+		];
+	});
+}
+
 const TESTS: Record<string, () => Promise<Result[]>> = {
 	computer: () => twoSongs('computer'),
 	own: () => twoSongs('own'),
 	host: () => twoSongs('host'),
 	'past-the-end': pastTheEnd,
-	'new-length': sameItemNewLength
+	'new-length': sameItemNewLength,
+	'repeat-one': repeatOne,
+	'pause-play': pauseAndPlay,
+	'jump-while-starting': jumpWhileStarting,
+	speed,
+	'skip-while-computer-answers': skipWhileComputerAnswers,
+	'own-module-fails': ownModuleFails,
+	'link-fails': linkFails
 };
 
 declare global {

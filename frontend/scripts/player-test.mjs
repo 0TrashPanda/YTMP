@@ -124,7 +124,10 @@ async function startServer(script) {
 		// Your own module: a song's link, late.
 		if (path === '/module/info') return json(res, { name: 'ytmp-ytm', version: 'test' });
 		if ((m = /^\/module\/songs\/([^/]+)\/stream$/.exec(path))) {
-			const seconds = Number(/len(\d+)/.exec(decodeURIComponent(m[1]))?.[1]);
+			const id = decodeURIComponent(m[1]);
+			const seconds = Number(/len(\d+)/.exec(id)?.[1]);
+			// A song YouTube won't give it (`…-fail-…`).
+			if (id.includes('-fail-')) return json(res, { error: { code: 'unavailable', message: 'This song is not available' } }, 404);
 			await sleep(seconds >= 5 ? LONG_LOOKUP_MS : LATE_MS);
 			return json(res, { url: `http://${req.headers.host}/module/files/api/audio/${m[1]}`, expiresAt: Date.now() + 3600_000 });
 		}
