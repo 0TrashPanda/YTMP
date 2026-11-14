@@ -1009,8 +1009,11 @@ class Room(
                 member.listening = command.on
                 member.startsTogether = command.on && command.startsTogether
                 member.ownLookups = if (command.on) command.ownLookups else OwnLookups.NONE
+                member.endsSongs = command.on && command.endsSongs
                 member.heldUntil = null
                 emit(Event.ParticipantUpdated(member.toParticipant()))
+                // Whether the room waits for a player's end at the song's length changed.
+                scheduleEnd()
                 if (command.on) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
             is Command.SetSpeakers -> {
@@ -1950,8 +1953,11 @@ class Room(
         val item = current ?: return
         // Without a known duration the song can't end on its own; it plays until skipped.
         if (!playingNow() || item.song.durationMs <= 0) return
-        // At another speed, the rest of the song takes longer or shorter.
-        val remaining = ((item.song.durationMs - position()) / playback.rate).toLong()
+        // At another speed, the rest of the song takes longer or shorter. A player that says
+        // when it played the song to its end (PlayerEnded, which moves on at once) gets a
+        // moment more: one a little behind the room would lose the song's last moment.
+        val wait = if (members.values.any { it.listening && it.endsSongs }) PLAYER_END_WAIT_MS else 0L
+        val remaining = ((item.song.durationMs - position()) / playback.rate).toLong() + wait
         endJob = scope.launch {
             delay(maxOf(0, remaining))
             mutex.withLock {
@@ -2397,6 +2403,12 @@ class Room(
         const val PLAYER_LENGTH_TOLERANCE_MS = 250L
         /** A player's end ([Command.PlayerEnded]) counts only this close to the room's own position. */
         const val PLAYER_END_MATCH_MS = 5_000L
+        /**
+         * At a song's length, how long the room waits for a PlayerEnded from players that send
+         * one ([Member.endsSongs]): a player listening alone may be up to 1.5 s behind (it
+         * doesn't jump for less, sync.ts `ALONE_TOLERANCE_MS`).
+         */
+        const val PLAYER_END_WAIT_MS = 1_500L
 
         /** Songs that fail to load in a row before the room pauses instead of skipping on. */
         const val MAX_FAILED_IN_A_ROW = 3

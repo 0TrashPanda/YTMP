@@ -262,6 +262,7 @@ export interface CommandSetListening {
   on: boolean;
   startsTogether: boolean;
   ownLookups: OwnLookups;
+  endsSongs: boolean;
 }
 
 export type RoomOpenMode = "ask" | "move" | "move_if_away";

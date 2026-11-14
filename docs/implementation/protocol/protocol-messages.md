@@ -115,7 +115,7 @@ Each command lists the permission it needs (see [room management](../../features
 
 | Command | Fields | Permission |
 |---------|--------|------------|
-| `SetListening` ✅ | `on`, `startsTogether` (the player sends `PlayerReady`) | Play audio locally |
+| `SetListening` ✅ | `on`, `startsTogether` (the player sends `PlayerReady`), `ownLookups`, `endsSongs` (the player sends `PlayerEnded`: the room waits a moment for it at a song's length) | Play audio locally |
 | `SetSpeakers` ✅ | `names` (speakers near the phone that play the room, from the app; empty: none), `startsTogether` | Play audio locally |
 | `SetRemotePlay` ✅ | `allowed`, `canStart`. A device with an account says whether your other devices may switch its *Play here* (its setting) and whether it can start sound now without a tap (`Participant.remotePlay`, `canStartSound`) | — (yourself) |
 | `SetDeviceListening` ✅ | `participantId`, `on`. Switches *Play here* on another participant **with the same account** that allows it; on only when it can start sound and may listen (`listen_locally`). Sets their `listenRequest` and bumps `listenRequests`; that device switches itself (`lib/listenRequests.ts`). See [your devices](../../features/playback-and-outputs.md#your-devices) | — (only your own devices) |

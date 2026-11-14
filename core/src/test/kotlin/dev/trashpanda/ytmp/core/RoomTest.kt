@@ -533,6 +533,39 @@ class RoomTest {
     }
 
     @Test
+    fun `at a song's length the room waits a moment for players that say when they played it to its end`() = runTest {
+        val room = Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> "https://stream/$id" }, backgroundScope) {
+            testScheduler.currentTime
+        }
+        val client = room.connect()
+        room.run(client, Command.SetListening(true, endsSongs = true))
+        room.run(client, Command.AddSongs(listOf(song(1).copy(durationMs = 100_000), song(2).copy(durationMs = 100_000), song(3).copy(durationMs = 100_000), song(4)), QueuePosition.END))
+        runCurrent()
+        val first = client.state.nowPlaying!!.item.itemId
+
+        // At the length the player (a little behind) still plays its last moment.
+        advanceTimeBy(100_400)
+        runCurrent()
+        assertEquals(first, client.state.nowPlaying?.item?.itemId)
+        // Its end moves the room on at once.
+        room.run(client, Command.PlayerEnded(first, 100_000))
+        runCurrent()
+        assertEquals("ytm:song2", client.state.nowPlaying?.item?.song?.id)
+        assertEquals(QueueItemResult.PLAYED, client.state.history.last().result)
+
+        // No end from the player (its audio broke off): the room moves on a moment later all the same.
+        advanceTimeBy(100_000 + Room.PLAYER_END_WAIT_MS + 100)
+        runCurrent()
+        assertEquals("ytm:song3", client.state.nowPlaying?.item?.song?.id)
+
+        // A player that doesn't say so (an older app): the room moves on at the length, as before.
+        room.run(client, Command.SetListening(true))
+        advanceTimeBy(100_100)
+        runCurrent()
+        assertEquals("ytm:song4", client.state.nowPlaying?.item?.song?.id)
+    }
+
+    @Test
     fun `a player's end only counts from someone playing along, and repeat one plays it again`() = runTest {
         val room = Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> "https://stream/$id" }, backgroundScope) {
             testScheduler.currentTime

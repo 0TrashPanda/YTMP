@@ -186,6 +186,12 @@ Implemented (A + B), and tested on a Pixel 7:
   - Tested in a party room on the emulator next to a browser listener: after the start (two
     seeks for a slow start, then 6 s at 0.97×), no correction at all for over 3 minutes, and
     none after a pause and resume. See `android/.../SyncCorrection.kt`.
+  - **Starting with others** (a song the room starts, or after a pause): sound comes out a
+    moment after play (the room's message, then the audio output: ~0.5–0.8 s on a Galaxy A20e).
+    Started at the room's position, the phone was that far behind and jumped in the first
+    second of every song. It starts `SyncCorrection.startLeadMs` ahead instead (learned from
+    each start like the seek lead, which starts no longer change). Listening alone it starts
+    where it is and the room follows it, so nothing is skipped.
 - **Browser and Android:** play 3% faster or slower (pitch kept) when more than 40 ms off, back
   to normal below 10 ms, seek above 400 ms. Listening alone, only more than 1.5 s is fixed.
   The party screen on a Chromecast syncs loosely instead (`looseCorrection`): no speed
@@ -258,15 +264,24 @@ players send theirs (`PlayerReady.durationMs`, taken within 250 ms for a song th
 look up), and their end:
 
 - **Web player** (desktop app, browsers, the party screen): on the audio's `ended`, and when
-  it pauses at the end because the room is past the audio's length (`sync()`). Once per song;
-  again after `playing` (repeat one).
+  it pauses at the end because the room is past the audio's length (`sync()`). Still playing
+  its last 1.5 s it plays out rather than stopping where the room's clock is (it stopped up to
+  100 ms early, and a player listening alone up to 1.5 s behind lost that much). Once per
+  song; again after `playing` (repeat one).
 - **Android app** (`PlaybackService.reportEnded`): on `STATE_ENDED`, once until `STATE_READY`.
 - **The room takes it** only for the current song, from a member who listens, while it
   plays, when the player's position is within `PLAYER_END_MATCH_MS` (5 s) of the room's, and
   with a known length only in its last 10%: a player that's behind or whose stream broke off
   early can't skip the song for everyone. Repeat one plays it again, as at the clock's end.
+- **The room waits a moment for it:** with a listener whose player says it sends it
+  (`SetListening.endsSongs`: the web player, the Android app from bridge version 21), the
+  clock ends a song `Room.PLAYER_END_WAIT_MS` (1.5 s) after its length, so a player a little
+  behind plays its last moment; its `PlayerEnded` moves on at once. Without such a listener
+  it ends at the length, as before.
 - Speakers move on by themselves already (`outputSkipped`); older players don't send it and
   older hosts ignore it (an unreadable message is dropped), so the clock ends songs there.
+- **Exact lengths from YouTube:** the module takes a song's length from its stream link
+  (`dur=2103.426`), not yt-dlp's whole seconds, which can be shorter than the audio.
 
 For sub-millisecond multi-room sync, the plan is a [Snapcast output](../../features/future-ideas.md#snapcast-output)
 rather than building it into YTMP.

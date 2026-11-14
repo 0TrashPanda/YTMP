@@ -427,6 +427,55 @@ function linkFails(): Promise<Result[]> {
 	});
 }
 
+/**
+ * The song plays to the very end of its audio, also when the room's state changes often near
+ * the end (each change runs sync): it isn't stopped a moment before (it was, up to 100 ms).
+ */
+function toTheVeryEnd(): Promise<Result[]> {
+	return withPlayer('host', async (room, player) => {
+		room.movesOn = false;
+		const a = item(3, 3000);
+		const { audio } = watchAudio(player);
+		const pauses: number[] = [];
+		audio.addEventListener('pause', () => pauses.push(audio.currentTime));
+		room.play(a, roomLink(a.song));
+		await waitFor(() => !audio.paused && audio.currentTime > 1.5, 6000);
+		const busy = setInterval(() => player.sync(), 15);
+		await waitFor(() => room.of('PlayerEnded').length > 0, 4000);
+		clearInterval(busy);
+		await sleep(300);
+		const ended = room.of('PlayerEnded');
+		const early = pauses.filter((t) => t < audio.duration - 0.02);
+		return [
+			{ name: 'to the very end: PlayerEnded at the end of the audio', ok: ended.length === 1 && ended[0].command.positionMs >= 2980, detail: `at ${ended.map((s) => s.command.positionMs).join(', ') || 'never'} of 3000 ms` },
+			{ name: 'to the very end: not stopped before the end of its audio', ok: early.length === 0, detail: `paused at ${pauses.map((t) => t.toFixed(3)).join(', ')} of ${audio.duration} s` }
+		];
+	});
+}
+
+/**
+ * Listening alone, the player doesn't jump for less than 1.5 s of drift: 0.8 s behind the room,
+ * it still plays its song to the end (the room waits for its PlayerEnded), not stopping 0.8 s early.
+ */
+function behindPlaysOut(): Promise<Result[]> {
+	return withPlayer('host', async (room, player) => {
+		room.movesOn = false;
+		const a = item(5, 5000);
+		const { audio } = watchAudio(player);
+		room.play(a, roomLink(a.song));
+		await waitFor(() => !audio.paused && audio.currentTime > 1, 6000);
+		room.apply({ kind: 'PlaybackChanged', playback: room.playback(true, Math.round(room.position()) + 800) });
+		await sleep(500);
+		const d = drift(room, audio);
+		await waitFor(() => room.of('PlayerEnded').length > 0, 6000);
+		const ended = room.of('PlayerEnded');
+		return [
+			{ name: '0.8 s behind, alone: it stays behind (no jump)', ok: d < -600, detail: `drift ${d} ms` },
+			{ name: '0.8 s behind, alone: still plays to the end of its audio', ok: ended.length === 1 && ended[0].command.positionMs >= 4950, detail: `PlayerEnded at ${ended.map((s) => s.command.positionMs).join(', ') || 'never'} of 5000 ms` }
+		];
+	});
+}
+
 const TESTS: Record<string, () => Promise<Result[]>> = {
 	computer: () => twoSongs('computer'),
 	own: () => twoSongs('own'),
@@ -439,7 +488,9 @@ const TESTS: Record<string, () => Promise<Result[]>> = {
 	speed,
 	'skip-while-computer-answers': skipWhileComputerAnswers,
 	'own-module-fails': ownModuleFails,
-	'link-fails': linkFails
+	'link-fails': linkFails,
+	'to-the-very-end': toTheVeryEnd,
+	'behind-plays-out': behindPlaysOut
 };
 
 declare global {

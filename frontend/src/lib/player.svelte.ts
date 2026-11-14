@@ -13,7 +13,7 @@ import { saved, type SongSource } from './storage';
 import { pickSource, SOURCE_NAMES } from './songSources';
 import { computerAudio, tellComputer } from './computer.svelte';
 import { onThisPhone } from './offlinePlaylists.svelte';
-import { correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
+import { ALONE_TOLERANCE_MS, correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
 
 /**
  * Whether this browser looks YouTube songs up itself (see OwnLookups): with its own module, in
@@ -268,12 +268,12 @@ class WebPlayer implements RoomPlayer {
 		this.timer = setInterval(() => this.sync(), 500);
 		// New songs wait for this player to load them (see reportReady).
 		this.sentLookups = ownLookups();
-		await this.room.run({ kind: 'SetListening', on: true, startsTogether: true, ownLookups: this.sentLookups });
+		await this.room.run({ kind: 'SetListening', on: true, startsTogether: true, ownLookups: this.sentLookups, endsSongs: true });
 	}
 
 	reconnected(): void {
 		this.sentLookups = ownLookups();
-		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: true, ownLookups: this.sentLookups });
+		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: true, ownLookups: this.sentLookups, endsSongs: true });
 	}
 
 	/** What the room last heard about this player's own lookups: sent again when it changes (the module starts, the order changes). */
@@ -283,7 +283,7 @@ class WebPlayer implements RoomPlayer {
 		const now = ownLookups();
 		if (now === this.sentLookups) return;
 		this.sentLookups = now;
-		this.room.run({ kind: 'SetListening', on: true, startsTogether: true, ownLookups: now });
+		this.room.run({ kind: 'SetListening', on: true, startsTogether: true, ownLookups: now, endsSongs: true });
 	}
 
 	disable(chosen = true): void {
@@ -294,7 +294,7 @@ class WebPlayer implements RoomPlayer {
 		clearInterval(this.timer);
 		this.audio.pause();
 		this.setMediaKeys(false);
-		this.room.run({ kind: 'SetListening', on: false, startsTogether: false, ownLookups: 'none' });
+		this.room.run({ kind: 'SetListening', on: false, startsTogether: false, ownLookups: 'none', endsSongs: false });
 	}
 
 	setVolume(value: number): void {
@@ -392,6 +392,11 @@ class WebPlayer implements RoomPlayer {
 		// over, and it flipped between loading and playing many times a second.
 		const lengthMs = this.audio.duration * 1000;
 		if (Number.isFinite(lengthMs) && expectedMs >= lengthMs - 100) {
+			// Still playing its last moment (a player listening alone may be up to 1.5 s behind
+			// the room): it plays out, and 'ended' tells the room, which waits a moment for that
+			// (endsSongs). Paused there, ended, or far from its end: it stays at the end.
+			const left = lengthMs - this.audio.currentTime * 1000;
+			if (!this.audio.paused && !this.audio.ended && left > 0 && left <= ALONE_TOLERANCE_MS) return;
 			if (!this.audio.paused) this.audio.pause();
 			this.buffering = false;
 			// Paused a moment before the audio's own end: it ended all the same.
@@ -828,11 +833,11 @@ class NativePlayer implements RoomPlayer {
 		saved.setSoloOff(this.room.roomCode, false);
 		this.sync();
 		// The app says when it has loaded a new song (bridge version 9), so new songs wait for it.
-		await this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: nativeLookups(this.bridge) });
+		await this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: nativeLookups(this.bridge), endsSongs: this.bridge.bridgeVersion() >= 21 });
 	}
 
 	reconnected(): void {
-		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: nativeLookups(this.bridge) });
+		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: nativeLookups(this.bridge), endsSongs: this.bridge.bridgeVersion() >= 21 });
 	}
 
 	disable(chosen = true): void {
@@ -840,7 +845,7 @@ class NativePlayer implements RoomPlayer {
 		saved.listening = false;
 		if (chosen && this.room.state?.room.visibility === 'private') saved.setSoloOff(this.room.roomCode, true);
 		this.sync();
-		this.room.run({ kind: 'SetListening', on: false, startsTogether: false, ownLookups: 'none' });
+		this.room.run({ kind: 'SetListening', on: false, startsTogether: false, ownLookups: 'none', endsSongs: false });
 	}
 
 	setVolume(value: number): void {

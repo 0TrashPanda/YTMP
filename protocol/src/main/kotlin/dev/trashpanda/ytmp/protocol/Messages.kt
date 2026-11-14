@@ -295,11 +295,14 @@ sealed interface Command {
      * [startsTogether]: this player tells the host when it has loaded a new song
      * ([PlayerReady]), so the room waits for it before the song starts (see [PlaybackStatus.starting]).
      * [ownLookups]: whether it looks YouTube songs up itself (its own module), and before the
-     * room's link or only after it. Sent again when that changes.
+     * room's link or only after it. Sent again when that changes. [endsSongs]: this player
+     * says when it played a song to its end ([PlayerEnded]), so at the song's length the room
+     * waits a moment for that ([Room] `PLAYER_END_WAIT_MS`) instead of cutting off a player
+     * that's a little behind.
      */
     @Serializable
     @SerialName("SetListening")
-    data class SetListening(val on: Boolean, val startsTogether: Boolean = false, val ownLookups: OwnLookups = OwnLookups.NONE) : Command
+    data class SetListening(val on: Boolean, val startsTogether: Boolean = false, val ownLookups: OwnLookups = OwnLookups.NONE, val endsSongs: Boolean = false) : Command
 
     /**
      * Plays the room on speakers near this participant's phone ([names], empty: none), which

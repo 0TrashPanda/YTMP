@@ -21,6 +21,8 @@ internal class Member(
     var startsTogether: Boolean = false,
     /** Their player looks YouTube songs up itself (Command.SetListening.ownLookups). */
     var ownLookups: OwnLookups = OwnLookups.NONE,
+    /** Their player says when it played a song to its end (Command.PlayerEnded). */
+    var endsSongs: Boolean = false,
     /** Speakers near their phone that they play the room on (Command.SetSpeakers). */
     var speakers: List<String> = emptyList(),
     var speakersStartTogether: Boolean = false,
