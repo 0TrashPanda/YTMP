@@ -24,6 +24,11 @@ what's planned is marked there.
   change touches what the Chromecast shows: the party/TV/cast screens, shared components,
   styles (`app.css`, Tailwind config), polyfills, or updated dependencies (Svelte, Vite,
   Tailwind); and once before a release. Skip it for screens the Chromecast never shows.
+- The web player playing real audio (`frontend/src/lib/player.svelte.ts`, fake room, real
+  Chromium/Chrome/Edge, headless and muted, ~1 min): `cd frontend && pnpm test:player`. Run it
+  when a change touches the player (or `computer.svelte.ts`/`ownModule.svelte.ts`/`roomEvents.ts`
+  where it loads songs) or what the room asks of players (PlayerReady/Ended/Stalled, lengths,
+  `starting`, NowPlayingChanged); and once before a release.
 - Android: `./gradlew :android:assembleDebug`; release lint: `./gradlew :android:lintRelease`.
 - Desktop app: `python desktop/scripts/bundle_module.py` (the module and Deno, once) and
   `python desktop/scripts/bundle_host.py` (this computer's host and its Java runtime; needs a

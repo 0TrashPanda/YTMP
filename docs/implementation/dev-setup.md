@@ -75,6 +75,10 @@ tools/          smoke-test.py (checks a running phone or server), chrome90-test.
 - The web app in Chrome 90, the browser of older Chromecasts (party screen):
   `node tools/chrome90-test.mjs` (after `pnpm build` and `./gradlew :server:installDist`; it
   downloads Chromium 90 once).
+- The web player playing real audio with a fake room (song lengths, PlayerReady, PlayerEnded,
+  waiting at the end; from this computer, your own module and the host): `cd frontend &&
+  pnpm test:player` (`scripts/player-test.mjs` and `tests/player/harness.ts`; needs Chromium,
+  Chrome or Edge, or `YTMP_CHROME`; headless and muted).
 - After changing anything in `protocol/`, run `./gradlew :protocol:generateTs` to update the
   web app's types (`frontend/src/lib/protocol.gen.ts`).
 - yt-dlp needs a JavaScript runtime for YouTube: Deno by default, or set
