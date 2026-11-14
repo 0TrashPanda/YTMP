@@ -191,7 +191,7 @@ class GraphCopyStore(
         val saved = Saved(clock(), graph)
         val temp = File(file.path + ".part")
         temp.writeText(ProtocolJson.encodeToString(Saved.serializer(), saved))
-        if (!enabled || !temp.renameTo(file)) {
+        if (!enabled || !temp.replace(file)) {
             temp.delete()
             return false
         }

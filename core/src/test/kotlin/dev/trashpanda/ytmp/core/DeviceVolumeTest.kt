@@ -101,7 +101,7 @@ class DeviceVolumeTest {
     }
 
     @Test
-    fun `you switch "Play here" on and off on another of your devices that allows it`() = runTest {
+    fun `you switch Play here on and off on another of your devices that allows it`() = runTest {
         val room = newRoom()
         val phone = room.connect("Anna", device = "Pixel 8", account = anna)
         val laptop = room.connect("Anna", device = "Firefox on Linux", account = anna)

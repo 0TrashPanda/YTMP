@@ -240,7 +240,7 @@ class RadioCrawl(
             loaded()[seed] = at
             val temp = File(file.path + ".part")
             temp.writeText(json.encodeToString(loaded()))
-            temp.renameTo(file)
+            temp.replace(file)
         }
 
         private companion object {

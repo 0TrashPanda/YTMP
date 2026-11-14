@@ -32,7 +32,7 @@ def real_yt_dlp_files() -> dict[str, str]:
     """The bundled yt-dlp's own files, to make a "newer" one that really works."""
     root = Path(yt_dlp.__file__).parent
     return {
-        f"yt_dlp/{path.relative_to(root)}": path.read_text(encoding="utf-8")
+        f"yt_dlp/{path.relative_to(root).as_posix()}": path.read_text(encoding="utf-8")
         for path in root.rglob("*")
         if path.is_file() and "__pycache__" not in path.parts and path.suffix in (".py", ".js")
     }

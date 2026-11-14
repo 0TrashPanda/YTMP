@@ -700,7 +700,7 @@ class PlaylistConverter(
     private fun writeAtomically(file: File, text: String) {
         val temp = File(file.path + ".part")
         temp.writeText(text)
-        if (!temp.renameTo(file)) log.warn("Couldn't keep {}", file.name)
+        if (!temp.replace(file)) log.warn("Couldn't keep {}", file.name)
     }
 
     @Serializable

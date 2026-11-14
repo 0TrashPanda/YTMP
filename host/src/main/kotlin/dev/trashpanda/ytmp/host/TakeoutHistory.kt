@@ -66,7 +66,7 @@ class TakeoutHistory(private val file: File) {
         val songs = Takeout.read(input, zone)
         val temp = File(file.path + ".part")
         temp.writeText(json.encodeToString(TakeoutFile.serializer(), TakeoutFile(songs)))
-        if (!temp.renameTo(file)) throw IllegalStateException("Couldn't save the history")
+        if (!temp.replace(file)) throw IllegalStateException("Couldn't save the history")
         synchronized(lock) { loaded = songs }
         return summary()!!
     }
