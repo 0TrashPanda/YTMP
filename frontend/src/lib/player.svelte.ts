@@ -373,6 +373,16 @@ class WebPlayer implements RoomPlayer {
 			return;
 		}
 
+		// The room is past the end of the audio (it doesn't know the song's length, so it plays on
+		// until someone skips): wait at the end. Seeking there ended the audio, playing started it
+		// over, and it flipped between loading and playing many times a second.
+		const lengthMs = this.audio.duration * 1000;
+		if (Number.isFinite(lengthMs) && expectedMs >= lengthMs - 100) {
+			if (!this.audio.paused) this.audio.pause();
+			this.buffering = false;
+			return;
+		}
+
 		const drift = this.audio.currentTime * 1000 - expectedMs;
 		// Corrections are on top of the room's speed (an episode played faster or slower).
 		const speed = playback.speed ?? 1;
