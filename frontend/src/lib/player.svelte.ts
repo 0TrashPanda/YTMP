@@ -499,7 +499,10 @@ class WebPlayer implements RoomPlayer {
 		this.computerHas = true;
 		if (here) {
 			// The cache hears about it first, so asking for its audio fills the cache.
+			// Unloaded meanwhile: without load() the last song stays in, ready, with its length,
+			// and the room took that as this song's length (and ended it there).
 			this.audio.removeAttribute('src');
+			this.audio.load();
 			void tellComputer(now.item.song, 'started').then((has) => {
 				if (load !== this.loads) return;
 				this.computerHas = has !== false;
