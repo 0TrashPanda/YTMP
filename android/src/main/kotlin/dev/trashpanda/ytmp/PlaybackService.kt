@@ -513,7 +513,12 @@ class PlaybackService : MediaSessionService() {
                 },
                 item.itemId,
             )
-            if (throughHost && !url.startsWith(LocalHost.LOCAL_URL)) checkHostSaved(url, item.itemId)
+            // Through a host's `/api/audio/…`: whether it has the song or gets it from YouTube now.
+            // This phone's own host (a room on this phone): its module looks the song up then.
+            if (from != Source.SAVED) {
+                val onPhone = url.startsWith(LocalHost.LOCAL_URL)
+                if (onPhone || throughHost) checkHostSaved(url, item.itemId, if (onPhone) "module" else "hostYoutube")
+            }
             if (from == Source.OWN) lookUpNext()
             bufferingSince = null
             exo.setMediaItem(
@@ -629,11 +634,12 @@ class PlaybackService : MediaSessionService() {
     }
 
     /**
-     * Playing through the room's host ([url]: its `/api/audio/…`): asks whether it has the song
-     * saved; when it gets it from YouTube now, the page's badge says so ("hostYoutube"). An older
-     * host doesn't say: "host" stays.
+     * Playing through a host ([url]: its `/api/audio/…`, the room's or this phone's own): asks
+     * whether it has the song saved; when it gets it from YouTube now, the page's badge says so
+     * ([notSaved]: "hostYoutube" for the room's host, "module" for this phone's). An older host
+     * doesn't say: the badge stays.
      */
-    private fun checkHostSaved(url: String, itemId: String) {
+    private fun checkHostSaved(url: String, itemId: String, notSaved: String) {
         if (!url.contains("/api/audio/")) return
         scope.launch {
             val saved = withContext(Dispatchers.IO) {
@@ -649,7 +655,7 @@ class PlaybackService : MediaSessionService() {
                     }
                 }.getOrNull()
             }
-            if (saved == false && loadedItemId == itemId && source != Source.SAVED) PlaybackHub.audioSource("hostYoutube", itemId)
+            if (saved == false && loadedItemId == itemId && source != Source.SAVED) PlaybackHub.audioSource(notSaved, itemId)
         }
     }
 

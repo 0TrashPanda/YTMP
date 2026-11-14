@@ -111,7 +111,10 @@ permissions say otherwise (permission: *Play audio locally*).
     phone, browser or computer looked the song up itself), *Server* / *Host phone* (saved there:
     its song cache, downloads or music files), *YouTube via server* / *YouTube via host phone*
     (the server gets it from YouTube right now and streams it to you), *This phone* or *This
-    computer* (on your device). No badge when it plays on a speaker.
+    computer* (on your device: saved there or its own music). A song your phone or computer
+    gets from YouTube right now, also in a room on your phone, says *Your module*: its song
+    cache keeps it as it plays, so next time it says *This phone* / *This computer*. No badge
+    when it plays on a speaker.
   - **Search and pages from your own module** ✅: with your own module on, search (and
     the suggestions while typing), Home, artist, album, playlist and podcast pages, pasted
     links and YouTube Music's lyrics come from it too, so YouTube sees your computer rather
