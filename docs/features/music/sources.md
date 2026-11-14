@@ -160,7 +160,7 @@ Songs you play are kept, so they start at once next time, need no YouTube lookup
 without internet on the phone. It works by itself: there is nothing to pick.
 
 **The desktop app** has one of its own, off by default (*Settings → Song cache*: Off, 500 MB
-up to 10 GB, *Clear cache*): YouTube Music songs the computer plays are kept on its disk as
+up to 10 GB, or any size typed in GB; *Clear cache*): YouTube Music songs the computer plays are kept on its disk as
 they play (one download, nothing extra), and the next song in the queue is fetched into it
 while the current one plays. Only music, nothing over an hour.
 
@@ -171,8 +171,12 @@ phones, and your phone only gives its songs to you.
 
 - **Copy from my phone** on the computer asks your phone through your server. With YTMP open on
   the phone (logged in with the same account, on the same Wi-Fi) it answers at once and the
-  copy starts. The phone doesn't announce itself on the network otherwise, and doesn't check in
-  the background: with the app closed, open it.
+  copy starts. When more than one of your phones answers, you pick which one to copy from.
+  The phone doesn't announce itself on the network otherwise, and doesn't check in the
+  background: with the app closed, open it.
+- **Which songs**: *Only cache* (the default: what the phone kept as it played), *Cache and
+  local* (also its downloads and own music files), or *Only local*. The computer remembers it,
+  also for the copies that start by themselves.
 - **Send songs to my computer** on the phone (*Settings → Song cache and downloads*): shows the
   phone on the Wi-Fi for 10 minutes. A computer that copied from it before copies by itself,
   also when your server is down (the first copy gives the computer a key from the phone).

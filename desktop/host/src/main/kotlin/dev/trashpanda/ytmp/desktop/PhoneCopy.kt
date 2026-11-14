@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.desktop
 
 import dev.trashpanda.ytmp.host.COPY_KEY_HEADER
+import dev.trashpanda.ytmp.host.CachedSongFile
 import dev.trashpanda.ytmp.host.CachedSongFiles
 import dev.trashpanda.ytmp.host.CopyKey
 import dev.trashpanda.ytmp.host.SongCache
@@ -11,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -42,9 +44,33 @@ import javax.jmdns.ServiceListener
  * also gets a key from the phone ([keys]); with that key it works without the server too, and a
  * phone with a key that shows itself is copied from by itself.
  */
-class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope, private val keysFile: File) {
+class PhoneCopy(
+    private val cache: SongCache,
+    private val scope: CoroutineScope,
+    private val keysFile: File,
+    /** Which of the phone's songs to copy ([Which]), kept for the copies that start by themselves too. */
+    private val whichFile: File,
+) {
     @Serializable
     data class Phone(val id: String, val name: String, val url: String)
+
+    /**
+     * Which of the phone's songs to copy: its song cache, its local songs (downloads and its own
+     * music files that are a YouTube Music song), or both. The phone's list tells them apart:
+     * a cached song comes with its size, a local one without ([CachedSongFile]).
+     */
+    @Serializable
+    enum class Which {
+        @SerialName("cache") CACHE,
+        @SerialName("both") BOTH,
+        @SerialName("local") LOCAL;
+
+        fun takes(song: CachedSongFile): Boolean = when (this) {
+            CACHE -> song.size != null
+            LOCAL -> song.size == null
+            BOTH -> true
+        }
+    }
 
     /** One copy, as the window shows it. */
     @Serializable
@@ -69,13 +95,16 @@ class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope,
     data class Found(val id: String, val name: String, val url: String, val owner: String?, val keyed: Boolean)
 
     @Serializable
-    data class State(val found: List<Found>, val copy: Status?)
+    data class State(val found: List<Found>, val copy: Status?, val which: Which = Which.CACHE)
 
     /** Phones showing themselves on the network now, by id. */
     private val shown = ConcurrentHashMap<String, Pair<Phone, String?>>()
     /** Phone id → its key. */
     private val keys = ConcurrentHashMap<String, String>(loadKeys())
     @Volatile private var status: Status? = null
+    /** Only the song cache unless you pick otherwise: a phone's own files are often many, and big. */
+    @Volatile var which: Which = runCatching { Which.valueOf(whichFile.readText().trim()) }.getOrDefault(Which.CACHE)
+        private set
     private var job: Job? = null
 
     /** The phones on the network, only [account]'s (by its mark) or ones this computer has a key for. */
@@ -83,7 +112,7 @@ class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope,
         val mark = account?.let(::ownerMark)
         val mine = shown.values.filter { (phone, owner) -> (mark != null && owner == mark) || keys.containsKey(phone.id) }
             .map { (phone, owner) -> Found(phone.id, phone.name, phone.url, owner, keys.containsKey(phone.id)) }
-        return State(mine.sortedBy { it.name }, status)
+        return State(mine.sortedBy { it.name }, status, which)
     }
 
     /** Looks for phones that show themselves, on every network interface, until the app ends. */
@@ -116,8 +145,9 @@ class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope,
      * (your login for that phone, from your server), which also gets a key for next time.
      */
     @Synchronized
-    fun start(phone: Phone, token: String?): State {
+    fun start(phone: Phone, token: String?, which: Which? = null): State {
         if (job?.isActive == true) return state(null)
+        which?.let(::choose)
         if (cache.maxBytes <= 0) {
             status = Status(phone.name, running = false, error = "Turn the song cache on first", finishedAt = System.currentTimeMillis())
             return state(null)
@@ -137,6 +167,16 @@ class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope,
         return state(null)
     }
 
+    /** Which songs to copy from now on (also when a phone with a key shows itself). */
+    @Synchronized
+    fun choose(which: Which) {
+        this.which = which
+        runCatching {
+            whichFile.parentFile?.mkdirs()
+            whichFile.writeText(which.name)
+        }
+    }
+
     @Synchronized
     fun stop() {
         job?.cancel()
@@ -145,11 +185,12 @@ class PhoneCopy(private val cache: SongCache, private val scope: CoroutineScope,
     private suspend fun copy(phone: Phone, token: String?) {
         val auth = withContext(Dispatchers.IO) { login(phone, token) }
         val list = withContext(Dispatchers.IO) { get(phone, "/api/cache/songs", auth, HttpResponse.BodyHandlers.ofString()) }
-        val songs = ProtocolJson.decodeFromString(CachedSongFiles.serializer(), list.body()).songs.distinctBy { it.song.id }
+        val which = which
+        val songs = ProtocolJson.decodeFromString(CachedSongFiles.serializer(), list.body()).songs.distinctBy { it.song.id }.filter(which::takes)
         val here = songs.count { cache.has(it.song.id) }
         val wanted = songs.filter { !cache.has(it.song.id) }
         status = Status(phone.name, running = true, total = wanted.size, here = here)
-        log.info("Copying up to {} songs from {} ({} here already)", wanted.size, phone.name, here)
+        log.info("Copying up to {} songs from {} ({} here already; {})", wanted.size, phone.name, here, which)
         var copied = 0
         var bytes = 0L
         var noRoom = 0

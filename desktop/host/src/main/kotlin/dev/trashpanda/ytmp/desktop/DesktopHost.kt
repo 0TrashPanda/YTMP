@@ -124,7 +124,7 @@ class DesktopHost(private val config: Config) {
     val outputs = OutputDrivers(scope, listOf(casts, sonos, mpd, zones, tvs))
     val nearby = NearbySpeakers(scope, outputs.all)
     /** Your phones on this network, and copying their songs here. */
-    val phones = PhoneCopy(cache, scope, File(config.dir, "phone-keys.json"))
+    val phones = PhoneCopy(cache, scope, File(config.dir, "phone-keys.json"), File(config.dir, "phone-copy-songs.txt"))
     /** Problems with the speakers (another app took one), numbered, for the window to show once. */
     private val notices = ArrayDeque<NearbyNotice>()
     private var noticeCount = 0
@@ -247,7 +247,12 @@ class DesktopHost(private val config: Config) {
             post("/phones/copy") {
                 val copy = call.receive<PhoneCopyRequest>()
                 if (cache.maxBytes <= 0) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Turn the song cache on first")
-                call.respond(phones.start(copy.phone, copy.token))
+                call.respond(phones.start(copy.phone, copy.token, copy.which))
+            }
+            // Which of a phone's songs to copy: its song cache, its local songs, or both.
+            post("/phones/which") {
+                phones.choose(call.receive<PhoneCopyWhich>().which)
+                call.respond(phones.state(null))
             }
             post("/phones/stop") {
                 phones.stop()
@@ -342,7 +347,10 @@ class DesktopHost(private val config: Config) {
     data class Upload(val songId: String, val url: String, val secret: String)
 
     @Serializable
-    data class PhoneCopyRequest(val phone: PhoneCopy.Phone, val token: String? = null)
+    data class PhoneCopyRequest(val phone: PhoneCopy.Phone, val token: String? = null, val which: PhoneCopy.Which? = null)
+
+    @Serializable
+    data class PhoneCopyWhich(val which: PhoneCopy.Which)
 
     @Serializable
     data class NearbyDevice(val id: String, val name: String, val kind: OutputKind)

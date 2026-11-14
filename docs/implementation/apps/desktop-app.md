@@ -199,7 +199,8 @@ devices, and without the phone announcing itself all the time.
   looped while the app is on screen), which the server answers the moment the ask comes (a
   `StateFlow` per account): no polling delay. Asked, the phone `POST`s `/api/auth/phone-copy/here`
   `MyPhone { id, name, url }` and shows itself on its network for 10 minutes. The window reads
-  `GET /api/account/phone-copy` every second and starts the copy with the phone that answered.
+  `GET /api/account/phone-copy` every second; when one phone answered within 3 s it starts the
+  copy with it, when more did it lists them and you pick.
   There's no push to a phone whose app isn't running (Android only allows that through
   Google's Firebase Cloud Messaging, which YTMP doesn't use), and no background check.
 - **By hand** (*Send songs to my computer*, the phone's `POST /api/cache/songs/show`, its own
@@ -218,6 +219,9 @@ devices, and without the phone announcing itself all the time.
   gets a key with it (`POST /api/cache/songs/key`, only with a login); the desktop host keeps it
   in `phone-keys.json` and uses it from then on (`X-Copy-Key`). A phone with a key that shows
   itself is copied from at once, without the window or the server.
+- **Which songs** (`PhoneCopy.Which`, kept in `phone-copy-songs.txt`, `POST /api/desktop/phones/which`
+  or `which` with the copy): `cache` (default), `both` or `local`. The phone's list tells them
+  apart without a phone update: cached songs come with their size, downloads and own files without.
 - **The copy** (`PhoneCopy`): skips songs that are here; for each other song it reads the size
   from the answer and leaves it out when it doesn't fit in what's left of the cache (it would
   push others out), else `SongCache.take` (kept like a fetched song; MP3, FLAC and Ogg are
