@@ -49,7 +49,7 @@
 			</svg>
 			<b data-tauri-drag-region>YTMP</b>
 		</div>
-		<button id="update" title="Update ready" aria-label="Update ready">
+		<button id="update" title="Update YTMP" aria-label="Update YTMP">
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
 				<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />
 			</svg>
@@ -69,16 +69,15 @@
 			for (const action of ['minimize', 'maximize', 'close']) {
 				document.getElementById(action).addEventListener('click', () => invoke('window_action', { action }));
 			}
-			update.addEventListener('click', () => {
-				const box = update.getBoundingClientRect();
-				invoke('open_update', { x: box.left + box.width / 2 });
-			});
-			// Called by the app (frame.rs): a new version is downloaded and ready to install.
+			update.addEventListener('click', () => invoke('open_update'));
+			// Called by the app (frame.rs): a new version is out (the arrow opens the update dialog).
 			window.updateReady = (version) => {
-				update.title = `YTMP ${version} is ready: restart to update`;
+				update.title = `YTMP ${version} is out: click to update`;
 				update.setAttribute('aria-label', update.title);
 				update.classList.add('ready');
 			};
+			// Called by the app: the new version's download failed (it looks again later).
+			window.updateGone = () => update.classList.remove('ready');
 			// Called by the app when the window is maximized or restored.
 			window.maximized = (on) => {
 				document.getElementById('maximize').setAttribute('aria-label', on ? 'Restore' : 'Maximize');

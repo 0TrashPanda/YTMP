@@ -21,12 +21,15 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 /// What the app keeps: the server, this computer's id and secret for the server (it asks for a
-/// song of this computer's music with them), and the version it was installing (updates.rs).
+/// song of this computer's music with them), and the version it was installing, and whether it asks before updating (updates.rs).
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Settings {
     server: Option<String>,
     #[serde(default)]
     pub(crate) installing: Option<String>,
+    /// A new version found at the start is offered (with *Later*), not installed right away.
+    #[serde(default)]
+    pub(crate) ask_before_updating: bool,
     #[serde(default)]
     device_id: Option<String>,
     #[serde(default)]
@@ -132,6 +135,7 @@ fn open_server(app: &AppHandle, url: &Url) {
             .permission("allow-open-logs")
             .permission("allow-read-logs")
             .permission("allow-check-updates")
+            .permission("allow-ask-before-updating")
             .permission("allow-quit-ready");
         if let Err(e) = app.add_capability(capability) {
             eprintln!("can't allow {origin}: {e}");
@@ -312,7 +316,8 @@ fn bridge_script(app: &AppHandle) -> String {
     pickFolder: () => invoke('pick_folder'),
     openLogs: () => invoke('open_logs'),
     readLogs: () => invoke('read_logs'),
-    checkUpdates: () => invoke('check_updates'),
+    checkUpdates: (quiet) => invoke('check_updates', {{ quiet: !!quiet }}),
+    askBeforeUpdating: (on) => invoke('ask_before_updating', {{ on: on ?? null }}),
     onQuit: (handler) => {{ quitHandler = handler; }},
     autoplay: true,
   }});
@@ -357,6 +362,7 @@ fn main() {
             updates::open_update,
             updates::close_update,
             updates::install_update,
+            updates::ask_before_updating,
         ])
         .register_asynchronous_uri_scheme_protocol("ytmphost", |ctx, request, responder| {
             let app = ctx.app_handle().clone();

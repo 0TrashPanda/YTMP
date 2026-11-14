@@ -1,4 +1,5 @@
 import { updated } from '$app/state';
+import { desktopApp } from './ownModule.svelte';
 
 /**
  * A new version of the web app on the host (a server update): an open page reloads itself to
@@ -84,8 +85,35 @@ function reloadOnce(): boolean {
 	return true;
 }
 
-/** Call once, from the root layout: reloads the page when a new version is there and it's calm. */
+/** This page just reloaded for an update (in the last minute). */
+function justReloaded(): boolean {
+	try {
+		return Date.now() - Number(sessionStorage.getItem(RELOADED_KEY) ?? 0) < 60_000;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Call once, from the root layout: reloads the page when a new version is there and it's calm.
+ * In the desktop app, the server's update is also the moment to look for a new version of the
+ * app (it offers one in a dialog, see desktop/src-tauri/src/updates.rs).
+ */
 export function reloadOnUpdate(): void {
+	// Also once the page has reloaded for it: reloading right away may cut the first look short.
+	let lookedForApp = justReloaded();
+	if (lookedForApp) {
+		desktopApp()
+			?.checkUpdates?.(true)
+			.catch(() => {});
+	}
+	$effect(() => {
+		if (!updated.current || lookedForApp) return;
+		lookedForApp = true;
+		desktopApp()
+			?.checkUpdates?.(true)
+			.catch(() => {});
+	});
 	const reloadIfCalm = () => {
 		if (updated.current && !playingHere && !typing()) reloadOnce();
 	};

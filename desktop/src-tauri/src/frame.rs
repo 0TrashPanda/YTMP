@@ -130,12 +130,24 @@ fn layout(window: &Window) {
     }
 }
 
-/// A new version is downloaded: the arrow shows in the title bar.
+/// A new version is offered: the arrow shows in the title bar.
 pub fn update_ready(app: &AppHandle, version: &str) {
     if let Some(title) = app.get_webview("titlebar") {
         let version = serde_json::to_string(version).unwrap_or_default();
         let _ = title.eval(format!("window.updateReady && window.updateReady({version})"));
     }
+}
+
+/// The new version can't be had after all (its download failed): the arrow goes.
+pub fn update_gone(app: &AppHandle) {
+    if let Some(title) = app.get_webview("titlebar") {
+        let _ = title.eval("window.updateGone && window.updateGone()");
+    }
+}
+
+/// The window has been shown (the page loaded, or a while passed).
+pub fn shown() -> bool {
+    SHOWN.load(Ordering::SeqCst)
 }
 
 /// The app is closing ([for_update]: to install a new version): the page stops playing the room
@@ -184,5 +196,5 @@ pub struct FrameState {
 #[tauri::command]
 pub fn frame_state(app: AppHandle) -> FrameState {
     let maximized = app.get_window("main").and_then(|w| w.is_maximized().ok()).unwrap_or(false);
-    FrameState { update: updates::ready_version(&app), maximized }
+    FrameState { update: updates::found_version(&app), maximized }
 }

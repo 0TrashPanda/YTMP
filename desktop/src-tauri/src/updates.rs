@@ -1,7 +1,9 @@
 // New versions (docs/implementation/apps/desktop-app.md#packaging-updates-and-releases). At the start the splash window
-// looks for one and installs it right there, before the window opens (like Discord). While the
-// app runs it looks every few hours: a new version downloads quietly, and the green arrow in the
-// title bar (frame.rs) offers it; *Restart now* installs it. Before installing, the page stops
+// looks for one and installs it right there, before the window opens (like Discord), unless
+// *Ask before updating* is on. While the app runs it looks every few hours, and when the web app
+// says the server was updated. A new version found while the app runs (or asked first) is
+// offered in a dialog with *Restart now* and *Later*; it downloads meanwhile, and the green
+// arrow in the title bar (frame.rs) offers it again after *Later*. Before installing, the page stops
 // playing the room (frame::before_quit), so the room doesn't play on for nobody.
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,17 +21,17 @@ pub fn on() -> bool {
     option_env!("YTMP_UPDATER_PUBKEY").is_some_and(|k| !k.is_empty())
 }
 
-/// A downloaded version, ready to install.
-struct Ready {
+/// A new version: what the dialog shows, and the download once it's done.
+struct Found {
     update: Update,
-    bytes: Vec<u8>,
     notes: String,
+    bytes: Option<Vec<u8>>,
 }
 
 /// The app's update state.
 #[derive(Default)]
 pub struct Updates {
-    ready: Mutex<Option<Ready>>,
+    found: Mutex<Option<Found>>,
     /// What the splash window shows (it asks once it's loaded: see `splash_state`).
     splash: Mutex<SplashText>,
 }
@@ -41,9 +43,9 @@ pub struct SplashText {
     under: String,
 }
 
-/// The version that's downloaded and ready, if any (for the title bar's arrow).
-pub fn ready_version(app: &AppHandle) -> Option<String> {
-    app.state::<Updates>().ready.lock().unwrap().as_ref().map(|r| r.update.version.clone())
+/// The new version that's offered, if any (for the title bar's arrow).
+pub fn found_version(app: &AppHandle) -> Option<String> {
+    app.state::<Updates>().found.lock().unwrap().as_ref().map(|f| f.update.version.clone())
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -106,6 +108,8 @@ const RELEASES: &str = "https://github.com/0TrashPanda/YTMP/releases";
 
 /// One look at a time (the one at the start, every few hours, and *Check for updates*).
 static CHECKING: AtomicBool = AtomicBool::new(false);
+/// *Restart now* came before the download was done: it installs as soon as it is.
+static INSTALL_WHEN_DOWNLOADED: AtomicBool = AtomicBool::new(false);
 
 /// A new version and its release notes, or none when this is the newest. [timeout] for each request.
 async fn find(app: &AppHandle, timeout: Duration) -> Result<Option<(Update, String)>, String> {
@@ -116,8 +120,15 @@ async fn find(app: &AppHandle, timeout: Duration) -> Result<Option<(Update, Stri
     Ok(update.map(|update| (update, notes.replace("\r\n", "\n"))))
 }
 
+/// *Settings → App → Ask before updating*: on, a new version found at the start is offered
+/// (with *Later*) once the window is open, instead of installing right away.
+fn asks_first(app: &AppHandle) -> bool {
+    app.state::<State>().settings.lock().unwrap().ask_before_updating
+}
+
 /// At the start, in the splash window: a new version downloads and installs right away, before
-/// the app's window opens. False when there's none (or it couldn't look): the app opens.
+/// the app's window opens (unless the app asks first: then it's offered once the window is
+/// open). False when the app opens.
 pub async fn install_at_start(app: &AppHandle) -> bool {
     if CHECKING.swap(true, Ordering::SeqCst) {
         return false;
@@ -126,7 +137,7 @@ pub async fn install_at_start(app: &AppHandle) -> bool {
     // Not long: without internet the app still opens quickly.
     let found = find(app, Duration::from_secs(6)).await;
     CHECKING.store(false, Ordering::SeqCst);
-    let (update, _) = match found {
+    let (update, notes) = match found {
         Ok(Some(found)) => found,
         Ok(None) => return false,
         Err(e) => {
@@ -134,26 +145,13 @@ pub async fn install_at_start(app: &AppHandle) -> bool {
             return false;
         }
     };
+    if asks_first(app) {
+        offer(app, update, notes);
+        return false;
+    }
     let version = update.version.clone();
     set_splash(app, &format!("Downloading YTMP {version}"), Some(0.0), "");
-    let shown = app.clone();
-    let mut got = 0usize;
-    let mut last = -1i64;
-    let downloaded = update
-        .download(
-            move |chunk, total| {
-                got += chunk;
-                let Some(total) = total.filter(|t| *t > 0) else { return };
-                let percent = (got as f64 / total as f64 * 100.0) as i64;
-                if percent != last {
-                    last = percent;
-                    let under = format!("{} of {} MB", got / 1_000_000, total / 1_000_000);
-                    set_splash(&shown, &format!("Downloading YTMP {version}"), Some(got as f64 / total as f64), &under);
-                }
-            },
-            || {},
-        )
-        .await;
+    let downloaded = update.download(progress(app, &version), || {}).await;
     match downloaded {
         Ok(bytes) => {
             install(app, update, bytes);
@@ -167,53 +165,136 @@ pub async fn install_at_start(app: &AppHandle) -> bool {
     }
 }
 
-/// Every few hours while the app runs: a new version downloads, and the title bar offers it.
+/// How far the download is, in the splash window.
+fn progress(app: &AppHandle, version: &str) -> impl FnMut(usize, Option<u64>) + Send + 'static {
+    let app = app.clone();
+    let what = format!("Downloading YTMP {version}");
+    let mut got = 0usize;
+    let mut last = -1i64;
+    move |chunk, total| {
+        got += chunk;
+        let Some(total) = total.filter(|t| *t > 0) else { return };
+        let percent = (got as f64 / total as f64 * 100.0) as i64;
+        if percent != last {
+            last = percent;
+            let under = format!("{} of {} MB", got / 1_000_000, total / 1_000_000);
+            set_splash(&app, &what, Some(got as f64 / total as f64), &under);
+        }
+    }
+}
+
+/// Every few hours while the app runs.
 pub async fn look_now_and_then(app: AppHandle) {
     loop {
         sleep(Duration::from_secs(6 * 60 * 60)).await;
-        if let Err(e) = look(&app).await {
+        if let Err(e) = look(&app, false).await {
             eprintln!("update check: {e}");
         }
     }
 }
 
-/// Looks for a new version; when there is one it downloads (if it isn't already) and the arrow
-/// in the title bar shows. True when there is one.
-async fn look(app: &AppHandle) -> Result<bool, String> {
-    if ready_version(app).is_some() {
+/// Looks for a new version; a new one is offered right away (the dialog, see `offer`). One
+/// that was already offered (and put off with *Later*) is offered again when [again]. True
+/// when there is one.
+async fn look(app: &AppHandle, again: bool) -> Result<bool, String> {
+    if found_version(app).is_some() {
+        if again {
+            open_dialog(app);
+        }
         return Ok(true);
     }
     if CHECKING.swap(true, Ordering::SeqCst) {
         return Err("It's already looking.".into());
     }
     let found = find(app, Duration::from_secs(15)).await;
-    let Some((update, notes)) = found.inspect_err(|_| CHECKING.store(false, Ordering::SeqCst))? else {
-        CHECKING.store(false, Ordering::SeqCst);
-        return Ok(false);
-    };
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        match update.download(|_, _| {}, || {}).await {
-            Ok(bytes) => {
-                let version = update.version.clone();
-                *app.state::<Updates>().ready.lock().unwrap() = Some(Ready { update, bytes, notes });
-                frame::update_ready(&app, &version);
-            }
-            Err(e) => eprintln!("update download: {e}"),
-        }
-        CHECKING.store(false, Ordering::SeqCst);
-    });
+    CHECKING.store(false, Ordering::SeqCst);
+    let Some((update, notes)) = found? else { return Ok(false) };
+    offer(app, update, notes);
     Ok(true)
 }
 
-/// *Settings → App → Check for updates*: looks now. True when there's a new version (it
-/// downloads, and the arrow in the title bar offers it), false when this is the newest.
+/// A new version: the dialog offers it (*Restart now* or *Later*) as soon as the window is open,
+/// the arrow in the title bar keeps offering it, and it downloads meanwhile.
+fn offer(app: &AppHandle, update: Update, notes: String) {
+    let version = update.version.clone();
+    *app.state::<Updates>().found.lock().unwrap() = Some(Found { update: update.clone(), notes, bytes: None });
+    frame::update_ready(app, &version);
+    let shown = app.clone();
+    tauri::async_runtime::spawn(async move {
+        // At the start the window isn't there yet.
+        for _ in 0..120 {
+            if frame::shown() {
+                open_dialog(&shown);
+                break;
+            }
+            sleep(Duration::from_millis(500)).await;
+        }
+    });
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        // How far it is shows only once *Restart now* waits for it (in the splash window).
+        let mut shown = progress(&app, &version);
+        let downloaded = update
+            .download(
+                move |chunk, total| {
+                    if INSTALL_WHEN_DOWNLOADED.load(Ordering::SeqCst) {
+                        shown(chunk, total);
+                    }
+                },
+                || {},
+            )
+            .await;
+        match downloaded {
+            Ok(bytes) => {
+                let ready = {
+                    let updates = app.state::<Updates>();
+                    let mut found = updates.found.lock().unwrap();
+                    let Some(this) = found.as_mut().filter(|f| f.update.version == version) else { return };
+                    this.bytes = Some(bytes);
+                    // Under the lock: *Restart now* sets it under the same lock.
+                    if INSTALL_WHEN_DOWNLOADED.swap(false, Ordering::SeqCst) { found.take() } else { None }
+                };
+                if let Some(ready) = ready {
+                    let _ = tauri::async_runtime::spawn_blocking(move || install(&app, ready.update, ready.bytes.unwrap_or_default())).await;
+                }
+            }
+            Err(e) => {
+                // The next look tries again.
+                eprintln!("update download: {e}");
+                *app.state::<Updates>().found.lock().unwrap() = None;
+                close_dialog(&app);
+                frame::update_gone(&app);
+                if INSTALL_WHEN_DOWNLOADED.swap(false, Ordering::SeqCst) {
+                    set_splash(&app, "The update didn't download", None, &e.to_string());
+                    sleep(Duration::from_secs(4)).await;
+                    if let Some(window) = app.get_window("main") {
+                        let _ = window.show();
+                    }
+                    close_splash(&app);
+                }
+            }
+        }
+    });
+}
+
+/// *Settings → App → Check for updates* ([quiet]: the web app looking by itself, after the
+/// server was updated). True when there's a new version: the dialog offers it right away
+/// (looking by itself, not again when it was put off with *Later*); false when this is the newest.
 #[tauri::command]
-pub async fn check_updates(app: AppHandle) -> Result<bool, String> {
+pub async fn check_updates(app: AppHandle, quiet: Option<bool>) -> Result<bool, String> {
     if !on() {
         return Err("This build doesn't update itself.".into());
     }
-    look(&app).await
+    look(&app, !quiet.unwrap_or(false)).await
+}
+
+/// *Settings → App → Ask before updating*: [on] sets it; says whether it's on.
+#[tauri::command]
+pub fn ask_before_updating(app: AppHandle, on: Option<bool>) -> bool {
+    let Some(on) = on else { return asks_first(&app) };
+    app.state::<State>().settings.lock().unwrap().ask_before_updating = on;
+    save(&app);
+    on
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -249,7 +330,7 @@ pub fn opened(app: &AppHandle) -> Option<String> {
     (installing.as_deref() == Some(version.as_str())).then(|| format!("Updated to {version}"))
 }
 
-/// What the arrow's popup shows.
+/// What the dialog shows.
 #[derive(serde::Serialize)]
 pub struct UpdateInfo {
     version: String,
@@ -259,71 +340,105 @@ pub struct UpdateInfo {
 
 #[tauri::command]
 pub fn update_info(app: AppHandle) -> Option<UpdateInfo> {
-    let ready = app.state::<Updates>();
-    let ready = ready.ready.lock().unwrap();
-    ready.as_ref().map(|r| UpdateInfo { version: r.update.version.clone(), current: r.update.current_version.clone(), notes: r.notes.clone() })
+    let found = app.state::<Updates>();
+    let found = found.found.lock().unwrap();
+    found.as_ref().map(|f| UpdateInfo { version: f.update.version.clone(), current: f.update.current_version.clone(), notes: f.notes.clone() })
 }
 
-const POPUP: &str = "update";
-const POPUP_WIDTH: f64 = 320.0;
-const POPUP_HEIGHT: f64 = 220.0;
+const DIALOG: &str = "update";
+const DIALOG_WIDTH: f64 = 380.0;
+const DIALOG_HEIGHT: f64 = 280.0;
 
-/// The arrow in the title bar, at [x] (from the window's left, in its pixels): the popup under
-/// it, with the release notes and *Restart now*. Clicked again, it closes.
-#[tauri::command]
-pub fn open_update(app: AppHandle, x: f64) {
-    if let Some(popup) = app.get_webview_window(POPUP) {
-        let _ = popup.close();
+/// The update dialog (`update.html`: the release notes, *Restart now* and *Later*), in the
+/// middle of the app's window. Only from async code: a window opened from a synchronous
+/// command hangs on Windows (that's why the arrow did nothing before).
+fn open_dialog(app: &AppHandle) {
+    if let Some(dialog) = app.get_webview_window(DIALOG) {
+        let _ = dialog.set_focus();
         return;
     }
     let Some(window) = app.get_window("main") else { return };
+    if window.is_minimized().unwrap_or(false) {
+        let _ = window.unminimize();
+    }
     let scale = window.scale_factor().unwrap_or(1.0);
-    let (Ok(at), Ok(size)) = (window.inner_position(), window.inner_size()) else { return };
-    let width = POPUP_WIDTH * scale;
-    // Under the arrow, inside the window.
-    let left = (at.x as f64 + x * scale - width + 24.0 * scale).max(at.x as f64 + 8.0 * scale);
-    let left = left.min(at.x as f64 + size.width as f64 - width - 8.0 * scale);
-    let top = at.y as f64 + (frame::BAR + 4.0) * scale;
-    let builder = WebviewWindowBuilder::new(&app, POPUP, WebviewUrl::App("update.html".into()))
+    let (Ok(at), Ok(size)) = (window.outer_position(), window.outer_size()) else { return };
+    let left = at.x as f64 + (size.width as f64 - DIALOG_WIDTH * scale) / 2.0;
+    let top = at.y as f64 + (size.height as f64 - DIALOG_HEIGHT * scale) / 2.0;
+    let builder = WebviewWindowBuilder::new(app, DIALOG, WebviewUrl::App("update.html".into()))
         .title("Update YTMP")
-        .inner_size(POPUP_WIDTH, POPUP_HEIGHT)
+        .inner_size(DIALOG_WIDTH, DIALOG_HEIGHT)
         .resizable(false)
+        .minimizable(false)
+        .maximizable(false)
         .decorations(false)
         .skip_taskbar(true)
-        .always_on_top(true)
         .focused(true)
         .visible(false);
+    // On Windows over the app's window and with it (not over other apps).
     #[cfg(windows)]
-    let builder = builder.additional_browser_args(frame::BROWSER_ARGS);
+    let builder = match window.hwnd() {
+        Ok(hwnd) => builder.owner_raw(hwnd),
+        Err(_) => builder,
+    }
+    .additional_browser_args(frame::BROWSER_ARGS);
+    // On Linux the GTK window may only be touched on the main thread: on top instead.
+    #[cfg(not(windows))]
+    let builder = builder.always_on_top(true);
     match builder.build() {
-        Ok(popup) => {
-            let _ = popup.set_position(PhysicalPosition::new(left as i32, top as i32));
-            let _ = popup.show();
-            let _ = popup.set_focus();
+        Ok(dialog) => {
+            let _ = dialog.set_position(PhysicalPosition::new(left as i32, top as i32));
+            let _ = dialog.show();
+            let _ = dialog.set_focus();
         }
-        Err(e) => eprintln!("update popup: {e}"),
+        Err(e) => eprintln!("update dialog: {e}"),
     }
 }
 
+/// The arrow in the title bar: the dialog again.
 #[tauri::command]
-pub fn close_update(app: AppHandle) {
-    if let Some(popup) = app.get_webview_window(POPUP) {
-        let _ = popup.close();
+pub async fn open_update(app: AppHandle) {
+    open_dialog(&app);
+}
+
+fn close_dialog(app: &AppHandle) {
+    if let Some(dialog) = app.get_webview_window(DIALOG) {
+        let _ = dialog.close();
     }
 }
 
-/// *Restart now*: the page stops playing the room, the splash window shows the install, and the
-/// new version starts (playing on where this one stopped: appQuit.ts).
+/// *Later*: the dialog goes; the arrow in the title bar stays.
+#[tauri::command]
+pub async fn close_update(app: AppHandle) {
+    close_dialog(&app);
+}
+
+/// *Restart now*: the page stops playing the room, the splash window shows the install (and the
+/// rest of the download, if it isn't done), and the new version starts (playing on where this
+/// one stopped: appQuit.ts).
 #[tauri::command]
 pub async fn install_update(app: AppHandle) {
-    close_update(app.clone());
-    let Some(ready) = app.state::<Updates>().ready.lock().unwrap().take() else { return };
+    close_dialog(&app);
+    let Some(version) = found_version(&app) else { return };
     frame::before_quit(&app, true).await;
-    open_splash(&app, &format!("Installing YTMP {}…", ready.update.version));
+    let ready = {
+        let updates = app.state::<Updates>();
+        let mut found = updates.found.lock().unwrap();
+        if found.as_ref().is_some_and(|f| f.bytes.is_some()) {
+            found.take()
+        } else {
+            INSTALL_WHEN_DOWNLOADED.store(true, Ordering::SeqCst);
+            None
+        }
+    };
+    let what = if ready.is_some() { format!("Installing YTMP {version}…") } else { format!("Downloading YTMP {version}") };
+    open_splash(&app, &what);
     if let Some(window) = app.get_window("main") {
         let _ = window.hide();
     }
-    tauri::async_runtime::spawn_blocking(move || install(&app, ready.update, ready.bytes));
+    if let Some(ready) = ready {
+        tauri::async_runtime::spawn_blocking(move || install(&app, ready.update, ready.bytes.unwrap_or_default()));
+    }
 }
 
 pub async fn sleep(duration: Duration) {

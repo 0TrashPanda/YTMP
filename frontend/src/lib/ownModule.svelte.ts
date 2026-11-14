@@ -94,11 +94,16 @@ export interface DesktopApp {
 	/** The app's version and this start's logs (its host, its module), as text to copy. */
 	readLogs?: () => Promise<string>;
 	/**
-	 * Looks for a new version now: true when there is one (it downloads, and the arrow in the
-	 * title bar offers it), false when this is the newest; rejects with why it couldn't look.
-	 * Absent before 0.47.
+	 * Looks for a new version now: true when there is one (newer apps offer it in a dialog right
+	 * away, with *Later*; [quiet]: not again when it was put off with *Later*), false when this is
+	 * the newest; rejects with why it couldn't look. Absent before 0.47.
 	 */
-	checkUpdates?: () => Promise<boolean>;
+	checkUpdates?: (quiet?: boolean) => Promise<boolean>;
+	/**
+	 * *Ask before updating*: with [on] sets it; says whether it's on. On, a new version found at
+	 * the start is offered (with *Later*) instead of installed right away. Absent in older apps.
+	 */
+	askBeforeUpdating?: (on?: boolean) => Promise<boolean>;
 	/**
 	 * [handler] runs when the app closes or restarts for an update ([forUpdate]), before the
 	 * window goes (null: none). The app waits for it, a short while at most (appQuit.ts).

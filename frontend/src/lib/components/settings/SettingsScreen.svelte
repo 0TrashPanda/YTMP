@@ -137,13 +137,25 @@
 		try {
 			const found = await desktop?.checkUpdates?.();
 			if (found === false) updateCheck = 'You have the newest version.';
-			// Older apps asked in a dialog; newer ones download it and show an arrow at the top.
-			else if (found && desktop?.onQuit) updateCheck = "A new version is downloading. When it's ready, the green arrow at the top installs it.";
+			// Newer apps offer it in a dialog right away; 0.49 up to these showed only an arrow at the top.
+			else if (found && desktop?.onQuit && !desktop.askBeforeUpdating) updateCheck = "A new version is downloading. When it's ready, the green arrow at the top installs it.";
 		} catch (e) {
 			updateCheck = `Couldn't look for updates. ${e instanceof Error ? e.message : String(e)}`;
 		} finally {
 			checkingUpdates = false;
 		}
+	}
+	/** *Ask before updating* in the desktop app (null: this app can't). */
+	let askBeforeUpdating = $state<boolean | null>(null);
+	if (desktop?.askBeforeUpdating) {
+		desktop
+			.askBeforeUpdating()
+			.then((on) => (askBeforeUpdating = on))
+			.catch(() => {});
+	}
+	function setAskBeforeUpdating(on: boolean) {
+		askBeforeUpdating = on;
+		desktop?.askBeforeUpdating?.(on).catch(() => (askBeforeUpdating = !on));
 	}
 	/** *Copy logs* in the desktop app: this start's logs on the clipboard, to paste where you need them. */
 	async function copyDesktopLogs() {
@@ -933,13 +945,21 @@
 		<div class="flex items-center gap-3">
 			<div class="flex-1">
 				<p class="text-sm font-medium">Version</p>
-				<p class="text-xs text-muted">YTMP {desktop.version} for {desktop.platform === 'windows' ? 'Windows' : 'Linux'}.{desktop.updates ? (desktop.onQuit ? ' New versions install when the app starts.' : ' New versions are offered when the app starts.') : ''}</p>
+				<p class="text-xs text-muted">YTMP {desktop.version} for {desktop.platform === 'windows' ? 'Windows' : 'Linux'}.{desktop.updates ? (askBeforeUpdating !== null ? '' : desktop.onQuit ? ' New versions install when the app starts.' : ' New versions are offered when the app starts.') : ''}</p>
 				{#if updateCheck}<p class="text-xs text-muted" aria-live="polite">{updateCheck}</p>{/if}
 			</div>
 			{#if desktop.updates && desktop.checkUpdates}
 				<button class="shrink-0 rounded-full bg-raised px-4 py-2 text-sm font-medium hover:bg-line disabled:opacity-50" disabled={checkingUpdates} onclick={checkDesktopUpdates}>{checkingUpdates ? 'Looking…' : 'Check for updates'}</button>
 			{/if}
 		</div>
+		{#if desktop.updates && askBeforeUpdating !== null}
+			<Toggle
+				label="Ask before updating"
+				hint={askBeforeUpdating ? 'A new version is offered when the app starts: restart now or later.' : 'A new version installs when the app starts.'}
+				checked={askBeforeUpdating}
+				onchange={setAskBeforeUpdating}
+			/>
+		{/if}
 		<div class="flex items-center gap-3">
 			<div class="flex-1">
 				<p class="text-sm font-medium">Server</p>

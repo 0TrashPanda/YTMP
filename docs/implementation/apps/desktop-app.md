@@ -66,7 +66,7 @@ Windows check below).
   https page from fetching `http://127.0.0.1` (mixed content; "Load failed", the request
   never leaves; seen in the Linux check below), and Chrome's loopback exception doesn't
   exist there. An **initialization script** the shell runs on every page sets
-  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates, checkUpdates(), onQuit(handler), autoplay, openLogs(), readLogs() }`
+  `window.YtmpDesktop = { version, platform, moduleRequest(path), changeServer(), updates, checkUpdates(quiet), askBeforeUpdating(on), onQuit(handler), autoplay, openLogs(), readLogs() }`
   (`updates`: the build looks for new versions, so *Settings → App* says so; missing before
   0.45; `openLogs`/`readLogs` for *Settings → App → Logs*: the app's log folder with `host.log`
   and `module.log`, opened with the opener plugin, or their text (the last 2 MB of each) for the
@@ -353,16 +353,24 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
   through GitHub's list of releases (like the Android app: 0.x releases are pre-releases,
   which `/releases/latest` skips) for the newest with a `latest.json` (6 s at most per
   request, so the app still opens quickly offline). A newer version downloads there with a
-  progress bar and installs at once, before the app's window opens; otherwise the splash
+  progress bar and installs at once, before the app's window opens (with *Settings → App →
+  Ask before updating* on, `ask_before_updating` in `settings.json`, it's offered in the
+  dialog below once the window is open instead); otherwise the splash
   says *Starting YTMP…* until the page has loaded (20 s at most), then the window shows.
   GitHub's API allows only 60 requests an hour per network without signing in; when it says
   no, the app reads the releases feed (`releases.atom`) instead and takes the newest release
-  whose `latest.json` is there. While the app runs it looks again every 6 hours; a new
-  version downloads quietly and a green arrow shows in the title bar (`frame.rs`). The arrow
-  opens a popup under it (`update.html`: the release notes without their *Install* part,
-  *Restart now* / *Later*, closes when you click elsewhere). *Settings → App → Check for
-  updates* (`checkUpdates()`, from 0.47) looks right away: true when there's one (it
-  downloads, then the arrow shows), false when this is the newest; one look runs at a time.
+  whose `latest.json` is there. While the app runs it looks again every 6 hours, and when the
+  web app notices the server was updated (`appUpdate.svelte.ts`: `checkUpdates(true)`, also
+  once after the page reloaded for it). A new version is offered right away in a dialog
+  (`update.html`, a window of its own over the app's, owned by it: the release notes without
+  their *Install* part, *Restart now* / *Later*) and downloads meanwhile; a green arrow in
+  the title bar (`frame.rs`) opens the dialog again after *Later*. *Settings → App → Check
+  for updates* (`checkUpdates()`, from 0.47) looks right away: true when there's one (the
+  dialog shows, also when it was put off before), false when this is the newest; one look
+  runs at a time. The quiet looks don't show a version again that was put off with *Later*.
+  *Restart now* before the download is done shows the rest of it in the splash window, then
+  installs. The dialog is opened from async code only: a window built in a synchronous
+  command hangs on Windows (up to 0.51 the arrow's popup could hang that way).
   Installing: the page stops playing the room first (`before_quit`, below), the splash says
   *Installing…*, the module and the host stop (the installer replaces their files, which
   Windows won't do while they run), and the installer runs: on Windows quietly (`/S`, no

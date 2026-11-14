@@ -10,20 +10,21 @@
 				box-sizing: border-box;
 				display: flex;
 				flex-direction: column;
-				gap: 8px;
-				padding: 14px 16px;
+				gap: 10px;
+				padding: 18px 20px 16px;
 				background: #1f1f1f;
-				border: 1px solid #2a2a2a;
+				border: 1px solid #3a3a3a;
 				color: #fff;
 				font: 13px Roboto, 'Segoe UI', system-ui, sans-serif;
 				user-select: none;
 				-webkit-user-select: none;
 				cursor: default;
 			}
-			h1 { margin: 0; font-size: 14px; font-weight: 500; }
+			h1 { margin: 0; font-size: 16px; font-weight: 500; }
+			#sub { margin: -6px 0 0; color: #aaa; font-size: 12px; }
 			#notes { flex: 1; overflow: auto; margin: 0; color: #aaa; font-size: 12px; line-height: 1.5; }
 			#notes p { margin: 0 0 4px; }
-			.buttons { display: flex; gap: 8px; align-items: center; }
+			.buttons { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 			button { border: 0; border-radius: 999px; padding: 7px 14px; font: inherit; font-weight: 500; }
 			#now { background: #fff; color: #000; }
 			#now:hover { background: #ddd; }
@@ -32,12 +33,14 @@
 		</style>
 	</head>
 	<body>
-		<!-- What the arrow in the title bar opens (desktop/src-tauri/src/updates.rs). -->
-		<h1 id="title">A new version is ready</h1>
+		<!-- The update dialog (desktop/src-tauri/src/updates.rs): shown when a new version is found,
+		     and again from the arrow in the title bar. -->
+		<h1 id="title">A new version of YTMP is out</h1>
+		<p id="sub"></p>
 		<div id="notes"></div>
 		<div class="buttons">
-			<button id="now">Restart now</button>
 			<button id="later">Later</button>
+			<button id="now">Restart now</button>
 		</div>
 		<script>
 			const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
@@ -45,8 +48,6 @@
 			document.getElementById('later').addEventListener('click', close);
 			document.getElementById('now').addEventListener('click', () => invoke('install_update'));
 			addEventListener('keydown', (e) => e.key === 'Escape' && close());
-			// Clicked somewhere else: it goes, like a menu.
-			addEventListener('blur', close);
 			// The release notes (Markdown) as short lines, without how to install it.
 			const lines = (notes) =>
 				notes
@@ -57,14 +58,14 @@
 					.map((line) => line.replace(/^[-*]\s+/, '• ').replace(/\*\*|__|`/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'));
 			invoke('update_info').then((info) => {
 				if (!info) return close();
-				document.getElementById('title').textContent = `YTMP ${info.version} is ready`;
+				document.getElementById('title').textContent = `YTMP ${info.version} is out`;
+				document.getElementById('sub').textContent = `You have ${info.current}. Restart to update, or later with the arrow at the top.`;
 				const notes = document.getElementById('notes');
 				for (const line of lines(info.notes)) {
 					const p = document.createElement('p');
 					p.textContent = line;
 					notes.append(p);
 				}
-				if (!notes.childElementCount) notes.textContent = `You have ${info.current}.`;
 			});
 		</script>
 	</body>
