@@ -81,7 +81,8 @@
 	const playing = $derived(!!playback?.playing || !!playback?.starting || !!playback?.loading);
 	// A paused room may not have the stream yet (a restored room gets it on play): only loading while playing.
 	const loading = $derived(current !== null && (current.streamUrl === null || !!playback?.starting) && playing);
-	const status = $derived(loading ? ' • loading…' : player.buffering ? ' • buffering…' : '');
+	// Buffering only while the room plays: paused (a restored room), the player may still be looking the song up.
+	const status = $derived(loading ? ' • loading…' : player.buffering && playing ? ' • buffering…' : '');
 	/**
 	 * Desktop: the room plays but not on this device, nor on a speaker or TV it chose: says so next
 	 * to Play here (the phone's player says "Not playing here"). Settings → Solo rooms can hide it.
@@ -326,13 +327,13 @@
 									<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => onPodcast(podcast)} onpointerenter={() => prefetch('podcast', podcast.id)}>{podcast.name}</button>
 								{/if}
 								{#each song.artists as artist, i (i)}
-									{#if i > 0}<span class="shrink-0">, </span>{/if}<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => onArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}
+									{#if i > 0}<span class="shrink-0">{', '}</span>{/if}<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => onArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}
 										>{artist.name}</button
 									>
 								{/each}
 								{#if song.album}
 									{@const album = song.album}
-									<span class="shrink-0"> • </span><button class="min-w-0 truncate hover:text-white hover:underline" onclick={() => onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
+									<span class="shrink-0">{' • '}</span><button class="min-w-0 truncate hover:text-white hover:underline" onclick={() => onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
 								{/if}
 								<span class="shrink-0">{#if year} • {year}{/if}{status}</span>
 							</div>

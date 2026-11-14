@@ -439,7 +439,7 @@
 						{/if}
 					</p>
 					<p class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted">
-						<span class="truncate">Added by {current.item.addedByName}{loading ? ' • loading…' : player.buffering ? ' • buffering…' : ''}</span>
+						<span class="truncate">Added by {current.item.addedByName}{loading ? ' • loading…' : player.buffering && playing ? ' • buffering…' : ''}</span>
 						<SourceBadge source={player.audioSource} />
 					</p>
 					{#if player.error}
