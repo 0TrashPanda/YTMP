@@ -643,7 +643,10 @@ sealed interface Event {
     @SerialName("HistoryItemRemoved")
     data class HistoryItemRemoved(val itemId: String) : Event
 
-    /** A new current song (or none). Its stream URL follows in [StreamReady]. */
+    /**
+     * A new current song (or none). Its stream URL follows in [StreamReady]. The same item again
+     * is the current song with its exact length: it keeps its stream.
+     */
     @Serializable
     @SerialName("NowPlayingChanged")
     data class NowPlayingChanged(val item: QueueItem?) : Event

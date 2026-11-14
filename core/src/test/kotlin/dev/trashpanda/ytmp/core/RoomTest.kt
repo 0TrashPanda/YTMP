@@ -484,6 +484,8 @@ class RoomTest {
         runCurrent()
         assertEquals(204_000, client.state.nowPlaying?.item?.song?.durationMs)
         assertTrue(client.state.playback.playing)
+        // It keeps its stream: without one it said loading forever, with no sound.
+        assertEquals("/api/audio/ytm%3Asong1", client.state.nowPlaying?.streamUrl)
 
         // It ends by itself after that length.
         advanceTimeBy(205_000)

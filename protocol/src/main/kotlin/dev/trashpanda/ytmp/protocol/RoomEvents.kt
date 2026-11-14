@@ -20,7 +20,10 @@ fun RoomState.apply(event: Event): RoomState = when (event) {
     is Event.HistoryAppended -> copy(history = history + event.item)
     is Event.HistoryItemRemoved -> copy(history = history.filter { it.itemId != event.itemId })
     is Event.HistoryReplaced -> copy(history = event.items)
-    is Event.NowPlayingChanged -> copy(nowPlaying = event.item?.let { NowPlaying(it, null) })
+    // The same item again (its exact length came in): it keeps the stream it plays.
+    is Event.NowPlayingChanged -> copy(nowPlaying = event.item?.let { item ->
+        NowPlaying(item, nowPlaying?.takeIf { it.item.itemId == item.itemId }?.streamUrl)
+    })
     is Event.StreamReady -> {
         val now = nowPlaying
         if (now?.item?.itemId == event.itemId) copy(nowPlaying = now.copy(streamUrl = event.streamUrl)) else this

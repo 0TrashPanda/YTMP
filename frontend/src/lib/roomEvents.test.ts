@@ -13,6 +13,16 @@ describe('applyEvent', () => {
 		expect({ ...state, playback: end.playback }).toEqual(end);
 	});
 
+	it('keeps the stream when the current song comes again with its exact length', () => {
+		const item = { itemId: 'i1', song: { durationMs: 0 } } as RoomState['queue'][number];
+		const state = { nowPlaying: { item, streamUrl: '/api/audio/x' } } as RoomState;
+		applyEvent(state, { kind: 'NowPlayingChanged', item: { ...item, song: { ...item.song, durationMs: 204_000 } } });
+		expect(state.nowPlaying?.streamUrl).toBe('/api/audio/x');
+		expect(state.nowPlaying?.item.song.durationMs).toBe(204_000);
+		applyEvent(state, { kind: 'NowPlayingChanged', item: { ...item, itemId: 'i2' } });
+		expect(state.nowPlaying?.streamUrl).toBeNull();
+	});
+
 	it('moves, removes and replaces queue items', () => {
 		const item = (itemId: string) => ({ itemId }) as RoomState['queue'][number];
 		const state = { queue: [item('a'), item('b'), item('c')] } as RoomState;

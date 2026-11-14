@@ -36,7 +36,8 @@ export function applyEvent(s: RoomState, e: Event): void {
 			s.history = s.history.filter((i) => i.itemId !== e.itemId);
 			break;
 		case 'NowPlayingChanged':
-			s.nowPlaying = e.item ? { item: e.item, streamUrl: null } : null;
+			// The same item again (its exact length came in): it keeps the stream it plays.
+			s.nowPlaying = e.item ? { item: e.item, streamUrl: s.nowPlaying?.item.itemId === e.item.itemId ? s.nowPlaying.streamUrl : null } : null;
 			break;
 		case 'StreamReady':
 			if (s.nowPlaying?.item.itemId === e.itemId) s.nowPlaying.streamUrl = e.streamUrl;

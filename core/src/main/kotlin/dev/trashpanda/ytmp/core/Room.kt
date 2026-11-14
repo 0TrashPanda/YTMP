@@ -1933,8 +1933,10 @@ class Room(
         if (durationMs == null || durationMs <= 0 || abs(durationMs - item.song.durationMs) < toleranceMs) return
         val exact = item.copy(song = item.song.copy(durationMs = durationMs))
         current = exact
-        // Clients take it as the same song (same item ID) with a new length; the stream follows.
+        // Clients take it as the same song (same item ID) with a new length and keep its stream.
         emit(Event.NowPlayingChanged(exact))
+        // Apps from before that took it as a new song without a stream: loading forever, no sound.
+        streamUrl?.let { emit(Event.StreamReady(exact.itemId, it)) }
     }
 
     private fun emitPlayback() {
