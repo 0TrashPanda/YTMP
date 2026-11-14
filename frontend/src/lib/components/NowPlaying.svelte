@@ -422,55 +422,55 @@
 			</div>
 
 			{#if song && current}
-				<div class="flex w-full max-w-[36rem] min-w-0 shrink-0 items-center gap-1 lg:hidden" role="presentation" oncontextmenu={onSongMenu}>
-				<div class="min-w-0 flex-1">
+				<div class="flex w-full max-w-[36rem] min-w-0 shrink-0 flex-col lg:hidden" role="presentation" oncontextmenu={onSongMenu}>
 					<h1 class="text-2xl font-bold"><Marquee text={song.title} /></h1>
-					<!-- The album shortens ("…"), the names stay whole (unless one is longer than the line). Not one truncated line: a too-long button in it vanishes whole. -->
-					<p class="flex min-w-0 overflow-hidden whitespace-pre text-muted">
-						{#if song.podcast}
-							{@const podcast = song.podcast}
-							<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => open.onPodcast(podcast)} onpointerenter={() => prefetch('podcast', podcast.id)}>{podcast.name}</button>
+					<!-- The title gets the whole width; like, dislike and save sit next to the artist and "Added by". -->
+					<div class="flex min-w-0 items-center gap-2">
+						<div class="min-w-0 flex-1">
+							<!-- The album shortens ("…"), the names stay whole (unless one is longer than the line). Not one truncated line: a too-long button in it vanishes whole. -->
+							<p class="flex min-w-0 overflow-hidden whitespace-pre text-muted">
+								{#if song.podcast}
+									{@const podcast = song.podcast}
+									<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => open.onPodcast(podcast)} onpointerenter={() => prefetch('podcast', podcast.id)}>{podcast.name}</button>
+								{/if}
+								{#each song.artists as artist, i (i)}
+									{#if i > 0}<span class="shrink-0">{', '}</span>{/if}<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => open.onArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}>{artist.name}</button>
+								{/each}
+								{#if song.album}
+									{@const album = song.album}
+									<span class="shrink-0">{' • '}</span><button class="min-w-0 truncate hover:text-white hover:underline" onclick={() => open.onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
+								{/if}
+							</p>
+							<p class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted">
+								<span class="truncate">Added by {current.item.addedByName}{loading ? ' • loading…' : player.buffering && playing ? ' • buffering…' : ''}</span>
+								<SourceBadge source={player.audioSource} />
+							</p>
+							{#if player.error}
+								<p class="mt-0.5 text-xs text-accent">{player.error}</p>
+							{/if}
+						</div>
+						{#if youtube.account && isYoutubeSong(song.id)}
+							{@const shown = song}
+							<div class="flex shrink-0 items-center rounded-full bg-white/10">
+								<button class="rounded-l-full py-2 pr-2.5 pl-3.5 hover:bg-white/15 disabled:opacity-40" disabled={liked === null} aria-label={liked ? 'Remove like' : 'Like'} aria-pressed={!!liked} onclick={toggleLike}>
+									<Icon name={liked ? 'liked' : 'like'} size={22} />
+								</button>
+								<span class="h-5 w-px bg-white/20"></span>
+								<button
+									class="rounded-r-full py-2 pr-3.5 pl-2.5 hover:bg-white/15 disabled:opacity-40"
+									disabled={rating === null}
+									aria-label={rating === 'dislike' ? 'Remove dislike' : 'Dislike'}
+									aria-pressed={rating === 'dislike'}
+									onclick={toggleDislike}
+								>
+									<Icon name={rating === 'dislike' ? 'disliked' : 'dislike'} size={22} />
+								</button>
+							</div>
+							<button class="shrink-0 rounded-full bg-white/10 p-2 hover:bg-white/15" aria-label="Save to playlist" onclick={() => onSave(shown)}>
+								<Icon name="save" size={22} />
+							</button>
 						{/if}
-						{#each song.artists as artist, i (i)}
-							{#if i > 0}<span class="shrink-0">{', '}</span>{/if}<button class="max-w-full shrink-0 truncate hover:text-white hover:underline" onclick={() => open.onArtist(artist)} onpointerenter={() => artist.id && prefetch('artist', artist.id)}>{artist.name}</button>
-						{/each}
-						{#if song.album}
-							{@const album = song.album}
-							<span class="shrink-0">{' • '}</span><button class="min-w-0 truncate hover:text-white hover:underline" onclick={() => open.onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
-						{/if}
-					</p>
-					<p class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted">
-						<span class="truncate">Added by {current.item.addedByName}{loading ? ' • loading…' : player.buffering && playing ? ' • buffering…' : ''}</span>
-						<SourceBadge source={player.audioSource} />
-					</p>
-					{#if player.error}
-						<p class="mt-0.5 text-xs text-accent">{player.error}</p>
-					{/if}
-				</div>
-				{#if youtube.account && song && isYoutubeSong(song.id)}
-					{@const shown = song}
-					<button
-						class="shrink-0 rounded-full p-2.5 hover:bg-white/10 disabled:opacity-40"
-						disabled={rating === null}
-						aria-label={rating === 'dislike' ? 'Remove dislike' : 'Dislike'}
-						aria-pressed={rating === 'dislike'}
-						onclick={toggleDislike}
-					>
-						<Icon name={rating === 'dislike' ? 'disliked' : 'dislike'} size={26} />
-					</button>
-					<button
-						class="shrink-0 rounded-full p-2.5 hover:bg-white/10 disabled:opacity-40"
-						disabled={liked === null}
-						aria-label={liked ? 'Remove like' : 'Like'}
-						aria-pressed={!!liked}
-						onclick={toggleLike}
-					>
-						<Icon name={liked ? 'liked' : 'like'} size={26} />
-					</button>
-					<button class="shrink-0 rounded-full p-2.5 hover:bg-white/10" aria-label="Save to playlist" onclick={() => onSave(shown)}>
-						<Icon name="save" size={26} />
-					</button>
-				{/if}
+					</div>
 				</div>
 
 				<!-- Phones: the controls (desktop has them in the player bar). -->
