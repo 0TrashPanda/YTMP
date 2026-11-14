@@ -318,7 +318,39 @@ fn install(app: &AppHandle, update: Update, bytes: Vec<u8>) {
         std::thread::sleep(Duration::from_secs(4));
     }
     // The module was stopped for it: start over (as the new version, or as this one).
+    #[cfg(target_os = "linux")]
+    leave_appimage_environment();
     app.restart();
+}
+
+/// The AppImage's start-up put its own (mounted) folder in the environment: LD_LIBRARY_PATH,
+/// PATH, PYTHONHOME, GTK's and GStreamer's paths and more. Tauri's restart passes them on to the
+/// new AppImage, whose start script then ran the system's bash with this one's libraries
+/// ("undefined symbol"), so after an update nothing started (up to 0.52.6). The new AppImage
+/// gets the environment without them, as it was before this one started, and starts in the
+/// folder this one was started from (this one's folder goes away with it).
+#[cfg(target_os = "linux")]
+fn leave_appimage_environment() {
+    let Some(appdir) = std::env::var("APPDIR").ok().filter(|dir| !dir.is_empty()) else { return };
+    for (key, value) in std::env::vars() {
+        if key == "APPIMAGE" || !value.contains(&appdir) {
+            continue;
+        }
+        match without_dir(&value, &appdir) {
+            Some(kept) => std::env::set_var(&key, kept),
+            None => std::env::remove_var(&key),
+        }
+    }
+    if let Some(started_in) = std::env::var_os("OWD") {
+        let _ = std::env::set_current_dir(started_in);
+    }
+}
+
+/// [value] (a `:`-separated list) without the parts in [dir]; None when nothing is left.
+#[cfg(target_os = "linux")]
+fn without_dir(value: &str, dir: &str) -> Option<String> {
+    let kept: Vec<&str> = value.split(':').filter(|part| !part.is_empty() && !part.contains(dir)).collect();
+    (!kept.is_empty()).then(|| kept.join(":"))
 }
 
 /// The app started: a line for the splash window when it just updated itself.
@@ -554,5 +586,22 @@ mod tests {
     fn the_splash_gets_plain_arguments() {
         let text = SplashText { what: "Downloading \"x\"".into(), progress: Some(1.5), under: String::new() };
         assert_eq!(splash_args(&text), r#""Downloading \"x\"", 1, """#);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn leaves_out_the_appimage_folder() {
+        let dir = "/tmp/.mount_YTMP.AMAmgmf";
+        assert_eq!(without_dir("/tmp/.mount_YTMP.AMAmgmf/usr/", dir), None);
+        assert_eq!(without_dir("/tmp/.mount_YTMP.AMAmgmf/usr/lib/:/tmp/.mount_YTMP.AMAmgmf/usr/lib64", dir), None);
+        assert_eq!(
+            without_dir("/tmp/.mount_YTMP.AMAmgmf/usr/bin/:/home/me/.local/bin:/usr/bin", dir).as_deref(),
+            Some("/home/me/.local/bin:/usr/bin")
+        );
+        assert_eq!(
+            without_dir("/tmp/.mount_YTMP.AMAmgmf/usr/share/:/usr/share:/usr/local/share", dir).as_deref(),
+            Some("/usr/share:/usr/local/share")
+        );
+        assert_eq!(without_dir("/tmp/.mount_YTMP.AMAmgmf/usr/lib/gstreamer-1.0:", dir), None);
     }
 }

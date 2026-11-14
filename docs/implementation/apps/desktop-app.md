@@ -377,7 +377,12 @@ The web app already sets the Media Session API (title, art, play/pause/next/prev
   Installing: the page stops playing the room first (`before_quit`, below), the splash says
   *Installing…*, the module and the host stop (the installer replaces their files, which
   Windows won't do while they run), and the installer runs: on Windows quietly (`/S`, no
-  NSIS window) and it starts the new version itself. The version being installed is kept in
+  NSIS window) and it starts the new version itself. On Linux the updater replaces the
+  AppImage file and the app starts it again; the AppImage's start-up put its own folder in the
+  environment (`LD_LIBRARY_PATH`, `PATH`, `PYTHONHOME`, GTK's and GStreamer's paths), and passed
+  on, the new AppImage's start script crashed in the system's bash ("undefined symbol"), so up
+  to 0.52.6 nothing started after an update. `leave_appimage_environment` takes those parts out
+  first. The version being installed is kept in
   `settings.json` (`installing`), so the new version's splash says *Updated to …* and
   doesn't look again right away. Up to 0.48 the app asked in a system dialog (*Update* /
   *Later* / *Skip this version*), and installed with NSIS's own progress window.
