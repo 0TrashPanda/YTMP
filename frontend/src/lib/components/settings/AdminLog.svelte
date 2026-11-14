@@ -27,7 +27,7 @@
 					<span class="font-medium">{entry.actor}</span>
 					{entry.action.charAt(0).toLowerCase() + entry.action.slice(1)}
 					{#if entry.target}<span class="font-medium">{entry.target}</span>{/if}
-					{#if entry.detail}<span class="text-muted"> · {entry.detail}</span>{/if}
+					{#if entry.detail}<span class="text-muted">{` · ${entry.detail}`}</span>{/if}
 					<span class="block text-xs text-muted">{when(entry.at)}</span>
 				</li>
 			{/each}

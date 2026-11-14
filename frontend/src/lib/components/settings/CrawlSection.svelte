@@ -121,7 +121,7 @@
 		/>
 		<p class="text-sm">
 			{crawl.done.toLocaleString()} of {crawl.total.toLocaleString()} songs learned
-			{#if crawl.waiting}<span class="text-muted"> · {crawl.waiting}{crawl.until ? ` (until ${until(crawl.until)})` : ''}</span>{/if}
+			{#if crawl.waiting}<span class="text-muted">{' · '}{crawl.waiting}{crawl.until ? ` (until ${until(crawl.until)})` : ''}</span>{/if}
 		</p>
 	</div>
 {/if}

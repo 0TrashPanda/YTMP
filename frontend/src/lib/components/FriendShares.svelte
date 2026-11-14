@@ -88,7 +88,7 @@
 					<div class="truncate font-medium">{song.title}</div>
 					<div class="truncate text-sm text-muted">{artistNames(song)}</div>
 					<div class="truncate text-xs text-muted">
-						{#if label(share)}<span class="font-medium text-white/80">{label(share)}</span> · {/if}{ago(share.at)}{#if share.note}: “{share.note}”{/if}
+						{#if label(share)}<span class="font-medium text-white/80">{label(share)}</span>{' · '}{/if}{ago(share.at)}{#if share.note}: “{share.note}”{/if}
 					</div>
 				</div>
 			</button>

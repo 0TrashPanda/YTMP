@@ -212,7 +212,7 @@
 								{time(play.playedAt)} · {play.roomName}
 								{#if play.listenedWith.length}· with {play.listenedWith.map((p) => p.name).join(', ')}{:else if play.shared}· with others{/if}
 								{#if !play.addedByMe}· added by {play.addedByName}{/if}
-								{#if play.imported}· imported{#if play.skipped} · skipped{/if}{:else if play.skipped}· skipped at {formatTime(play.heardMs)}{/if}
+								{#if play.imported}· imported{#if play.skipped}{' · skipped'}{/if}{:else if play.skipped}· skipped at {formatTime(play.heardMs)}{/if}
 							</p>
 						</div>
 						<button

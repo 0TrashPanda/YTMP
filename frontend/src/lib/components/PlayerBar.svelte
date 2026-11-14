@@ -335,7 +335,7 @@
 									{@const album = song.album}
 									<span class="shrink-0">{' • '}</span><button class="min-w-0 truncate hover:text-white hover:underline" onclick={() => onAlbum(album)} onpointerenter={() => album.id && prefetch('album', album.id)}>{album.name}</button>
 								{/if}
-								<span class="shrink-0">{#if year} • {year}{/if}{status}</span>
+								<span class="shrink-0">{#if year}{` • ${year}`}{/if}{status}</span>
 							</div>
 						{/if}
 					</div>

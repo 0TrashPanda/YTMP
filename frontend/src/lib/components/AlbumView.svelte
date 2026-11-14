@@ -63,7 +63,7 @@
 							<button class="font-medium text-white hover:underline" onclick={() => onArtist(artist)}>{artist.name}</button>
 						{:else}{artist.name}{/if}
 					{/each}
-					{#if album.year} • {album.year}{/if} • {album.songs.length} songs • {formatTime(total)}
+					{#if album.year}{` • ${album.year}`}{/if} • {album.songs.length} songs • {formatTime(total)}
 				</p>
 			{/if}
 			<PlayAllButtons bind:this={buttons} {room} songs={album?.songs ?? null} name={album?.title ?? title} {onToast}>

@@ -238,7 +238,7 @@
 			{/if}
 			{#if playlist}
 				<p class="mt-1 text-muted">
-					{#if playlist.author}<span class="font-medium text-white">{playlist.author}</span> • {/if}{playlist.songCount ?? playlist.songs.length} songs{playlist.more ? '' : ` • ${formatTime(total)}`}
+					{#if playlist.author}<span class="font-medium text-white">{playlist.author}</span>{' • '}{/if}{playlist.songCount ?? playlist.songs.length} songs{playlist.more ? '' : ` • ${formatTime(total)}`}
 				</p>
 				{#if playlist.description}
 					<button class="mt-1 max-w-prose text-left text-sm text-muted {showDescription ? '' : 'line-clamp-2'}" onclick={() => (showDescription = !showDescription)}>
