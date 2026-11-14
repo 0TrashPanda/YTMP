@@ -588,7 +588,9 @@ class PlaybackService : MediaSessionService() {
         if (!target.enabled || !target.starting || target.item?.itemId != itemId || readySent == itemId) return
         readySent = itemId
         Log.d(TAG, if (failed) "can't start $itemId" else "ready to start $itemId")
-        PlaybackHub.command("""{"kind":"PlayerReady","itemId":${JSONObject.quote(itemId)},"failed":$failed}""")
+        // Its length too: when the room didn't look the song up itself, that's the only exact one.
+        val length = if (!failed && exo.duration > 0) ""","durationMs":${exo.duration}""" else ""
+        PlaybackHub.command("""{"kind":"PlayerReady","itemId":${JSONObject.quote(itemId)},"failed":$failed$length}""")
     }
 
     private fun sourceFor(target: PlaybackTarget, item: TargetItem): Source = when {

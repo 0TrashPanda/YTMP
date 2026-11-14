@@ -468,6 +468,30 @@ class RoomTest {
     }
 
     @Test
+    fun `a song the listeners looked up gets its length from their player`() = runTest {
+        val room = Room("ABCD", "Test", "owner-token", RoomVisibility.PUBLIC, { id -> "https://stream/$id" }, backgroundScope) {
+            testScheduler.currentTime
+        }
+        val client = room.connect()
+        room.run(client, Command.SetListening(true, startsTogether = true, ownLookups = OwnLookups.FIRST))
+        // A listing without a length.
+        room.run(client, Command.AddSongs(listOf(song(1).copy(durationMs = 0), song(2)), QueuePosition.END))
+        runCurrent()
+        val itemId = client.state.nowPlaying!!.item.itemId
+        assertTrue(client.state.playback.starting)
+
+        room.run(client, Command.PlayerReady(itemId, durationMs = 204_000))
+        runCurrent()
+        assertEquals(204_000, client.state.nowPlaying?.item?.song?.durationMs)
+        assertTrue(client.state.playback.playing)
+
+        // It ends by itself after that length.
+        advanceTimeBy(205_000)
+        runCurrent()
+        assertEquals("ytm:song2", client.state.nowPlaying?.item?.song?.id)
+    }
+
+    @Test
     fun `only the hosting device can join a private room until it is made public`() = runTest {
         val room = Room("ABCD", "Solo", "owner-token", RoomVisibility.PRIVATE, { "x" }, backgroundScope) { testScheduler.currentTime }
         val owner = FakeClient()

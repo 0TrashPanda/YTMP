@@ -189,6 +189,7 @@ export interface CommandPlayerReady {
   itemId: string;
   speakers: boolean;
   failed: boolean;
+  durationMs: number | null;
 }
 
 export interface CommandPlayerStalled {

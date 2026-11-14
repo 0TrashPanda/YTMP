@@ -97,6 +97,9 @@ uses the room's link or the proxy for a song whose own link fails. Songs that ar
   playing is `first` or `fallback`, the room plays on with that link instead of pausing or
   skipping. Before, the room only started a song once the host had looked it up, so a
   server stopped by the bot check paused a room whose only listener could look it up fine.
+  Without its own lookup the host has no exact length (a listing may leave it out: 0:00,
+  and the song never ended): the players send theirs with `PlayerReady.durationMs`, and the
+  room takes it for a song it didn't look up (`Room.lengthFromPlayer`).
 
 **Fetching in pieces** ✅: YouTube sends a request for the whole rest of a file (no end to its
 `Range`) only about as fast as the song plays, so a player's buffer runs dry: short pauses

@@ -1024,7 +1024,10 @@ class Room(
                 emit(Event.ParticipantUpdated(member.toParticipant()))
                 if (names.isNotEmpty()) emptyJob?.cancel() else pauseWhenNobodyHears(0)
             }
-            is Command.PlayerReady -> ready(command.itemId, if (command.speakers) "${member.id}:speakers" else member.id, command.failed)
+            is Command.PlayerReady -> {
+                lengthFromPlayer(command.itemId, command.durationMs)
+                ready(command.itemId, if (command.speakers) "${member.id}:speakers" else member.id, command.failed)
+            }
             is Command.PlayerStalled -> stalled(member, command.itemId, command.positionMs)
             is Command.SetOutput -> {
                 need(member, Permission.CHANGE_OUTPUTS)?.let { return it }
@@ -1885,6 +1888,19 @@ class Room(
      * Listings round some lengths (podcasts: "3 hr 36 min") or leave them out, but the song
      * ends by its length. When the stream knows better, the current song gets its exact length.
      */
+    /**
+     * A player has the song's length: taken when the host didn't look the song up itself
+     * ([ownLookupLink]), so it has no exact length of its own. Without one a song whose listing
+     * leaves the length out shows 0:00 and never ends by itself.
+     */
+    private fun lengthFromPlayer(itemId: String, durationMs: Long?) {
+        val item = current?.takeIf { it.itemId == itemId } ?: return
+        if (durationMs == null || streamUrl != ownLookupLink(item.song.id)) return
+        val before = item.song.durationMs
+        exactDuration(item, durationMs)
+        if (current?.song?.durationMs != before) emitPlayback()
+    }
+
     private fun exactDuration(item: QueueItem, durationMs: Long?) {
         if (durationMs == null || durationMs <= 0 || abs(durationMs - item.song.durationMs) < DURATION_TOLERANCE_MS) return
         val exact = item.copy(song = item.song.copy(durationMs = durationMs))

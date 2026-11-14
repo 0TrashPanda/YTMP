@@ -646,7 +646,10 @@ class WebPlayer implements RoomPlayer {
 	private reportReady(itemId: string, failed = false): void {
 		if (!this.room.state?.playback.starting || this.readySent === itemId) return;
 		this.readySent = itemId;
-		this.room.run({ kind: 'PlayerReady', itemId, speakers: false, failed });
+		// Its length too: when the room didn't look the song up itself, that's the only exact one.
+		const length = this.audio.duration;
+		const durationMs = !failed && Number.isFinite(length) && length > 0 ? Math.round(length * 1000) : null;
+		this.room.run({ kind: 'PlayerReady', itemId, speakers: false, failed, durationMs });
 	}
 
 	private onError(): void {
