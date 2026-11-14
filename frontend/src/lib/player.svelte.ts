@@ -12,6 +12,7 @@ import { settings } from './settings.svelte';
 import { saved, type SongSource } from './storage';
 import { pickSource, SOURCE_NAMES } from './songSources';
 import { computerAudio, tellComputer } from './computer.svelte';
+import { onThisPhone } from './offlinePlaylists.svelte';
 import { correction, looseCorrection, LOOSE_SETTLE_MS, ownRate, targetPosition } from './sync';
 
 /**
@@ -26,8 +27,15 @@ export function ownLookups(): OwnLookups {
 	return at === 0 ? 'first' : 'fallback';
 }
 
-/** The Android app plays the room's link first, and looks a song up on the phone when that doesn't play (PlaybackService). */
-const NATIVE_LOOKUPS: OwnLookups = 'fallback';
+/**
+ * The Android app looks songs up on the phone first (bridge 20, PlaybackService); before, it
+ * played the room's link first and looked a song up when that didn't play.
+ */
+const nativeLookups = (bridge: NativeBridge): OwnLookups => {
+	// A room on the phone itself: its host looks songs up with the phone's module already.
+	if (onThisPhone()) return 'none';
+	return bridge.bridgeVersion() >= 20 ? 'first' : 'fallback';
+};
 
 /** Where the sound playing here comes from: YouTube, the host streaming it, or this phone itself. */
 export type AudioSource = 'youtube' | 'host' | 'device';
@@ -760,11 +768,11 @@ class NativePlayer implements RoomPlayer {
 		saved.setSoloOff(this.room.roomCode, false);
 		this.sync();
 		// The app says when it has loaded a new song (bridge version 9), so new songs wait for it.
-		await this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: NATIVE_LOOKUPS });
+		await this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: nativeLookups(this.bridge) });
 	}
 
 	reconnected(): void {
-		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: NATIVE_LOOKUPS });
+		if (this.enabled) this.room.run({ kind: 'SetListening', on: true, startsTogether: this.bridge.bridgeVersion() >= 9, ownLookups: nativeLookups(this.bridge) });
 	}
 
 	disable(chosen = true): void {

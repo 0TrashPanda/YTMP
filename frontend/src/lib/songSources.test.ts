@@ -40,11 +40,11 @@ describe('pickSource', () => {
 });
 
 describe('the default order', () => {
-	it('puts the app’s own module first in the desktop app, the room’s link first elsewhere', async () => {
+	it('puts your own module first, in the desktop app and in browsers', async () => {
 		const { saved } = await import('./storage');
 		vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
 		vi.stubGlobal('window', {});
-		expect(saved.songSources).toEqual(['direct', 'own', 'host']);
+		expect(saved.songSources).toEqual(['own', 'direct', 'host']);
 		vi.stubGlobal('window', { YtmpDesktop: { version: '0.45.0', platform: 'windows', moduleRequest: async () => ({ status: 200, body: '' }) } });
 		expect(saved.songSources).toEqual(['own', 'direct', 'host']);
 		vi.stubGlobal('localStorage', { getItem: () => '["host","own","direct"]', setItem: () => {}, removeItem: () => {} });

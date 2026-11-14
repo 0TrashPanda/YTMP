@@ -79,9 +79,9 @@ Windows check below).
   uses `moduleRequest` when it's there. In the app, `activeModule()` is the app's own module
   (a browser's saved one doesn't count there), shown in *Settings → Where songs play from* as
   *This app's YouTube Music*, with a switch (`ytmp.desktopModule`) and its state. In the app
-  the default order of *Where songs play from* puts it first (`DESKTOP_SONG_SOURCES`: own
-  module, the room's link, through the server), so songs come from this computer unless
-  you change the order; browsers keep the room's link first.
+  the default order of *Where songs play from* puts it first (`SONG_SOURCES`: own
+  module, the room's link, through the server; the same in browsers, where it's skipped
+  without a module), so songs come from this computer unless you change the order.
 
 ## This computer's host ✅
 

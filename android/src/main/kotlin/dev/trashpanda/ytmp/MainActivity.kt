@@ -973,7 +973,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 19
+        const val BRIDGE_VERSION = 20
 
         /** What reading a tag starts (foreground dispatch, [preferTapShare]). */
         private val TAG_ACTIONS = setOf(NfcAdapter.ACTION_NDEF_DISCOVERED, NfcAdapter.ACTION_TECH_DISCOVERED, NfcAdapter.ACTION_TAG_DISCOVERED)

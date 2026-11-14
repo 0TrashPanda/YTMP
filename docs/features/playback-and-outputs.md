@@ -94,7 +94,8 @@ permissions say otherwise (permission: *Play audio locally*).
     that on your network, see [server admin](accounts/server-admin.md)).
   - **The order** ✅: in a browser, *Settings → Where songs play from* sets which way is
     tried first: the room's link, your own module or through the server (for example your
-    module first). When one doesn't work for a song, the next one is tried; through the
+    module first). By default your own module comes first (the app's too), when there is
+    one. When one doesn't work for a song, the next one is tried; through the
     server is always the last try.
     The room follows that ✅: when everyone playing along looks songs up first (and no
     speaker plays the room), the server doesn't look them up at all; and when the server

@@ -64,12 +64,13 @@ network (e.g. Caddy) the last `X-Forwarded-For` entry counts, and the header is 
 the request doesn't come from such a proxy. Others get 403 and the player shows it can't
 play the song. Verified: the stream URL carries `ip=<server's public IPv4>` in `sparams`.
 
-**Own lookups** ✅ (between steps 1 and 2): after the direct URL failed, a client that can
-resolve YouTube links itself does so for the rest of the room, and only uses the proxy for a
-song whose own link fails too. Songs that aren't YouTube's (`ytm:` IDs) keep the host's URL.
+**Own lookups** ✅ (before step 1): a client that can resolve YouTube links itself does so
+first, by default (since 2026-11-14; before, only after the direct URL failed), and only
+uses the room's link or the proxy for a song whose own link fails. Songs that aren't YouTube's (`ytm:` IDs) keep the host's URL.
 
 - **Android app** (`PlaybackService`, `Source`): the phone's own module (`OnDeviceYtm`,
-  `LocalHost.ytm`), not for rooms on the phone itself. Links are kept per song while they
+  `LocalHost.ytm`), not for rooms on the phone itself: `preferred` starts at `OWN`; a
+  song it can't look up goes through the host. Links are kept per song while they
   have 10 min left; the next song (queue, else autoplay, from `RoomFollower`) is looked up
   as soon as one starts.
 - **Browser** (`WebPlayer`, `ownModule.svelte.ts`, `songSources.ts`): a YTM module the listener
@@ -77,7 +78,7 @@ song whose own link fails too. Songs that aren't YouTube's (`ytm:` IDs) keep the
   address, key and on/off). `moduleStatus` checks it with `GET /info` when the page opens and
   every minute while it doesn't answer (or a lookup can't reach it); meanwhile it's skipped
   and the room shows a line until it answers or is switched off. The player tries the ways in
-  `saved.songSources` (default: room's link, own module, host; in the desktop app own module first) with `pickSource`, once each per
+  `saved.songSources` (default `SONG_SOURCES`: own module, room's link, host) with `pickSource`, once each per
   song; a room link from YouTube that failed is skipped for the next songs too, until nothing
   worked for a song. The player calls `GET /songs/{id}/stream` there and prefetches the next
   song. The module answers pages from any origin only when it has a key (CORS, including
@@ -87,8 +88,9 @@ song whose own link fails too. Songs that aren't YouTube's (`ytm:` IDs) keep the
 - **The room knows** ✅ (`Command.SetListening.ownLookups`, `OwnLookups`, `Room.listenersLookUp`):
   a player says whether it looks songs up itself, `first` (own module first in its order and
   usable: `ownLookups()` in `player.svelte.ts`, sent again from `sync()` when that changes),
-  `fallback` (own module later in the order; the Android app, which plays the room's link
-  first) or `none`. When everyone playing a YouTube song is `first` and no speaker plays
+  `fallback` (own module later in the order; an Android app before bridge 20, which played
+  the room's link first) or `none` (no module; the Android app in a room on the phone itself).
+  The Android app is `first` from bridge 20. When everyone playing a YouTube song is `first` and no speaker plays
   the room, the host doesn't look it up (nor warms it up): the room's link is the host's
   proxy (`/api/audio/…`), which only looks the song up for a player that asks for it (its
   own lookup failed). When the host's lookup fails (also YouTube's bot check) and someone

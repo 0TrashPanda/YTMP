@@ -111,8 +111,11 @@ class PlaybackService : MediaSessionService() {
     private var readySent: String? = null
     private var loadedUrl: String? = null
 
-    /** Where songs in this room come from, after what worked so far. */
-    private var preferred = Source.DIRECT
+    /**
+     * Where songs in this room come from, after what worked so far: looked up on this phone
+     * first (the room's host then needn't, see SetListening.ownLookups), else the room's link.
+     */
+    private var preferred = Source.OWN
 
     /** Where the loaded song comes from. */
     private var source = Source.DIRECT
@@ -474,7 +477,7 @@ class PlaybackService : MediaSessionService() {
         setKeepForeground(target != null && target.enabled && target.item != null || speakersShown)
         if (target?.room != null && target.room.hostUrl != sourceRoom?.hostUrl) {
             sourceRoom = target.room
-            preferred = Source.DIRECT
+            preferred = Source.OWN
             hostItemId = null
             clockOffset = null
         }
@@ -1096,7 +1099,7 @@ class PlaybackService : MediaSessionService() {
         stoppedHere = false
         resumedHere = true
         follower.follow(room)
-        follower.command("""{"kind":"SetListening","on":true,"startsTogether":true,"ownLookups":"fallback"}""")
+        follower.command("""{"kind":"SetListening","on":true,"startsTogether":true,"ownLookups":"first"}""")
         PlaybackHub.status("resumed")
         merge(target, follower.room.value)?.let(::apply)
     }
