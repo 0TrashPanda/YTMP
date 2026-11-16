@@ -232,7 +232,7 @@ app's *Nearby rooms* ([networking.md](../networking.md#lan-discovery)).
   with TXT `code` and `name`; a room leaves the list when the network says it's gone.
   `GET /api/desktop/rooms` answers `[{ name, code, url }]`.
 - **The list** (`frontend/src/lib/computerRooms.ts`): on your server's start page only, read
-  every 3 s while it's open; shown when the app has `YtmpDesktop.openNearbyRoom` (0.54 on).
+  every 3 s while it's open; shown when the app has `YtmpDesktop.openNearbyRoom` (0.53.3 on).
 - **Opening one** (`open_nearby_room` in `main.rs`): the app asks its host whether it found
   that room (a page can't send the window anywhere else this way), gives the phone's origin a
   smaller capability than your server's (closing properly, the title bar, updates, `open_home`
