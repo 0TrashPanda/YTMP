@@ -38,7 +38,7 @@ Music, without Premium, and not tied to a single music service.
   [server admin](docs/features/accounts/server-admin.md)
 - **Apps**: Android (lock screen, widget, hosting on the phone, updates itself) and a desktop
   app for Windows and Linux (its own YouTube lookups, media keys, local music, speakers
-  nearby). → [platforms](docs/features/platforms.md)
+  nearby, nearby rooms). → [platforms](docs/features/platforms.md)
 
 ## What's next
 

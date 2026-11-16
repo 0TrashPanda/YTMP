@@ -181,6 +181,8 @@ class DesktopHost(private val config: Config) {
     }
     /** Your phones on this network, and copying their songs here. */
     val phones = PhoneCopy(cache, scope, File(config.dir, "phone-keys.json"), File(config.dir, "phone-copy-songs.txt"))
+    /** Public rooms phones on this network host (*Nearby rooms*). */
+    val nearbyRooms = NearbyRooms()
     /** Problems with the speakers (another app took one), numbered, for the window to show once. */
     private val notices = ArrayDeque<NearbyNotice>()
     private var noticeCount = 0
@@ -250,6 +252,7 @@ class DesktopHost(private val config: Config) {
                 zones.discover()
                 tvs.discover()
                 phones.discover()
+                nearbyRooms.discover()
             }.onFailure { log.warn("Looking for speakers failed: {}", it.toString()) }
         }
         embeddedServer(CIO, port = config.port, host = "127.0.0.1") { module() }.start(wait = true)
@@ -340,6 +343,8 @@ class DesktopHost(private val config: Config) {
                 phones.stop()
                 call.respond(phones.state(null))
             }
+            // Nearby rooms: public rooms phones on this network host.
+            get("/rooms") { call.respond(nearbyRooms.rooms) }
             get("/nearby") { call.respond(nearbyState(call.request.queryParameters["after"]?.toIntOrNull() ?: Int.MAX_VALUE)) }
             post("/nearby/play") {
                 val play = call.receive<NearbyPlay>()

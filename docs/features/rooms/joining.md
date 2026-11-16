@@ -41,9 +41,9 @@ keeps leading from its last 10 codes, so another room can't take them.
 
 There are three ways to find a phone host, with automatic discovery as the main one:
 
-1. **Automatic discovery (main)** ✅: the app lists public rooms on the same network
-   (*Nearby rooms*). Tap one to join, with no code or IP needed. (Not tested between two
-   real phones yet.)
+1. **Automatic discovery (main)** ✅: the Android app and the desktop app list public rooms
+   on the same network (*Nearby rooms*). Tap one to join, with no code or IP needed. (Not
+   tested between two real phones yet.)
 2. **QR code** ✅: the room's share sheet shows a QR code with its link. Scanning it with any
    phone camera opens it in a browser and joins the room. On an Android phone with the YTMP
    app, the link opens in the app instead (it asks *Open in the YTMP app?*, with *Continue in the
@@ -51,7 +51,7 @@ There are three ways to find a phone host, with automatic discovery as the main 
 3. **Manual IP**: type the link (`http://<phone's IP>:8765/room/CODE`) in a browser. Planned:
    a field for it in the app.
 
-> Browsers cannot discover devices on the network by themselves, so browser clients
+> Browsers (not the apps) cannot discover devices on the network by themselves, so browser clients
 > use the **QR code** or **manual IP**. The phone host also serves the web UI, so
 > scanning the QR code with a normal camera app is enough to join from a browser.
 

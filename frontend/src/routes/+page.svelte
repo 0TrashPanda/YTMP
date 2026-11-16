@@ -10,6 +10,8 @@
 	import SettingsScreen, { type SettingsSection } from '../lib/components/settings/SettingsScreen.svelte';
 	import { youtube } from '../lib/youtube.svelte';
 	import { nativeBridge, type NearbyRoom } from '../lib/native';
+	import { hasComputerRooms, openComputerRoom, watchComputerRooms } from '../lib/computerRooms';
+	import { desktopApp } from '../lib/ownModule.svelte';
 	import type { HostInfo, RoomInfo, RoomOpenMode, RoomVisibility, SyncedRoom } from '../lib/protocol.gen';
 	import { settings } from '../lib/settings.svelte';
 	import { saved } from '../lib/storage';
@@ -38,6 +40,9 @@
 	let host = $state<HostInfo | null>(null);
 	let myRooms = $state<RoomInfo[]>([]);
 	let nearby = $state<NearbyRoom[]>([]);
+	// The desktop app on your server's page finds them with its own host; on a phone's page it goes back to your server.
+	const computerRooms = hasComputerRooms();
+	let stopComputerRooms = () => {};
 	/** Logged in with an account this host accepts. */
 	let me = $state<Identity | null>(null);
 	let authUrl = $state('');
@@ -117,6 +122,7 @@
 			window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: (rooms) => (nearby = rooms), onBack };
 			youtube.load();
 		}
+		if (computerRooms && host?.kind === 'server') stopComputerRooms = watchComputerRooms((rooms) => (nearby = rooms));
 	});
 
 	/**
@@ -157,6 +163,7 @@
 	onDestroy(() => {
 		finishClosing();
 		stopShared();
+		stopComputerRooms();
 		if (window.__ytmpNative) window.__ytmpNative = { ...window.__ytmpNative, onNearbyRooms: undefined, onBack: undefined };
 	});
 
@@ -351,7 +358,8 @@
 
 	function joinNearby(room: NearbyRoom) {
 		saved.displayName = name.trim();
-		location.href = `${room.url}/room/${room.code}`;
+		if (computerRooms) void attempt(() => openComputerRoom(room));
+		else location.href = `${room.url}/room/${room.code}`;
 	}
 
 	async function attempt(action: () => Promise<void>) {
@@ -736,7 +744,7 @@
 			{@render elsewhereList()}
 		{/if}
 
-		{#if nativeBridge}
+		{#if nativeBridge || (computerRooms && host?.kind === 'server')}
 			<section class="flex flex-col gap-1">
 				<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">Nearby rooms</h2>
 				{#each nearby as room (room.url + room.code)}
@@ -749,10 +757,18 @@
 						<span class="font-mono text-sm text-muted">{room.code}</span>
 					</button>
 				{:else}
-					<p class="px-1 text-sm text-muted">No rooms found on this Wi-Fi.</p>
+					<p class="px-1 text-sm text-muted">No rooms found on this {nativeBridge ? 'Wi-Fi' : 'network'}.</p>
 				{/each}
 			</section>
+		{/if}
+		{#if !nativeBridge && host && host.kind !== 'server' && desktopApp()?.openHome}
+			<p class="text-center text-sm text-muted">
+				On {location.host} ·
+				<button class="underline" onclick={() => desktopApp()?.openHome?.()}>Back to your server</button>
+			</p>
+		{/if}
 
+		{#if nativeBridge}
 			<p class="text-center text-sm text-muted">
 				{#if onThisPhone}
 					<button class="underline" onclick={() => nativeBridge?.openServer()}>Join a room on a server</button>

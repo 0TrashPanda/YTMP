@@ -80,6 +80,9 @@ server, like in a browser; **everything YouTube** happens on your own computer:
 - **Speakers near this computer**: *Play on → Near this computer* lists the Chromecasts,
   Sonos speakers, MPDs and TVs on the computer's network, also when your server can't reach
   them.
+- **Nearby rooms**: the start page lists the public rooms phones on the computer's network
+  host, like the Android app; click one to join. *Back to your server* on the phone's page
+  goes back.
 - **Songs from your phone**: *Copy from my phone* (YTMP open on the phone), or *Send songs to
   my computer* on the phone, copies the songs the phone keeps over Wi-Fi.
 - **The first start** asks for your server's address, like the Android app.

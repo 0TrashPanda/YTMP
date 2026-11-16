@@ -180,7 +180,7 @@ export interface CastScreenState {
 	shown: { deviceId: string; name: string; url: string }[];
 }
 
-/** A room another phone on the same network is hosting (android/.../Nearby.kt). */
+/** A room another phone on the same network is hosting (android/.../Nearby.kt; desktop/host/.../NearbyRooms.kt). */
 export interface NearbyRoom {
 	name: string;
 	code: string;

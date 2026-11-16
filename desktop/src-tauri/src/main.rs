@@ -75,6 +75,8 @@ pub(crate) struct State {
     pub(crate) settings: Mutex<Settings>,
     /// Server origins that may call the app's commands (a capability each, added once).
     allowed: Mutex<HashSet<String>>,
+    /// Phones' origins opened from *Nearby rooms*: a smaller capability each, and no host.
+    nearby: Mutex<HashSet<String>>,
 }
 
 fn settings_file(app: &AppHandle) -> PathBuf {
@@ -140,7 +142,9 @@ fn open_server(app: &AppHandle, url: &Url) {
             .permission("allow-check-updates")
             .permission("allow-ask-before-updating")
             .permission("allow-show-title-bar")
-            .permission("allow-quit-ready");
+            .permission("allow-quit-ready")
+            .permission("allow-open-nearby-room")
+            .permission("allow-open-home");
         if let Err(e) = app.add_capability(capability) {
             eprintln!("can't allow {origin}: {e}");
         }
@@ -195,6 +199,63 @@ async fn connect(app: AppHandle, address: String) -> Result<(), String> {
 fn change_server(page: Webview) {
     let setup = if cfg!(windows) { "http://tauri.localhost/index.html?change=1" } else { "tauri://localhost/index.html?change=1" };
     let _ = page.navigate(Url::parse(setup).unwrap());
+}
+
+#[derive(serde::Deserialize)]
+struct FoundRoom {
+    code: String,
+    url: String,
+}
+
+/// *Nearby rooms* on the home page: opens a room a phone on this network hosts, one this
+/// computer's host found (desktop/host/…/NearbyRooms.kt). The phone's page may close the app
+/// properly, go back to your server and use the title bar, but not this computer's YouTube
+/// module, logs or host (the phone plays the room's songs itself).
+#[tauri::command]
+async fn open_nearby_room(app: AppHandle, url: String, code: String) -> Result<(), String> {
+    let host = app.clone();
+    let (status, _, body) = tauri::async_runtime::spawn_blocking(move || host.state::<Sidecars>().host.forward("GET", "/api/desktop/rooms", None, None, &[]))
+        .await
+        .map_err(|e| e.to_string())?;
+    let found: Vec<FoundRoom> = if status == 200 { serde_json::from_slice(&body).unwrap_or_default() } else { vec![] };
+    if !found.iter().any(|room| room.url == url && room.code == code) {
+        return Err("That room isn't on this network any more".into());
+    }
+    let page = Url::parse(&format!("{url}/room/{code}")).map_err(|e| e.to_string())?;
+    let origin = page.origin().ascii_serialization();
+    let state = app.state::<State>();
+    let mut nearby = state.nearby.lock().unwrap();
+    if !state.allowed.lock().unwrap().contains(&origin) && nearby.insert(origin.clone()) {
+        let capability = CapabilityBuilder::new(format!("nearby-{}", nearby.len()))
+            .remote(format!("{origin}/*"))
+            .local(false)
+            .window("main")
+            .permission("allow-change-server")
+            .permission("allow-open-home")
+            .permission("allow-media-update")
+            .permission("allow-check-updates")
+            .permission("allow-ask-before-updating")
+            .permission("allow-show-title-bar")
+            .permission("allow-quit-ready");
+        if let Err(e) = app.add_capability(capability) {
+            eprintln!("can't allow {origin}: {e}");
+        }
+    }
+    drop(nearby);
+    if let Some(page_view) = app.get_webview("app") {
+        let _ = page_view.navigate(page);
+    }
+    Ok(())
+}
+
+/// Back to your server from a phone's page (*Nearby rooms*), without asking for its address again.
+#[tauri::command]
+fn open_home(app: AppHandle, page: Webview) {
+    let saved = app.state::<State>().settings.lock().unwrap().server.clone();
+    match saved.as_deref().map(normalize) {
+        Some(Ok(url)) => open_server(&app, &url),
+        _ => change_server(page),
+    }
 }
 
 /// The page's Media Session changed: on Windows the app shows it (media.rs); elsewhere the web view does that itself.
@@ -273,6 +334,10 @@ fn host_request(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> taur
         return cors(tauri::http::Response::builder().status(204)).body(vec![]).unwrap_or_default();
     }
     let header = |name: &str| request.headers().get(name).and_then(|v| v.to_str().ok());
+    // A phone's page opened from *Nearby rooms* isn't yours: not this computer's music and cache.
+    if header("origin").is_some_and(|origin| app.state::<State>().nearby.lock().unwrap().contains(origin)) {
+        return cors(tauri::http::Response::builder().status(403)).body(vec![]).unwrap_or_default();
+    }
     let path = request.uri().path_and_query().map(|p| p.as_str()).unwrap_or("/");
     let (status, headers, body) =
         app.state::<Sidecars>().host.forward(request.method().as_str(), path, header("range"), header("content-type"), request.body());
@@ -314,6 +379,8 @@ fn bridge_script(app: &AppHandle) -> String {
     platform: {platform:?},
     moduleRequest: (path, method, body) => invoke('module_request', {{ path, method, body }}),
     changeServer: () => invoke('change_server'),
+    openNearbyRoom: (url, code) => invoke('open_nearby_room', {{ url, code }}),
+    openHome: () => invoke('open_home'),
     updates: {updates},
     host: {host:?},
     device: Object.freeze({{ id: {device_id:?}, secret: {device_secret:?} }}),
@@ -353,6 +420,8 @@ fn main() {
             open_saved,
             connect,
             change_server,
+            open_nearby_room,
+            open_home,
             media_update,
             pick_folder,
             open_logs,
@@ -380,7 +449,7 @@ fn main() {
                 .ok()
                 .and_then(|text| serde_json::from_str(&text).ok())
                 .unwrap_or_default();
-            app.manage(State { settings: Mutex::new(settings), allowed: Mutex::new(HashSet::new()) });
+            app.manage(State { settings: Mutex::new(settings), allowed: Mutex::new(HashSet::new()), nearby: Mutex::new(HashSet::new()) });
             module::Module::start(&handle, Kind::Module);
             module::Module::start(&handle, Kind::Host);
 

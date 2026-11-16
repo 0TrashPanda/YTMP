@@ -81,6 +81,10 @@ export interface DesktopApp {
 	moduleRequest?: (path: string, method?: string, body?: string) => Promise<ModuleAnswer>;
 	/** Back to the app's page that asks for the server's address. */
 	changeServer?: () => Promise<void>;
+	/** Opens a room a phone on this network hosts, one the app's host found (*Nearby rooms*, absent before 0.54). */
+	openNearbyRoom?: (url: string, code: string) => Promise<void>;
+	/** Back to your server from a phone's page (absent before 0.54). */
+	openHome?: () => Promise<void>;
 	/** This build looks for new versions when it starts (absent before 0.45: those didn't). */
 	updates?: boolean;
 	/** This computer's host, where the window gets this computer's music and song cache (`…/api/…`); absent in older apps. */

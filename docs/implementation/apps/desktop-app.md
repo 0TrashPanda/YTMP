@@ -223,6 +223,25 @@ over its own connection (`FollowerSource`/`RoomFollower`, moved from the Android
 - **Tried**: the AppImage on Linux finds the home's Chromecasts and plays on them (2026-11-16,
   once firewalld let mDNS in). **Not tried yet**: the party screen on a TV from the computer.
 
+## Nearby rooms ✅
+
+The start page lists public rooms phones on this computer's network host, like the Android
+app's *Nearby rooms* ([networking.md](../networking.md#lan-discovery)).
+
+- **Finding them** (`NearbyRooms`, jmDNS, started with the speakers' discovery): `_ytmp._tcp`
+  with TXT `code` and `name`; a room leaves the list when the network says it's gone.
+  `GET /api/desktop/rooms` answers `[{ name, code, url }]`.
+- **The list** (`frontend/src/lib/computerRooms.ts`): on your server's start page only, read
+  every 3 s while it's open; shown when the app has `YtmpDesktop.openNearbyRoom` (0.54 on).
+- **Opening one** (`open_nearby_room` in `main.rs`): the app asks its host whether it found
+  that room (a page can't send the window anywhere else this way), gives the phone's origin a
+  smaller capability than your server's (closing properly, the title bar, updates, `open_home`
+  and *Change server*; not the YouTube module, the logs or the folder picker) and opens
+  `<url>/room/<code>`. Requests from that origin to this computer's host (`ytmphost`) get 403:
+  the phone's page isn't yours, and it plays the room's songs itself.
+- **Back**: the phone's start page shows *On <address> · Back to your server*
+  (`YtmpDesktop.openHome`, `open_home`: the saved server, else the setup page).
+
 ## Songs from your phone ✅
 
 Copying a phone's songs into the computer's song cache over Wi-Fi, only between one account's
@@ -494,7 +513,7 @@ the module.
 8. ✅ The music on the computer and a song cache (see above).
 9. ✅ This computer's host (Kotlin, the phone's host code) instead of the module doing them.
 10. ✅ Speakers (Chromecast, Sonos, MPD, zones, YouTube TVs) from the host, with always-on
-    discovery in the app; ✅ copying songs from a phone's cache over Wi-Fi.
+    discovery in the app; ✅ copying songs from a phone's cache over Wi-Fi; ✅ *Nearby rooms*.
 
 ## Open questions
 

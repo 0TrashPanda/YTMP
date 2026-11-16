@@ -9,6 +9,9 @@ Feature description: [features/joining.md](../features/rooms/joining.md).
   protocol version).
 - Android: `NsdManager` for both advertising and discovery; the app's room list shows
   *Nearby rooms*.
+- Desktop app: its host only looks (it has no rooms), with jmDNS on every network interface
+  (`desktop/host/.../NearbyRooms.kt`, `GET /api/desktop/rooms`); see
+  [desktop-app.md](apps/desktop-app.md#nearby-rooms-).
 - Solo rooms are **not advertised**.
 - Not verified yet between two real phones (the dev PC's firewall blocks mDNS).
 
