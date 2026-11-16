@@ -9,6 +9,8 @@ import dev.trashpanda.ytmp.host.KeptPlaylists
 import dev.trashpanda.ytmp.host.TakeoutHistory
 import dev.trashpanda.ytmp.host.CachedSource
 import dev.trashpanda.ytmp.host.CastOutputs
+import dev.trashpanda.ytmp.host.CastScreens
+import dev.trashpanda.ytmp.host.ShownScreen
 import dev.trashpanda.ytmp.host.FollowerSource
 import dev.trashpanda.ytmp.host.MpdOutputs
 import dev.trashpanda.ytmp.host.NearbyPlaying
@@ -30,6 +32,7 @@ import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.HostKind
 import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.protocol.ProtocolJson
+import dev.trashpanda.ytmp.protocol.ScreenUnlinkRequest
 import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.SongCachePlace
 import dev.trashpanda.ytmp.protocol.SongCacheSettings
@@ -57,6 +60,7 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -160,6 +164,21 @@ class DesktopHost(private val config: Config) {
     private val tvs = YoutubeTvOutputs(scope)
     val outputs = OutputDrivers(scope, listOf(casts, sonos, mpd, zones, tvs))
     val nearby = NearbySpeakers(scope, outputs.all)
+    /**
+     * A room's party screen on a TV here (DashCast opens the server's `/tv` page, which plays the
+     * music itself), like the phone's. When it ends, the room hears so (best effort).
+     */
+    private val castScreens = CastScreens(scope, casts) { screen ->
+        val (url, request) = screen.unlink() ?: return@CastScreens
+        val body = ProtocolJson.encodeToString(ScreenUnlinkRequest.serializer(), request)
+        withContext(Dispatchers.IO) {
+            uploads.send(
+                HttpRequest.newBuilder(URI(url)).timeout(Duration.ofSeconds(5)).header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body)).build(),
+                HttpResponse.BodyHandlers.discarding(),
+            )
+        }
+    }
     /** Your phones on this network, and copying their songs here. */
     val phones = PhoneCopy(cache, scope, File(config.dir, "phone-keys.json"), File(config.dir, "phone-copy-songs.txt"))
     /** Problems with the speakers (another app took one), numbered, for the window to show once. */
@@ -297,7 +316,7 @@ class DesktopHost(private val config: Config) {
 
     private fun nearbyState(after: Int): NearbyState {
         val devices = outputs.devices.value.map { NearbyDevice(it.id, it.name, it.kind) }
-        return NearbyState(devices, nearby.playing.value, synchronized(notices) { notices.filter { it.id > after } }, noticeCount)
+        return NearbyState(devices, nearby.playing.value, synchronized(notices) { notices.filter { it.id > after } }, noticeCount, castScreens.shown.value)
     }
 
     private fun Route.desktopRoutes() {
@@ -327,11 +346,33 @@ class DesktopHost(private val config: Config) {
                 val device = outputs.devices.value.firstOrNull { it.id == play.deviceId }
                     ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "That speaker isn't on this network now")
                 val link = RoomLink(play.hostUrl, play.code, play.guestToken)
+                // A TV does one thing at a time: the music instead of the party screen.
+                castScreens.stop(device.id)
                 nearby.turnOn(play.code, device.id, device.name) { FollowerSource(link) }
                 call.respond(nearbyState(Int.MAX_VALUE))
             }
             post("/nearby/stop") {
                 nearby.turnOff(call.receive<NearbyStop>().deviceId)
+                call.respond(nearbyState(Int.MAX_VALUE))
+            }
+            // The party screen of a room on a TV here: `url` is the window's own `/tv#cast=CODE.TOKEN`.
+            post("/nearby/screen") {
+                val show = call.receive<NearbyScreen>()
+                if (!ShownScreen.CAST_PAGE.matches(show.url)) throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Not a party screen page")
+                if (casts.address(show.deviceId) == null) throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "That TV isn't on this network now")
+                // The party screen plays the music itself.
+                nearby.turnOff(show.deviceId)
+                try {
+                    castScreens.show(show.deviceId, show.url)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    log.warn("Couldn't show the party screen on {}: {}", show.deviceId, e.toString())
+                    throw ApiException(HttpStatusCode.BadGateway, ErrorCode.INVALID, e.message ?: "The TV didn't answer")
+                }
+                call.respond(nearbyState(Int.MAX_VALUE))
+            }
+            post("/nearby/screen/stop") {
+                castScreens.stop(call.receive<NearbyStop>().deviceId)
                 call.respond(nearbyState(Int.MAX_VALUE))
             }
             post("/nearby/volume") {
@@ -445,15 +486,18 @@ class DesktopHost(private val config: Config) {
     @Serializable
     data class NearbyNotice(val id: Int, val text: String)
 
-    /** Like the phone app's bridge `nearby` (shown: its party screens, none here), with the notices after the one asked for. */
+    /** Like the phone app's bridge `nearby` (shown: the party screens on TVs here), with the notices after the one asked for. */
     @Serializable
     data class NearbyState(
         val devices: List<NearbyDevice>,
         val playing: NearbyPlaying?,
         val notices: List<NearbyNotice>,
         val lastNotice: Int,
-        val shown: List<String> = emptyList(),
+        val shown: List<ShownScreen> = emptyList(),
     )
+
+    @Serializable
+    data class NearbyScreen(val deviceId: String, val url: String)
 
     @Serializable
     data class NearbyPlay(val deviceId: String, val hostUrl: String, val code: String, val guestToken: String)

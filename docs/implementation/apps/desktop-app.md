@@ -201,7 +201,9 @@ over its own connection (`FollowerSource`/`RoomFollower`, moved from the Android
 - **Finding them**: always while the app runs, from 3 s after the host starts: mDNS with jmDNS
   for Chromecasts, MPDs and zones files (`NetworkDiscovery.kt`, moved from `server/` to
   `host/`), SSDP for Sonos and DIAL for YouTube TVs (the drivers' own `discover`). Tried on
-  Windows 10 on 2026-11-13: the living room's Chromecast was found in 10 s.
+  Windows 10 on 2026-11-13: the living room's Chromecast was found in 10 s. jmDNS can resolve
+  a Chromecast before its TXT record (`id`, `fn`) came, on one of the interfaces: it asks again
+  then instead of adding it as `Chromecast-<id>` (it showed twice, 2026-11-16, Linux).
 - **The audio on the network** (`lanServer`): speakers fetch `/api/audio/<song>` from this
   computer, so a second, tiny server listens on all addresses, without the key, with only
   that route, and only for songs in the room the speakers play (`NearbySpeakers.plays`: now,
@@ -212,9 +214,14 @@ over its own connection (`FollowerSource`/`RoomFollower`, moved from the Android
   notices after `?after=`), `POST …/nearby/play { deviceId, hostUrl, code, guestToken }`,
   `…/stop`, `…/volume`. *Play on* (`OutputsSheet`) looks every 2 s while it's open and shows
   them under *Near this computer*, like the phone app's bridge `nearby`; the room page shows
-  the notices (looked at every 5 s). The party screen on a TV isn't offered on the computer.
-- **Not tried yet**: playing on a speaker from the app (it needs the owner's OK to play sound
-  at home), and the AppImage on Linux.
+  the notices (looked at every 5 s).
+- **The party screen on a TV** (`CastScreens`, like the phone's): `POST …/nearby/screen
+  { deviceId, url }` (the window's own `/tv#cast=CODE.TOKEN`, made with `POST /api/screens/cast`)
+  opens it there with DashCast, `…/screen/stop` closes it; `shown` in the state says what each
+  TV shows. Showing it stops the music there (the page plays it), playing music stops it. When
+  it ends, the host tells the room (`/api/screens/unlink`).
+- **Tried**: the AppImage on Linux finds the home's Chromecasts and plays on them (2026-11-16,
+  once firewalld let mDNS in). **Not tried yet**: the party screen on a TV from the computer.
 
 ## Songs from your phone ✅
 

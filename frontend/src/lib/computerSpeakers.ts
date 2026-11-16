@@ -25,7 +25,7 @@ async function ask(path: string, body?: unknown): Promise<HostNearby> {
 	return answer as HostNearby;
 }
 
-const asState = (answer: HostNearby): NearbyState => ({ devices: answer.devices, shown: [], playing: answer.playing });
+const asState = (answer: HostNearby): NearbyState => ({ devices: answer.devices, shown: answer.shown ?? [], playing: answer.playing });
 
 /** The desktop app with a host that finds speakers (older apps don't). */
 export const hasComputerSpeakers = (): boolean => onComputer();
@@ -46,6 +46,15 @@ export async function playOnComputerSpeaker(deviceId: string, room: { hostUrl: s
 
 export async function stopComputerSpeaker(deviceId: string): Promise<NearbyState> {
 	return asState(await ask('/api/desktop/nearby/stop', { deviceId }));
+}
+
+/** Shows a room's party screen ([url]: this page's `/tv#cast=CODE.TOKEN`) on the TV [deviceId]; the new state. */
+export async function showOnComputerTv(deviceId: string, url: string): Promise<NearbyState> {
+	return asState(await ask('/api/desktop/nearby/screen', { deviceId, url }));
+}
+
+export async function stopComputerTv(deviceId: string): Promise<NearbyState> {
+	return asState(await ask('/api/desktop/nearby/screen/stop', { deviceId }));
 }
 
 /** [volume]: 0–1. */

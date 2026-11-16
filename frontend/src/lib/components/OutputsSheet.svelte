@@ -6,7 +6,15 @@
 	import { rememberOutput } from '../playOn';
 	import { castScreen, unlinkScreen } from '../api';
 	import { nativeBridge, type CastScreenState, type NearbyState } from '../native';
-	import { computerSpeakers, hasComputerSpeakers, playOnComputerSpeaker, setComputerSpeakerVolume, stopComputerSpeaker } from '../computerSpeakers';
+	import {
+		computerSpeakers,
+		hasComputerSpeakers,
+		playOnComputerSpeaker,
+		setComputerSpeakerVolume,
+		showOnComputerTv,
+		stopComputerSpeaker,
+		stopComputerTv
+	} from '../computerSpeakers';
 	import type { RoomPlayer } from '../player.svelte';
 	import type { RoomConnection } from '../room.svelte';
 	import { saved } from '../storage';
@@ -73,8 +81,8 @@
 	// The desktop app: its own host plays the room on speakers near this computer (computerSpeakers.ts).
 	const onDesktop = !nativeBridge && hasComputerSpeakers();
 	const canPlayNear = !!nativeBridge?.playNearby || onDesktop;
-	/** The party screen on a TV: only the phone app shows it. */
-	const canShowScreen = !!nativeBridge?.showCastScreen;
+	/** The party screen on a TV: the phone app and the desktop app show it. */
+	const canShowScreen = !!nativeBridge?.showCastScreen || onDesktop;
 	$effect(() => {
 		if (!onDesktop) return;
 		let open = true;
@@ -159,21 +167,27 @@
 
 	async function showOnTv(device: { id: string; name: string }, on: boolean) {
 		if (!on) {
-			nativeBridge?.stopCastScreen?.(device.id);
+			if (onDesktop) void onComputer(stopComputerTv(device.id));
+			else nativeBridge?.stopCastScreen?.(device.id);
 			return;
 		}
 		const guestToken = saved.guestToken(room.roomCode);
-		if (!guestToken || !nativeBridge?.showCastScreen) return;
-		// The party screen plays the music itself.
-		if (playingOn(device.id)) nativeBridge?.stopNearby?.(device.id);
+		if (!guestToken || !canShowScreen) return;
+		// The party screen plays the music itself (on the desktop, its host stops the music there).
+		if (!onDesktop && playingOn(device.id)) nativeBridge?.stopNearby?.(device.id);
 		starting = device.id;
 		try {
 			const screen = await castScreen(room.roomCode, guestToken, device.name);
 			const url = `${location.origin}/tv#cast=${encodeURIComponent(screen.roomCode)}.${encodeURIComponent(screen.guestToken)}`;
-			const error = await new Promise<string | null>((resolve) => {
-				answers.set(device.id, resolve);
-				nativeBridge?.showCastScreen?.(device.id, url);
-			});
+			const error = onDesktop
+				? await showOnComputerTv(device.id, url).then(
+						(state) => ((near = state), null),
+						(e: unknown) => (e instanceof Error ? e.message : String(e))
+					)
+				: await new Promise<string | null>((resolve) => {
+						answers.set(device.id, resolve);
+						nativeBridge?.showCastScreen?.(device.id, url);
+					});
 			if (error) {
 				onToast(`${device.name} didn't show it: ${error}`);
 				unlinkScreen(screen.roomCode, screen.guestToken).catch(() => {});

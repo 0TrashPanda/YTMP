@@ -15,6 +15,8 @@ private val zoneLog = LoggerFactory.getLogger("ytmp.zones")
 /** Finds Chromecasts (`_googlecast._tcp`) on every network interface with mDNS. */
 fun CastOutputs.discover(): AutoCloseable {
     val mdns = JmmDNS.Factory.getInstance()
+    // A removed service comes without its TXT record: remember which device each instance was.
+    val found = java.util.concurrent.ConcurrentHashMap<String, String>()
     mdns.addServiceListener(
         "_googlecast._tcp.local.",
         object : ServiceListener {
@@ -23,20 +25,30 @@ fun CastOutputs.discover(): AutoCloseable {
             override fun serviceResolved(event: ServiceEvent) {
                 val info = event.info
                 val host = info.inet4Addresses.firstOrNull()?.hostAddress ?: return
-                val id = info.getPropertyString("id") ?: info.name
-                val name = info.getPropertyString("fn") ?: info.name
-                add(CastDeviceAddress("cast:$id", name, host, info.port))
+                val name = info.getPropertyString("fn")
+                if (name == null) {
+                    // jmDNS can resolve it before the TXT record (its id and name) came, on one of
+                    // the interfaces: without it, it would show as "Chromecast-<id>", a second time.
+                    event.dns.requestServiceInfo(event.type, event.name, true)
+                    return
+                }
+                val id = "cast:" + (info.getPropertyString("id") ?: castIdFrom(info.name))
+                found[info.name] = id
+                add(CastDeviceAddress(id, name, host, info.port))
                 castLog.info("Found Cast device {} at {}", name, host)
             }
 
             override fun serviceRemoved(event: ServiceEvent) {
-                val id = event.info.getPropertyString("id") ?: event.info.name
-                remove("cast:$id")
+                found.remove(event.name)?.let(::remove)
             }
         },
     )
     return AutoCloseable { mdns.close() }
 }
+
+/** A Cast device's instance name is `<model>-<id>` (`Chromecast-1c3bbcf8…`): its id, else the whole name. */
+internal fun castIdFrom(instance: String): String =
+    instance.substringAfterLast('-').takeIf { it.length == 32 && it.all { c -> c in '0'..'9' || c in 'a'..'f' } } ?: instance
 
 /** Finds MPDs that announce themselves (`_mpd._tcp`, MPD's zeroconf) on every network interface; the ones in [keep] stay when they go quiet. */
 fun MpdOutputs.discover(keep: Set<String> = emptySet()): AutoCloseable {
