@@ -126,7 +126,8 @@ Like YTM:
 
 - In *Up next*, **hold** a song (or right-click it) for its menu; with a mouse a ⋮ also shows
   on hover, in the place of the song's length, like YTM (touch screens: hold and let go, or ⋮
-  there when the setting for it is on). No drag handles. **Swipe a song left** to remove it, like YTM (the menu has *Remove* too,
+  there when the setting for it is on). Touch screens also have a drag handle at the end of each
+  song that moves it straight away; with a mouse there is none. **Swipe a song left** to remove it, like YTM (the menu has *Remove* too,
   also for the current song: the next one plays). Both [settable](README.md#gestures).
 - There is no *Move* action: songs are moved by **dragging** them in *Up next*, by any
   part of the song: with a mouse press and move up or down; with a finger hold it a moment

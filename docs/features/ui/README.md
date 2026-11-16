@@ -311,7 +311,7 @@ In a browser (not in the app): **Space** or **K** play/pause, **N** next, **P** 
 permissions), and aren't active while typing, in a dialog, or with Ctrl, Alt or Cmd held. Also
 listed under *Settings → Playback*.
 
-**Moving songs with the keyboard** ✅: on a song's drag handle (reached with Tab), **↑** / **↓**
+**Moving songs with the keyboard** ✅: on a song (reached with Tab), **↑** / **↓**
 move it one place, **Home** / **End** to the top or bottom of its list (in Up next: within the
 queue, Autoplay or the played songs; on your own playlists: the playlist). The handle keeps the
 focus, and a screen reader hears where the song is now.

@@ -677,6 +677,26 @@
 								<Icon name="more" size={18} />
 							</button>
 						</div>
+						<!-- Touch screens: a handle that moves the song at once (holding the song works too).
+							 Moving and letting go go through the row's own handlers. -->
+						{#if room.can('reorder')}
+							<button
+								class="tap hidden touch-none rounded-full p-1.5 text-muted pointer-coarse:block"
+								aria-label="Move {slot.item.song.title}"
+								tabindex="-1"
+								data-no-drag
+								onpointerdown={(e) => {
+									if (drag) return;
+									e.preventDefault();
+									stopPressing();
+									heldStill = false;
+									swipe.cancel();
+									startDrag(e.currentTarget, e.pointerId, e.clientY, index);
+								}}
+							>
+								<Icon name="drag" size={18} />
+							</button>
+						{/if}
 					</div>
 				</div>
 			{/if}
