@@ -61,9 +61,23 @@ class CastWebPage(private val channel: CastChannel) {
     }
 
     /** DashCast still runs on the device (nobody cast something else, the TV wasn't switched off). */
-    suspend fun isShowing(): Boolean {
+    suspend fun isShowing(): Boolean = check().showing
+
+    /** Whether DashCast still runs there, and the device's volume (0–1, null when it doesn't say). */
+    suspend fun check(): Check {
         val status = status()
-        return (dashCast(status) != null).also { if (!it) log.info("DashCast: no longer runs (running: {})", appIds(status)) }
+        val showing = (dashCast(status) != null).also { if (!it) log.info("DashCast: no longer runs (running: {})", appIds(status)) }
+        return Check(showing, volumeIn(status))
+    }
+
+    class Check(val showing: Boolean, val volume: Double?)
+
+    /** The device's volume, 0–1 (the TV's own, which the page plays at full volume). */
+    suspend fun setVolume(level: Double) {
+        channel.request(
+            NS_RECEIVER, RECEIVER,
+            payload("SET_VOLUME", "volume" to JsonObject(mapOf("level" to JsonPrimitive(level.coerceIn(0.0, 1.0))))),
+        )
     }
 
     private fun appIds(status: JsonObject): List<String> =
@@ -96,6 +110,15 @@ class CastWebPage(private val channel: CastChannel) {
 
     companion object {
         private val log = LoggerFactory.getLogger(CastWebPage::class.java)
+
+        /**
+         * The volume in a receiver status (an answer, or one the device sends by itself when its
+         * volume changes elsewhere), rounded to 1%. Not every message has objects there: a Nest
+         * Hub's LAUNCH_STATUS has `"status": "USER_ALLOWED"`.
+         */
+        fun volumeIn(message: JsonObject): Double? =
+            (((message["status"] as? JsonObject)?.get("volume") as? JsonObject)?.get("level") as? JsonPrimitive)
+                ?.content?.toDoubleOrNull()?.let { Math.round(it * 100) / 100.0 }
 
         /** DashCast's app id and namespace (as in pychromecast's dashcast controller). */
         const val APP_ID = "84912283"

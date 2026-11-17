@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import java.net.URLDecoder
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The party screen of a room on another host (a server) on a TV with Chromecast that only
@@ -33,9 +34,15 @@ class CastScreens(
     private val checkMs: Long = 10_000,
     private val onEnded: suspend (ShownScreen) -> Unit,
 ) {
-    private class Session(val screen: ShownScreen, val channel: CastChannel, val watcher: Job)
+    private class Session(val screen: ShownScreen, @Volatile var channel: CastChannel) {
+        /** The TV's volume (0–1), null until it told us. */
+        @Volatile var volume: Double? = null
+        var watcher: Job? = null
+        var listener: Job? = null
+    }
 
-    private val sessions = HashMap<String, Session>()
+    /** Changed under [lock]; read without it for the volume. */
+    private val sessions = ConcurrentHashMap<String, Session>()
     private val lock = Mutex()
     private val _shown = MutableStateFlow<List<ShownScreen>>(emptyList())
 
@@ -58,8 +65,14 @@ class CastScreens(
                 throw e
             }
             val screen = ShownScreen(deviceId, device.name, url)
-            val watcher = scope.launch { watch(screen, channel) }
-            sessions[deviceId] = Session(screen, channel, watcher)
+            val session = Session(screen, channel)
+            session.volume = runCatching { CastWebPage(channel).check().volume }.getOrNull()
+            // Changed on the TV's remote or in Google Home: the device tells us right away.
+            session.listener = scope.launch {
+                channel.messages.collect { (namespace, message) -> if (namespace == CastChannel.NS_RECEIVER) heard(session, CastWebPage.volumeIn(message)) }
+            }
+            session.watcher = scope.launch { watch(screen, channel) }
+            sessions[deviceId] = session
             publish()
             log.info("Showing a party screen on {}", device.name)
         }
@@ -70,6 +83,19 @@ class CastScreens(
         lock.withLock { sessions[deviceId]?.let { end(it, stopApp = true) } }
     }
 
+    /** Sets the TV's own volume (0–1) where [deviceId] shows a party screen; the page plays at full volume. */
+    suspend fun setVolume(deviceId: String, volume: Double): Unit = withContext(Dispatchers.IO) {
+        val session = sessions[deviceId] ?: return@withContext
+        CastWebPage(session.channel).setVolume(volume)
+        heard(session, Math.round(volume.coerceIn(0.0, 1.0) * 100) / 100.0)
+    }
+
+    private fun heard(session: Session, volume: Double?) {
+        if (volume == null || volume == session.volume) return
+        session.volume = volume
+        publish()
+    }
+
     /** Checks every while that DashCast still runs there; when it doesn't, the screen ended. */
     private suspend fun watch(screen: ShownScreen, first: CastChannel) {
         var channel = first
@@ -77,8 +103,14 @@ class CastScreens(
         while (true) {
             delay(checkMs)
             val showing = try {
-                if (!channel.isOpen) channel = devices.address(screen.deviceId)?.let { CastChannel.open(it.host, it.port) } ?: error("gone")
-                CastWebPage(channel).isShowing().also { failures = 0 }
+                if (!channel.isOpen) {
+                    channel = devices.address(screen.deviceId)?.let { CastChannel.open(it.host, it.port) } ?: error("gone")
+                    sessions[screen.deviceId]?.takeIf { it.screen == screen }?.channel = channel
+                }
+                val check = CastWebPage(channel).check()
+                failures = 0
+                sessions[screen.deviceId]?.takeIf { it.screen == screen }?.let { heard(it, check.volume) }
+                check.showing
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -96,7 +128,8 @@ class CastScreens(
     }
 
     private suspend fun end(session: Session, stopApp: Boolean, watching: Boolean = true) {
-        if (watching) session.watcher.cancel()
+        if (watching) session.watcher?.cancel()
+        session.listener?.cancel()
         if (stopApp) runCatching { CastWebPage(session.channel).stop() }
         session.channel.close()
         sessions.remove(session.screen.deviceId)
@@ -111,7 +144,7 @@ class CastScreens(
         }
     }
 
-    private fun publish() = _shown.update { sessions.values.map { it.screen } }
+    private fun publish() = _shown.update { sessions.values.map { it.screen.copy(volume = it.volume) } }
 
     companion object {
         private val log = LoggerFactory.getLogger(CastScreens::class.java)
@@ -119,9 +152,12 @@ class CastScreens(
     }
 }
 
-/** A party screen this phone shows on [deviceId] ([name]): [url] is the room's `/tv#cast=CODE.TOKEN` page. */
+/**
+ * A party screen this phone shows on [deviceId] ([name]): [url] is the room's `/tv#cast=CODE.TOKEN`
+ * page, [volume] the TV's own (0–1), null until it told us.
+ */
 @Serializable
-data class ShownScreen(val deviceId: String, val name: String, val url: String) {
+data class ShownScreen(val deviceId: String, val name: String, val url: String, val volume: Double? = null) {
     /** How to tell the room this screen ended: `POST` [ScreenUnlinkRequest] to this address. */
     fun unlink(): Pair<String, ScreenUnlinkRequest>? {
         val (code, token) = CAST_PAGE.matchEntire(url)?.destructured ?: return null

@@ -62,6 +62,11 @@ export async function setComputerSpeakerVolume(deviceId: string, volume: number)
 	return asState(await ask('/api/desktop/nearby/volume', { deviceId, volume }));
 }
 
+/** The TV's own volume (0–1) while it shows a party screen; the new state. */
+export async function setComputerTvVolume(deviceId: string, volume: number): Promise<NearbyState> {
+	return asState(await ask('/api/desktop/nearby/screen/volume', { deviceId, volume }));
+}
+
 /**
  * Shows the speakers' problems (another app took one, one went off the network) with [show],
  * looking every few seconds, until the returned function is called. Only new ones.

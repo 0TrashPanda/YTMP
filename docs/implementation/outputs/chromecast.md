@@ -144,7 +144,10 @@ outputs (same `cast:<id>`), with a switch for the party screen:
 - Switched off (`stopCastScreen`), another app on the TV, or 3 failed checks (TV off): the app
   stops it and sends `POST /api/screens/unlink { roomCode, guestToken }` itself, so the screen
   leaves the room.
-- Volume: the TV's own (remote, buttons); the page plays at full volume.
+- Volume: the TV's own; the page plays at full volume. *Play on* has a slider for it under the
+  TV (bridge v22 `setCastScreenVolume`, the desktop's `POST …/nearby/screen/volume`):
+  `CastScreens.setVolume` sends the receiver's `SET_VOLUME`, and `shown[].volume` follows the
+  TV (its status on showing, what it sends when the remote changes it, and each 10 s check).
 
 ## Later
 

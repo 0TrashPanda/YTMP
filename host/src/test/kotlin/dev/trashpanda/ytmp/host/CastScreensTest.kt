@@ -30,7 +30,14 @@ class CastScreensTest {
             screens.show("cast:tv", url)
             eventually { device.dashCastUrl == url }
             assertEquals(true, device.dashCastForce)
-            assertEquals(listOf(ShownScreen("cast:tv", "Living room TV", url)), screens.shown.value)
+            assertEquals(listOf(ShownScreen("cast:tv", "Living room TV", url, volume = 0.5)), screens.shown.value)
+
+            // The TV's own volume: set from here, and changed on its remote.
+            screens.setVolume("cast:tv", 0.3)
+            assertEquals(0.3, device.volume)
+            assertEquals(0.3, screens.shown.value.single().volume)
+            device.changeVolumeExternally(0.7)
+            eventually { screens.shown.value.single().volume == 0.7 }
 
             screens.stop("cast:tv")
             assertTrue(!device.dashCastRunning)

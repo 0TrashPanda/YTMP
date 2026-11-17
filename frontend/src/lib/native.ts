@@ -60,6 +60,8 @@ export interface NativeBridge {
 	stopNearby?(deviceId: string): void;
 	/** 0–1. */
 	setNearbyVolume?(deviceId: string, volume: number): void;
+	/** The TV's own volume (0–1) where the phone shows a party screen (bridge version 22). */
+	setCastScreenVolume?(deviceId: string, volume: number): void;
 	/**
 	 * Where the song the app loaded comes from (bridge version 17): "kind:itemId", kind
 	 * "youtube", "host" or "device" (saved on this phone, or its own music); empty when nothing
@@ -169,7 +171,8 @@ export interface NativeCallbacks {
 /** Speakers and TVs on the phone's own network (android/.../MainActivity.kt), for a room on another host. */
 export interface NearbyState {
 	devices: { id: string; name: string; kind: 'chromecast' | 'sonos' | 'mpd' | 'zone' | 'youtube_tv' }[];
-	shown: { deviceId: string; name: string; url: string }[];
+	/** The party screens shown here, with the TV's own volume (0–1, null until it told; older apps leave it out). */
+	shown: { deviceId: string; name: string; url: string; volume?: number | null }[];
 	/** The room playing on speakers here, with them; null when none plays. */
 	playing: { roomCode: string; speakers: { id: string; name: string; volume: number | null }[] } | null;
 }

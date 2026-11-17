@@ -385,6 +385,17 @@ class DesktopHost(private val config: Config) {
                 nearby.setVolume(change.deviceId, change.volume)
                 call.respond(nearbyState(Int.MAX_VALUE))
             }
+            // The TV's own volume while it shows a party screen (the page there plays at full volume).
+            post("/nearby/screen/volume") {
+                val change = call.receive<NearbyVolume>()
+                try {
+                    castScreens.setVolume(change.deviceId, change.volume)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    throw ApiException(HttpStatusCode.BadGateway, ErrorCode.INVALID, e.message ?: "The TV didn't answer")
+                }
+                call.respond(nearbyState(Int.MAX_VALUE))
+            }
             get("/music") { call.respond(musicStatus()) }
             put("/music") {
                 val change = call.receive<MusicChange>()

@@ -217,8 +217,8 @@ over its own connection (`FollowerSource`/`RoomFollower`, moved from the Android
   the notices (looked at every 5 s).
 - **The party screen on a TV** (`CastScreens`, like the phone's): `POST …/nearby/screen
   { deviceId, url }` (the window's own `/tv#cast=CODE.TOKEN`, made with `POST /api/screens/cast`)
-  opens it there with DashCast, `…/screen/stop` closes it; `shown` in the state says what each
-  TV shows. Showing it stops the music there (the page plays it), playing music stops it. When
+  opens it there with DashCast, `…/screen/stop` closes it, `…/screen/volume { deviceId, volume }`
+  sets the TV's own volume; `shown` in the state says what each TV shows, with its volume. Showing it stops the music there (the page plays it), playing music stops it. When
   it ends, the host tells the room (`/api/screens/unlink`).
 - **Tried**: the AppImage on Linux finds the home's Chromecasts and plays on them (2026-11-16,
   once firewalld let mDNS in). **Not tried yet**: the party screen on a TV from the computer.

@@ -127,7 +127,7 @@
   your server: `POST /api/rooms/clone-to-server`, forwarded with your host token (`RoomSync`).
   See [room lifecycle](../../features/rooms/room-lifecycle.md#cloning-a-room).
 - **Party screen on your own TV** (bridge `castScreens`, `showCastScreen`, `stopCastScreen`,
-  version 7): in a room on another host, the phone's Chromecasts show that room's `/tv` page
+  version 7; `setCastScreenVolume`, the TV's volume, version 22): in a room on another host, the phone's Chromecasts show that room's `/tv` page
   with DashCast (`LocalHost.castScreens`), see
   [chromecast](../outputs/chromecast.md#from-the-app-in-a-room-on-another-host-).
 - **Speakers near the phone** (bridge `nearby`, `playNearby`, `stopNearby`,

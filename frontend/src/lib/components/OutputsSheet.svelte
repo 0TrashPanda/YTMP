@@ -11,6 +11,7 @@
 		hasComputerSpeakers,
 		playOnComputerSpeaker,
 		setComputerSpeakerVolume,
+		setComputerTvVolume,
 		showOnComputerTv,
 		stopComputerSpeaker,
 		stopComputerTv
@@ -145,6 +146,13 @@
 	function setNearVolume(deviceId: string, volume: number) {
 		if (onDesktop) void onComputer(setComputerSpeakerVolume(deviceId, volume));
 		else nativeBridge?.setNearbyVolume?.(deviceId, volume);
+	}
+
+	/** The TV's own volume while it shows this room's party screen (the page plays at full volume). */
+	const canSetTvVolume = onDesktop || !!nativeBridge?.setCastScreenVolume;
+	function setTvVolume(deviceId: string, volume: number) {
+		if (onDesktop) void onComputer(setComputerTvVolume(deviceId, volume));
+		else nativeBridge?.setCastScreenVolume?.(deviceId, volume);
 	}
 
 	function playNear(device: { id: string }, on: boolean) {
@@ -449,6 +457,30 @@
 							label="Volume of {device.name} in percent"
 							class="bg-surface py-1.5"
 							onchange={(v) => setNearVolume(device.id, v / 100)}
+						/>
+					</div>
+				{/if}
+				{#if showsHere && canSetTvVolume && shown?.volume != null}
+					<div class="flex items-center gap-3">
+						<input
+							type="range"
+							class="min-w-0 flex-1 accent-white"
+							min="0"
+							max="1"
+							step="0.02"
+							value={shown.volume}
+							aria-label="Volume of {device.name}"
+							use:wheelAdjust
+							onchange={(e) => setTvVolume(device.id, Number(e.currentTarget.value))}
+						/>
+						<NumberField
+							value={Math.round(shown.volume * 100)}
+							min={0}
+							max={100}
+							unit="%"
+							label="Volume of {device.name} in percent"
+							class="bg-surface py-1.5"
+							onchange={(v) => setTvVolume(device.id, v / 100)}
 						/>
 					</div>
 				{/if}

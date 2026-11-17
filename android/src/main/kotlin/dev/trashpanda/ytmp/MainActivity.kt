@@ -862,6 +862,16 @@ class MainActivity : ComponentActivity() {
             if (currentUrl?.let(::isAppPage) == true) app.host.nearby.setVolume(deviceId, volume)
         }
 
+        /** The TV's own volume (0–1) where this phone shows a party screen (bridge version 22). */
+        @JavascriptInterface
+        fun setCastScreenVolume(deviceId: String, volume: Double) {
+            if (currentUrl?.let(::isAppPage) != true) return
+            lifecycleScope.launch {
+                runCatching { app.host.castScreens.setVolume(deviceId, volume) }
+                    .onFailure { if (it is CancellationException) throw it else Log.w("YtmpCast", "Couldn't set the volume on $deviceId", it) }
+            }
+        }
+
         /**
          * Download (bridge version 11): [songJson] is the Song, saved with its tags in the phone's
          * Music/YTMP folder. The phone gets it from YouTube itself, whichever host the page is on.
@@ -973,7 +983,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val BRIDGE_VERSION = 21
+        const val BRIDGE_VERSION = 22
 
         /** What reading a tag starts (foreground dispatch, [preferTapShare]). */
         private val TAG_ACTIONS = setOf(NfcAdapter.ACTION_NDEF_DISCOVERED, NfcAdapter.ACTION_TECH_DISCOVERED, NfcAdapter.ACTION_TAG_DISCOVERED)

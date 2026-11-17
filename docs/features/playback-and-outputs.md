@@ -189,7 +189,7 @@ songs from your computer (its own music and song cache too). The first time, Win
 whether YTMP may use the network: allow it on private networks, or the speakers can't get
 the songs. On Linux, a firewall has to let mDNS in (UDP 5353, firewalld's `mdns` service) or
 no Chromecasts show up. A TV with Chromecast can also show the room's party screen from the
-computer, like from the phone app.
+computer, like from the phone app, with a slider for the TV's volume (also from the phone).
 
 **Amplifier zones** ✅: a house with a multi-room amplifier and a player on one of its inputs
 (say a Raspberry Pi) describes them once, in a file on its own network. Every phone or home
