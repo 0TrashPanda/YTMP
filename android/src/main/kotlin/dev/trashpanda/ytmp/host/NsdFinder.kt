@@ -82,10 +82,13 @@ abstract class NsdFinder(context: Context, private val serviceType: String, priv
         discovery = null
     }
 
-    /** The phone is on another network now: none of the devices found are here, look again. */
+    /**
+     * The phone is on another network now: none of the devices found are here, look again.
+     * [lost]: or it was off Wi-Fi a while; the ones a room plays on stay a bit longer ([lose]).
+     */
     @Synchronized
-    fun forgetAll() {
-        for (name in found.keys.toList()) forget(name, "on another network", lost = false)
+    fun forgetAll(lost: Boolean = false) {
+        for (name in found.keys.toList()) forget(name, if (lost) "off Wi-Fi a while" else "on another network", lost)
         seenAt.clear()
         if (discovery != null) {
             stop()

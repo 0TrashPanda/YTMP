@@ -15,9 +15,10 @@ import java.net.InetAddress
  * Tells when the phone is on another Wi-Fi network than before ([onMoved]): the speakers and
  * TVs found on the old one can't be reached there. A network is known by its address range and
  * router (no location permission needed, unlike its name). Being off Wi-Fi for longer than
- * [OFFLINE_GRACE_MS] counts as moving too; a short drop on the same network doesn't.
+ * [OFFLINE_GRACE_MS] counts as moving too (`offline`: maybe back on the same one soon); a short
+ * drop on the same network doesn't.
  */
-class WifiWatch(context: Context, private val onMoved: () -> Unit) {
+class WifiWatch(context: Context, private val onMoved: (offline: Boolean) -> Unit) {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
     private val handler = Handler(Looper.getMainLooper())
     /** The Wi-Fi network the devices were found on, or null after being offline. */
@@ -27,7 +28,7 @@ class WifiWatch(context: Context, private val onMoved: () -> Unit) {
         synchronized(this) {
             if (networks.isNotEmpty() || current == null) return@Runnable
             current = null
-            onMoved()
+            onMoved(true)
         }
     }
 
@@ -41,7 +42,7 @@ class WifiWatch(context: Context, private val onMoved: () -> Unit) {
                     handler.removeCallbacks(offline)
                     val before = current
                     current = key
-                    if (before != null && before != key) onMoved()
+                    if (before != null && before != key) onMoved(false)
                 }
             }
 

@@ -115,8 +115,12 @@
   search doesn't find it within 20 s, and when the phone is on another Wi-Fi network
   (`WifiWatch`: another address range or router, or off Wi-Fi for over a minute). A device a
   room still plays on stays while the room reaches it (the phone's search sometimes loses
-  every device at once for a minute or two while they play on): it goes once its connection
-  fails or the room stops playing there (`DeviceDriver.lose`; not for zones).
+  every device at once for a minute or two while they play on): it goes once the room stops
+  playing there, or once its connection has failed for 2.5 minutes (`DeviceDriver.lose`,
+  `keepAfterFailingMs`; not for zones). The phone's own Wi-Fi drops for about a minute now and
+  then, and the search and every connection fail together; the room keeps the TV or speaker
+  and plays on there once the phone is back. Off Wi-Fi for over a minute counts as lost the
+  same way, not as another network.
 - **Cloning onto the phone** (bridge `cloneRoom`, version 6): from another host's page in the
   app, the page hands over a copy of the room; the app makes it on its own host and the page
   opens it there (`http://127.0.0.1:8765/room/CODE#owner=…`). From the phone's own page onto

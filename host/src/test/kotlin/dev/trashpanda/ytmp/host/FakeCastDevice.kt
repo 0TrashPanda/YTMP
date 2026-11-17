@@ -131,10 +131,24 @@ class FakeCastDevice : AutoCloseable {
         }
     }
 
+    private val sockets = java.util.concurrent.CopyOnWriteArrayList<java.net.Socket>()
+
+    /** Out of reach (like the phone off Wi-Fi): connections drop, new ones are closed at once. */
+    @Volatile var unreachable = false
+        set(value) {
+            field = value
+            if (value) sockets.forEach { runCatching { it.close() } }
+        }
+
     init {
         thread(isDaemon = true) {
             while (!server.isClosed) {
                 val socket = runCatching { server.accept() }.getOrNull() ?: break
+                if (unreachable) {
+                    socket.close()
+                    continue
+                }
+                sockets += socket
                 thread(isDaemon = true) {
                     val input = DataInputStream(socket.inputStream)
                     val output = socket.outputStream

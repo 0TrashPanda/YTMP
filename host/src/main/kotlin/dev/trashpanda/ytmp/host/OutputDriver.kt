@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -106,18 +107,30 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
     private val reached = HashMap<String, Int>()
     /** Devices the search lost while a room still reached them: how to forget each once none does. */
     private val lost = HashMap<String, () -> Unit>()
+    /**
+     * Devices a room played on until they stopped answering: until when (nanoTime) they're kept
+     * anyway. The phone's own Wi-Fi drops for a minute now and then; the device is still there.
+     */
+    private val keptUntil = HashMap<String, Long>()
+    /** How long a device a room played on is kept after it stopped answering. */
+    internal var keepAfterFailingMs = KEEP_AFTER_FAILING_MS
 
     /**
-     * The network search lost device [id]: [forget] it, but only once no room reaches it any more.
-     * A phone's search sometimes loses every device at once for a minute while they play on fine;
-     * a device that's really gone fails its next sync, and then it's forgotten.
+     * The network search lost device [id]: [forget] it, but only once no room reaches it any more
+     * and none played on it in the last [keepAfterFailingMs].
+     * A phone's search sometimes loses every device at once for a minute while they play on fine,
+     * and when the phone itself drops off Wi-Fi for a while, the search and every connection fail
+     * together; a device that's really gone keeps failing, and then it's forgotten.
      */
     protected fun lose(id: String, forget: () -> Unit) {
-        val now = synchronized(reached) {
-            if ((reached[id] ?: 0) > 0) lost[id] = forget else lost.remove(id)
-            id !in lost
+        val (now, wait) = synchronized(reached) {
+            val wait = keptFor(id)
+            if ((reached[id] ?: 0) > 0 || wait > 0) lost[id] = forget else lost.remove(id)
+            (id !in lost) to wait
         }
-        if (now) forget() else log.info("{} {}: the network search lost it, but a room still reaches it, so it stays", kind, name(id))
+        if (now) return forget()
+        log.info("{} {}: the network search lost it, but a room still reaches it (or did just now), so it stays", kind, name(id))
+        if (wait > 0) forgetLater(id, wait)
     }
 
     /** The search found device [id] (again): it isn't lost. */
@@ -125,14 +138,49 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
         synchronized(reached) { lost.remove(id) }
     }
 
-    private fun reaches(id: String, yes: Boolean) {
+    /** How many ms device [id] is still kept after it stopped answering; 0: not kept. Locked on [reached]. */
+    private fun keptFor(id: String): Long {
+        val until = keptUntil[id] ?: return 0
+        val left = (until - System.nanoTime()) / 1_000_000
+        if (left <= 0) keptUntil.remove(id)
+        return left.coerceAtLeast(0)
+    }
+
+    /** [reaches]: a room's session there synced fine ([yes]), or stopped doing so, because it [failed] or the room let go. */
+    private fun reaches(id: String, yes: Boolean, failed: Boolean = false) {
+        var wait = 0L
         val forget = synchronized(reached) {
             val count = (reached[id] ?: 0) + if (yes) 1 else -1
             if (count > 0) reached[id] = count else reached.remove(id)
-            if (count > 0) null else lost.remove(id)
-        } ?: return
-        log.info("{} {}: lost by the network search, and no room reaches it any more: removed", kind, name(id))
-        forget()
+            if (yes) keptUntil.remove(id)
+            else if (failed && count <= 0) keptUntil[id] = System.nanoTime() + keepAfterFailingMs * 1_000_000
+            wait = keptFor(id)
+            if (count > 0 || (wait > 0 && id in lost)) null else lost.remove(id)
+        }
+        if (forget != null) {
+            log.info("{} {}: lost by the network search, and no room reaches it any more: removed", kind, name(id))
+            forget()
+        } else if (wait > 0 && synchronized(reached) { id in lost }) {
+            forgetLater(id, wait)
+        }
+    }
+
+    /** Forgets lost device [id] in [ms], unless a room reaches it again or the search finds it by then. */
+    private fun forgetLater(id: String, ms: Long) {
+        scope.launch {
+            var wait = ms
+            var forget: (() -> Unit)? = null
+            while (forget == null) {
+                delay(wait.coerceAtLeast(1))
+                forget = synchronized(reached) {
+                    if (id !in lost || (reached[id] ?: 0) > 0) return@launch
+                    wait = keptFor(id)
+                    if (wait > 0) null else lost.remove(id)
+                }
+            }
+            log.info("{} {}: lost by the network search, and it didn't answer again in time: removed", kind, name(id))
+            forget()
+        }
     }
 
     final override suspend fun drive(room: OutputRoom) {
@@ -145,8 +193,8 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
         val sittingOut = HashSet<String>()
         // Devices whose session here synced fine last time.
         val reachedHere = HashSet<String>()
-        fun unreached(id: String) {
-            if (reachedHere.remove(id)) reaches(id, false)
+        fun unreached(id: String, failed: Boolean = false) {
+            if (reachedHere.remove(id)) reaches(id, false, failed)
         }
         try {
             while (true) {
@@ -189,7 +237,7 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
                     } catch (e: Exception) {
                         log.warn("{} {} failed: {}", kind, name(id), e.message)
                         if (session.failed()) sessions.remove(id)
-                        unreached(id)
+                        unreached(id, failed = true)
                         // A new song doesn't wait for it.
                         if (view.starting) view.current?.let { room.outputReady(id, it.itemId) }
                     }
@@ -204,6 +252,8 @@ abstract class DeviceDriver(scope: CoroutineScope, private val kind: String) : R
     private companion object {
         val log = LoggerFactory.getLogger(DeviceDriver::class.java)
         const val SYNC_INTERVAL_MS = 2_000L
+        /** A phone's Wi-Fi drop: about a minute in the logs, sometimes a bit more. */
+        const val KEEP_AFTER_FAILING_MS = 150_000L
     }
 }
 

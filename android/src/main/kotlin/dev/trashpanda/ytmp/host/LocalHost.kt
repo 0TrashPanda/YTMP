@@ -122,12 +122,13 @@ class LocalHost(private val context: Context) {
     val tvs = YoutubeTvOutputs(scope)
     val tvFinder = TvFinder(context, tvs, scope)
     /** On another Wi-Fi network, the devices found on the old one go from the list. */
-    private val wifi = WifiWatch(context) {
-        Log.i(TAG, "On another network: looking for speakers and TVs again")
-        castFinder.forgetAll()
-        sonosFinder.forgetAll()
-        mpdFinder.forgetAll()
-        zoneFinder.forgetAll()
+    private val wifi = WifiWatch(context) { offline ->
+        // Off Wi-Fi a while: the speakers a room plays on stay a bit longer, the phone may be back on the same network.
+        Log.i(TAG, if (offline) "Off Wi-Fi a while: looking for speakers and TVs again" else "On another network: looking for speakers and TVs again")
+        castFinder.forgetAll(lost = offline)
+        sonosFinder.forgetAll(lost = offline)
+        mpdFinder.forgetAll(lost = offline)
+        zoneFinder.forgetAll(lost = offline)
         tvFinder.forgetAll()
     }
     /** Speakers here that play a room on another host (a server), which can't reach them. */
