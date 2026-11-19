@@ -6,7 +6,8 @@ A full-screen view for a **TV, laptop or tablet** during a party:
 
 - the current song with **large album art**, title and artist, who added it, and progress
 - the next four songs (queue, then autoplay), and who added them
-- a large **QR code** and the **room code** to join, and the address
+- a large **QR code** and the **room code** to join, and the address; a solo room, which
+  nobody else can join, shows a fifth song there instead
 - a **background colour taken from the album art** (see below), changing with every song
 - the skip votes so far, and messages like "Skipped …: enough votes"
 

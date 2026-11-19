@@ -1,7 +1,8 @@
 <script lang="ts">
 	// The party screen (docs/features/ui/party-screen.md): the room on a TV, laptop or tablet.
 	// Big album art on a background in its colour, the song and its progress, the next songs
-	// and who added them, and a QR code and the room code to join. It only watches.
+	// and who added them, and a QR code and the room code to join (a solo room, which nobody
+	// else can join, shows one more song there instead). It only watches.
 	import { onDestroy, onMount } from 'svelte';
 	import { renderSVG } from 'uqr';
 	import { artColor } from '../artColor';
@@ -29,7 +30,9 @@
 	const s = $derived(room.state);
 	const current = $derived(s?.nowPlaying?.item ?? null);
 	const song = $derived(current?.song ?? null);
-	const upNext = $derived([...(s?.queue ?? []), ...(s?.autoplay ?? [])].slice(0, 4));
+	// A solo room (only you, on your devices): no one to invite, so no QR code and one more song.
+	const solo = $derived(s?.room.visibility === 'private');
+	const upNext = $derived([...(s?.queue ?? []), ...(s?.autoplay ?? [])].slice(0, solo ? 5 : 4));
 	const votes = $derived(s?.skipVotes ?? null);
 	// Karaoke mode (a room setting): the lyrics large, instead of the big album art and what's next.
 	const karaoke = $derived(!!s?.settings.karaoke && !!song && !song.podcast);
@@ -187,7 +190,7 @@
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-[2vh] px-[6vw] text-center">
 			<h1 class="text-[min(7vh,6vw)] font-bold">{s?.room.name ?? 'Party screen'}</h1>
-			<p class="text-[min(3.5vh,3vw)] text-white/70 portrait:text-[min(2.6vh,4.5vw)]">Nothing playing yet. Scan the code to add a song.</p>
+			<p class="text-[min(3.5vh,3vw)] text-white/70 portrait:text-[min(2.6vh,4.5vw)]">{solo ? 'Nothing playing yet.' : 'Nothing playing yet. Scan the code to add a song.'}</p>
 		</div>
 	{/if}
 
@@ -196,7 +199,12 @@
 		<div class="min-w-0 flex-1">
 			{#if upNext.length && !karaoke}
 				<p class="mb-[1.5vh] text-[max(13px,1.9vh)] font-medium tracking-[0.2em] text-white/55 uppercase">Up next</p>
-				<div class="grid grid-cols-4 gap-[1.5vw] portrait:grid-cols-2 portrait:gap-[2vw] portrait:[&>*:nth-child(n+3)]:hidden">
+				<!-- Portrait: two songs, or in a solo room four (where the QR code would be). -->
+				<div
+					class="grid gap-[1.5vw] portrait:grid-cols-2 portrait:gap-[2vw] {solo
+						? 'grid-cols-5 portrait:[&>*:nth-child(n+5)]:hidden'
+						: 'grid-cols-4 portrait:[&>*:nth-child(n+3)]:hidden'}"
+				>
 					{#each upNext as item (item.itemId)}
 						<div class="flex min-w-0 items-center gap-[1vw] rounded-[1vmin] bg-black/25 p-[1vmin] portrait:gap-[3vw]">
 							<Art song={item.song} size={160} class="aspect-square h-[8vh] rounded-[0.6vmin] portrait:h-[6vh]" />
@@ -210,7 +218,7 @@
 				</div>
 			{/if}
 		</div>
-		{#if s}
+		{#if s && !solo}
 			<div class="flex shrink-0 items-center gap-[1.5vw] rounded-[1.5vmin] bg-black/35 p-[1.5vmin] portrait:gap-[4vw]">
 				<!-- Karaoke: smaller, so the lyrics get more room. -->
 				<div
