@@ -680,11 +680,19 @@ export interface EventRolesChanged {
   roles: Role[];
 }
 
+export interface RoomSummary {
+  covers: string[];
+  artists: string[];
+  song: string | null;
+  playing: boolean;
+}
+
 export interface RoomInfo {
   code: string;
   name: string;
   visibility: RoomVisibility;
   hasPassword: boolean;
+  summary: RoomSummary | null;
 }
 
 export interface EventRoomUpdated {
@@ -1858,6 +1866,7 @@ export interface SyncedRoom {
   playing: boolean;
   nowPlaying: string | null;
   openElsewhere: RoomOpenMode | null;
+  summary: RoomSummary | null;
 }
 
 export interface SyncedRoomsResponse {

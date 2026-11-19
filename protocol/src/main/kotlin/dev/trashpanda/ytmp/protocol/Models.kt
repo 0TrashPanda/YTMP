@@ -199,6 +199,26 @@ data class RoomInfo(
     val visibility: RoomVisibility,
     /** Joining needs a password ([ClientMessage.Hello.password]). */
     val hasPassword: Boolean = false,
+    /** What the room sounds like, for room lists; only in `GET /api/rooms` and `GET /api/rooms/{code}`. */
+    val summary: RoomSummary? = null,
+)
+
+/**
+ * What a room sounds like, so a room list can show it without a name
+ * (docs/features/rooms/room-lifecycle.md#the-room-list): the covers of its last songs and the artists
+ * it plays most, from what just played and what's up next.
+ */
+@Serializable
+@SerialName("RoomSummary")
+data class RoomSummary(
+    /** Cover images of the last songs (the one playing first), at most 4, all different. */
+    val covers: List<String> = emptyList(),
+    /** The artists (or podcasts) it plays most right now, at most 3. */
+    val artists: List<String> = emptyList(),
+    /** "Title · Artist" of the song it's on, or the last one it played. */
+    val song: String? = null,
+    /** [song] is playing now. */
+    val playing: Boolean = false,
 )
 
 @Serializable

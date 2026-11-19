@@ -54,6 +54,8 @@ data class SyncedRoom(
     val nowPlaying: String?,
     /** The room's own setting for opening it elsewhere; null: your account's. */
     val openElsewhere: RoomOpenMode?,
+    /** What the room sounds like (covers, artists), for the room list. */
+    val summary: RoomSummary? = null,
 )
 
 /** `GET /api/rooms/elsewhere` (and `/api/auth/rooms` for hosts): your rooms on other hosts. */

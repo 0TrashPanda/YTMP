@@ -121,6 +121,11 @@ class Room(
 
     val info: RoomInfo get() = RoomInfo(code, name, visibility, hasPassword = passwordHash != null)
 
+    /** [info] with what the room sounds like ([RoomSummaries]), for room lists. */
+    suspend fun listing(): RoomInfo = mutex.withLock {
+        info.copy(summary = RoomSummaries.of(history, current, queue, wantPlaying))
+    }
+
     /** The room's code; it can change ([Command.SetRoomCode]). */
     @Volatile
     override var code: String = code

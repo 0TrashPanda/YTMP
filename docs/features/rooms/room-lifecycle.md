@@ -9,6 +9,26 @@ leave, and how a room (or its queue) can move to another place.
 > ([room sync](room-sync.md)). Not built: transfer of someone else's room, a local copy that
 > survives closing the page.
 
+## The room list
+
+> ✅ Built.
+
+The start page lists your rooms (and, with an account, [your rooms on your other
+devices](room-sync.md)). Each room shows **what it sounds like**, so rooms tell themselves
+apart without you naming them, like mixes in YouTube Music:
+
+- **A cover collage**: the covers of its last four songs (the one playing first), or the last
+  cover alone while it has fewer. A room that hasn't played anything shows its icon.
+- **A room you didn't name** (it kept *Anna's room*) is called after the **artists it plays
+  most**, from the songs that just played and the ones up next, e.g. *Nujabes, J Dilla,
+  Tomppabeats*. Switch genre in a room and its title follows the music. Under it: the song
+  it's on (▶), or the last one it played.
+- **A room with a name of its own** (*Road trip*) keeps it, with its artists under it.
+- Party rooms say *Party*. The room code is in the room itself (and in the tooltip).
+
+Making a room for each kind of music you like is therefore enough to come back to it later:
+the list shows which room is which.
+
 ## Changing the owner
 
 The **owner** can **hand the room over to another participant** at any time (*Make Owner* in

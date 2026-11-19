@@ -11,6 +11,8 @@
 	import { youtube } from '../lib/youtube.svelte';
 	import { nativeBridge, type NearbyRoom } from '../lib/native';
 	import { hasComputerRooms, openComputerRoom, watchComputerRooms } from '../lib/computerRooms';
+	import { roomLine, roomTitle } from '../lib/roomLabels';
+	import RoomCovers from '../lib/components/RoomCovers.svelte';
 	import { desktopApp } from '../lib/ownModule.svelte';
 	import type { HostInfo, RoomInfo, RoomOpenMode, RoomVisibility, SyncedRoom } from '../lib/protocol.gen';
 	import { settings } from '../lib/settings.svelte';
@@ -459,12 +461,11 @@
 			<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">On {list[0].home.kind === 'server' ? 'your server' : list[0].home.hostName}</h2>
 			{#each list as room (room.syncId)}
 				<button class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2 text-left ring-1 ring-line disabled:opacity-40" disabled={busy} onclick={() => openElsewhere(room)}>
-					<Icon name={room.visibility === 'private' ? 'headphones' : 'people'} size={20} class="text-muted" />
+					<RoomCovers covers={room.summary?.covers ?? []} party={room.visibility !== 'private'} />
 					<span class="min-w-0 flex-1">
-						<span class="block truncate">{room.name}</span>
-						<span class="block truncate text-xs text-muted">{seen(room)}</span>
+						<span class="block truncate">{roomTitle(room.name, room.summary)}</span>
+						<span class="block truncate text-xs text-muted">{[room.visibility === 'private' ? null : 'Party', seen(room)].filter(Boolean).join(' · ')}</span>
 					</span>
-					<span class="font-mono text-sm text-muted">{room.code}</span>
 				</button>
 			{/each}
 		</section>
@@ -530,11 +531,14 @@
 		<section class="flex flex-col gap-1">
 			<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">{title}</h2>
 			{#each myRooms.filter((r) => r.code !== closing?.room.code) as room (room.code)}
+				{@const line = [room.visibility === 'private' ? null : 'Party', roomLine(room.name, room.summary)].filter(Boolean).join(' · ')}
 				<div class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2 ring-1 ring-line">
-					<a href="/room/{room.code}" class="flex min-w-0 flex-1 items-center gap-3">
-						<Icon name={room.visibility === 'private' ? 'headphones' : 'people'} size={20} class="text-muted" />
-						<span class="min-w-0 flex-1 truncate">{room.name}</span>
-						<span class="font-mono text-sm text-muted">{room.code}</span>
+					<a href="/room/{room.code}" class="flex min-w-0 flex-1 items-center gap-3" title="{room.name} · {room.code}">
+						<RoomCovers covers={room.summary?.covers ?? []} party={room.visibility !== 'private'} />
+						<span class="min-w-0 flex-1">
+							<span class="block truncate">{roomTitle(room.name, room.summary)}</span>
+							{#if line}<span class="block truncate text-xs text-muted">{line}</span>{/if}
+						</span>
 					</a>
 					<button
 						class="tap ml-1 flex rounded-full p-1.5 text-muted hover:bg-line hover:text-white"

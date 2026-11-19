@@ -2,6 +2,7 @@ package dev.trashpanda.ytmp.server
 
 import dev.trashpanda.ytmp.core.Room
 import dev.trashpanda.ytmp.core.RoomManager
+import dev.trashpanda.ytmp.core.RoomSummaries
 import dev.trashpanda.ytmp.core.SavedRoom
 import dev.trashpanda.ytmp.host.AccountTokens
 import dev.trashpanda.ytmp.host.ApiException
@@ -155,6 +156,7 @@ class RoomHub(
         playing = playing,
         nowPlaying = saved.current?.song?.title,
         openElsewhere = saved.settings?.openElsewhere,
+        summary = RoomSummaries.of(saved.history, saved.current, saved.queue, playing),
     )
 
     private fun roomUrl(home: RoomHome, code: String): String? = home.url?.let { "${it.trimEnd('/')}/room/$code" }

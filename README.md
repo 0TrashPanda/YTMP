@@ -33,7 +33,7 @@ Music, without Premium, and not tied to a single music service.
   → [playback and outputs](docs/features/playback-and-outputs.md), [sources](docs/features/music/sources.md)
 - **People and accounts**: optional YTMP accounts with listening history, your YouTube Music
   sign-in (on the phone or the server), friends and shared songs, your rooms on all your
-  devices, settings that follow you, an admin page for the server.
+  devices (listed by their covers and artists), settings that follow you, an admin page for the server.
   → [accounts](docs/features/accounts/accounts.md), [friends](docs/features/accounts/friends.md),
   [server admin](docs/features/accounts/server-admin.md)
 - **Apps**: Android (lock screen, widget, hosting on the phone, updates itself) and a desktop

@@ -41,7 +41,7 @@ function connected(party = false) {
 	room.connect();
 	const socket = FakeSocket.last;
 	const state = {
-		room: { code: 'ROOM', name: 'Room', visibility: party ? 'public' : 'private', hasPassword: false },
+		room: { code: 'ROOM', name: 'Room', visibility: party ? 'public' : 'private', hasPassword: false, summary: null },
 		participants: [
 			{ id: 'p1', name: 'Anna', isOwner: true, online: true, listening: false, speakers: [], allow: [], deny: [], roleId: 'owner' },
 			...(party ? [{ id: 'p2', name: 'Bram', isOwner: false, online: true, listening: true, speakers: [], allow: [], deny: [], roleId: 'owner' }] : [])
