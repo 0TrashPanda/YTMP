@@ -632,7 +632,7 @@
 		{#if host?.accountsOnly}
 			<p class="text-muted">This server is for accounts only.</p>
 			{#each host.authServers as server (server.issuer)}
-				<a href={identity.loginUrl(server)} class="rounded-full bg-white py-3 text-center font-medium text-black">Log in to join</a>
+				<a href={identity.loginUrl(server)} onclick={(e) => identity.logIn(server, false, e)} class="rounded-full bg-white py-3 text-center font-medium text-black">Log in to join</a>
 			{/each}
 		{:else}
 		<form
@@ -671,7 +671,7 @@
 		</form>
 		{#if host && !identity.get(host.authServers)}
 			{#each host.authServers as server (server.issuer)}
-				<a href={identity.loginUrl(server)} class="rounded-full bg-raised py-3 text-center font-medium hover:bg-line">
+				<a href={identity.loginUrl(server)} onclick={(e) => identity.logIn(server, false, e)} class="rounded-full bg-raised py-3 text-center font-medium hover:bg-line">
 					Log in with {server.url ? new URL(server.url).host : server.issuer}
 				</a>
 			{/each}
@@ -707,7 +707,7 @@
 				<p class="text-sm text-muted">Is it yours? Log in with your account to open it.</p>
 			{/if}
 			{#each host.authServers as server (server.issuer)}
-				<a href={identity.loginUrl(server)} class="rounded-full bg-white px-6 py-3 font-medium text-black">
+				<a href={identity.loginUrl(server)} onclick={(e) => identity.logIn(server, false, e)} class="rounded-full bg-white px-6 py-3 font-medium text-black">
 					Log in{host.authServers.length > 1 ? ` with ${server.url ? new URL(server.url).host : server.issuer}` : ''}
 				</a>
 			{/each}

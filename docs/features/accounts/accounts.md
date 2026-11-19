@@ -130,6 +130,16 @@ too, and so do radios **you** start there (Start radio, Autoplay this): your pag
 songs. When that radio runs low, the room goes on with its own. Not yet: plays there going
 into your YouTube Music history.
 
+**Your own phones don't ask** ✅: a room on a phone that's logged in with your account (in the
+app on that phone) opens straight away in your other browsers, with your YouTube Music and
+history, without *"Join rooms on … as …?"*. It's not the phone's word for it: your server
+checks that it's one of your phones (see [how](../../implementation/auth.md#your-own-phones)).
+Phones logged in with someone else's account, and other servers, still ask. **Settings →
+Account → Join my phones without asking** (on by default) turns it off: then your own phones
+ask too. An answer you gave a host before in that browser stays (a yes, or a yes without your
+YouTube Music); after *Not now*, the phone's page doesn't check by itself for a week, but its
+**Log in** button goes straight in.
+
 ## Log in once ✅
 
 - On a server, one login covers everything there: logging in on the account page also logs
@@ -141,7 +151,8 @@ into your YouTube Music history.
   there. The first time, your server asks *"Join rooms on <host> as <name>?"* (or *Not now,
   join as a guest*); after a yes, that host logs you in by itself, without asking your name.
   Not logged in there, or the server can't be reached (no internet): the host asks your name
-  as before, with a **Log in** button. *Not now* isn't asked again for a week.
+  as before, with a **Log in** button. *Not now* isn't asked again for a week. Your own
+  phones don't ask at all ([above](#your-youtube-music-in-rooms-on-other-hosts-)).
 - **Your phone's YouTube Music on your other devices**: the account the phone's own pages are
   logged in with is the phone's **owner**. Logged in with that account on another device (in a
   room on the phone), you get the phone's YouTube Music too: your Home, Library, likes, and

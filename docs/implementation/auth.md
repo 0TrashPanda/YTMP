@@ -1,7 +1,8 @@
 # Authentication
 
 > Status: **implemented**: accounts, login, signed host tokens, trusted servers, phone hosts
-> linked to a server, role templates, listening history, log in once, accounts only, and the
+> linked to a server, role templates, listening history, log in once, your own phones without
+> the question, accounts only, and the
 > YouTube Music sign-in. Not yet: YTMP playlists, linked media servers, and room transfer
 > data on the account.
 
@@ -62,7 +63,8 @@ serves its own JavaScript, so it could read anything typed there):
 1. A host's page (`HostInfo.authServers` lists who it trusts) sends you to
    `<auth server>/connect?return=<this page>`.
 2. There you log in (once per browser), and confirm *"Join rooms on <host> as <name>?"*. The
-   server's own pages skip that question.
+   server's own pages skip that question, and so do your own phones
+   ([below](#your-own-phones)).
 3. The auth server signs a **host token** (JWT, ES256): `iss`, `sub` (username), `name`,
    `aud` = the **origin** of the returning page, 30 days. It goes back in the URL fragment
    (`#ytmp-connect=…`), which never reaches a server; the page keeps it and removes the fragment.
@@ -218,6 +220,46 @@ Music for you, `youtube.load()` switches every `/api/me/...` request (and Home, 
 - `AccountService.verifyYoutubeToken` only accepts them for: `GET /api/me/...`,
   `PUT /api/me/likes/...`, `POST /api/me/playlists` and `.../songs`. Everywhere else (host
   logins, `/api/auth/*`, room sync) tokens with a scope are refused.
+
+### Your own phones
+
+`/connect` skips its question for a host that is one of the account's own phones, with the
+YouTube Music and history tokens, when the account's setting says so
+(`AccountSettings.ownDevicesWithoutAsking`, default **on**: such a phone is as much yours as the
+app's own pages, which read your history without asking anyway). "Yours" is decided by the
+server, never by the host's word:
+
+1. **The phone's key.** Each phone keeps an ES256 key pair (`OwnDevice` in `host/`, in the app's
+   preferences), made for one account: a new owner gets a new key. When the phone's own page
+   proves its owner (a loopback request with a host token), the phone sends the public key to
+   that account's server (`PUT /api/auth/devices/{id}`, `OwnDeviceRequest`), again once a day.
+   The server only takes it with a host token made for the **app's own pages**
+   (`PHONE_APP_ORIGIN`, or the debug app's), the same tokens it already trusts to read the
+   history: they only reach the account's own phones. A token for any other host (every host
+   you joined has one) or a scoped token is refused. Kept as `devices` account data
+   (`OwnDevices.kt`, at most 20; a phone not heard of for 90 days no longer counts).
+2. **The proof.** A host's page asks its own host for `GET /api/host/own-proof?origin=<its
+   origin>` before going to `/connect` (`identity.logIn` in `account.ts`, also for
+   `connectQuietly`), and adds the answer as `proof=`. The phone signs `{dev, origin, iat, jti}`
+   (`OwnHostProofs`) only for its **own** addresses (`localOrigins`, like the token audience
+   check); another origin, or a host that isn't a phone, gets 404.
+3. **The check.** `/connect` sends it with the target's origin to `POST /api/account/own-host`
+   (login session). The server accepts it only when it's signed by a key of **this** account's
+   phones, for exactly that origin, at most 5 minutes off, and not used before (each `jti`
+   once). The answer (`OwnHostAnswer`) says `own` and `withoutAsking` (own and the setting on).
+   With `withoutAsking`, `/connect` goes straight back with the host token and the YouTube
+   Music and history tokens, without remembering a yes in `ytmp.approvedHosts`: with the setting
+   off, the question comes back. A host you answered before in that browser keeps that answer
+   (with or without YouTube Music), as before.
+
+Why another host can't pass for your phone: it can't make a proof the server accepts without a
+key the server got from your app's own pages; asking your phone for a proof for its own address
+gets 404; and passing on your phone's proof for your phone's address fails the origin check.
+What a host page sees is unchanged: a phone that is yours gets what a yes would give it (your
+name and account ID, and the YouTube Music and history tokens). Known limit: someone on the
+network who takes over your phone's address while it's away can replay a proof for at most
+5 minutes after it was made, and only once; on plain HTTP they could read that address's pages
+anyway.
 
 ### The phone's owner
 

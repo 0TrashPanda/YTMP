@@ -61,6 +61,10 @@ import kotlinx.coroutines.async
 import dev.trashpanda.ytmp.protocol.PhoneCopyState
 import dev.trashpanda.ytmp.protocol.PhoneCopyAsked
 import dev.trashpanda.ytmp.protocol.MyPhone
+import dev.trashpanda.ytmp.protocol.OwnDeviceRequest
+import dev.trashpanda.ytmp.protocol.OwnHostAnswer
+import dev.trashpanda.ytmp.protocol.OwnHostCheck
+import dev.trashpanda.ytmp.host.OwnHostProofs
 import dev.trashpanda.ytmp.protocol.Permission
 import dev.trashpanda.ytmp.protocol.Role
 import dev.trashpanda.ytmp.protocol.RoleTemplate
@@ -641,5 +645,70 @@ class AccountApiTest {
         assertEquals(1, made.plays)
         // The parts are gone once imported.
         assertEquals(HttpStatusCode.BadRequest, client.post("/api/account/imports?upload=abcdefgh12") { bearerAuth(anna) }.status)
+    }
+
+    @Test
+    fun `your own phone joins without the question, only when the server knows its key and the proof is for that address`() = testApplication {
+        setup(SignupMode.OPEN)
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>().sessionToken
+        val sam = client.postJson("/api/account/signup", SignupRequest("sam", "password123", "Sam")).body<SessionResponse>().sessionToken
+        val appToken = client.postJson("/api/account/host-token", HostTokenRequest(PHONE_APP_ORIGIN), anna).body<HostTokenResponse>().token
+        val joinedToken = client.postJson("/api/account/host-token", HostTokenRequest("http://192.168.1.50:8765"), anna).body<HostTokenResponse>().token
+        val youtubeToken = client.post("/api/account/youtube-token") { bearerAuth(anna) }.body<HostTokenResponse>().token
+        val phoneKey = AccountTokens.newKeyPair()
+        val device = OwnDeviceRequest("Pixel 7", AccountTokens.encodeKey(phoneKey.public))
+        suspend fun register(token: String, id: String = "pixel-1", request: OwnDeviceRequest = device) = client.put("/api/auth/devices/$id") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }.status
+
+        // Only the phone's own app may say a key is the account's: not a host you joined, not a scoped token.
+        assertEquals(HttpStatusCode.Forbidden, register(joinedToken))
+        assertEquals(HttpStatusCode.Unauthorized, register(youtubeToken))
+        assertEquals(HttpStatusCode.BadRequest, register(appToken, request = OwnDeviceRequest("Pixel 7", "not a key")))
+        assertEquals(HttpStatusCode.NoContent, register(appToken))
+
+        val phone = "http://192.168.1.23:8765"
+        fun proof(origin: String = phone, key: java.security.PrivateKey = phoneKey.private, dev: String = "pixel-1", at: Long = System.currentTimeMillis() / 1000) =
+            OwnHostProofs.sign(OwnHostProofs.Claims(dev, origin, at, java.util.UUID.randomUUID().toString()), key)
+        suspend fun check(origin: String, proof: String, session: String = anna) =
+            client.postJson("/api/account/own-host", OwnHostCheck(origin, proof), session).body<OwnHostAnswer>()
+
+        val good = proof()
+        assertEquals(OwnHostAnswer(own = true, withoutAsking = true, device = "Pixel 7"), check(phone, good))
+        // Each proof works once.
+        assertFalse(check(phone, good).own)
+        // A host elsewhere passing on the phone's proof: it's for the phone's address, not its own.
+        assertFalse(check("http://192.168.1.66:8765", proof()).own)
+        // Someone else's key under the phone's id, an old proof, another account's phone.
+        assertFalse(check(phone, proof(key = AccountTokens.newKeyPair().private)).own)
+        assertFalse(check(phone, proof(at = System.currentTimeMillis() / 1000 - 600)).own)
+        assertFalse(check(phone, proof(dev = "other")).own)
+        assertFalse(check(phone, proof(), sam).own)
+        assertEquals(HttpStatusCode.Unauthorized, client.postJson("/api/account/own-host", OwnHostCheck(phone, proof()), appToken).status)
+
+        // The setting: off, the server still knows it's yours, but /connect asks.
+        val settings = client.get("/api/account/settings") { bearerAuth(anna) }.body<AccountSettings>()
+        assertTrue(settings.ownDevicesWithoutAsking)
+        client.put("/api/account/settings") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(anna)
+            setBody(settings.copy(ownDevicesWithoutAsking = false))
+        }
+        assertEquals(OwnHostAnswer(own = true, withoutAsking = false, device = "Pixel 7"), check(phone, proof()))
+        client.put("/api/account/settings") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(anna)
+            setBody(settings)
+        }
+        assertTrue(check(phone, proof()).withoutAsking)
+
+        // A new key for the phone (a new owner had it, or it was reset) replaces the old one.
+        val newKey = AccountTokens.newKeyPair()
+        assertEquals(HttpStatusCode.NoContent, register(appToken, request = OwnDeviceRequest("Pixel 7", AccountTokens.encodeKey(newKey.public))))
+        assertFalse(check(phone, proof()).own)
+        assertTrue(check(phone, proof(key = newKey.private)).own)
     }
 }

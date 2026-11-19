@@ -70,6 +70,12 @@ data class AccountSettings(
     val hasRoomPassword: Boolean = false,
     /** Which of your listening radio and Find similar learn from (the song graph). */
     val historyRadio: HistoryRadio = HistoryRadio.ALL,
+    /**
+     * Joining a room on one of your own phones (one the server knows is yours, see
+     * docs/implementation/auth.md#your-own-phones) goes straight in, with your YouTube Music and
+     * history, without the `/connect` question.
+     */
+    val ownDevicesWithoutAsking: Boolean = true,
 )
 
 /** Which of your listening the song graph uses for your radio. */

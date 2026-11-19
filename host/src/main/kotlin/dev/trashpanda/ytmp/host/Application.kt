@@ -145,6 +145,11 @@ data class HostOptions(
      */
     val deviceOwner: () -> String? = { null },
     /**
+     * The phone's key for proving to its owner's server that it's theirs (`GET /api/host/own-proof`):
+     * their rooms here then join without the question. A phone.
+     */
+    val ownDevice: OwnDevice? = null,
+    /**
      * No guests: the API (but logging in and audio for speakers) and rooms need an account
      * of [auth]. A server setting (`accounts.guests = false`, or its admin page), so it can change while running.
      */

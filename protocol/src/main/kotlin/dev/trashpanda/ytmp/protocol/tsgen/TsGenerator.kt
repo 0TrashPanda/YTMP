@@ -40,6 +40,10 @@ import dev.trashpanda.ytmp.protocol.ChangePasswordRequest
 import dev.trashpanda.ytmp.protocol.HostTokenRequest
 import dev.trashpanda.ytmp.protocol.PhoneCopyState
 import dev.trashpanda.ytmp.protocol.HostTokenResponse
+import dev.trashpanda.ytmp.protocol.OwnDeviceRequest
+import dev.trashpanda.ytmp.protocol.OwnHostAnswer
+import dev.trashpanda.ytmp.protocol.OwnHostCheck
+import dev.trashpanda.ytmp.protocol.OwnHostProof
 import dev.trashpanda.ytmp.protocol.AccountListResponse
 import dev.trashpanda.ytmp.protocol.CreateAccountRequest
 import dev.trashpanda.ytmp.protocol.UpdateAccountRequest
@@ -239,6 +243,10 @@ fun main(args: Array<String>) {
     generator.addRoot(ChangePasswordRequest.serializer().descriptor)
     generator.addRoot(HostTokenRequest.serializer().descriptor)
     generator.addRoot(HostTokenResponse.serializer().descriptor)
+    generator.addRoot(OwnDeviceRequest.serializer().descriptor)
+    generator.addRoot(OwnHostProof.serializer().descriptor)
+    generator.addRoot(OwnHostCheck.serializer().descriptor)
+    generator.addRoot(OwnHostAnswer.serializer().descriptor)
     generator.addRoot(PhoneCopyState.serializer().descriptor)
     generator.addRoot(AccountListResponse.serializer().descriptor)
     generator.addRoot(CreateAccountRequest.serializer().descriptor)

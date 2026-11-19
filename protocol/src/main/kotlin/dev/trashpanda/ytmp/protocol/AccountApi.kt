@@ -81,6 +81,44 @@ data class HostTokenRequest(
 data class HostTokenResponse(val token: String, val expiresAt: Long, val account: AccountInfo)
 
 /**
+ * `PUT /api/auth/devices/{id}`: a phone tells its owner's server the key it proves itself with
+ * (see [OwnHostCheck]). Only with a host token for the app's own pages, which only reach the
+ * account's own phones.
+ */
+@Serializable
+@SerialName("OwnDeviceRequest")
+data class OwnDeviceRequest(
+    /** What the phone is called, e.g. `Pixel 7`. */
+    val name: String,
+    /** Its public key (P-256, X.509, base64). */
+    val publicKey: String,
+)
+
+/** `GET /api/host/own-proof?origin=`: a phone's signed word that [origin] is one of its own addresses. */
+@Serializable
+@SerialName("OwnHostProof")
+data class OwnHostProof(val proof: String)
+
+/**
+ * `POST /api/account/own-host` (the `/connect` page): is the host at [origin] one of your own
+ * phones? [proof] comes from that host's page ([OwnHostProof]).
+ */
+@Serializable
+@SerialName("OwnHostCheck")
+data class OwnHostCheck(val origin: String, val proof: String)
+
+@Serializable
+@SerialName("OwnHostAnswer")
+data class OwnHostAnswer(
+    /** The server checked it: a phone of this account, at that address. */
+    val own: Boolean,
+    /** And the account joins its own phones without the question (its setting). */
+    val withoutAsking: Boolean = false,
+    /** The phone's name, when it's yours. */
+    val device: String? = null,
+)
+
+/**
  * One of your phones, ready to give its songs to your computer (the desktop app's *Songs from
  * your phone*): where it is on its network, from the phone itself.
  */

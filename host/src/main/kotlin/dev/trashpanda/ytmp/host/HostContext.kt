@@ -30,7 +30,10 @@ internal class HostContext(val rooms: RoomManager, val sources: HostSources, val
         val token = bearerToken() ?: return null
         return options.auth.verify(token)?.also {
             options.onAccountToken(token, it)
-            if (options.isLocal(this)) options.onLocalAccount(it)
+            if (options.isLocal(this)) {
+                options.onLocalAccount(it)
+                options.ownDevice?.usedBy(it.id, token)
+            }
         }
     }
 

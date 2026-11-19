@@ -33,7 +33,10 @@ import type {
 	HistoryImport,
 	HistoryImportList,
 	GraphBuildStatus,
-	RadioCrawlStatus
+	RadioCrawlStatus,
+	OwnHostAnswer,
+	OwnHostCheck,
+	OwnHostProof
 } from './protocol.gen';
 
 function read<T>(key: string): T | null {
@@ -121,6 +124,8 @@ export const authServer = {
 	youtubeToken: () => call<HostTokenResponse>('/api/account/youtube-token', undefined, 'POST'),
 	/** A token for your listening history here, for the pages of rooms on other hosts. */
 	historyToken: () => call<HostTokenResponse>('/api/account/history-token', undefined, 'POST'),
+	/** Whether the host at [origin] is one of your own phones: [proof] is its signed word, from its page. */
+	ownHost: (origin: string, proof: string) => call<OwnHostAnswer>('/api/account/own-host', { origin, proof } satisfies OwnHostCheck),
 	history: (before: number | null, query: string) => {
 		const params = new URLSearchParams({ limit: '50' });
 		if (before !== null) params.set('before', String(before));
@@ -316,10 +321,26 @@ export const identity = {
 		history.replaceState(history.state, '', location.pathname + location.search);
 	},
 
-	/** Where to go to log in with [server]; you come back to this page. [quiet]: see [connectQuietly]. */
-	loginUrl(server: AuthServerRef, quiet = false): string {
+	/**
+	 * Where to go to log in with [server]; you come back to this page. [quiet]: see [connectQuietly].
+	 * [proof]: this host's word that it's one of your phones ([ownProof]).
+	 */
+	loginUrl(server: AuthServerRef, quiet = false, proof?: string | null): string {
 		const base = server.url ?? '';
-		return `${base}/connect?${quiet ? 'quiet=1&' : ''}return=${encodeURIComponent(location.href)}`;
+		return `${base}/connect?${quiet ? 'quiet=1&' : ''}${proof ? `proof=${encodeURIComponent(proof)}&` : ''}return=${encodeURIComponent(location.href)}`;
+	},
+
+	/**
+	 * Goes to log in with [server] (see [loginUrl]), with this host's proof that it's a phone
+	 * (when it is one), so /connect can skip its question when it's one of yours. For a link's
+	 * click: the link's own address works too, it only asks.
+	 */
+	async logIn(server: AuthServerRef, quiet = false, event?: Event): Promise<void> {
+		// Opening it in a new tab: the plain link.
+		const click = event as MouseEvent | undefined;
+		if (click && (click.button > 0 || click.ctrlKey || click.metaKey || click.shiftKey)) return;
+		event?.preventDefault();
+		location.href = identity.loginUrl(server, quiet, await ownProof());
 	}
 };
 
@@ -355,8 +376,22 @@ export async function connectQuietly(host: HostInfo): Promise<boolean> {
 	} catch {
 		return false;
 	}
-	location.href = identity.loginUrl(server, true);
+	await identity.logIn(server, true);
 	return true;
+}
+
+/**
+ * This host's signed word that this page's address is its own (a phone, for its owner's server:
+ * docs/implementation/auth.md#your-own-phones), or null (not a phone, or it has no owner). It
+ * proves nothing by itself: only the server can tell whether that phone is yours.
+ */
+async function ownProof(): Promise<string | null> {
+	try {
+		const response = await fetch(`/api/host/own-proof?origin=${encodeURIComponent(location.origin)}`, { signal: AbortSignal.timeout(1500) });
+		return response.ok ? ((await response.json()) as OwnHostProof).proof : null;
+	} catch {
+		return null;
+	}
 }
 
 // --- log in once ---------------------------------------------------------------------------

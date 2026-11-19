@@ -153,6 +153,21 @@
 				<option value="move">Always move it to where I open it</option>
 				<option value="move_if_away">Move it only if its device is away</option>
 			</select>
+			<div class="flex items-center gap-4">
+				<div class="min-w-0 flex-1">
+					<p class="text-sm font-medium">Join my phones without asking</p>
+					<p class="text-xs text-muted">
+						Rooms on a phone logged in with this account open straight away, with your YouTube Music and history. This server checks that the phone is
+						really yours. Other phones and servers still ask first.
+					</p>
+				</div>
+				<Switch
+					checked={s.ownDevicesWithoutAsking}
+					label="Join my phones without asking"
+					disabled={busy}
+					onchange={(on) => saveSettings({ ...s, ownDevicesWithoutAsking: on })}
+				/>
+			</div>
 		</section>
 	{/if}
 
@@ -216,7 +231,7 @@
 {:else if host?.authServers.length}
 	<p class="text-sm text-muted">Log in with your YTMP account: rooms you make are yours on all your devices, and your history and roles come along.</p>
 	{#each host.authServers as server (server.issuer)}
-		<a href={identity.loginUrl(server)} class="rounded-full bg-white py-2.5 text-center font-medium text-black">
+		<a href={identity.loginUrl(server)} onclick={(e) => identity.logIn(server, false, e)} class="rounded-full bg-white py-2.5 text-center font-medium text-black">
 			Log in{host.authServers.length > 1 ? ` with ${server.url ? new URL(server.url).host : server.issuer}` : ''}
 		</a>
 	{/each}

@@ -9,6 +9,7 @@ import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.HostInfo
+import dev.trashpanda.ytmp.protocol.OwnHostProof
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.ROOM_CODE
 import dev.trashpanda.ytmp.protocol.RejectReason
@@ -55,6 +56,13 @@ internal fun Route.roomRoutes(host: HostContext) = with(host) {
                 canRecognize = sources.recognizer != null,
             ),
         )
+    }
+    // A phone's signed word that the page's address is its own, for its owner's server
+    // (docs/implementation/auth.md#your-own-phones): only for its own addresses.
+    get("/host/own-proof") {
+        val proof = call.request.queryParameters["origin"]?.let { options.ownDevice?.proof(it) }
+            ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Not one of this host's own addresses")
+        call.respond(OwnHostProof(proof))
     }
     get("/rooms") {
         // The hosting phone sees all its rooms; on a server, you see the rooms your account owns.

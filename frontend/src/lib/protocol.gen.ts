@@ -1003,6 +1003,26 @@ export interface HostTokenResponse {
   account: AccountInfo;
 }
 
+export interface OwnDeviceRequest {
+  name: string;
+  publicKey: string;
+}
+
+export interface OwnHostProof {
+  proof: string;
+}
+
+export interface OwnHostCheck {
+  origin: string;
+  proof: string;
+}
+
+export interface OwnHostAnswer {
+  own: boolean;
+  withoutAsking: boolean;
+  device: string | null;
+}
+
 export interface MyPhone {
   id: string;
   name: string;
@@ -1242,6 +1262,7 @@ export interface AccountSettings {
   openElsewhere: RoomOpenMode;
   hasRoomPassword: boolean;
   historyRadio: HistoryRadio;
+  ownDevicesWithoutAsking: boolean;
 }
 
 export interface GraphNode {

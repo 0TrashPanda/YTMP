@@ -61,6 +61,9 @@ import dev.trashpanda.ytmp.protocol.GraphBuildStatus
 import dev.trashpanda.ytmp.protocol.GraphFull
 import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.HistoryImportList
+import dev.trashpanda.ytmp.protocol.OwnDeviceRequest
+import dev.trashpanda.ytmp.protocol.OwnHostAnswer
+import dev.trashpanda.ytmp.protocol.OwnHostCheck
 import dev.trashpanda.ytmp.protocol.PlayedSongs
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
 import dev.trashpanda.ytmp.protocol.GenreAnswer
@@ -109,6 +112,9 @@ class AccountService(
     private val genres: SharedGenres? = null,
 ) {
     private val throttle = LoginThrottle(clock)
+
+    /** The accounts' own phones (see [OwnDevices]). */
+    val ownDevices = OwnDevices(accounts, clock)
 
     /** Who may create accounts; can change while running (the admin page). */
     @Volatile
@@ -712,6 +718,30 @@ class AccountService(
         // Your listening history here, for the pages of rooms on other hosts (they call this server).
         post("/account/history-token") {
             call.respond(scopedToken(call.account(), HISTORY_SCOPE))
+        }
+
+        // Your own phones (docs/implementation/auth.md#your-own-phones). A phone tells its key from
+        // its own app: only a host token for the app's own pages, which only reach the account's
+        // own phones, may do that (not one for any host you joined).
+        put("/auth/devices/{id}") {
+            val claims = call.ownToken() ?: throw notLoggedIn()
+            if (normalizeOrigin(claims.aud) !in setOf(PHONE_APP_ORIGIN, PHONE_DEBUG_APP_ORIGIN)) throw forbidden("Only the phone's own app can do this")
+            val account = io { accounts.find(claims.sub) } ?: throw notLoggedIn()
+            val request = call.receive<OwnDeviceRequest>()
+            if (!io { ownDevices.remember(account.id, call.parameters["id"]!!, request.name, request.publicKey) }) {
+                throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "Not a device key")
+            }
+            call.respond(HttpStatusCode.NoContent)
+        }
+
+        // The /connect page: is the host at this address one of your own phones? Its page brought
+        // the phone's signed word for it; the server checks it with the key the phone gave.
+        post("/account/own-host") {
+            val account = call.account()
+            val check = call.receive<OwnHostCheck>()
+            val device = io { ownDevices.check(account.id, check.origin, check.proof) }
+            val withoutAsking = device != null && io { settings(account) }.ownDevicesWithoutAsking
+            call.respond(OwnHostAnswer(own = device != null, withoutAsking = withoutAsking, device = device?.name))
         }
 
         // Songs from your phone (the desktop app): the computer asks your phones through here; a

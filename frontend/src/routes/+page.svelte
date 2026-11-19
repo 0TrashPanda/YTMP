@@ -574,7 +574,7 @@
 		<section class="flex flex-col gap-3 rounded-xl bg-surface p-5 text-center ring-1 ring-line">
 			<p>This server is for accounts only.</p>
 			{#each host.authServers as server (server.issuer)}
-				<a href={identity.loginUrl(server)} class="rounded-full bg-white py-3 font-medium text-black">Log in{host.authServers.length > 1 ? ` on ${server.issuer}` : ''}</a>
+				<a href={identity.loginUrl(server)} onclick={(e) => identity.logIn(server, false, e)} class="rounded-full bg-white py-3 font-medium text-black">Log in{host.authServers.length > 1 ? ` on ${server.issuer}` : ''}</a>
 			{/each}
 		</section>
 	{:else}
@@ -605,7 +605,7 @@
 				{/if}
 			</label>
 			{#each host?.authServers ?? [] as server (server.issuer)}
-				<a href={identity.loginUrl(server)} class="-mt-3 text-center text-sm text-muted underline">
+				<a href={identity.loginUrl(server)} onclick={(e) => identity.logIn(server, false, e)} class="-mt-3 text-center text-sm text-muted underline">
 					Or log in with your account on {server.issuer}
 				</a>
 			{/each}

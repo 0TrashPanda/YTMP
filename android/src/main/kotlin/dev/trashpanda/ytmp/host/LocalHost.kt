@@ -480,6 +480,25 @@ class LocalHost(private val context: Context) {
     /** Songs from your phone: the owner's computer copies this phone's songs (PhoneCopyLink). */
     val phoneCopy: PhoneCopyLink by lazy { PhoneCopyLink(context, authLink, sync, ::lanUrl, scope) }
 
+    /** Proves to the owner's server that this phone is theirs, so their rooms here join without the question. */
+    private val ownDevice: OwnDevice by lazy {
+        val prefs = context.getSharedPreferences("own-device", Context.MODE_PRIVATE)
+        OwnDevice(
+            store = object : OwnDevice.Store {
+                override fun get(key: String): String? = prefs.getString(key, null)
+
+                override fun put(values: Map<String, String?>) {
+                    prefs.edit().apply { values.forEach { (k, v) -> if (v == null) remove(k) else putString(k, v) } }.apply()
+                }
+            },
+            owner = { authLink.ownerAccount },
+            serverOf = { account -> authLink.auth.servers().firstOrNull { account.endsWith("@${it.issuer}") }?.url },
+            ownOrigins = { localOrigins(PORT) },
+            name = { sync.hostName },
+            scope = scope,
+        )
+    }
+
     /**
      * Songs played on this phone go into the owner's YouTube Music history, so its suggestions
      * learn from them (see [YoutubeHistory]). Like YouTube, a play counts after 30 seconds.
@@ -571,6 +590,7 @@ class LocalHost(private val context: Context) {
                     onAccountToken = sync::remember,
                     onLocalAccount = { authLink.usedBy(it.id) },
                     deviceOwner = { authLink.ownerAccount },
+                    ownDevice = ownDevice,
                     cacheSettings = cacheControls,
                     copyKeys = phoneCopy,
                 ),

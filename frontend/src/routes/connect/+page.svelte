@@ -11,6 +11,8 @@
 	const returnUrl = page.url.searchParams.get('return');
 	/** A host's page checking whether you're logged in here (see connectQuietly): no login form. */
 	const quiet = page.url.searchParams.get('quiet') === '1';
+	/** The host's signed word that it's one of your phones (see identity.logIn); only this server can tell whether it is. */
+	const proof = page.url.searchParams.get('proof');
 	const target = (() => {
 		try {
 			const url = new URL(returnUrl ?? '');
@@ -67,22 +69,44 @@
 			error = e instanceof Error ? e.message : "Can't reach the server";
 		}
 		loaded = true;
-		// Our own pages, and hosts you said yes to, don't need to ask.
-		if (account && target && target.origin !== location.origin) withYoutube = approved(WITH_YOUTUBE)[account.id]?.includes(target.origin) ?? true;
-		if (account && target && (target.origin === location.origin || approved()[account.id]?.includes(target.origin))) await allow();
+		if (account) await decide(account);
 		// Not logged in here (or the server didn't answer): the host's page asks your name as before.
-		else if (quiet && !account) goBack('none');
+		else if (quiet) goBack('none');
 	});
 
-	async function allow() {
+	/** Logged in: goes straight back where it needn't ask. */
+	async function decide(account: AccountInfo) {
+		if (!target) return;
+		// Our own pages, and hosts you said yes to, don't need to ask (with what you said then).
+		if (target.origin !== location.origin) withYoutube = approved(WITH_YOUTUBE)[account.id]?.includes(target.origin) ?? true;
+		if (target.origin === location.origin || approved()[account.id]?.includes(target.origin)) return allow();
+		// One of your own phones (this server checks the phone's proof), and your setting says
+		// not to ask there: with your YouTube Music and history. Not remembered as a yes, so with
+		// the setting off it asks again.
+		if (proof) {
+			deciding = true;
+			const answer = await authServer.ownHost(target.origin, proof).catch(() => null);
+			deciding = false;
+			if (answer?.withoutAsking) {
+				withYoutube = true;
+				return allow(false);
+			}
+		}
+	}
+
+	/** Checking whether the host is one of your phones (the question waits for that). */
+	let deciding = $state(false);
+
+	/** [keep]: remember the answer for this host in this browser. */
+	async function allow(keep = true) {
 		if (!target) return;
 		busy = true;
 		error = null;
 		try {
 			const token = await authServer.hostToken(target.origin);
-			remember(token.account.id, target.origin);
 			const otherHost = target.origin !== location.origin;
-			if (otherHost) remember(token.account.id, target.origin, WITH_YOUTUBE, withYoutube);
+			if (keep) remember(token.account.id, target.origin);
+			if (keep && otherHost) remember(token.account.id, target.origin, WITH_YOUTUBE, withYoutube);
 			const youtube = otherHost && withYoutube ? await authServer.youtubeToken().catch(() => undefined) : undefined;
 			const history = otherHost && withYoutube ? await authServer.historyToken().catch(() => undefined) : undefined;
 			returnWithIdentity(target.toString(), token, youtube, history);
@@ -108,7 +132,15 @@
 	{:else if !loaded}
 		<p class="text-center text-muted">Loading…</p>
 	{:else if info && !account}
-		<LoginForm {info} onDone={() => (account = session.current?.account ?? null)} />
+		<LoginForm
+			{info}
+			onDone={() => {
+				account = session.current?.account ?? null;
+				if (account) decide(account);
+			}}
+		/>
+	{:else if account && (deciding || busy) && !error}
+		<p class="text-center text-muted">Logging in…</p>
 	{:else if account}
 		<section class="flex flex-col gap-4 rounded-xl bg-surface p-5 ring-1 ring-line">
 			<p>
@@ -126,7 +158,7 @@
 					</span>
 				</span>
 			</label>
-			<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy} onclick={allow}>Continue</button>
+			<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy} onclick={() => allow()}>Continue</button>
 			<div class="flex justify-between text-sm text-muted">
 				<button class="underline" onclick={switchAccount}>Use another account</button>
 				{#if quiet}
