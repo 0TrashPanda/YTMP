@@ -149,6 +149,19 @@ class RadioTest {
     }
 
     @Test
+    fun `play from a tapped song, it plays now and the rest of the album becomes autoplay`() = runTest {
+        val room = room()
+        room.run(Command.PlayNow(song("a2")))
+        runCurrent()
+        room.run(Command.AutoplaySongs(listOf(song("a3"), song("a4"))))
+        runCurrent()
+        val state = room.state()
+        assertEquals("a2", state.nowPlaying?.item?.song?.id)
+        assertTrue(state.queue.isEmpty())
+        assertEquals(listOf("a3", "a4"), state.autoplay.map { it.song.id }.take(2))
+    }
+
+    @Test
     fun `start radio clears the queue, plays the song once and continues with its radio`() = runTest {
         val room = room()
         room.run(Command.AddSongs(listOf(song("x"), song("y")), QueuePosition.END))

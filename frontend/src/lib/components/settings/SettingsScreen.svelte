@@ -599,7 +599,7 @@
 		/>
 		<Toggle
 			label="Tap a song to play an album or playlist from there"
-			hint="Like YouTube Music: when nothing is queued or playing, tapping a song on an album or playlist page plays it from that song (the songs after it come next). Otherwise a tap does what Taps and swipes says. Play from here in the song menu always does it."
+			hint="Like YouTube Music: when no song is on and nothing is queued, tapping a song on an album or playlist page plays it from that song (the songs after it go into autoplay). Otherwise a tap does what Taps and swipes says. Play from here in the song menu always does it."
 			setting={settings.tapPlaysFromHere}
 		/>
 		<Toggle

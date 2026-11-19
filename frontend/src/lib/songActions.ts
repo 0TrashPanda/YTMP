@@ -162,3 +162,21 @@ export function skipBySwipe(room: RoomConnection, forward: boolean): void {
 	if (forward) void room.next();
 	else if (room.canPrevious) void room.run({ kind: 'Previous' });
 }
+
+/**
+ * Plays [list] from its first song: that one plays now, the rest come after it. Into the queue
+ * (Play next) when [restToAutoplay] is false; else, when the queue is empty, the rest go into
+ * autoplay, like YouTube Music's album or playlist from a tapped song: the queue stays free for
+ * what people add, and autoplay's radio goes on after the last one. A party is asked first
+ * (the room's "Ask before interrupting"); cancelled, nothing is added.
+ */
+export async function playList(room: RoomConnection, list: Song[], onToast: Toast, restToAutoplay = false) {
+	const [first, ...rest] = list;
+	if (!first) return;
+	let e = await room.run({ kind: 'PlayNow', song: first });
+	if (!e && rest.length) {
+		const toAutoplay = restToAutoplay && !room.state?.queue.length && room.can('autoplay_from_here');
+		e = await room.run(toAutoplay ? { kind: 'AutoplaySongs', songs: rest } : { kind: 'AddSongs', songs: rest, position: 'next' });
+	}
+	if (e && !room.wasNoticed(e)) onToast(e.message);
+}

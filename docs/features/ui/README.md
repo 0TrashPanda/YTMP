@@ -257,13 +257,16 @@ YouTube Music. It can be only the mini player, only the art, or off. The mini pl
 the finger, and up (open) and down (clear the room) still work: the first clear direction
 decides.
 
-✅ **Play from here**: in an empty room (nothing queued, and nothing playing: no song, or
-it's paused or finished), **tapping a song on an album or playlist page plays it from that
-song**, like YouTube Music: that song plays now and the ones after it come next; the songs
-before it are left out. When something is queued or playing, a tap there does what *Tap* in
-lists says (*Play next* by default), so it doesn't throw away what's lined up. *Settings →
+✅ **Play from here**: in an empty room (no song on, playing or paused, and nothing queued),
+**tapping a song on an album or playlist page plays it from that song**, like YouTube Music:
+that song plays now and the ones after it go into **autoplay** (Up next's *Autoplay* part), so
+the queue stays free for what people add and the radio goes on after the last one; the songs
+before it are left out. When a song is on (even with nothing queued after it) or something is
+queued, a tap there does what *Tap* in lists says (*Play next* by default), so it doesn't
+throw away what's playing or lined up. *Settings →
 Playback → Tap a song to play an album or playlist from there* (on by default) switches the
-empty-room tap off. The song menu on those pages always has **Play from here**. It's the
+empty-room tap off. The song menu on those pages always has **Play from here** (with songs queued, the ones
+after it come next in the queue instead of autoplay). It's the
 page's *Play* from that song, so the same limits apply (at most *Settings → Adding songs →
 most songs at once*, or asked first above the set number, counting from that song on), and in
 a party you're asked before it interrupts the music. Long playlists load the songs after it as
