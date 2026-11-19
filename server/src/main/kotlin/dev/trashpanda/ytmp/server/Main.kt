@@ -212,6 +212,7 @@ fun main(args: Array<String>) {
                     crawl.played(play)
                 },
                 onSongStarted = songCache::started,
+                genreOf = songCache::genreSoon,
             ),
             bookmarks = AccountBookmarks(auth, this),
         )

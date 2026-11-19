@@ -13,6 +13,7 @@
 	import { menuAt, startRadio } from '../songActions';
 	import { RADIO_FROM, withFrom } from '../radio.svelte';
 	import { settings } from '../settings.svelte';
+	import { genreList, topGenres } from '../genres';
 	import type { ItemList, QueueItem } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
@@ -30,6 +31,12 @@
 
 	const roomState = $derived(room.state);
 	const from = $derived(roomState?.radioOptions?.from ?? 'mix');
+	/** What the room plays (the songs played, the one playing and the queue), which autoplay keeps to. */
+	const roomGenres = $derived(
+		roomState && roomState.radioOptions?.keepGenres !== false
+			? topGenres([...roomState.history, ...(roomState.nowPlaying ? [roomState.nowPlaying.item] : []), ...roomState.queue].map((i) => i.song))
+			: []
+	);
 	const chips = $derived(RADIO_FROM.filter((f) => f.value === from || !settings.radioChipsHidden.value.includes(f.value)));
 	const canClear = $derived(
 		!!roomState?.queue.length && room.can(roomState.queue.every((i) => i.addedBy === room.participantId) ? 'remove_own' : 'remove_others')
@@ -586,7 +593,7 @@
 				>
 					<h3 class="text-sm font-medium tracking-wide text-muted uppercase">Autoplay</h3>
 					<span class="min-w-0 flex-1 truncate text-xs text-muted">
-						{roomState?.autoplaySeed ? `Songs like ${roomState.autoplaySeed.title}` : 'Plays when the queue runs out'}
+						{roomState?.autoplaySeed ? `Songs like ${roomState.autoplaySeed.title}` : roomGenres.length ? `Keeping to ${genreList(roomGenres)}` : 'Plays when the queue runs out'}
 					</span>
 					{#if room.can('autoplay_from_here')}
 						<button class="tap shrink-0 rounded-full px-3 py-1 text-xs text-muted hover:bg-raised hover:text-white" aria-label="Clear autoplay" onclick={() => room.run({ kind: 'ClearAutoplay' })}>

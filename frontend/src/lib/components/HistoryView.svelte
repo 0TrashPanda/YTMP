@@ -8,6 +8,7 @@
 	import { listening } from '../listening.svelte';
 	import type { AccountSettings, HistoryEntry } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
+	import { genreShares } from '../genres';
 	import Icon from './Icon.svelte';
 	import SongList from './SongList.svelte';
 	import type { MenuTarget } from './SongMenu.svelte';
@@ -86,9 +87,18 @@
 		return parts.join(' · ');
 	}
 
+	/** Only this genre's songs (the chips); null: all. */
+	let genre = $state<string | null>(null);
+	const WEEK_MS = 7 * 24 * 3600_000;
+	/** Your genres in the last 7 days, of what's loaded. */
+	const week = $derived(genreShares(plays.filter((p) => p.playedAt > Date.now() - WEEK_MS).map((p) => p.song)).slice(0, 3));
+	/** The chips: the genres in what's loaded, most played first. */
+	const chips = $derived(genreShares(plays.map((p) => p.song)).slice(0, 8).map((g) => g.genre));
+
 	const days = $derived.by(() => {
 		const groups: { day: string; plays: HistoryEntry[] }[] = [];
 		for (const play of plays) {
+			if (genre && play.song.genre !== genre) continue;
 			const day = dayName(play.playedAt);
 			if (groups.at(-1)?.day !== day) groups.push({ day, plays: [] });
 			groups.at(-1)!.plays.push(play);
@@ -130,6 +140,27 @@
 			<button class="-my-1 -mr-2 rounded-full p-1.5 text-muted hover:text-white" aria-label="Clear" onclick={() => ((query = ''), load(true))}><Icon name="close" size={20} /></button>
 		{/if}
 	</label>
+
+	{#if week.length && !query.trim()}
+		<div class="mx-2 rounded-lg bg-raised px-4 py-3 sm:max-w-md">
+			<p class="mb-2 text-sm text-muted">Your genres this week</p>
+			{#each week as g (g.genre)}
+				<div class="flex items-center gap-3 py-0.5 text-sm">
+					<span class="w-28 truncate">{g.genre}</span>
+					<div class="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10"><div class="h-full rounded-full bg-white" style:width="{Math.round(g.share * 100)}%"></div></div>
+					<span class="w-9 text-right text-muted">{Math.round(g.share * 100)}%</span>
+				</div>
+			{/each}
+		</div>
+	{/if}
+	{#if chips.length > 1}
+		<div class="flex gap-2 overflow-x-auto px-2" style:scrollbar-width="none">
+			<button class="shrink-0 rounded-lg px-3 py-1.5 text-sm {genre === null ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20'}" onclick={() => (genre = null)}>All</button>
+			{#each chips as g (g)}
+				<button class="shrink-0 rounded-lg px-3 py-1.5 text-sm {genre === g ? 'bg-white text-black' : 'bg-white/10 hover:bg-white/20'}" onclick={() => (genre = genre === g ? null : g)}>{g}</button>
+			{/each}
+		</div>
+	{/if}
 
 	{#if !loaded}
 		<div class="flex animate-pulse flex-col gap-3 px-2">

@@ -12,6 +12,7 @@ export type MenuAction =
 	| 'radio'
 	| 'autoplay'
 	| 'similar'
+	| 'genre'
 	| 'graph'
 	| 'like'
 	| 'dislike'
@@ -39,6 +40,7 @@ export const MENU_ACTIONS: Record<MenuAction, { name: string; icon: IconName; hi
 	radio: { name: 'Start radio', icon: 'radio' },
 	autoplay: { name: 'Autoplay this', icon: 'autoplay' },
 	similar: { name: 'Find similar', icon: 'similar' },
+	genre: { name: 'More of its genre', icon: 'note', hint: "YouTube Music's page for the song's genre" },
 	graph: { name: 'Song graph', icon: 'graph', hint: 'With your YTMP account' },
 	like: { name: 'Like', icon: 'like', hint: 'With YouTube Music linked' },
 	dislike: { name: 'Dislike', icon: 'dislike', hint: 'With YouTube Music linked' },
@@ -66,6 +68,7 @@ export const DEFAULT_ITEMS: MenuItem[] = [
 	'radio',
 	'autoplay',
 	'similar',
+	'genre',
 	'graph',
 	'divider',
 	'like',

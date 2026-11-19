@@ -40,6 +40,7 @@ export interface Song {
   thumbnails: Thumbnail[];
   explicit: boolean;
   podcast: PodcastRef | null;
+  genre: string | null;
 }
 
 export type QueuePosition = "next" | "end" | "autoplay";
@@ -70,6 +71,7 @@ export interface RadioOptions {
   offline: RadioFrom;
   blockedSongs: string[];
   blockedArtists: string[];
+  keepGenres: boolean;
 }
 
 export interface CommandAutoplayFromHere {
@@ -1495,6 +1497,15 @@ export interface HomeSection {
 
 export interface HomePage {
   sections: HomeSection[];
+}
+
+export interface GenreLink {
+  id: string;
+  title: string;
+}
+
+export interface GenreList {
+  genres: GenreLink[];
 }
 
 export type LocalLibraryKind = "mpd" | "phone" | "cache" | "computer";

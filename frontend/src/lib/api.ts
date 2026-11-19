@@ -27,7 +27,7 @@ import type {
 	MyPlaylists,
 	PlaylistSummary,
 	SaveSongsRequest,
-	HomePage,
+	GenreList, HomePage,
 	HostInfo,
 	RecognizeRequest,
 	RecognizeResponse,
@@ -504,6 +504,12 @@ export async function setPodcastSaved(id: string, saved: boolean): Promise<void>
 }
 
 /** Suggestions for the home page: quick picks, new releases, mixes (yours, with your YouTube Music). */
+/** YouTube Music's genres (Explore → Moods & genres). */
+export const getGenres = (): Promise<GenreList> => cached('genres', () => request<GenreList>('/api/genres'));
+
+/** A genre's page: its playlists. */
+export const getGenre = (id: string): Promise<HomePage> => cached(`genre:${id}`, () => request<HomePage>(`/api/genres/${encodeURIComponent(id)}`));
+
 export async function getHome(): Promise<HomePage> {
 	// Not known yet whether it's yours (first start): wait for the host's answer, not long.
 	if (!answered && !youtubeFrom && moduleUsable()) await Promise.race([signInKnown, new Promise((done) => setTimeout(done, ANSWER_WAIT_MS))]);

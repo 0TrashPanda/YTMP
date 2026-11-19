@@ -19,6 +19,8 @@ export type View =
 	| { kind: 'playlist'; id: string; title: string; personal?: boolean }
 	| { kind: 'podcast'; id: string; title: string }
 	| { kind: 'genre'; library: string; name: string }
+	/** YouTube Music's page for a genre (the song menu's "More Pop"). */
+	| { kind: 'ytmGenre'; id: string; title: string }
 	| { kind: 'folder'; library: string; path: string }
 	/** A playlist that's all on the phone ("Cached on this phone"): plays from there, also offline. */
 	| { kind: 'localPlaylist'; library: string; id: string }

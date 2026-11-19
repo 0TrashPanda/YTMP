@@ -39,6 +39,7 @@ _ARTIST_SONGS = 20
 # parts (see _first_part_only), public ones load whole, up to this many songs.
 _PLAYLIST_SONGS = 1000
 _HOME_SECTIONS = 12
+_GENRES_KEPT_S = 24 * 3600
 _LIBRARY_ITEMS = 200
 _YTM_ORIGIN = "https://music.youtube.com"
 # Search types (the chips above the results) -> ytmusicapi's search filter.
@@ -174,6 +175,8 @@ class YtmCore:
         self._streams: dict[str, StreamInfo] = {}
         self._lock = threading.Lock()
         self._ydls = _YdlPool()
+        # (when, answer) of genres(): kept for a day.
+        self._genres: tuple[float, dict] | None = None
         self._language = language
         self._location = location
         # The signed-in YouTube Music account (the phone owner's), next to the anonymous one
@@ -618,6 +621,54 @@ class YtmCore:
             items = [item for c in s.get("contents") or [] if (item := parse.home_item(c))]
             if items:
                 sections.append({"title": s.get("title") or "", "strapline": s.get("strapline"), "items": items})
+        return {"sections": sections}
+
+    def genres(self) -> dict:
+        """YouTube Music's genres (Explore → Moods & genres): {genres: [{id, title}]}, the id for [genre].
+
+        Kept for a day: they hardly change."""
+        with self._lock:
+            kept = self._genres
+        if kept and kept[0] > time.time() - _GENRES_KEPT_S:
+            return kept[1]
+        categories = self._ytm.get_mood_categories() or {}
+        # The section called "Genres" (in the module's language); else all of them.
+        named = [items for title, items in categories.items() if "genre" in str(title).lower()]
+        found = []
+        for items in named or list(categories.values()):
+            for c in items or []:
+                if isinstance(c, dict) and c.get("params") and c.get("title"):
+                    found.append({"id": c["params"], "title": c["title"]})
+        answer = {"genres": found}
+        with self._lock:
+            self._genres = (time.time(), answer)
+        return answer
+
+    def genre(self, genre_id: str) -> dict:
+        """A genre's page, as Home-like rows: songs, featured and community playlists, music videos,
+        albums. NotFound when it has none.
+
+        Read like Home, not with ytmusicapi's get_mood_playlists: that one only knows playlists
+        and breaks on the songs these pages have now."""
+        try:
+            response = self._ytm._send_request("browse", {"browseId": "FEmusic_moods_and_genres_category", "params": genre_id})
+        except Exception as e:
+            log.info("genre %s: %s", genre_id, e)
+            raise NotFound("No page for this genre") from e
+        sections = []
+        for row in nav(response, SINGLE_COLUMN_TAB + SECTION_LIST, True) or []:
+            try:
+                parsed = _with_straplines([row])
+            except Exception as e:
+                # A row it doesn't know: the page goes on without it.
+                log.info("genre %s: a row: %s", genre_id, e)
+                continue
+            for s in parsed:
+                items = [item for c in s.get("contents") or [] if (item := parse.home_item(c))]
+                if items:
+                    sections.append({"title": s.get("title") or "", "items": items})
+        if not sections:
+            raise NotFound("No page for this genre")
         return {"sections": sections}
 
     def stream(self, song_id: str, fresh: bool = False) -> StreamInfo:

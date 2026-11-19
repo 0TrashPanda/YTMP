@@ -24,7 +24,8 @@ export const DEFAULT_RADIO: RadioOptions = {
 	mixEvery: 2,
 	offline: 'graph',
 	blockedSongs: [],
-	blockedArtists: []
+	blockedArtists: [],
+	keepGenres: true
 };
 
 const FROM = new Set<RadioFrom>(['mix', 'ytm', 'graph', 'device']);
@@ -45,7 +46,8 @@ export function parseRadio(saved: unknown): RadioOptions {
 		mixEvery: Math.round(num(s.mixEvery, 1, 10, 2)),
 		offline: s.offline === 'device' ? 'device' : 'graph',
 		blockedSongs: strings(s.blockedSongs),
-		blockedArtists: strings(s.blockedArtists)
+		blockedArtists: strings(s.blockedArtists),
+		keepGenres: s.keepGenres !== false
 	};
 }
 

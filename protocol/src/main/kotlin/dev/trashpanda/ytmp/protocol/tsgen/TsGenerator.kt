@@ -80,6 +80,7 @@ import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.GenreList
 import dev.trashpanda.ytmp.protocol.LocalLibraries
 import dev.trashpanda.ytmp.protocol.LocalLibraryPage
 import dev.trashpanda.ytmp.protocol.YoutubeAccountStatus
@@ -277,6 +278,7 @@ fun main(args: Array<String>) {
     generator.addRoot(SearchPage.serializer().descriptor)
     generator.addRoot(PodcastPage.serializer().descriptor)
     generator.addRoot(HomePage.serializer().descriptor)
+    generator.addRoot(GenreList.serializer().descriptor)
     generator.addRoot(LocalLibraries.serializer().descriptor)
     generator.addRoot(LocalLibraryPage.serializer().descriptor)
     generator.addRoot(SongCacheStatus.serializer().descriptor)

@@ -326,6 +326,50 @@ class RadioTest {
         assertTrue(state.autoplay.size >= Room.AUTOPLAY_LOW - 1)
     }
 
+    /** Songs a, b, c are Pop; of their radios the even ones are Pop, 9 isn't known yet, the rest Rock. */
+    private val genres: (Song) -> String? = { song ->
+        val n = song.id.substringAfter('-', "").toIntOrNull()
+        when {
+            n == null -> "Pop"
+            n == 9 -> null
+            n % 2 == 0 -> "Pop"
+            else -> "Rock"
+        }
+    }
+
+    @Test
+    fun `songs get their genre, and the room's autoplay keeps to the genres it plays`() = runTest {
+        val room = room()
+        room.genreOf = genres
+        room.run(Command.AddSongs(listOf(song("a"), song("b"), song("c")), QueuePosition.END))
+        runCurrent()
+        var state = room.state()
+        assertEquals("Pop", state.nowPlaying!!.item.song.genre)
+        assertEquals(listOf("Pop", "Pop"), state.queue.map { it.song.genre })
+        // Two songs left: autoplay isn't there yet. One song left: it's the Pop songs first, then the one not known yet.
+        advanceTimeBy(60_001)
+        runCurrent()
+        state = room.state()
+        assertEquals(listOf("c-2", "c-4", "c-6", "c-8", "c-10", "c-9"), state.autoplay.map { it.song.id })
+        assertEquals("Pop", state.autoplay.first().song.genre)
+    }
+
+    @Test
+    fun `with the genre choice off, or a radio someone started, autoplay keeps every genre`() = runTest {
+        val room = room()
+        room.genreOf = genres
+        room.run(Command.SetRadioOptions(dev.trashpanda.ytmp.protocol.RadioOptions(keepGenres = false)))
+        room.run(Command.AddSongs(listOf(song("a")), QueuePosition.END))
+        runCurrent()
+        assertEquals((1..10).map { "a-$it" }, room.state().autoplay.map { it.song.id })
+
+        val other = room()
+        other.genreOf = genres
+        other.run(Command.StartRadio(song("b")))
+        runCurrent()
+        assertEquals((1..10).map { "b-$it" }, other.state().autoplay.map { it.song.id })
+    }
+
     @Test
     fun `with autoplay off the music stops at the end of the queue`() = runTest {
         val room = room()

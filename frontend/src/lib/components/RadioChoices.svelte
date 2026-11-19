@@ -8,7 +8,7 @@
 
 	let {
 		value = $bindable(),
-		show = ['from', 'discover', 'account', 'taste'],
+		show = ['from', 'discover', 'account', 'taste', 'genre'],
 		hasAccount = false,
 		party = false
 	}: {
@@ -59,6 +59,16 @@
 				<button type="button" class={chip(value.withAccount === true)} onclick={() => (value = { ...value, withAccount: true })}>As you</button>
 				<button type="button" class={chip(value.withAccount === false)} onclick={() => (value = { ...value, withAccount: false })}>Without your account</button>
 			</div>
+		</div>
+	{/if}
+	{#if show.includes('genre')}
+		<div>
+			<p class="mb-2 text-sm text-muted">Genre</p>
+			<div class="flex flex-wrap gap-2">
+				<button type="button" class={chip(value.keepGenres)} onclick={() => (value = { ...value, keepGenres: true })}>The room's genres</button>
+				<button type="button" class={chip(!value.keepGenres)} onclick={() => (value = { ...value, keepGenres: false })}>Any</button>
+			</div>
+			<p class="mt-1.5 text-xs text-muted">{value.keepGenres ? 'Autoplay prefers songs in the genres the room plays, like Pop and Hip-Hop/Rap.' : 'Autoplay picks songs whatever their genre.'}</p>
 		</div>
 	{/if}
 	{#if show.includes('taste') && party && value.from !== 'ytm'}

@@ -73,6 +73,10 @@ song: when, in which room, who you listened with, who added it and whether you s
   swipes* says (play next, add to queue, play now, start radio, the song menu), and the song
   menu has everything it has elsewhere, plus **Remove from your history**.
 - **Search** your history at the top. Older days load as you scroll.
+- **Your genres this week** ✅: a card with the three genres you heard most in the last
+  seven days, and their share. Below it, **chips** for the genres in your history show only
+  that genre's songs. Songs carry the genre they had in the room ([genres](../../implementation/sources/genres.md)),
+  so songs heard before genres existed have none.
 - On your server's own pages, *Export or delete days* goes to the full history page.
 
 ## Recap

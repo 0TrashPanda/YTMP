@@ -42,12 +42,12 @@ object RoomSummaries {
     }
 
     /**
-     * The genres that are at least a fifth of the songs that have one, most first; none when
+     * What [songs] are mostly (also the genres autoplay keeps to): the genres that are at least a fifth of the songs that have one, most first; none when
      * under half of the songs have one yet. Podcasts aren't a genre here.
      */
-    private fun topGenres(songs: List<Song>, genreOf: (Song) -> String?): List<String> {
+    fun topGenres(songs: List<Song>, genreOf: (Song) -> String? = { null }): List<String> {
         val music = songs.filter { it.podcast == null }
-        val genres = music.mapNotNull { song -> genreOf(song)?.trim()?.takeIf { it.isNotEmpty() && it != PODCAST } }
+        val genres = music.mapNotNull { song -> (song.genre ?: genreOf(song))?.trim()?.takeIf { it.isNotEmpty() && it != PODCAST } }
         if (genres.isEmpty() || genres.size * 2 < music.size) return emptyList()
         val counts = LinkedHashMap<String, Int>()
         for (genre in genres) counts[genre] = (counts[genre] ?: 0) + 1

@@ -146,7 +146,7 @@
 				<Art {song} size={300} class="aspect-square h-[11vh] shrink-0 rounded-[1vmin] shadow-xl" />
 				<div class="min-w-0 flex-1">
 					<p class="truncate text-[min(4vh,3vw)] leading-tight font-bold portrait:text-[min(3vh,5.5vw)]">{song.title}</p>
-					<p class="truncate text-[min(2.8vh,2.1vw)] text-white/70 portrait:text-[min(2.2vh,4vw)]">{artistNames(song)} · Added by {addedBy(current)}</p>
+					<p class="truncate text-[min(2.8vh,2.1vw)] text-white/70 portrait:text-[min(2.2vh,4vw)]">{artistNames(song)}{song.genre && !song.podcast ? ` · ${song.genre}` : ''} · Added by {addedBy(current)}</p>
 					{#if duration > 0}
 						<div class="mt-[1vh] h-[max(3px,0.5vh)] overflow-hidden rounded-full bg-white/20">
 							<div class="h-full rounded-full bg-white transition-[width] duration-[250ms] ease-linear" style:width="{(position / duration) * 100}%"></div>
@@ -170,7 +170,7 @@
 					{s?.playback.playing || s?.playback.starting || s?.playback.loading ? 'Now playing' : 'Paused'} · Added by {addedBy(current)}
 				</p>
 				<h1 class="line-clamp-2 text-[min(7vh,5vw)] leading-tight font-bold portrait:text-[min(4.5vh,7vw)]">{song.title}</h1>
-				<p class="truncate text-[min(3.6vh,2.6vw)] text-white/75 portrait:text-[min(2.6vh,4.5vw)]">{artistNames(song)}</p>
+				<p class="truncate text-[min(3.6vh,2.6vw)] text-white/75 portrait:text-[min(2.6vh,4.5vw)]">{artistNames(song)}{song.genre && !song.podcast ? ` · ${song.genre}` : ''}</p>
 				{#if duration > 0}
 					<div class="mt-[2vh] h-[max(4px,0.7vh)] overflow-hidden rounded-full bg-white/20">
 						<div class="h-full rounded-full bg-white transition-[width] duration-[250ms] ease-linear" style:width="{(position / duration) * 100}%"></div>

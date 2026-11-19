@@ -140,4 +140,9 @@ data class RoomHooks(
     val onRoomClosed: (Room) -> Unit = {},
     /** A room is no longer [account]'s (it got another owner): its copy under [syncId] can go. */
     val onRoomDisowned: (account: String, syncId: String) -> Unit = { _, _ -> },
+    /**
+     * A song's genre when the host knows it ("": none found; null: not yet, and it's looked up
+     * soon). Songs get it as they're added and start (docs/implementation/sources/genres.md).
+     */
+    val genreOf: (Song) -> String? = { null },
 )

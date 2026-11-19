@@ -9,6 +9,7 @@ import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.OutputKind
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.GenreLink
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.YoutubeHistory
 import dev.trashpanda.ytmp.protocol.RoomVisibility
@@ -87,6 +88,12 @@ interface CatalogSource {
 
     /** Home, not from a cache: pulled down to refresh. */
     suspend fun freshHome(): HomePage = home()
+
+    /** The source's genres (YouTube Music's Moods & genres); none here when it has no genre pages. */
+    suspend fun genres(): List<GenreLink> = emptyList()
+
+    /** A genre's page (its playlists), by its [GenreLink.id]. */
+    suspend fun genre(id: String): HomePage = throw UnsupportedOperationException("No genre pages here")
 }
 
 /**

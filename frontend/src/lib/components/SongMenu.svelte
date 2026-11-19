@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import type { AlbumRef, ArtistRef, PodcastRef, QueueItem, Song } from '../protocol.gen';
+	import type { AlbumRef, ArtistRef, GenreLink, PodcastRef, QueueItem, Song } from '../protocol.gen';
 
 	/** Where a song in a menu comes from. */
 	export type SongPlace = 'search' | 'history' | 'current' | 'queue' | 'autoplay';
@@ -25,6 +25,7 @@
 </script>
 
 <script lang="ts">
+	import { genrePageOf, loadYtmGenres } from '../ytmGenres.svelte';
 	import { motionMs } from '../motion.svelte';
 	import { modal } from '../modal';
 	import { swipeDown } from '../swipeDown';
@@ -73,8 +74,11 @@
 		onGraph?: (song: Song) => void;
 		/** Share the song: with friends and groups, its link, or by holding phones together (SongShareSheet). */
 		onShare?: (song: Song) => void;
+		/** YouTube Music's page for the song's genre ("More Pop"). */
+		onGenre?: (genre: GenreLink) => void;
 	}
-	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave, onSleepTimer, onGraph, onShare }: Props = $props();
+	let { room, target, onClose, onToast, onFindSimilar, onArtist, onAlbum, onPodcast, onSave, onSleepTimer, onGraph, onShare, onGenre }: Props = $props();
+	loadYtmGenres();
 
 	const song = $derived(target.song);
 	const item = $derived(target.item);
@@ -232,6 +236,8 @@
 			// Read everything from the target before closing: closing clears it.
 			const current = song;
 			add('similar', { icon: 'similar', label: 'Find similar', run: () => (onFindSimilar(current), onClose()), held: radioFor('similar', current, `Songs like ${quoted(current)}`) });
+			const genrePage = onGenre ? genrePageOf(current) : null;
+			if (genrePage) add('genre', { icon: 'note', label: `More ${current.genre}`, run: () => (onClose(), onGenre!(genrePage)) });
 			if (onGraph && listening.available) add('graph', { icon: 'graph', label: 'Song graph', run: () => (onClose(), onGraph(current)) });
 			}
 		// Likes and playlists are YouTube Music's: not for local music.
@@ -562,7 +568,7 @@
 			<Art {song} size={48} class="h-12 w-12" />
 			<div class="min-w-0 flex-1">
 				<p class="truncate font-medium">{song.title}</p>
-				<p class="truncate text-sm text-muted">{song.podcast?.name ?? artistNames(song)}</p>
+				<p class="truncate text-sm text-muted">{song.podcast?.name ?? artistNames(song)}{song.genre && !song.podcast ? ` • ${song.genre}` : ''}</p>
 			</div>
 		</div>
 		{#if layout.buttons.length}

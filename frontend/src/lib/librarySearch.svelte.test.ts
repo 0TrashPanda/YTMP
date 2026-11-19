@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlaylistPage, SearchItem, Song } from './protocol.gen';
 
-const song = (id: string, title = id, artist = 'Someone'): Song => ({ id, title, artists: [{ id: null, name: artist }], album: null, durationMs: 0, thumbnails: [], explicit: false, podcast: null });
+const song = (id: string, title = id, artist = 'Someone'): Song => ({ id, title, artists: [{ id: null, name: artist }], album: null, durationMs: 0, thumbnails: [], explicit: false, podcast: null, genre: null });
 const part = (songs: Song[], more: string | null): PlaylistPage => ({ id: 'LM', title: 'Liked music', author: null, description: null, thumbnails: [], songs, owned: false, itemIds: [], more, songCount: null }) as PlaylistPage;
 const playlist = (id: string, title: string): SearchItem => ({ kind: 'playlist', id, title, author: null, itemCount: 3, thumbnails: [] }) as SearchItem;
 

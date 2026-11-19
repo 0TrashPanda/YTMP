@@ -4,7 +4,7 @@
 
 A full-screen view for a **TV, laptop or tablet** during a party:
 
-- the current song with **large album art**, title and artist, who added it, and progress
+- the current song with **large album art**, title and artist (and its genre, once it's known), who added it, and progress
 - the next four songs (queue, then autoplay), and who added them
 - a large **QR code** and the **room code** to join, and the address
 - a **background colour taken from the album art** (see below), changing with every song

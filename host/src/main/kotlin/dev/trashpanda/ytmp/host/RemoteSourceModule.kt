@@ -33,6 +33,8 @@ import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.GenreLink
+import dev.trashpanda.ytmp.protocol.GenreList
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
@@ -126,6 +128,10 @@ class RemoteSourceModule(
     override suspend fun song(id: String): Song = client.get("$baseUrl/songs/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
 
     override suspend fun home(): HomePage = client.get("$baseUrl/home") { auth() }.orThrow().body()
+
+    override suspend fun genres(): List<GenreLink> = client.get("$baseUrl/genres") { auth() }.orThrow().body<GenreList>().genres
+
+    override suspend fun genre(id: String): HomePage = client.get("$baseUrl/genres/${id.encodeURLPathPart()}") { auth() }.orThrow().body()
 
     /** YouTube Music's lyrics for the song, or null when it has none. */
     suspend fun lyrics(songId: String): Lyrics? {

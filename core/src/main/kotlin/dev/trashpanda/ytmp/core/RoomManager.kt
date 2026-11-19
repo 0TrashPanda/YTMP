@@ -168,6 +168,7 @@ class RoomManager(
         room.addChangeListener { roomChanged(room.code) }
         room.onPlayFinished = hooks.onPlayFinished
         room.onSongStarted = hooks.onSongStarted
+        room.genreOf = hooks.genreOf
         scope.launch { room.setAvailableOutputs(outputs.value) }
         return true
     }

@@ -21,6 +21,11 @@ What you may not do in a party (no permission) is left out.
 
 ## Song menu
 
+The menu's top shows the song, its artist and, once it's known, its **genre** ✅. **More Pop**
+(after *Find similar*) opens YouTube Music's page for the song's genre (its songs, playlists,
+music videos and albums); only
+when the song has a genre YouTube Music has a page for.
+
 **Every song** has the same menu, wherever it appears ✅: search results (also the top
 result), the queue (upcoming), the queue history (played or skipped), artist pages (top
 songs and *Show all*), album pages, playlist pages (also Liked music and YouTube Music's own

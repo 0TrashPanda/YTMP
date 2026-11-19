@@ -333,6 +333,8 @@ class LocalHost(private val context: Context) {
             override suspend fun podcast(id: String) = ytm.podcast(id)
             override suspend fun song(id: String) = ytm.song(id)
             override suspend fun home() = ytm.home()
+            override suspend fun genres() = ytm.genres()
+            override suspend fun genre(id: String) = ytm.genre(id)
         },
         suggest = { ytm.suggestions(it) },
     )
@@ -367,6 +369,7 @@ class LocalHost(private val context: Context) {
                 crawl.played(play)
             },
             onSongStarted = cache::started,
+            genreOf = cache::genreSoon,
             onRoomSaved = { sync.saved(it) },
             onRoomClosed = { sync.closed(it) },
             onRoomDisowned = { account, syncId -> sync.closed(account, syncId) },

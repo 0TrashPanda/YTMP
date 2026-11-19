@@ -11,7 +11,7 @@ import kotlinx.coroutines.Job
  * out, refilled with a radio from its last song so it never runs dry. The room fills it; this
  * keeps its state. Only used with the room locked.
  */
-internal class Autoplay(private val clock: () -> Long) {
+internal class Autoplay(private val clock: () -> Long, private val withGenre: (Song) -> Song = { it }) {
     val items = ArrayList<QueueItem>()
     /** Set by Autoplay from here (or a radio, or a playlist): it keeps going even with the autoplay setting off. */
     var seed: Song? = null
@@ -62,5 +62,5 @@ internal class Autoplay(private val clock: () -> Long) {
     }
 
     private fun item(song: Song, origin: QueueItemOrigin) =
-        QueueItem(Ids.short(), song, by?.first ?: "autoplay", by?.second ?: "Autoplay", clock(), result = null, origin = origin)
+        QueueItem(Ids.short(), withGenre(song), by?.first ?: "autoplay", by?.second ?: "Autoplay", clock(), result = null, origin = origin)
 }

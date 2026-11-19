@@ -34,11 +34,12 @@
 	import AlbumView from '../../../lib/components/AlbumView.svelte';
 	import PlaylistView from '../../../lib/components/PlaylistView.svelte';
 	import PodcastView from '../../../lib/components/PodcastView.svelte';
+	import GenreView from '../../../lib/components/GenreView.svelte';
 	import SearchBox from '../../../lib/components/SearchBox.svelte';
 	import SongMenu, { type MenuTarget } from '../../../lib/components/SongMenu.svelte';
 	import CardMenu from '../../../lib/components/CardMenu.svelte';
 	import { preferences } from '../../../lib/preferences.svelte';
-	import type { AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
+	import type { GenreLink, AlbumRef, ArtistRef, PodcastRef, SearchType, Song } from '../../../lib/protocol.gen';
 	import { mergeActions, type ToastAction, type ToastGroup } from '../../../lib/songActions';
 	import { swipeAway } from '../../../lib/swipeAway';
 	import GraphView from '../../../lib/components/GraphView.svelte';
@@ -204,6 +205,11 @@
 	function openAlbum(album: AlbumRef, artist = '') {
 		if (album.id) show({ kind: 'album', id: album.id, title: album.name });
 		else searchFor(`${album.name} ${artist}`.trim());
+	}
+
+	/** YouTube Music's page for a song's genre. */
+	function openGenrePage(genre: GenreLink) {
+		show({ kind: 'ytmGenre', id: genre.id, title: genre.title });
 	}
 
 	/** [personal]: one of yours, from your library. */
@@ -874,6 +880,8 @@
 								<PlaylistView {room} id={view.id} title={view.title} personal={view.personal} onToast={toast} onMenu={openMenu} onGone={back} />
 							{:else if view.kind === 'podcast'}
 								<PodcastView {room} id={view.id} title={view.title} onToast={toast} onMenu={openMenu} />
+							{:else if view.kind === 'ytmGenre'}
+								<GenreView {room} id={view.id} title={view.title} onToast={toast} onMenu={openMenu} onArtist={openArtist} onAlbum={openAlbum} onPlaylist={openPlaylist} onPodcast={openPodcast} />
 							{:else if view.kind === 'history'}
 								<HistoryView {room} onToast={toast} onMenu={openMenu} />
 							{:else if view.kind === 'friend'}
@@ -958,6 +966,7 @@
 						onArtist={openArtist}
 						onAlbum={(a) => openAlbum(a, room?.state?.nowPlaying?.item.song.artists[0]?.name)}
 						onPodcast={openPodcast}
+						onGenre={openGenrePage}
 					/>
 					{/key}
 				{/if}
@@ -1010,6 +1019,7 @@
 			onSleepTimer={() => (sheet = { kind: 'sleep' })}
 			onGraph={(song) => (sheet = { kind: 'graph', song })}
 			onShare={(song) => (sheet = { kind: 'shareSong', song })}
+			onGenre={openGenrePage}
 		/>
 	{:else if sheet?.kind === 'shareSong'}
 		<SongShareSheet song={sheet.song} onClose={() => close('shareSong')} onToast={toast} onFriends={openFriends} />

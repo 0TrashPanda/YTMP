@@ -52,6 +52,8 @@ data class RadioOptions(
     val blockedSongs: List<String> = emptyList(),
     /** Artists never put in a radio (their names, Dislike's *don't play this artist*). */
     val blockedArtists: List<String> = emptyList(),
+    /** Autoplay prefers songs in the genres the room plays (docs/implementation/sources/genres.md); false: any. */
+    val keepGenres: Boolean = true,
 )
 
 /**

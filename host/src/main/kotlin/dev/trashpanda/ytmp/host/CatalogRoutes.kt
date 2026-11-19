@@ -1,5 +1,6 @@
 package dev.trashpanda.ytmp.host
 
+import dev.trashpanda.ytmp.protocol.GenreList
 import dev.trashpanda.ytmp.protocol.AlbumRef
 import dev.trashpanda.ytmp.protocol.ArtistRef
 import dev.trashpanda.ytmp.protocol.ErrorCode
@@ -115,6 +116,19 @@ internal fun Route.catalogRoutes(host: HostContext) = with(host) {
         }
         val source = catalog("home")
         call.respond(if (fresh) source.freshHome() else source.home())
+    }
+
+    // YouTube Music's genres, and a genre's page (the song menu's "More Pop").
+    get("/genres") {
+        call.respond(GenreList(sources.catalog?.genres().orEmpty()))
+    }
+    get("/genres/{id}") {
+        val page = try {
+            catalog("genre").genre(call.parameters["id"]!!)
+        } catch (e: UnsupportedOperationException) {
+            throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, e.message ?: "No genre pages here")
+        }
+        call.respond(page)
     }
 
     // The Local tab: the libraries here, then one whole (filtered in the page as you type).

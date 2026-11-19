@@ -1,6 +1,7 @@
 package dev.trashpanda.ytmp.desktop
 
 import dev.trashpanda.ytmp.core.RadioSource
+import dev.trashpanda.ytmp.core.RoomHooks
 import dev.trashpanda.ytmp.core.RoomManager
 import dev.trashpanda.ytmp.host.ApiException
 import dev.trashpanda.ytmp.host.CachePrefill
@@ -150,7 +151,7 @@ class DesktopHost(private val config: Config) {
     /** Songs the window plays now or next: the cache doesn't remove them. */
     @Volatile private var playing: Set<String> = emptySet()
     /** No rooms here, but the shared host API is built around a room manager. */
-    private val rooms = RoomManager(local.streams(cache.streams), scope)
+    private val rooms = RoomManager(local.streams(cache.streams), scope, hooks = RoomHooks(genreOf = cache::genreSoon))
     /** Songs' audio: this computer's music, the song cache, else YouTube through the module. */
     private val audio = local.audio(cache.audio(ytm))
 

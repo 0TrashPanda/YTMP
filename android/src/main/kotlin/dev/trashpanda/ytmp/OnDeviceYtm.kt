@@ -12,6 +12,8 @@ import dev.trashpanda.ytmp.protocol.Lyrics
 import dev.trashpanda.ytmp.protocol.PlaylistItemRef
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.GenreLink
+import dev.trashpanda.ytmp.protocol.GenreList
 import dev.trashpanda.ytmp.protocol.YoutubeAccount
 import dev.trashpanda.ytmp.protocol.PlaylistSummary
 import dev.trashpanda.ytmp.protocol.PodcastPage
@@ -153,6 +155,14 @@ class OnDeviceYtm(context: Context, language: String = "en", location: String = 
 
     override suspend fun song(id: String): Song = python {
         ProtocolJson.decodeFromString(Song.serializer(), json.callAttr("dumps", core.callAttr("song", id)).toString())
+    }
+
+    override suspend fun genres(): List<GenreLink> = python {
+        ProtocolJson.decodeFromString(GenreList.serializer(), json.callAttr("dumps", core.callAttr("genres")).toString()).genres
+    }
+
+    override suspend fun genre(id: String): HomePage = python {
+        ProtocolJson.decodeFromString(HomePage.serializer(), json.callAttr("dumps", core.callAttr("genre", id)).toString())
     }
 
     override suspend fun home(): HomePage = python {

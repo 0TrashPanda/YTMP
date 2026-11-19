@@ -13,7 +13,8 @@ const song = (id: string, podcast = false): SearchItem =>
 			durationMs: 0,
 			thumbnails: [],
 			explicit: false,
-			podcast: podcast ? { id: 'p', name: 'P' } : null
+			podcast: podcast ? { id: 'p', name: 'P' } : null,
+			genre: null
 		},
 		video: false
 	}) as SearchItem;

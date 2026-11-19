@@ -769,3 +769,33 @@ def test_stream_length_is_exact_from_the_link(monkeypatch):
     # No dur in the link: yt-dlp's length.
     monkeypatch.setattr(FakeYdl, "result", "https://x/videoplayback?expire=9999999999")
     assert ytm.stream("ytm:ep2").duration_ms == 2103000
+
+
+class FakeGenres:
+    asked = 0
+
+    def get_mood_categories(self):
+        FakeGenres.asked += 1
+        return {"Moods & moments": [{"title": "Chill", "params": "m1"}], "Genres": [{"title": "Pop", "params": "g1"}, {"title": "Hip-hop", "params": "g2"}]}
+
+    def _send_request(self, endpoint, body):
+        assert endpoint == "browse" and body["browseId"] == "FEmusic_moods_and_genres_category"
+        rows = [{"musicCarouselShelfRenderer": {"title": "Featured playlists"}}] if body["params"] == "g1" else []
+        return {"contents": {"singleColumnBrowseResultsRenderer": {"tabs": [{"tabRenderer": {"content": {"sectionListRenderer": {"contents": rows}}}}]}}}
+
+
+def test_genres_are_youtube_musics_and_kept_for_a_day(monkeypatch):
+    import pytest
+    # The rows as ytmusicapi reads them (Home's parser): a playlist row.
+    monkeypatch.setattr(core, "_parse_mixed_content", lambda rows: [{"title": "Featured playlists", "contents": [{"playlistId": "RDCLAK5uy_pop", "title": "Pop Certified", "description": "Dua Lipa, Harry Styles", "thumbnails": []}]}] if rows else [])
+    ytm = core.YtmCore()
+    ytm._ytm = FakeGenres()
+    FakeGenres.asked = 0
+    assert ytm.genres() == {"genres": [{"id": "g1", "title": "Pop"}, {"id": "g2", "title": "Hip-hop"}]}
+    ytm.genres()
+    assert FakeGenres.asked == 1
+    page = ytm.genre("g1")
+    assert page["sections"][0]["title"] == "Featured playlists"
+    assert page["sections"][0]["items"][0] == {"kind": "playlist", "id": "RDCLAK5uy_pop", "title": "Pop Certified", "author": "Dua Lipa, Harry Styles", "itemCount": None, "thumbnails": []}
+    with pytest.raises(core.NotFound):
+        ytm.genre("g2")

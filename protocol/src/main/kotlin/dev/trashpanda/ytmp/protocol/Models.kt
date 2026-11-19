@@ -49,6 +49,8 @@ data class Song(
     val explicit: Boolean = false,
     /** The podcast this is an episode of; null for music. */
     val podcast: PodcastRef? = null,
+    /** The song's genre (docs/implementation/sources/genres.md), when the host knows it; null: not (yet). */
+    val genre: String? = null,
 )
 
 @Serializable

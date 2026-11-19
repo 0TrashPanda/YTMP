@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.protocol.AlbumPage
 import dev.trashpanda.ytmp.protocol.ArtistPage
 import dev.trashpanda.ytmp.protocol.PlaylistPage
 import dev.trashpanda.ytmp.protocol.HomePage
+import dev.trashpanda.ytmp.protocol.GenreLink
 import dev.trashpanda.ytmp.protocol.PodcastPage
 import dev.trashpanda.ytmp.protocol.SearchPage
 import dev.trashpanda.ytmp.protocol.SearchType
@@ -39,6 +40,8 @@ class CachedSource(
     // Short: new episodes should show up soon.
     private val podcasts = TtlCache<String, PodcastPage>(100, 10.minutes, clock)
     private val homes = TtlCache<Unit, HomePage>(1, 30.minutes, clock)
+    private val genreLists = TtlCache<Unit, List<GenreLink>>(1, 24.hours, clock)
+    private val genrePages = TtlCache<String, HomePage>(50, 6.hours, clock)
     private val suggestionLists = TtlCache<String, List<String>>(500, 1.hours, clock)
 
     override suspend fun search(query: String, type: SearchType) =
@@ -69,6 +72,10 @@ class CachedSource(
         homes.clear()
         return home()
     }
+
+    override suspend fun genres() = genreLists.get(Unit) { catalog.genres() }
+
+    override suspend fun genre(id: String) = genrePages.get(id) { catalog.genre(id) }
 }
 
 /** A small least-recently-used cache whose entries expire after [ttl]. */

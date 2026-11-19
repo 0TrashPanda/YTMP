@@ -615,6 +615,31 @@ class ApplicationTest {
         assertEquals(HttpStatusCode.NotFound, client.get("/api/songs/ytm:abc").status)
     }
 
+    @Test
+    fun `YouTube Music's genres and a genre's page, where the source has them`() = testApplication {
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            val catalog = object : CatalogSource by generalCatalog {
+                override suspend fun genres() = listOf(dev.trashpanda.ytmp.protocol.GenreLink("g1", "Pop"))
+                override suspend fun genre(id: String) = if (id == "g1") home("Playlists") else throw SourceException("No page for this genre")
+            }
+            ytmpModule(rooms, HostSources(search, catalog = catalog), HostOptions(kind = HostKind.SERVER))
+        }
+        val client = jsonClient()
+        assertEquals(listOf("Pop"), client.get("/api/genres").body<dev.trashpanda.ytmp.protocol.GenreList>().genres.map { it.title })
+        assertEquals("Playlists", client.get("/api/genres/g1").body<HomePage>().sections.single().title)
+    }
+
+    @Test
+    fun `no genres where the source has no genre pages`() = testApplication {
+        application {
+            val rooms = RoomManager({ "x" }, CoroutineScope(SupervisorJob()))
+            ytmpModule(rooms, HostSources(search, catalog = generalCatalog), HostOptions(kind = HostKind.SERVER))
+        }
+        assertEquals(emptyList(), jsonClient().get("/api/genres").body<dev.trashpanda.ytmp.protocol.GenreList>().genres)
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/genres/g1").status)
+    }
+
     private val generalCatalog = object : CatalogSource {
         override suspend fun artist(id: String) = error("no")
         override suspend fun album(id: String) = error("no")

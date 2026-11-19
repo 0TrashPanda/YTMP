@@ -1,9 +1,10 @@
 # Genres
 
-> Status: **built** for the songs in the song cache and downloads, and the songs in rooms (for
-> the [room list](../../features/rooms/room-lifecycle.md#the-room-list)), on server, phone and
-> desktop app, with the owner's server's list shared by their phones. Not built: sharing with the
-> desktop app (it looks its songs up itself), genres in history, radios and the song map.
+> Status: **built** for the songs in the song cache and downloads, and the songs in rooms (the
+> [room list](../../features/rooms/room-lifecycle.md#the-room-list), the player, the song menu,
+> the party screen, autoplay and History), on server, phone and desktop app, with the owner's
+> server's list shared by their phones, and YouTube Music's genre pages. Not built: sharing with
+> the desktop app (it looks its songs up itself), genres in the song map.
 
 YouTube Music gives songs no genre (YouTube's only category is "Music"; *Moods & genres* are
 playlists). So the host asks music catalogs that do, by artist and title:
@@ -59,3 +60,39 @@ up once. A phone linked to a YTMP account (`SongCache.genreShare`) asks it first
   again 10 minutes later. What it found meanwhile goes to the list then (unless the app was
   closed in between).
 - The genres aren't personal: every account on the server shares the one list.
+
+## Songs in rooms
+
+A song carries its genre (`Song.genre`; null: not known yet, `""`: none found). Search results
+and pages don't have one; the room gives it when a song goes in:
+
+- `Room.genreOf` (`RoomHooks.genreOf`: `SongCache.genreSoon` on server, phone and desktop app)
+  fills it in when a song is added (the queue, autoplay) and again when it starts, in case it
+  was looked up since. Unknown ones are first in line to be looked up.
+- So the room's events carry it, and from there the **player**, the **song menu**, the **party
+  screen** and the **room list** show it. Its play goes into the listening **history** with the
+  song (`PlayReport.song`), where *Your genres this week* and the genre chips count them
+  (`frontend/src/lib/genres.ts`, the same rules as `RoomSummaries.topGenres`).
+- **Autoplay** (`Room.keepToGenres`): when the room fills its own autoplay queue, songs in the
+  room's genres (`RoomSummaries.topGenres` of the last 50 songs, the one playing and the
+  queue) go first, then songs without a known genre; other genres only when that leaves fewer
+  than `AUTOPLAY_LOW` (5). Only with `RadioOptions.keepGenres` (on by default) and not for a
+  radio someone started (`autoplay.seed`).
+
+## YouTube Music's genre pages
+
+*More Pop* (song menu) and the genre in the player open YouTube Music's page for the genre:
+
+- The module: `genres()` (ytmusicapi's `get_mood_categories`, the *Genres* section; kept a day)
+  and `genre(id)`: the genre's page read like Home (`FEmusic_moods_and_genres_category` with its
+  params, Home's row parser), so its rows come along: *Songs*, *Featured playlists*, *Community
+  playlists*, *Music videos*, *Albums*. Not ytmusicapi's `get_mood_playlists`: it only knows
+  playlists and breaks on the songs these pages have. As `GET /genres` and `GET /genres/{id}`,
+  also on the phone (Chaquopy).
+- The host: `CatalogSource.genres()`/`genre(id)`, cached (`CachedSource`: the list a day, pages
+  6 hours), as `GET /api/genres` (`GenreList`) and `GET /api/genres/{id}` (`HomePage`).
+- The web app loads the list once (`ytmGenres.svelte.ts`) and matches the song's genre to it
+  (`genrePageFor`): names in parts ("Hip-Hop/Rap" → hiphop, "R&B & soul" → rnb, soul), a few
+  aliases (Rap → Hip-hop, Electro → electronic), the genre's first part first. No match: no
+  *More …* and the player's genre is only a label. The page (`GenreView`) shows its rows like
+  Home: songs sideways in four rows, the rest as cards.

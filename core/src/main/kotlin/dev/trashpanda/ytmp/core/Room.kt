@@ -157,7 +157,7 @@ class Room(
     private var cleared = emptyList<String>()
     private var seq = 0L
 
-    private val autoplay = Autoplay(clock)
+    private val autoplay = Autoplay(clock) { withGenre(it) }
 
     /** Where podcast episodes were left off (song ID -> ms), to resume them. Oldest first. */
     private val episodePositions = LinkedHashMap<String, Long>()
@@ -240,6 +240,14 @@ class Room(
     /** Called (with the room locked, so it must not block) when a song starts, before its stream is looked up. */
     @Volatile
     var onSongStarted: ((Song) -> Unit)? = null
+
+    /** A song's genre when the host knows it ([RoomHooks.genreOf]). */
+    @Volatile
+    var genreOf: (Song) -> String? = { null }
+
+    /** [song] with its genre, when it has none yet and the host knows it now. */
+    private fun withGenre(song: Song): Song =
+        if (song.genre != null) song else runCatching { genreOf(song) }.getOrNull()?.let { song.copy(genre = it) } ?: song
 
     /** Last time someone was connected. Used to delete empty rooms. */
     @Volatile
@@ -1792,7 +1800,9 @@ class Room(
     }
 
     /** Makes [item] the current song and starts resolving its stream. */
-    private fun setCurrent(item: QueueItem?) {
+    private fun setCurrent(next: QueueItem?) {
+        // Its genre may have been looked up since it was added.
+        val item = next?.let { if (it.song.genre == null) it.copy(song = withGenre(it.song)) else it }
         resolveJob?.cancel()
         current = item
         // A run of queue songs (for repeat queue) starts with the first that isn't autoplay's.
@@ -2219,6 +2229,23 @@ class Room(
         }
     }
 
+    /**
+     * The room's own autoplay keeps to the genres the room plays (RadioOptions.keepGenres): those
+     * songs first, then ones whose genre isn't known yet; songs of other genres only when that
+     * leaves fewer than [AUTOPLAY_LOW]. A radio or Autoplay this someone started is left as it is.
+     */
+    private fun keepToGenres(songs: List<Song>): List<Song> {
+        if (!radioOptions.keepGenres || autoplay.seed != null) return songs
+        val played = history.takeLast(RECENT_SONGS).map { it.song } + listOfNotNull(current?.song) + queue.map { it.song }
+        val genres = RoomSummaries.topGenres(played, genreOf).toSet()
+        if (genres.isEmpty()) return songs
+        val withGenres = songs.map(::withGenre)
+        val (fits, rest) = withGenres.partition { it.genre in genres }
+        val (unknown, other) = rest.partition { it.genre.isNullOrEmpty() || it.podcast != null }
+        val kept = fits + unknown
+        return if (kept.size >= AUTOPLAY_LOW) kept else kept + other
+    }
+
     /** A playlist as the autoplay queue; when it runs low, the radio goes on from its last song. Called with [mutex] held. */
     private fun autoplaySongs(songs: List<Song>, by: Pair<String, String>) {
         autoplay.job?.cancel()
@@ -2261,7 +2288,7 @@ class Room(
                 }
                 if (!autoplayActive()) return@withLock
                 val skip = recentSongIds()
-                val fresh = songs.getOrThrow().filter { it.id !in skip }.distinctBy { it.id }
+                val fresh = keepToGenres(songs.getOrThrow().filter { it.id !in skip }.distinctBy { it.id })
                 if (fresh.isEmpty()) return@withLock
                 autoplay.add(fresh)
                 emit(autoplay.changed())
@@ -2331,7 +2358,7 @@ class Room(
     )
 
     private fun newItem(song: Song, member: Member) =
-        QueueItem(Ids.short(), song, member.id, member.name, clock(), result = null)
+        QueueItem(Ids.short(), withGenre(song), member.id, member.name, clock(), result = null)
 
     private fun emit(event: Event) {
         val message = ServerMessage.EventMessage(++seq, event)

@@ -87,6 +87,12 @@ queue runs out.
   without an explicit *Autoplay from here*, the room fills the autoplay queue itself with a
   radio from the last song, like YouTube Music, as soon as the queue is down to one song.
   Turned off, the music stops when the queue ends (and the autoplay queue is cleared).
+- **Keeps to the room's genres** ✅ (*Settings → Radio → Genre*, on by default): the room's
+  own autoplay plays songs in the genres the room plays (as the room list counts them: those
+  that are at least a fifth of the last and next songs), then songs whose genre isn't known
+  yet; other genres only when that leaves fewer than five. *Up next* says so above it
+  ("Keeping to Pop and Hip-Hop/Rap"). A radio or *Autoplay this* someone started keeps every
+  genre. Set to *Any*, autoplay doesn't look at genres.
 - Autoplay and radio songs skip anything from the last 50 songs, the queue and the autoplay
   queue. If a radio only has such songs, a couple of other recent songs are tried as seed.
 - **Start radio** clears the queue and puts the song's radio in the autoplay queue, the song

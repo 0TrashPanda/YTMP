@@ -191,6 +191,16 @@ data class SearchPage(val sections: List<SearchSection>)
 @SerialName("HomePage")
 data class HomePage(val sections: List<HomeSection>)
 
+/** One of YouTube Music's genres (Explore → Moods & genres); [id] opens its page (`GET /api/genres/{id}`). */
+@Serializable
+@SerialName("GenreLink")
+data class GenreLink(val id: String, val title: String)
+
+/** YouTube Music's genres (`GET /api/genres`): the song menu's *More Pop* opens the one a song's genre is. */
+@Serializable
+@SerialName("GenreList")
+data class GenreList(val genres: List<GenreLink>)
+
 @Serializable
 @SerialName("HomeSection")
 data class HomeSection(

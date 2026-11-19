@@ -23,8 +23,9 @@ Music, without Premium, and not tied to a single music service.
   cloning and moving rooms. → [queue](docs/features/rooms/queue.md),
   [rooms](docs/features/rooms/rooms-and-roles.md), [sharing](docs/features/rooms/sharing.md)
 - **Finding music**: YouTube Music's Home, search and pages, links pasted in search, song
-  recognition, synced lyrics with karaoke, radio and autoplay, podcasts that resume, a song
-  graph from your listening, Spotify playlist import.
+  recognition, synced lyrics with karaoke, radio and autoplay (keeping to the room's genres),
+  songs' genres with YouTube Music's genre pages, podcasts that resume, a song graph from your
+  listening and your genres in your history, Spotify playlist import.
   → [UI](docs/features/ui/README.md), [history and recommendations](docs/features/music/history-and-recommendations.md),
   [importing playlists](docs/features/music/importing-playlists.md)
 - **Playing**: in sync on every device, on Chromecast, Sonos, MPD, YouTube TVs and

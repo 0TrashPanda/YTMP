@@ -18,6 +18,9 @@ Like YTM:
   listen*). On a computer, while the room plays but not on this device (nor on a speaker or TV),
   the player bar says **Not playing here** next to a highlighted **Play here**. *Settings → Solo
   rooms → "Playing on" in the player* hides both in solo rooms. **Swipe down**, the ˅ or the phone's **Back** closes it.
+- **The song's genre** ✅ ("Pop", from Apple or Deezer: [genres](../../implementation/sources/genres.md)):
+  a small label before *Added by*, once it's known. Tapping it opens YouTube Music's page for
+  that genre (its songs, playlists, music videos and albums), when YouTube Music has one.
 - **Where the song comes from** ✅: while it plays on this device, a small label next to
   *Added by* (desktop: next to the time in the player bar): **YouTube** (straight from
   YouTube), **Server** or **Host phone** (the host sends it: saved there, its music files, or

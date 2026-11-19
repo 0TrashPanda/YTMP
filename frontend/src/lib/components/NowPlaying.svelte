@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { genrePageOf, loadYtmGenres } from '../ytmGenres.svelte';
 	import { motionMs } from '../motion.svelte';
 	// The full player, like YTM's. Phones (and tablets): the whole screen, with the album art,
 	// the song, the position, the controls and where it plays; "Up next" and "Related" slide up
@@ -21,7 +22,7 @@
 	import type { PageHandlers } from '../cards';
 	import { canPause, pause, play, type RoomPlayer } from '../player.svelte';
 	import SourceBadge from './SourceBadge.svelte';
-	import type { CommandUpdateSettings, Song } from '../protocol.gen';
+	import type { CommandUpdateSettings, GenreLink, Song } from '../protocol.gen';
 	import type { RoomConnection } from '../room.svelte';
 	import Art from './Art.svelte';
 	import { sleepTimer } from '../sleepTimer.svelte';
@@ -63,7 +64,10 @@
 		onSave: (song: Song) => void;
 		/** The sleep timer's sheet (the chip that shows while it runs). */
 		onSleepTimer: () => void;
+		/** YouTube Music's page for the song's genre (the genre under the title). */
+		onGenre?: (genre: GenreLink) => void;
 	} & Omit<PageHandlers, 'onPlaylist'> = $props();
+	loadYtmGenres();
 
 	const current = $derived(room.state?.nowPlaying ?? null);
 	// The lyrics, looked up while the player is open: the Lyrics tab then shows them right away.
@@ -442,6 +446,15 @@
 								{/if}
 							</p>
 							<p class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted">
+								{#if song.genre && !song.podcast && song.genre !== 'Podcast'}
+									<!-- The song's genre: YouTube Music's page for it, when it has one. -->
+									{@const genrePage = open.onGenre ? genrePageOf(song) : null}
+									{#if genrePage}
+										<button class="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-white/80 hover:bg-white/20" onclick={() => open.onGenre?.(genrePage)}>{song.genre}</button>
+									{:else}
+										<span class="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-white/80">{song.genre}</span>
+									{/if}
+								{/if}
 								<span class="truncate">Added by {current.item.addedByName}{loading ? ' • loading…' : player.buffering && playing ? ' • buffering…' : ''}</span>
 								<SourceBadge source={player.audioSource} />
 							</p>
