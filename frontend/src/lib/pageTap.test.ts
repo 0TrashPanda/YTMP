@@ -15,12 +15,14 @@ const room = (queued: number, current: 'none' | 'playing' | 'paused'): State =>
 describe('tapping a song on an album or playlist page', () => {
 	it('plays it from there in an empty room', () => {
 		expect(pageTap(room(0, 'none'), true, 'playNext')).toBe('playFromHere');
-		// A paused or finished song with nothing after it: empty too.
-		expect(pageTap(room(0, 'paused'), true, 'playNext')).toBe('playFromHere');
 	});
 
-	it('does what a tap in lists does when something is queued or playing', () => {
+	it('does what a tap in lists does when a song is on, even with nothing queued after it', () => {
 		expect(pageTap(room(0, 'playing'), true, 'playNext')).toBe('playNext');
+		expect(pageTap(room(0, 'paused'), true, 'addToQueue')).toBe('addToQueue');
+	});
+
+	it('does what a tap in lists does when something is queued', () => {
 		expect(pageTap(room(2, 'paused'), true, 'addToQueue')).toBe('addToQueue');
 		expect(pageTap(null, true, 'playNext')).toBe('playNext');
 	});

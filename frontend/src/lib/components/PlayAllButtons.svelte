@@ -4,13 +4,14 @@
 	// autoplay instead of the queue ([toAutoplay]): it plays when the queue is empty.
 	// A long one adds at most the set number of songs, or asks first above another, with the
 	// set choices (Settings → Adding songs); loading it says so when it takes a moment. The page
-	// plays it from a chosen song through [playFrom] (tapping a song there), with the same limits.
+	// plays it from a chosen song through [playFrom] (tapping a song there), with the same limits;
+	// the songs after it then go into autoplay when the queue is empty.
 	import type { Snippet } from 'svelte';
 	import { addChoice, pickSongs, songsFrom } from '../addLimit';
 	import { whileBusy } from '../busy.svelte';
 	import type { Song } from '../protocol.gen';
 	import { ADD_LIMITS, settings, type PlaylistPick } from '../settings.svelte';
-	import { addToQueue, playNext } from '../songActions';
+	import { addToQueue, playList, playNext } from '../songActions';
 	import type { RoomConnection } from '../room.svelte';
 	import Icon from './Icon.svelte';
 
@@ -114,16 +115,16 @@
 		if (amount) await withSongs(amount, (n) => `Adding ${n}…`, (list, label) => (position === 'next' ? playNext : addToQueue)(room, list, label, onToast));
 	}
 
-	/** Plays it (from song [start] on: the ones before it are left out, like YouTube Music). */
-	export async function playNow(start = 0) {
-		const amount = await howMany('Play', start);
-		if (amount) await withSongs(amount, (n) => `Starting ${n}…`, playList, start);
+	/** Plays it: the first song now, the rest next. */
+	export async function playNow() {
+		const amount = await howMany('Play');
+		if (amount) await withSongs(amount, (n) => `Starting ${n}…`, (list) => playList(room, list, onToast));
 	}
 
 	/** Shuffle play: plays it in random order (a long one: that many picked at random). */
 	export async function shufflePlay() {
 		const amount = await howMany('Play');
-		if (amount) await withSongs({ ...amount, how: 'random' }, (n) => `Shuffling ${n}…`, (list) => playList(shuffled(list)));
+		if (amount) await withSongs({ ...amount, how: 'random' }, (n) => `Shuffling ${n}…`, (list) => playList(room, shuffled(list), onToast));
 	}
 
 	/** [list] in random order (Fisher–Yates). */
@@ -136,18 +137,10 @@
 		return out;
 	}
 
-	/** The first song plays now, the rest come next. */
-	async function playList(list: Song[]) {
-		const [first, ...rest] = list;
-		// A party is asked first (the room's "Ask before interrupting"); cancelled, nothing is added.
-		let e = await room.run({ kind: 'PlayNow', song: first });
-		if (!e && rest.length) e = await room.run({ kind: 'AddSongs', songs: rest, position: 'next' });
-		if (e && !room.wasNoticed(e)) onToast(e.message);
-	}
-
-	/** Plays it from the song at [index] on (tapping a song on the page). */
-	export function playFrom(index: number): Promise<void> {
-		return playNow(index);
+	/** Plays it from the song at [index] on (tapping a song on the page): the songs after it go into autoplay when the queue is empty. */
+	export async function playFrom(index: number): Promise<void> {
+		const amount = await howMany('Play', index);
+		if (amount) await withSongs(amount, (n) => `Starting ${n}…`, (list) => playList(room, list, onToast, true), index);
 	}
 </script>
 

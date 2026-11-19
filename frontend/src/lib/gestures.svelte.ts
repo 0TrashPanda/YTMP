@@ -108,11 +108,12 @@ export function setGesture(where: Where, gesture: Gesture, action: QueueAction):
 
 /**
  * What tapping a song on an album or playlist page does: with [fromHere] on (Settings →
- * Playback) and the room empty (nothing queued and nothing playing), it plays the album or
- * playlist from that song, like YouTube Music; else what a tap in lists does.
+ * Playback) and the room empty (no current song, playing or paused, and nothing queued), it
+ * plays the album or playlist from that song, like YouTube Music; else what a tap in lists does,
+ * so a tap while a song is on doesn't replace it.
  */
-export function pageTap(state: Pick<RoomState, 'queue' | 'nowPlaying' | 'playback'> | null, fromHere: boolean, listTap: QueueAction): QueueAction {
-	const empty = !!state && state.queue.length === 0 && !(state.nowPlaying && state.playback.playing);
+export function pageTap(state: Pick<RoomState, 'queue' | 'nowPlaying'> | null, fromHere: boolean, listTap: QueueAction): QueueAction {
+	const empty = !!state && state.queue.length === 0 && !state.nowPlaying;
 	return fromHere && empty ? 'playFromHere' : listTap;
 }
 
