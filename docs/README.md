@@ -97,6 +97,7 @@ Questions that are still open are collected in [`open-questions.md`](open-questi
 | [Local music](implementation/sources/local-music.md) | A Raspberry Pi's music folder (MPD), the music on the phone, the Local tab's API |
 | [Song cache](implementation/sources/song-cache.md) | The song cache on server and phone: storing, serving, removing |
 | [Downloads](implementation/sources/downloads.md) | How downloads are made (tagging, formats) |
+| [Genres](implementation/sources/genres.md) | Genres for cached and downloaded songs (Apple, then Deezer) |
 | [Playlist converter](implementation/sources/playlist-converter.md) | Readers, matching, stored jobs, writers |
 | [Song recognition research](implementation/sources/song-recognition-research.md) | Why YTMP can't reuse YouTube Music's own recognizer (keep Shazam) |
 

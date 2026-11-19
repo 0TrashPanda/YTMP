@@ -28,7 +28,7 @@ devices on its own network. Local music is refused.
 YouTube offers audio in a few formats, including **AAC in an `.m4a`** container, which the
 module already prefers. That's a normal music file that every phone, PC and music player
 can play, so the host only **adds tags**: title, artist, album (a podcast's name for an
-episode, with genre *Podcast*), album artist and the cover (the song's largest picture,
+episode, with genre *Podcast*), the [genre](genres.md) when one is found, album artist and the cover (the song's largest picture,
 1200 px when Google can make it so; only from YouTube's picture servers), and the song's ID (a
 freeform item `----:dev.trashpanda.ytmp:id`), so the phone's
 [song cache](song-cache.md#downloaded-songs) knows which song a download is. It doesn't

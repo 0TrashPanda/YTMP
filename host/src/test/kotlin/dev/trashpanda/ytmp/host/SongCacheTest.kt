@@ -124,6 +124,26 @@ class SongCacheTest {
     }
 
     @Test
+    fun `cached songs get their genre once, kept in the index and shown in Cached on this phone`() = runBlocking {
+        val youtube = FakeYoutube()
+        val asked = CopyOnWriteArrayList<String>()
+        val at = File(dir, "genres")
+        fun make() = SongCache(at, 10_000_000, youtube, youtube, scope, coverOf = { null }, clock = { now }, genreLookup = { s -> asked += s.id; if (s.id == "ytm:a") "Pop" else "" })
+        val cache = make()
+        assertTrue(cache.take(song("a")) { it.writeBytes(bytesOf("a")) })
+        assertTrue(cache.take(song("b")) { it.writeBytes(bytesOf("b")) })
+        assertEquals("Pop", cache.genre(song("a")))
+        assertNull(cache.genre(song("b")))
+        assertEquals("Pop", cache.genre(song("a")))
+        assertEquals(listOf("ytm:a", "ytm:b"), asked)
+        val local = LocalMusic().apply { add(cache.library { "http://phone" }) }
+        assertEquals(listOf("Pop"), local.page(SongCache.LIBRARY_ID)!!.genres.map { it.name })
+        cache.saveNow()
+        assertEquals("Pop", make().genre(song("a")))
+        assertEquals(2, asked.size)
+    }
+
+    @Test
     fun `a song the player read all of is kept, and then needs no lookup`() = runBlocking {
         val youtube = FakeYoutube()
         val cache = cache(youtube)

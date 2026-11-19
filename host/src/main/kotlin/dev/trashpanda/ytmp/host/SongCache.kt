@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -97,6 +98,8 @@ class SongCache(
     private val fetchDelayMs: Long = FETCH_DELAY_MS,
     /** Where plays are counted per day ([importPlays]). */
     private val zone: ZoneId = ZoneId.systemDefault(),
+    /** Finds the genres of the songs here and of downloads ([genre]); null: none are looked up. */
+    private val genreLookup: GenreLookup? = null,
 ) {
     @Volatile
     var dir: File = dir
@@ -139,6 +142,9 @@ class SongCache(
     private val downloadedSongs = HashMap<String, Song>()
     /** Phone music checked against YouTube Music, by the track's key (see [LocalMatcher]). */
     private val localMatches = HashMap<String, LocalMatch>()
+    /** Songs' genres by song ID ([genre]); "": looked up, none found. */
+    private val genres = LinkedHashMap<String, String>()
+    private val genreSignal = Channel<Unit>(Channel.CONFLATED)
     /** Changes to [entries] and [downloadedSongs], for [library]. */
     @Volatile
     private var version = 0
@@ -182,6 +188,7 @@ class SongCache(
         load()
         scope.launch(Dispatchers.IO) { saveLoop() }
         scope.launch(Dispatchers.IO) { fetchLoop() }
+        genreLookup?.let { lookup -> scope.launch(Dispatchers.IO) { genreLoop(lookup) } }
     }
 
     /** Whether [song] may be kept: YouTube Music music (no episodes, nothing very long), while the cache is on. */
@@ -1000,6 +1007,63 @@ class SongCache(
         keepRule = true,
     )
 
+    // --- genres ---
+
+    /**
+     * [song]'s genre ("Pop", "Hip-Hop/Rap", "Podcast"), null when it has none: as found before,
+     * else looked up now (for a download's tags). Null too when it can't be looked up now.
+     */
+    suspend fun genre(song: Song): String? {
+        synchronized(lock) { genres[song.id] }?.let { return it.ifEmpty { null } }
+        val lookup = genreLookup ?: return null
+        return if (lookUpGenre(lookup, song)) synchronized(lock) { genres[song.id] }?.ifEmpty { null } else null
+    }
+
+    /** Looks [song]'s genre up and keeps it; false when it couldn't ask (offline, too many lookups). */
+    private suspend fun lookUpGenre(lookup: GenreLookup, song: Song): Boolean {
+        val genre = try {
+            lookup.genre(song)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.info("Song cache: no genre for {} now: {}", song.id, e.toString())
+            return false
+        }
+        synchronized(lock) {
+            genres.remove(song.id)
+            genres[song.id] = genre
+            while (genres.size > MAX_GENRES) genres.remove(genres.keys.first())
+            version++
+        }
+        saveSoon()
+        return true
+    }
+
+    /**
+     * Finds the genres of the cached and downloaded songs, one song at a time (Apple asks for
+     * at most about 20 lookups a minute); when it can't ask, again a while later.
+     */
+    private suspend fun genreLoop(lookup: GenreLookup) {
+        delay(GENRE_START_MS)
+        while (true) {
+            val songs = synchronized(lock) { entries.values.map { it.song } } +
+                runCatching { downloads?.all().orEmpty().map { d -> synchronized(lock) { downloadedSongs[d.song.id] } ?: d.song } }.getOrDefault(emptyList())
+            val missing = songs.distinctBy { it.id }.filter { synchronized(lock) { it.id !in genres } }
+            if (missing.isEmpty()) {
+                withTimeoutOrNull(GENRE_RECHECK_MS) { genreSignal.receive() }
+                continue
+            }
+            for (song in missing) {
+                if (synchronized(lock) { song.id in genres }) continue
+                if (!lookUpGenre(lookup, song)) {
+                    delay(GENRE_RETRY_MS)
+                    break
+                }
+                delay(GENRE_GAP_MS)
+            }
+        }
+    }
+
     // --- "Cached on this phone" ---
 
     /**
@@ -1019,17 +1083,18 @@ class SongCache(
             val now = version
             built?.let { (v, d, tracks) -> if (v == now && d === downloaded) return tracks }
             val (cached, richer) = synchronized(lock) { entries.values.map { it.song } to HashMap(downloadedSongs) }
+            val genreOf = synchronized(lock) { HashMap(genres) }
             val downloadIds = downloaded.map { it.song.id }.toSet()
             // What the app knew when it downloaded a song, with the file's own length.
             val tracks = downloaded.map { d ->
                 val song = richer[d.song.id]?.let { if (d.song.durationMs > 0) it.copy(durationMs = d.song.durationMs) else it } ?: d.song
-                track(song, if (d.local) ON_PHONE else DOWNLOADED)
-            } + cached.filter { it.id !in downloadIds }.map { track(it, CACHED) }
+                track(song, if (d.local) ON_PHONE else DOWNLOADED, genreOf[song.id].orEmpty())
+            } + cached.filter { it.id !in downloadIds }.map { track(it, CACHED, genreOf[it.id].orEmpty()) }
             built = Triple(now, downloaded, tracks)
             return tracks
         }
 
-        private fun track(song: Song, folder: String) = LocalTrack(
+        private fun track(song: Song, folder: String, genre: String) = LocalTrack(
             key = song.id,
             title = song.title,
             artist = song.artists.joinToString(", ") { it.name },
@@ -1040,6 +1105,7 @@ class SongCache(
             year = null,
             durationMs = song.durationMs,
             folder = folder,
+            genre = genre,
             song = song,
         )
 
@@ -1072,6 +1138,7 @@ class SongCache(
         val plays: Map<String, List<Long>> = emptyMap(),
         val downloads: List<Song> = emptyList(),
         val local: Map<String, LocalMatch> = emptyMap(),
+        val genres: Map<String, String> = emptyMap(),
     )
 
     /** Reads the index; files without a row (a fetch cut short, say) go. */
@@ -1091,6 +1158,7 @@ class SongCache(
             for ((id, times) in index.plays) times.filter { it >= now - PLAYS_KEPT_MS }.takeIf { it.isNotEmpty() }?.let { plays[id] = it.toMutableList() }
             for (song in index.downloads) downloadedSongs[song.id] = song
             localMatches.putAll(index.local)
+            genres.putAll(index.genres)
         }
         val files = synchronized(lock) { entries.values.map { it.file }.toSet() }
         val covers = synchronized(lock) { (entries.keys + downloadedSongs.keys).map { key(it) + ".jpg" }.toSet() }
@@ -1104,6 +1172,7 @@ class SongCache(
 
     private fun saveSoon() {
         saveSignal.trySend(Unit)
+        genreSignal.trySend(Unit)
     }
 
     private suspend fun saveLoop() {
@@ -1118,7 +1187,7 @@ class SongCache(
 
     private fun writeIndex() {
         val index = synchronized(lock) {
-            Index(entries.values.toList(), plays.mapValues { it.value.toList() }, downloadedSongs.values.toList(), HashMap(localMatches))
+            Index(entries.values.toList(), plays.mapValues { it.value.toList() }, downloadedSongs.values.toList(), HashMap(localMatches), LinkedHashMap(genres))
         }
         val file = File(dir, INDEX)
         val temp = File(dir, "$INDEX.part")
@@ -1175,6 +1244,12 @@ class SongCache(
         /** A skipped song counts as played after this long. */
         const val COUNTS_AFTER_MS = 30_000L
         private const val COVER_SIZE = 544
+        /** Genre lookups: the first a while after start, then one song every few seconds. */
+        private const val GENRE_START_MS = 20_000L
+        private const val GENRE_GAP_MS = 4_000L
+        private const val GENRE_RETRY_MS = 10L * 60 * 1000
+        private const val GENRE_RECHECK_MS = 60L * 60 * 1000
+        private const val MAX_GENRES = 50_000
 
         /** The host's audio route for a song, as rooms hand it out for cached songs. */
         fun audioPath(songId: String) = "/api/audio/" + URLEncoder.encode(songId, "UTF-8")

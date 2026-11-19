@@ -27,6 +27,7 @@ import dev.trashpanda.ytmp.host.LocalMusic
 import dev.trashpanda.ytmp.host.LyricsLookup
 import dev.trashpanda.ytmp.host.RemoteSourceModule
 import dev.trashpanda.ytmp.host.SongCache
+import dev.trashpanda.ytmp.host.GenreLookup
 import dev.trashpanda.ytmp.host.ytmpModule
 import dev.trashpanda.ytmp.protocol.ErrorCode
 import dev.trashpanda.ytmp.protocol.HostKind
@@ -112,7 +113,7 @@ class DesktopHost(private val config: Config) {
     val settings = DesktopSettings(File(config.dir, "desktop.json"))
     val library = ComputerLibrary(config.device, File(config.dir, "music-index.json"), config.windowBase.trimEnd('/'), scope)
     val local = LocalMusic()
-    val cache = SongCache(File(config.dir, "song-cache"), settings.cacheBytes, lookup = ytm, audio = ytm, scope = scope)
+    val cache = SongCache(File(config.dir, "song-cache"), settings.cacheBytes, lookup = ytm, audio = ytm, scope = scope, genreLookup = GenreLookup.online())
     /** Your YouTube Music sign-in (from your server account), for likes, history and playlists offline. */
     val youtube = DesktopYoutube(File(config.dir, "youtube.json"), ytm)
 

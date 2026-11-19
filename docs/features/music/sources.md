@@ -312,5 +312,5 @@ Where the cache is used:
 | Speakers | Speakers the phone plays on (Chromecast, Sonos, MPD, zones) get cached songs from the phone | The server's speakers get cached songs from the server |
 | Others in the room | Friends' browsers and phones in a room on the phone get cached songs from the phone | **All listeners** in a server room get cached songs from the server instead of from YouTube (with `proxy = "lan"` only devices on the server's network; others stream from YouTube as now) |
 | No YouTube lookup | A cached song isn't looked up on YouTube | A cached song isn't looked up on YouTube (fewer lookups, less risk of the [bot check](../../implementation/sources/ytm-module.md)) |
-| Offline | Without internet, cached songs still play in a solo room on the phone; the Local tab shows **Cached on this phone** (cached and downloaded songs) to pick them from | — |
+| Offline | Without internet, cached songs still play in a solo room on the phone; the Local tab shows **Cached on this phone** (cached and downloaded songs) to pick them from, with their genres (looked up at Apple, else Deezer, by artist and title: [genres](../../implementation/sources/genres.md)) | — |
 

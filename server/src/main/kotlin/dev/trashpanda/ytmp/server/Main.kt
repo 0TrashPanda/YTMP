@@ -14,6 +14,7 @@ import dev.trashpanda.ytmp.host.HostOptions
 import dev.trashpanda.ytmp.host.LyricsLookup
 import dev.trashpanda.ytmp.host.SongFiles
 import dev.trashpanda.ytmp.host.SongCache
+import dev.trashpanda.ytmp.host.GenreLookup
 import dev.trashpanda.ytmp.host.songCacheRoutes
 import dev.trashpanda.ytmp.host.songsInUse
 import dev.trashpanda.ytmp.host.MpdOutputs
@@ -123,7 +124,7 @@ fun main(args: Array<String>) {
         graph.buildIfNeeded(accounts)
         val cached = CachedSource(ytm, RadioSource { seed -> ytm.radio(seed).also { graph.learnRadio(seed, it) } }, ytm, ytm)
         // Songs played here, kept so they start at once without a YouTube lookup.
-        val songCache = SongCache(config.cache.folder(config.database), live.cacheBytes, lookup = ytm, audio = ytm, scope = this)
+        val songCache = SongCache(config.cache.folder(config.database), live.cacheBytes, lookup = ytm, audio = ytm, scope = this, genreLookup = GenreLookup.online())
         log.info("Song cache: {} ({} MB at most)", songCache.dir, songCache.maxBytes / (1024 * 1024))
         val history = History(db)
         // YouTube Music's radios of the songs here, learned slowly for the song graph (the admin switches it on):
@@ -244,7 +245,7 @@ fun main(args: Array<String>) {
                 catalog = local.catalog(cached),
                 lyrics = LyricsLookup({ song -> if (song.id.startsWith("ytm:")) ytm.lyrics(song.id) else null }),
                 audio = deviceSongs.audio(local.audio(songCache.audio(ytm))),
-                downloads = SongFiles(songCache.files(ytm)),
+                downloads = SongFiles(songCache.files(ytm), genreOf = songCache::genre),
                 cache = songCache,
                 local = local,
                 zones = zones,

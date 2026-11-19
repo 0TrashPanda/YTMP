@@ -154,7 +154,7 @@ class LocalHost(private val context: Context) {
         context,
         SongFiles(object : AudioFiles {
             override suspend fun download(songId: String, to: File, started: (type: String, size: Long?) -> Unit) = cache.files(audio).download(songId, to, started)
-        }, context.cacheDir),
+        }, context.cacheDir, genreOf = { cache.genre(it) }),
         scope,
         phoneLibrary,
         gate = dataRules::awaitDownload,
@@ -168,6 +168,7 @@ class LocalHost(private val context: Context) {
         cacheDir(cacheSettings.getString(CACHE_PLACE, PLACE_PHONE)!!), cacheSettings.getLong(CACHE_SIZE, DEFAULT_CACHE_BYTES),
         lookup = streams, audio = audio, scope = scope,
         downloads = CombinedDownloads(downloads, PhoneMatchedSongs({ matcher }, phoneLibrary)),
+        genreLookup = GenreLookup.online(),
     )
 
     /** The song graph on the owner's server learns from the radios this phone fetches. */

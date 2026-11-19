@@ -36,7 +36,8 @@ So nothing outside the audio path needs to know about the cache.
 Each cached song is one file named after its ID (`ytm_<video id>.m4a`: no `:`, which SD cards
 refuse), the audio as YouTube sent it, and its cover (`ytm_<video id>.jpg`, 544 px, for
 offline). What belongs to them is in `index.json` in the same folder: the song (title,
-artists, album, length), its file, type and size, when it was saved and last played. The
+artists, album, length), its file, type and size, when it was saved and last played, and
+its [genre](genres.md). The
 index is in the folder rather than the host's database, so moving the folder moves everything,
 and the server and the phone keep it the same way. The cache only ever deletes files it made
 (`ytm_…`), whatever else is in the folder.

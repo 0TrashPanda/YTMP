@@ -31,7 +31,8 @@ the library for `local:` ids, to YouTube Music for the rest.
   genres and folders as lists of places in the songs; for *Cached on this phone* also the
   playlists that are all on the phone, `LocalLibrary.playlists`, see
   [playlists offline](song-cache.md#playlists-offline)); the Local tab filters it as you type.
-  Genres come from the tags (MPD's `Genre`, Android's `GENRE`), one per spelling ("rock" and
+  Genres come from the tags (MPD's `Genre`, Android's `GENRE`; for *Cached on this phone*
+  they're [looked up](genres.md)), one per spelling ("rock" and
   "Rock" are one, named as most of its songs have it); folders are the ones with songs in them,
   by path ("" is the top), and the page builds the tree from them.
 - `GET /api/albums/{id}`, `GET /api/artists/{id}`: as for YouTube Music.

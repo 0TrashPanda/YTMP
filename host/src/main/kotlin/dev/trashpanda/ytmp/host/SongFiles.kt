@@ -26,7 +26,12 @@ class SongFile(val file: File, val name: String, val mimeType: String)
  * Makes songs into files to keep: the audio from [audio], with title, artist, album and cover
  * written in (YouTube's .m4a needs no converting). Temporary files go to [dir] (null: the system's).
  */
-class SongFiles(private val audio: AudioFiles, private val dir: File? = null) {
+class SongFiles(
+    private val audio: AudioFiles,
+    private val dir: File? = null,
+    /** The song's genre for its tags ([SongCache.genre]), or null. */
+    private val genreOf: suspend (Song) -> String? = { null },
+) {
     suspend fun make(song: Song): SongFile = withContext(Dispatchers.IO) {
         val raw = File.createTempFile("ytmp-download", ".part", dir)
         try {
@@ -38,7 +43,8 @@ class SongFiles(private val audio: AudioFiles, private val dir: File? = null) {
             }
             val tagged = File.createTempFile("ytmp-download", ".m4a", dir)
             try {
-                M4aTags.write(raw, tagged, tags(song, cover(song)))
+                val genre = runCatching { genreOf(song) }.getOrNull()
+                M4aTags.write(raw, tagged, tags(song, cover(song), genre))
             } catch (e: IllegalArgumentException) {
                 log.warn("download {}: couldn't write the tags, saved without: {}", song.id, e.message)
                 tagged.delete()
@@ -60,12 +66,12 @@ class SongFiles(private val audio: AudioFiles, private val dir: File? = null) {
         private val COVER_HOSTS = listOf(".googleusercontent.com", ".ggpht.com", ".ytimg.com")
         private val GOOGLE_SIZE = Regex("""=w(\d+)-h(\d+)""")
 
-        fun tags(song: Song, cover: ByteArray?) = M4aTags.Tags(
+        fun tags(song: Song, cover: ByteArray?, genre: String? = null) = M4aTags.Tags(
             title = song.title,
             artist = song.artists.joinToString(", ") { it.name }.ifBlank { null },
             album = song.album?.name ?: song.podcast?.name,
             albumArtist = song.artists.firstOrNull()?.name,
-            genre = if (song.podcast != null) "Podcast" else null,
+            genre = if (song.podcast != null) "Podcast" else genre?.takeIf { it.isNotBlank() },
             cover = cover,
             songId = song.id,
         )
