@@ -375,6 +375,15 @@
 			busy = false;
 		}
 	}
+
+	// Room lists: rows on phones; on wide screens a grid of tiles with big covers, like albums in
+	// YouTube Music (cover, then the name and a line under it).
+	const roomGrid = 'flex flex-col gap-1 lg:grid lg:grid-cols-4 lg:gap-x-5 lg:gap-y-6 xl:grid-cols-5';
+	const roomGridTitle = 'px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase lg:col-span-full lg:pb-0';
+	const roomItem = 'flex items-center gap-3 rounded-lg bg-surface px-3 py-2 text-left ring-1 ring-line lg:flex-col lg:items-stretch lg:bg-transparent lg:p-0 lg:ring-0';
+	const roomCover = 'h-11 w-11 lg:h-auto lg:w-full lg:aspect-square lg:rounded-md lg:transition-[filter] lg:group-hover:brightness-75 lg:[&_[data-placeholder]_svg]:h-12 lg:[&_[data-placeholder]_svg]:w-12';
+	const roomTitleCls = 'block truncate lg:font-medium';
+	const roomSubCls = 'block truncate text-xs text-muted lg:mt-0.5 lg:text-sm';
 </script>
 
 {#if host && !(host.accountsOnly && !me)}
@@ -457,14 +466,14 @@
 {#snippet elsewhereList()}
 	{#each [...new Set(elsewhere.map((r) => r.home.hostId))] as hostId (hostId)}
 		{@const list = elsewhere.filter((r) => r.home.hostId === hostId)}
-		<section class="flex flex-col gap-1">
-			<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">On {list[0].home.kind === 'server' ? 'your server' : list[0].home.hostName}</h2>
+		<section class={roomGrid}>
+			<h2 class={roomGridTitle}>On {list[0].home.kind === 'server' ? 'your server' : list[0].home.hostName}</h2>
 			{#each list as room (room.syncId)}
-				<button class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2 text-left ring-1 ring-line disabled:opacity-40" disabled={busy} onclick={() => openElsewhere(room)}>
-					<RoomCovers covers={room.summary?.covers ?? []} party={room.visibility !== 'private'} />
-					<span class="min-w-0 flex-1">
-						<span class="block truncate">{roomTitle(room.name, room.summary)}</span>
-						<span class="block truncate text-xs text-muted">{[room.visibility === 'private' ? null : 'Party', seen(room)].filter(Boolean).join(' · ')}</span>
+				<button class="group {roomItem} disabled:opacity-40" disabled={busy} onclick={() => openElsewhere(room)}>
+					<RoomCovers covers={room.summary?.covers ?? []} party={room.visibility !== 'private'} class={roomCover} />
+					<span class="min-w-0 flex-1 lg:mt-2">
+						<span class={roomTitleCls}>{roomTitle(room.name, room.summary)}</span>
+						<span class={roomSubCls}>{seen(room)}</span>
 					</span>
 				</button>
 			{/each}
@@ -528,20 +537,20 @@
 
 {#snippet roomList(title: string)}
 	{#if myRooms.length > 0}
-		<section class="flex flex-col gap-1">
-			<h2 class="px-1 pb-1 text-sm font-medium tracking-wide text-muted uppercase">{title}</h2>
+		<section class={roomGrid}>
+			<h2 class={roomGridTitle}>{title}</h2>
 			{#each myRooms.filter((r) => r.code !== closing?.room.code) as room (room.code)}
-				{@const line = [room.visibility === 'private' ? null : 'Party', roomLine(room.name, room.summary)].filter(Boolean).join(' · ')}
-				<div class="flex items-center gap-3 rounded-lg bg-surface px-3 py-2 ring-1 ring-line">
-					<a href="/room/{room.code}" class="flex min-w-0 flex-1 items-center gap-3" title="{room.name} · {room.code}">
-						<RoomCovers covers={room.summary?.covers ?? []} party={room.visibility !== 'private'} />
+				{@const line = roomLine(room.name, room.summary)}
+				<div class="group relative {roomItem}">
+					<a href="/room/{room.code}" class="flex min-w-0 flex-1 items-center gap-3 lg:flex-col lg:items-stretch lg:gap-2" title="{room.name} · {room.code}">
+						<RoomCovers covers={room.summary?.covers ?? []} party={room.visibility !== 'private'} class={roomCover} />
 						<span class="min-w-0 flex-1">
-							<span class="block truncate">{roomTitle(room.name, room.summary)}</span>
-							{#if line}<span class="block truncate text-xs text-muted">{line}</span>{/if}
+							<span class={roomTitleCls}>{roomTitle(room.name, room.summary)}</span>
+							{#if line}<span class={roomSubCls}>{line}</span>{/if}
 						</span>
 					</a>
 					<button
-						class="tap ml-1 flex rounded-full p-1.5 text-muted hover:bg-line hover:text-white"
+						class="tap ml-1 flex rounded-full p-1.5 text-muted hover:bg-line hover:text-white lg:absolute lg:top-2 lg:right-2 lg:ml-0 lg:bg-black/70 lg:text-white lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100 lg:hover:bg-black"
 						aria-label="Close {room.name}"
 						title="Close room"
 						onclick={() => startClose(room)}
@@ -554,7 +563,7 @@
 	{/if}
 {/snippet}
 
-<main class="mx-auto flex min-h-full max-w-md flex-col justify-center gap-6 px-4 py-12">
+<main class="mx-auto flex min-h-full max-w-md flex-col justify-center gap-6 px-4 py-12 lg:max-w-6xl lg:gap-10 lg:px-10">
 	<header class="text-center">
 		<h1 class="text-5xl font-black tracking-tight">YT<span class="text-accent">MP</span></h1>
 		<p class="mt-2 text-muted">One queue for everyone.</p>
@@ -679,70 +688,72 @@
 			{@render roomList('Your rooms on this phone')}
 			{@render elsewhereList()}
 		{:else if host}
-			<form class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line" onsubmit={join}>
-				<h2 class="text-lg font-bold">Join a room</h2>
-				<input
-					bind:this={joinCodeInput}
-					class="rounded-lg bg-raised px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] uppercase outline-none focus:ring-2 {missing?.field === 'joinCode' ? 'ring-2 ring-accent' : 'ring-white/40'} {shaking === 'joinCode' ? 'shake' : ''}"
-					aria-label="Room code to join"
-					aria-invalid={missing?.field === 'joinCode'}
-					bind:value={code}
-					maxlength="12"
-					placeholder="CODE"
-					autocapitalize="characters"
-					autocomplete="off"
-					spellcheck="false"
-				/>
-				{#if missing?.field === 'joinCode'}
-					<span class="-mt-1 text-center text-sm text-accent" role="alert">{missing.text}</span>
-				{/if}
-				<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy}>
-					Join
-				</button>
-			</form>
-
-			{#if host.canCreateRooms}
-				<section class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line">
-					<h2 class="text-lg font-bold">Host a room</h2>
+			<div class="flex flex-col gap-6 {host.canCreateRooms ? 'lg:grid lg:grid-cols-2' : ''}">
+				<form class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line" onsubmit={join}>
+					<h2 class="text-lg font-bold">Join a room</h2>
 					<input
-						class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
-						bind:value={roomName}
-						maxlength="64"
-						placeholder={defaultRoomName}
+						bind:this={joinCodeInput}
+						class="rounded-lg bg-raised px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] uppercase outline-none lg:flex-1 lg:text-4xl focus:ring-2 {missing?.field === 'joinCode' ? 'ring-2 ring-accent' : 'ring-white/40'} {shaking === 'joinCode' ? 'shake' : ''}"
+						aria-label="Room code to join"
+						aria-invalid={missing?.field === 'joinCode'}
+						bind:value={code}
+						maxlength="12"
+						placeholder="CODE"
+						autocapitalize="characters"
+						autocomplete="off"
+						spellcheck="false"
 					/>
-					{@render codeInput()}
-					{#if host.supportsPrivateRooms}
-						<div class="grid grid-cols-2 gap-3">
+					{#if missing?.field === 'joinCode'}
+						<span class="-mt-1 text-center text-sm text-accent" role="alert">{missing.text}</span>
+					{/if}
+					<button class="rounded-full bg-white py-3 font-medium text-black disabled:opacity-40" disabled={busy}>
+						Join
+					</button>
+				</form>
+
+				{#if host.canCreateRooms}
+					<section class="flex flex-col gap-3 rounded-xl bg-surface p-5 ring-1 ring-line">
+						<h2 class="text-lg font-bold">Host a room</h2>
+						<input
+							class="rounded-lg bg-raised px-4 py-3 outline-none ring-white/40 focus:ring-2"
+							bind:value={roomName}
+							maxlength="64"
+							placeholder={defaultRoomName}
+						/>
+						{@render codeInput()}
+						{#if host.supportsPrivateRooms}
+							<div class="grid grid-cols-2 gap-3">
+								<button
+									class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
+									disabled={busy}
+									onclick={() => !needs(['name', 'roomCode']) && hostRoom('private')}
+								>
+									<Icon name="headphones" />
+									<span class="font-medium">Solo</span>
+									<span class="text-xs text-muted">{me ? 'Just you, on all your devices' : `Just you, in this ${window.YtmpDesktop ? 'app' : 'browser'}`}</span>
+								</button>
+								<button
+									class="flex flex-col items-center gap-1 rounded-xl bg-accent-strong p-3 disabled:opacity-40"
+									disabled={busy}
+									onclick={() => !needs(['name', 'roomCode']) && hostRoom('public')}
+								>
+									<Icon name="people" />
+									<span class="font-medium">Party</span>
+									<span class="text-xs text-white">Friends join with the code</span>
+								</button>
+							</div>
+						{:else}
 							<button
-								class="flex flex-col items-center gap-1 rounded-xl bg-raised p-3 disabled:opacity-40"
-								disabled={busy}
-								onclick={() => !needs(['name', 'roomCode']) && hostRoom('private')}
-							>
-								<Icon name="headphones" />
-								<span class="font-medium">Solo</span>
-								<span class="text-xs text-muted">{me ? 'Just you, on all your devices' : `Just you, in this ${window.YtmpDesktop ? 'app' : 'browser'}`}</span>
-							</button>
-							<button
-								class="flex flex-col items-center gap-1 rounded-xl bg-accent-strong p-3 disabled:opacity-40"
+								class="rounded-full bg-accent-strong py-3 font-medium disabled:opacity-40"
 								disabled={busy}
 								onclick={() => !needs(['name', 'roomCode']) && hostRoom('public')}
 							>
-								<Icon name="people" />
-								<span class="font-medium">Party</span>
-								<span class="text-xs text-white">Friends join with the code</span>
+								Host
 							</button>
-						</div>
-					{:else}
-						<button
-							class="rounded-full bg-accent-strong py-3 font-medium disabled:opacity-40"
-							disabled={busy}
-							onclick={() => !needs(['name', 'roomCode']) && hostRoom('public')}
-						>
-							Host
-						</button>
-					{/if}
-				</section>
-			{/if}
+						{/if}
+					</section>
+				{/if}
+			</div>
 
 			{@render roomList('Your rooms')}
 			{@render elsewhereList()}
