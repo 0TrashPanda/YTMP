@@ -100,7 +100,10 @@ class SongCache(
     private val zone: ZoneId = ZoneId.systemDefault(),
     /** Finds the genres of the songs here and of downloads ([genre]); null: none are looked up. */
     private val genreLookup: GenreLookup? = null,
-) {
+    /** Genre lookups: the first this long after start, then one song every [genreGapMs]. */
+    private val genreStartMs: Long = GENRE_START_MS,
+    private val genreGapMs: Long = GENRE_GAP_MS,
+) : SharedGenres {
     @Volatile
     var dir: File = dir
         private set
@@ -147,6 +150,20 @@ class SongCache(
     private val genreSignal = Channel<Unit>(Channel.CONFLATED)
     /** Songs whose genre a room list wants ([genreSoon]): looked up before the cached ones. */
     private val wantedGenres = LinkedHashMap<String, Song>()
+    /** Genres looked up here that the owner's server's list ([genreShare]) hasn't heard yet. */
+    private val unshared = LinkedHashMap<String, String>()
+    /** Songs the server's list was asked about and didn't know (looked up here then), since start. */
+    private val askedShare = HashSet<String>()
+    /** When the server's list couldn't be asked: not again for a while ([GENRE_RETRY_MS]). */
+    @Volatile
+    private var shareFailedAt = 0L
+
+    /**
+     * The owner's server's list of genres (a phone linked to an account): asked before a song
+     * is looked up here, and told what was. Null: every song is looked up here.
+     */
+    @Volatile
+    var genreShare: GenreShare? = null
     /** Changes to [entries] and [downloadedSongs], for [library]. */
     @Volatile
     private var version = 0
@@ -1048,15 +1065,67 @@ class SongCache(
             log.info("Song cache: no genre for {} now: {}", song.id, e.toString())
             return false
         }
-        synchronized(lock) {
-            wantedGenres.remove(song.id)
-            genres.remove(song.id)
-            genres[song.id] = genre
-            while (genres.size > MAX_GENRES) genres.remove(genres.keys.first())
-            version++
+        keepGenres(mapOf(song.id to genre))
+        if (genreShare != null) synchronized(lock) {
+            unshared[song.id] = genre
+            while (unshared.size > MAX_WANTED_GENRES) unshared.remove(unshared.keys.first())
         }
-        saveSoon()
         return true
+    }
+
+    private fun keepGenres(found: Map<String, String>, onlyNew: Boolean = false) {
+        if (found.isEmpty()) return
+        var changed = false
+        synchronized(lock) {
+            for ((id, genre) in found) {
+                if (onlyNew && id in genres) continue
+                wantedGenres.remove(id)
+                genres.remove(id)
+                genres[id] = genre.trim().take(MAX_GENRE_LENGTH)
+                changed = true
+            }
+            while (genres.size > MAX_GENRES) genres.remove(genres.keys.first())
+            if (changed) version++
+        }
+        if (changed) saveSoon()
+    }
+
+    override fun knownGenres(songIds: Collection<String>): Map<String, String> = synchronized(lock) {
+        songIds.mapNotNull { id -> genres[id]?.let { id to it } }.toMap()
+    }
+
+    override fun addGenres(found: Map<String, String>) =
+        keepGenres(found.filterKeys { it.startsWith("ytm:") }, onlyNew = true)
+
+    /**
+     * Asks the server's list about [songs] (the ones not asked yet) and sends it what was looked
+     * up here. True when it asked about songs (they're known now, or to be looked up here);
+     * false when there was nothing to ask, no list, or it couldn't be asked.
+     */
+    private suspend fun askShare(songs: List<Song>): Boolean {
+        val share = genreShare ?: return false
+        if (shareFailedAt != 0L && clock() - shareFailedAt < GENRE_RETRY_MS) return false
+        val (found, wanted) = synchronized(lock) { HashMap(unshared) to songs.map { it.id }.filter { it !in askedShare && it !in genres } }
+        if (found.isEmpty() && wanted.isEmpty()) return false
+        val answer = try {
+            share.exchange(found, wanted)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        if (answer == null) {
+            shareFailedAt = clock()
+            return false
+        }
+        shareFailedAt = 0L
+        synchronized(lock) {
+            for ((id, genre) in found) if (unshared[id] == genre) unshared.remove(id)
+            if (askedShare.size + wanted.size > MAX_GENRES) askedShare.clear()
+            askedShare += wanted
+        }
+        keepGenres(answer.filterKeys { it in wanted })
+        return wanted.isNotEmpty()
     }
 
     /**
@@ -1065,32 +1134,48 @@ class SongCache(
      * when it can't ask, again a while later.
      */
     private suspend fun genreLoop(lookup: GenreLookup) {
-        delay(GENRE_START_MS)
+        delay(genreStartMs)
         while (true) {
-            val song = nextForGenre()
-            if (song == null) {
+            val batch = nextForGenre()
+            if (batch.isEmpty()) {
+                // Nothing to look up: what was looked up goes to the server's list.
+                if (synchronized(lock) { unshared.isNotEmpty() }) askShare(emptyList())
                 withTimeoutOrNull(GENRE_RECHECK_MS) { genreSignal.receive() }
                 continue
             }
+            // The owner's server's list first: what another device (or the server) found already.
+            if (askShare(batch)) continue
+            val song = batch.first()
             if (!lookUpGenre(lookup, song)) {
                 delay(GENRE_RETRY_MS)
                 continue
             }
-            delay(GENRE_GAP_MS)
+            if (synchronized(lock) { unshared.size } >= SHARE_EVERY) askShare(emptyList())
+            delay(genreGapMs)
         }
     }
 
-    /** The next song to look up: one a room list wants, else a cached song or download without a genre. */
-    private suspend fun nextForGenre(): Song? {
-        synchronized(lock) {
+    /**
+     * The next songs to look up, in order (at most [GENRE_BATCH]): the ones room lists want,
+     * then cached songs and downloads without a genre.
+     */
+    private suspend fun nextForGenre(): List<Song> {
+        val batch = synchronized(lock) {
             wantedGenres.keys.removeAll { it in genres }
-            wantedGenres.values.firstOrNull()?.let { return it }
-            entries.values.firstOrNull { it.song.id !in genres }?.let { return it.song }
+            (wantedGenres.values.asSequence() + entries.values.asSequence().map { it.song })
+                .filter { it.id !in genres }.distinctBy { it.id }.take(GENRE_BATCH).toMutableList()
         }
+        if (batch.size >= GENRE_BATCH) return batch
         val downloaded = runCatching { downloads?.all().orEmpty() }.getOrDefault(emptyList())
-        return synchronized(lock) {
-            downloaded.firstOrNull { it.song.id !in genres }?.let { d -> downloadedSongs[d.song.id] ?: d.song }
+        synchronized(lock) {
+            val ids = batch.map { it.id }.toMutableSet()
+            for (d in downloaded) {
+                if (batch.size >= GENRE_BATCH) break
+                if (d.song.id in genres || !ids.add(d.song.id)) continue
+                batch += downloadedSongs[d.song.id] ?: d.song
+            }
         }
+        return batch
     }
 
     // --- "Cached on this phone" ---
@@ -1280,6 +1365,11 @@ class SongCache(
         private const val GENRE_RECHECK_MS = 60L * 60 * 1000
         private const val MAX_GENRES = 50_000
         private const val MAX_WANTED_GENRES = 500
+        private const val MAX_GENRE_LENGTH = 60
+        /** Songs asked of the server's list at once. */
+        private const val GENRE_BATCH = 100
+        /** What was looked up here goes to the server's list after this many (or when there's nothing left). */
+        private const val SHARE_EVERY = 20
 
         /** The host's audio route for a song, as rooms hand it out for cached songs. */
         fun audioPath(songId: String) = "/api/audio/" + URLEncoder.encode(songId, "UTF-8")

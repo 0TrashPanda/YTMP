@@ -33,6 +33,23 @@ fun interface GenreLookup {
     }
 }
 
+/** The server's list of songs' genres, shared by the owner's devices (`POST /api/auth/genres`). */
+interface SharedGenres {
+    /** What the list has of [songIds] ("": none found); unknown ones are left out. */
+    fun knownGenres(songIds: Collection<String>): Map<String, String>
+
+    /** Genres a device looked up; the list keeps the ones it doesn't have yet. */
+    fun addGenres(found: Map<String, String>)
+}
+
+/**
+ * The owner's server's list, for a device (the phone): sends what the device [found] and
+ * answers what the list has of [wanted]; null when it can't be asked now.
+ */
+fun interface GenreShare {
+    suspend fun exchange(found: Map<String, String>, wanted: List<String>): Map<String, String>?
+}
+
 internal class OnlineGenres(
     private val get: suspend (String) -> String = { url -> withContext(Dispatchers.IO) { fetch(url) } },
 ) : GenreLookup {

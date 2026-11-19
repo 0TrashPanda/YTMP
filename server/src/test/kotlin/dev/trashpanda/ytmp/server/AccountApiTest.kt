@@ -1,5 +1,8 @@
 package dev.trashpanda.ytmp.server
 
+import dev.trashpanda.ytmp.host.SharedGenres
+import dev.trashpanda.ytmp.protocol.GenreAnswer
+import dev.trashpanda.ytmp.protocol.GenreExchange
 import dev.trashpanda.ytmp.host.RemoteSourceModule
 
 import dev.trashpanda.ytmp.core.RoomHooks
@@ -103,11 +106,11 @@ class AccountApiTest {
     /** testApplication's pages live at http://localhost. */
     private val origin = "http://localhost"
 
-    private fun ApplicationTestBuilder.setup(signup: SignupMode = SignupMode.INVITE): AccountService {
+    private fun ApplicationTestBuilder.setup(signup: SignupMode = SignupMode.INVITE, genres: SharedGenres? = null): AccountService {
         val db = Database.open(DatabaseConfig(path = Files.createTempDirectory("ytmp").resolve("ytmp.db").toString()))
         val accounts = Accounts(db)
         val key = accounts.signingKey()
-        val service = AccountService(accounts, "test.example", key, signup, History(db), trackingDefault = true, graph = SongGraph(db), isOwnOrigin = { it == origin }, episodes = Episodes(db), social = Social(db))
+        val service = AccountService(accounts, "test.example", key, signup, History(db), trackingDefault = true, graph = SongGraph(db), isOwnOrigin = { it == origin }, episodes = Episodes(db), social = Social(db), genres = genres)
         val auth = TrustedAuthServers(isOwnOrigin = { it == origin }, ownTemplates = service::roleTemplate, ownPlays = service::recordPlay).apply { trust(AuthServerRef(null, "test.example"), key.public) }
         application {
             val scope = CoroutineScope(SupervisorJob())
@@ -154,6 +157,23 @@ class AccountApiTest {
         assertEquals(listOf("Pixel"), client.get("/api/account/phone-copy") { bearerAuth(anna) }.body<PhoneCopyState>().phones.map { it.name })
         assertEquals(emptyList(), client.get("/api/account/phone-copy") { bearerAuth(sam) }.body<PhoneCopyState>().phones)
         assertEquals(HttpStatusCode.Unauthorized, client.get("/api/auth/phone-copy").status)
+    }
+
+    @Test
+    fun `devices share songs' genres through the server`() = testApplication {
+        val list = object : SharedGenres {
+            val kept = HashMap(mapOf("ytm:a" to "Pop"))
+            override fun knownGenres(songIds: Collection<String>) = songIds.mapNotNull { id -> kept[id]?.let { id to it } }.toMap()
+            override fun addGenres(found: Map<String, String>) = found.forEach { (id, g) -> kept.putIfAbsent(id, g) }
+        }
+        setup(SignupMode.OPEN, genres = list)
+        val client = jsonClient()
+        val anna = client.postJson("/api/account/signup", SignupRequest("anna", "password123", "Anna")).body<SessionResponse>().sessionToken
+        val phone = client.postJson("/api/account/host-token", HostTokenRequest("http://192.168.1.23:8765"), anna).body<HostTokenResponse>().token
+        val answer = client.postJson("/api/auth/genres", GenreExchange(found = mapOf("ytm:b" to "Rock"), wanted = listOf("ytm:a", "ytm:c")), phone).body<GenreAnswer>()
+        assertEquals(mapOf("ytm:a" to "Pop"), answer.genres)
+        assertEquals("Rock", list.kept["ytm:b"])
+        assertEquals(HttpStatusCode.Unauthorized, client.postJson("/api/auth/genres", GenreExchange(wanted = listOf("ytm:a"))).status)
     }
 
     @Test

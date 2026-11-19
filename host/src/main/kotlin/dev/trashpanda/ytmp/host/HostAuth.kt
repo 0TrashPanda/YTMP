@@ -5,6 +5,8 @@ import dev.trashpanda.ytmp.protocol.AuthServerInfo
 import dev.trashpanda.ytmp.protocol.AuthServerRef
 import dev.trashpanda.ytmp.protocol.ProtocolJson
 import dev.trashpanda.ytmp.protocol.GraphFull
+import dev.trashpanda.ytmp.protocol.GenreAnswer
+import dev.trashpanda.ytmp.protocol.GenreExchange
 import dev.trashpanda.ytmp.protocol.PlayedSongs
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
 import dev.trashpanda.ytmp.protocol.RadioHints
@@ -66,6 +68,13 @@ interface HostAuth {
      * (its song graph keeps it). False when it didn't take it (not reachable, or an older server).
      */
     suspend fun reportRadio(token: String, report: RadioFetchReport): Boolean = false
+
+    /**
+     * Swaps songs' genres with the auth server of the account in [token] (its shared list): sends
+     * what this host [GenreExchange.found], answers what the list has of the wanted ones. Null
+     * when it couldn't ask (not reachable, or an older server).
+     */
+    suspend fun exchangeGenres(token: String, exchange: GenreExchange): GenreAnswer? = null
 
     /** Where the account in [token] is in an episode, from its auth server (null: nowhere, or not shared with this host). */
     suspend fun episodeProgress(token: String, episodeId: String): EpisodeProgress? = null
@@ -198,6 +207,27 @@ class TrustedAuthServers(
         runCatching { postJson(url, "/api/auth/radio-fetch", token, ProtocolJson.encodeToString(RadioFetchReport.serializer(), report)) }
             .onFailure { e -> log.info("Couldn't send a radio to {}: {}", claims.iss, e.message) }
             .isSuccess
+    }
+
+    override suspend fun exchangeGenres(token: String, exchange: GenreExchange): GenreAnswer? = withContext(Dispatchers.IO) {
+        val (claims, server) = ownerOf(token) ?: return@withContext null
+        val url = server.url ?: return@withContext null
+        runCatching {
+            val connection = URI("${url.trimEnd('/')}/api/auth/genres").toURL().openConnection() as HttpURLConnection
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 30_000
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.setRequestProperty("Content-Type", "application/json")
+            try {
+                connection.outputStream.use { it.write(ProtocolJson.encodeToString(GenreExchange.serializer(), exchange).toByteArray()) }
+                if (connection.responseCode != 200) throw SourceException("$url answered ${connection.responseCode}")
+                connection.inputStream.bufferedReader().use { ProtocolJson.decodeFromString(GenreAnswer.serializer(), it.readText()) }
+            } finally {
+                connection.disconnect()
+            }
+        }.onFailure { log.info("No genres from {}: {}", claims.iss, it.message) }.getOrNull()
     }
 
     override suspend fun playedSongs(token: String, days: Int): List<String>? = withContext(Dispatchers.IO) {

@@ -399,3 +399,21 @@ data class Lyrics(
 @Serializable
 @SerialName("LyricLine")
 data class LyricLine(val timeMs: Long, val text: String)
+
+/**
+ * `POST /api/auth/genres` (a phone, with the account's host token): the server's list of songs'
+ * genres, shared by all the owner's devices (docs/implementation/sources/genres.md).
+ */
+@Serializable
+@SerialName("GenreExchange")
+data class GenreExchange(
+    /** Genres the device looked up itself, by song ID ("": none found), for the list. */
+    val found: Map<String, String> = emptyMap(),
+    /** Song IDs whose genre the device wants. */
+    val wanted: List<String> = emptyList(),
+)
+
+/** The answer: the genres of [GenreExchange.wanted] that the list has ("": none found); others aren't known yet. */
+@Serializable
+@SerialName("GenreAnswer")
+data class GenreAnswer(val genres: Map<String, String> = emptyMap())

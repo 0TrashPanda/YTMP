@@ -20,6 +20,7 @@ import dev.trashpanda.ytmp.protocol.RadioHints
 import dev.trashpanda.ytmp.protocol.RadioHintsRequest
 import dev.trashpanda.ytmp.protocol.RadioWay
 import dev.trashpanda.ytmp.protocol.Song
+import dev.trashpanda.ytmp.protocol.GenreExchange
 import dev.trashpanda.ytmp.core.StreamResolver
 import dev.trashpanda.ytmp.core.personalized
 import dev.trashpanda.ytmp.protocol.HostKind
@@ -511,6 +512,10 @@ class LocalHost(private val context: Context) {
         outputs.attach(rooms)
         if (phoneMusicOn) local.add(phoneLibrary)
         cache.inUse = { rooms.songsInUse() }
+        // Genres: the owner's server's list first, shared with their other devices.
+        cache.genreShare = GenreShare { found, wanted ->
+            authLink.ownerAccount?.let(sync::tokenFor)?.let { authLink.auth.exchangeGenres(it, GenreExchange(found, wanted))?.genres }
+        }
         applyKeepRule()
         cache.fetchGate = dataRules::awaitFetch
         downloads.onSaved = cache::downloaded

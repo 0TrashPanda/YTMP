@@ -63,6 +63,9 @@ import dev.trashpanda.ytmp.protocol.GraphTuning
 import dev.trashpanda.ytmp.protocol.HistoryImportList
 import dev.trashpanda.ytmp.protocol.PlayedSongs
 import dev.trashpanda.ytmp.protocol.RadioFetchReport
+import dev.trashpanda.ytmp.protocol.GenreAnswer
+import dev.trashpanda.ytmp.protocol.GenreExchange
+import dev.trashpanda.ytmp.host.SharedGenres
 import dev.trashpanda.ytmp.protocol.RadioHints
 import dev.trashpanda.ytmp.protocol.RadioHintsRequest
 import dev.trashpanda.ytmp.protocol.FriendRequest
@@ -102,6 +105,8 @@ class AccountService(
     private val episodes: Episodes? = null,
     /** Friends, groups and shared songs. */
     private val social: Social? = null,
+    /** Songs' genres, shared by the accounts' devices (the server's song cache). */
+    private val genres: SharedGenres? = null,
 ) {
     private val throttle = LoginThrottle(clock)
 
@@ -289,6 +294,18 @@ class AccountService(
             val report = call.receive<RadioFetchReport>()
             io { radioFetched(claims.sub, report) }
             call.respond(HttpStatusCode.NoContent)
+        }
+
+        // The list of songs' genres, shared by your devices: what a phone looked up, and what it wants.
+        post("/auth/genres") {
+            call.ownToken() ?: throw notLoggedIn()
+            val list = genres ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No genres here")
+            val exchange = call.receive<GenreExchange>()
+            if (exchange.found.size > MAX_GENRE_EXCHANGE || exchange.wanted.size > MAX_GENRE_EXCHANGE) {
+                throw ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID, "At most $MAX_GENRE_EXCHANGE songs at a time")
+            }
+            list.addGenres(exchange.found)
+            call.respond(GenreAnswer(list.knownGenres(exchange.wanted)))
         }
 
         // The graph view (also from the pages of your phone's app, like the history): around a
@@ -915,3 +932,6 @@ private fun GraphTuning.sane() = GraphTuning(
 /** An upload in parts: each at most this big (a reverse proxy's usual 1 MB limit, with room to spare), and all of it. */
 private const val MAX_UPLOAD_PART = 512 * 1024
 private const val MAX_UPLOAD = 500L * 1024 * 1024
+
+/** Songs a device sends or asks about at once (`POST /api/auth/genres`). */
+private const val MAX_GENRE_EXCHANGE = 1000

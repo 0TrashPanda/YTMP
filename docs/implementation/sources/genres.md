@@ -2,8 +2,8 @@
 
 > Status: **built** for the songs in the song cache and downloads, and the songs in rooms (for
 > the [room list](../../features/rooms/room-lifecycle.md#the-room-list)), on server, phone and
-> desktop app. Not built: a shared list of genres on the owner's server (one lookup per song for
-> all their devices), genres in history, radios and the song map.
+> desktop app, with the owner's server's list shared by their phones. Not built: sharing with the
+> desktop app (it looks its songs up itself), genres in history, radios and the song map.
 
 YouTube Music gives songs no genre (YouTube's only category is "Music"; *Moods & genres* are
 playlists). So the host asks music catalogs that do, by artist and title:
@@ -41,3 +41,21 @@ found, so it isn't asked again), at most 50,000.
   server does the same for your rooms on your other devices (`RoomHub`).
 - **Downloads**: `SongFiles` writes it in the file's genre tag (`©gen`), from the cache or
   looked up then (`SongCache.genre`), so other music players see it too.
+
+## Shared through the owner's server
+
+The server's song cache holds the list for all of an account's devices, so a song is looked
+up once. A phone linked to a YTMP account (`SongCache.genreShare`) asks it first:
+
+- `POST /api/auth/genres` with the account's host token: `GenreExchange` (`found`: what the
+  phone looked up itself, `wanted`: up to 100 song IDs it needs) → `GenreAnswer` (what the list
+  has of them, `""` included). At most 1,000 of each per call.
+- The phone asks about its next songs (the ones room lists want, then cached songs and
+  downloads) before looking any up. The ones the list doesn't have it looks up itself, and
+  sends them along the next time: after 20, or when it has nothing left to look up.
+- The list keeps what it hears unless it has the song already (`SharedGenres.addGenres`), and
+  only YouTube Music songs (local files have their own tags).
+- Not reachable (away from home, an older server): the phone looks songs up itself, and asks
+  again 10 minutes later. What it found meanwhile goes to the list then (unless the app was
+  closed in between).
+- The genres aren't personal: every account on the server shares the one list.

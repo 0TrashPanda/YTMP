@@ -147,6 +147,34 @@ class SongCacheTest {
     }
 
     @Test
+    fun `genres come from the server's list first, and what was looked up here goes to it`() = runBlocking {
+        val youtube = FakeYoutube()
+        val asked = CopyOnWriteArrayList<String>()
+        val serverList = java.util.concurrent.ConcurrentHashMap(mapOf("ytm:a" to "Pop"))
+        val wantedByPhone = CopyOnWriteArrayList<List<String>>()
+        val cache = SongCache(
+            File(dir, "shared"), 10_000_000, youtube, youtube, scope, coverOf = { null }, clock = { now },
+            genreLookup = { s -> asked += s.id; "Rock" }, genreStartMs = 0, genreGapMs = 0,
+        )
+        cache.genreShare = GenreShare { found, wanted ->
+            wantedByPhone += wanted
+            serverList.putAll(found)
+            wanted.mapNotNull { id -> serverList[id]?.let { id to it } }.toMap()
+        }
+        assertTrue(cache.take(song("a")) { it.writeBytes(bytesOf("a")) })
+        assertTrue(cache.take(song("b")) { it.writeBytes(bytesOf("b")) })
+        eventually { serverList["ytm:b"] == "Rock" }
+        // a came from the server's list; only b was looked up here, and the list has it now.
+        assertEquals(listOf("ytm:b"), asked)
+        assertEquals("Pop", cache.genreSoon(song("a")))
+        assertEquals("Rock", cache.genreSoon(song("b")))
+        assertEquals(setOf("ytm:a", "ytm:b"), wantedByPhone.flatten().toSet())
+        // The server's side: it keeps what a device found, without overwriting what it has.
+        cache.addGenres(mapOf("ytm:a" to "Dance", "ytm:z" to "Jazz", "local:x:s:1" to "Rock"))
+        assertEquals(mapOf("ytm:a" to "Pop", "ytm:z" to "Jazz"), cache.knownGenres(listOf("ytm:a", "ytm:z", "local:x:s:1", "ytm:q")))
+    }
+
+    @Test
     fun `a song the player read all of is kept, and then needs no lookup`() = runBlocking {
         val youtube = FakeYoutube()
         val cache = cache(youtube)
