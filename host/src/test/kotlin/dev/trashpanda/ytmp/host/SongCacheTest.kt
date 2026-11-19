@@ -136,6 +136,9 @@ class SongCacheTest {
         assertNull(cache.genre(song("b")))
         assertEquals("Pop", cache.genre(song("a")))
         assertEquals(listOf("ytm:a", "ytm:b"), asked)
+        // Room lists: known ones at once, without waiting for the others.
+        assertEquals("Pop", cache.genreSoon(song("a")))
+        assertNull(cache.genreSoon(song("c")))
         val local = LocalMusic().apply { add(cache.library { "http://phone" }) }
         assertEquals(listOf("Pop"), local.page(SongCache.LIBRARY_ID)!!.genres.map { it.name })
         cache.saveNow()

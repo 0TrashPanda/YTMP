@@ -217,7 +217,7 @@ fun main(args: Array<String>) {
         )
         rooms.startCleanup()
         songCache.inUse = { rooms.songsInUse() }
-        val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, defaultPassword = service::roomPassword)
+        val hub = RoomHub(db, rooms, issuer, ownUrl, serverName = issuer, verify = service::verifyOwnToken, openSetting = service::openElsewhere, genreOf = songCache::genreSoon, defaultPassword = service::roomPassword)
         monitor.subscribe(ApplicationStopping) { runBlocking { rooms.saveAll() } }
         outputs.attach(rooms)
         // The admin page changed a setting: put it to work (guests and audio are read on each request).

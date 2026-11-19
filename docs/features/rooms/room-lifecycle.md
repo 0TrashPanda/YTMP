@@ -21,9 +21,17 @@ apart without you naming them, like mixes in YouTube Music:
   cover alone while it has fewer. A room that hasn't played anything shows its icon.
 - **A room you didn't name** (it kept *Anna's room*) is called after the **artists it plays
   most**, from the songs that just played and the ones up next, e.g. *Nujabes, J Dilla,
-  Tomppabeats*. Switch genre in a room and its title follows the music. Under it: the song
-  it's on (▶), or the last one it played.
-- **A room with a name of its own** (*Road trip*) keeps it, with its artists under it.
+  Tomppabeats*. Switch genre in a room and its title follows the music. Under it: its
+  [genre](../../implementation/sources/genres.md) and the song it's on (▶), or the last one it
+  played (*Dance · ▶ Get Lucky · Daft Punk*).
+- **A mixed room**, where no artist stands out (the one heard most is at most a quarter of its
+  songs), is called after its **genres** instead: *Pop and Hip-Hop/Rap mix*. Three artists that
+  each played once would say little, and change with every song. While too few of its songs
+  have a genre (under half), it's called after its artists.
+- **A room with a name of its own** (*Road trip*) keeps it, with its genres and artists under
+  it (*Dance, Pop · Daft Punk, Justice*).
+- Genres are the ones that are at least a fifth of the songs, at most two. Podcast rooms show
+  no genre.
 - Party rooms say *Party*. The room code is in the room itself (and in the tooltip).
 
 Making a room for each kind of music you like is therefore enough to come back to it later:

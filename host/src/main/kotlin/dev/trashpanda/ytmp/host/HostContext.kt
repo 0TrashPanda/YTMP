@@ -20,6 +20,9 @@ import org.slf4j.LoggerFactory
 internal class HostContext(val rooms: RoomManager, val sources: HostSources, val options: HostOptions) {
     val screens = ScreenPairings()
 
+    /** Songs' genres for room lists ([SongCache.genreSoon]): known ones, others looked up soon. */
+    val genreOf: (Song) -> String? = { song -> sources.cache?.genreSoon(song) }
+
     fun ApplicationCall.mayManageRooms() = !options.localOnlyRoomManagement || options.isLocal(this)
 
     /** The account this request proves (bearer host token), if any. */

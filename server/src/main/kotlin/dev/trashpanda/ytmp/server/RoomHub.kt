@@ -8,6 +8,7 @@ import dev.trashpanda.ytmp.host.AccountTokens
 import dev.trashpanda.ytmp.host.ApiException
 import dev.trashpanda.ytmp.host.bearerToken
 import dev.trashpanda.ytmp.host.createFor
+import dev.trashpanda.ytmp.protocol.Song
 import dev.trashpanda.ytmp.protocol.CreateRoomRequest
 import dev.trashpanda.ytmp.protocol.CreateRoomResponse
 import dev.trashpanda.ytmp.protocol.ErrorCode
@@ -59,6 +60,8 @@ class RoomHub(
     private val verify: (String) -> AccountTokens.Claims?,
     /** The account's setting for opening rooms elsewhere. */
     private val openSetting: (username: String) -> RoomOpenMode,
+    /** Songs' genres for room lists (known ones; others are looked up soon). */
+    private val genreOf: (Song) -> String? = { null },
     /** The account's default room password (hashed), for rooms cloned onto this server. */
     private val defaultPassword: (username: String) -> String? = { null },
     private val clock: () -> Long = System::currentTimeMillis,
@@ -156,7 +159,7 @@ class RoomHub(
         playing = playing,
         nowPlaying = saved.current?.song?.title,
         openElsewhere = saved.settings?.openElsewhere,
-        summary = RoomSummaries.of(saved.history, saved.current, saved.queue, playing),
+        summary = RoomSummaries.of(saved.history, saved.current, saved.queue, playing, genreOf),
     )
 
     private fun roomUrl(home: RoomHome, code: String): String? = home.url?.let { "${it.trimEnd('/')}/room/$code" }

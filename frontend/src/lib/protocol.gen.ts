@@ -685,6 +685,8 @@ export interface RoomSummary {
   artists: string[];
   song: string | null;
   playing: boolean;
+  genres: string[];
+  mixed: boolean;
 }
 
 export interface RoomInfo {

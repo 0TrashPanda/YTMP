@@ -60,10 +60,10 @@ internal fun Route.roomRoutes(host: HostContext) = with(host) {
         // The hosting phone sees all its rooms; on a server, you see the rooms your account owns.
         if (options.localOnlyRoomManagement) {
             if (!options.isLocal(call)) throw onlyTheHostingDevice()
-            return@get call.respond(RoomListResponse(rooms.list.value.map { rooms[it.code]?.listing() ?: it }))
+            return@get call.respond(RoomListResponse(rooms.list.value.map { rooms[it.code]?.listing(genreOf) ?: it }))
         }
         val me = call.account()?.id ?: return@get call.respond(RoomListResponse(emptyList()))
-        call.respond(RoomListResponse(rooms.all().filter { it.ownerAccount == me }.map { it.listing() }))
+        call.respond(RoomListResponse(rooms.all().filter { it.ownerAccount == me }.map { it.listing(genreOf) }))
     }
     post("/rooms") {
         if (!call.mayManageRooms()) throw onlyTheHostingDevice()
@@ -87,7 +87,7 @@ internal fun Route.roomRoutes(host: HostContext) = with(host) {
         if (room == null || (room.visibility == RoomVisibility.PRIVATE && !options.isLocal(call) && !call.owns(room))) {
             throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")
         }
-        call.respond(room.listing())
+        call.respond(room.listing(genreOf))
     }
     delete("/rooms/{code}") {
         val room = rooms[call.parameters["code"]!!] ?: throw ApiException(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "Room not found")

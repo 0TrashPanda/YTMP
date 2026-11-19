@@ -145,6 +145,8 @@ class SongCache(
     /** Songs' genres by song ID ([genre]); "": looked up, none found. */
     private val genres = LinkedHashMap<String, String>()
     private val genreSignal = Channel<Unit>(Channel.CONFLATED)
+    /** Songs whose genre a room list wants ([genreSoon]): looked up before the cached ones. */
+    private val wantedGenres = LinkedHashMap<String, Song>()
     /** Changes to [entries] and [downloadedSongs], for [library]. */
     @Volatile
     private var version = 0
@@ -1019,6 +1021,23 @@ class SongCache(
         return if (lookUpGenre(lookup, song)) synchronized(lock) { genres[song.id] }?.ifEmpty { null } else null
     }
 
+    /**
+     * [song]'s genre when it's known (null: none, or not yet); one not looked up yet is, soon
+     * (for room lists: docs/features/rooms/room-lifecycle.md#the-room-list). Doesn't wait.
+     */
+    fun genreSoon(song: Song): String? {
+        val lookup = genreLookup
+        val wanted = synchronized(lock) {
+            genres[song.id]?.let { return it.ifEmpty { null } }
+            if (lookup == null || LocalMusic.isLocal(song.id) || song.id in wantedGenres) return null
+            wantedGenres[song.id] = song
+            while (wantedGenres.size > MAX_WANTED_GENRES) wantedGenres.remove(wantedGenres.keys.first())
+            true
+        }
+        if (wanted) genreSignal.trySend(Unit)
+        return null
+    }
+
     /** Looks [song]'s genre up and keeps it; false when it couldn't ask (offline, too many lookups). */
     private suspend fun lookUpGenre(lookup: GenreLookup, song: Song): Boolean {
         val genre = try {
@@ -1030,6 +1049,7 @@ class SongCache(
             return false
         }
         synchronized(lock) {
+            wantedGenres.remove(song.id)
             genres.remove(song.id)
             genres[song.id] = genre
             while (genres.size > MAX_GENRES) genres.remove(genres.keys.first())
@@ -1040,27 +1060,36 @@ class SongCache(
     }
 
     /**
-     * Finds the genres of the cached and downloaded songs, one song at a time (Apple asks for
-     * at most about 20 lookups a minute); when it can't ask, again a while later.
+     * Finds the genres of the songs room lists want ([genreSoon]), then of the cached and
+     * downloaded songs, one song at a time (Apple asks for at most about 20 lookups a minute);
+     * when it can't ask, again a while later.
      */
     private suspend fun genreLoop(lookup: GenreLookup) {
         delay(GENRE_START_MS)
         while (true) {
-            val songs = synchronized(lock) { entries.values.map { it.song } } +
-                runCatching { downloads?.all().orEmpty().map { d -> synchronized(lock) { downloadedSongs[d.song.id] } ?: d.song } }.getOrDefault(emptyList())
-            val missing = songs.distinctBy { it.id }.filter { synchronized(lock) { it.id !in genres } }
-            if (missing.isEmpty()) {
+            val song = nextForGenre()
+            if (song == null) {
                 withTimeoutOrNull(GENRE_RECHECK_MS) { genreSignal.receive() }
                 continue
             }
-            for (song in missing) {
-                if (synchronized(lock) { song.id in genres }) continue
-                if (!lookUpGenre(lookup, song)) {
-                    delay(GENRE_RETRY_MS)
-                    break
-                }
-                delay(GENRE_GAP_MS)
+            if (!lookUpGenre(lookup, song)) {
+                delay(GENRE_RETRY_MS)
+                continue
             }
+            delay(GENRE_GAP_MS)
+        }
+    }
+
+    /** The next song to look up: one a room list wants, else a cached song or download without a genre. */
+    private suspend fun nextForGenre(): Song? {
+        synchronized(lock) {
+            wantedGenres.keys.removeAll { it in genres }
+            wantedGenres.values.firstOrNull()?.let { return it }
+            entries.values.firstOrNull { it.song.id !in genres }?.let { return it.song }
+        }
+        val downloaded = runCatching { downloads?.all().orEmpty() }.getOrDefault(emptyList())
+        return synchronized(lock) {
+            downloaded.firstOrNull { it.song.id !in genres }?.let { d -> downloadedSongs[d.song.id] ?: d.song }
         }
     }
 
@@ -1250,6 +1279,7 @@ class SongCache(
         private const val GENRE_RETRY_MS = 10L * 60 * 1000
         private const val GENRE_RECHECK_MS = 60L * 60 * 1000
         private const val MAX_GENRES = 50_000
+        private const val MAX_WANTED_GENRES = 500
 
         /** The host's audio route for a song, as rooms hand it out for cached songs. */
         fun audioPath(songId: String) = "/api/audio/" + URLEncoder.encode(songId, "UTF-8")

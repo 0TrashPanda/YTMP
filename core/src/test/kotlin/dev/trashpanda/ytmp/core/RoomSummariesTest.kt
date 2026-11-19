@@ -62,4 +62,29 @@ class RoomSummariesTest {
         assertEquals(listOf("The Show", "Newer", "Old"), summary.artists)
         assertEquals("Song 3 · The Show", summary.song)
     }
+
+    @Test
+    fun `genres are the ones that are a fifth of the songs, none while too few songs have one`() {
+        val genre = mapOf("A" to "Dance", "B" to "Dance", "C" to "Pop", "D" to "Rock")
+        val genreOf = { s: Song -> genre[s.artists.first().name] }
+        val history = listOf(item("A"), item("A"), item("B"), item("C"), item("C"), item("D"), item("E"))
+        // 6 of 7 have one: Dance 3, Pop 2, Rock 1 (under a fifth).
+        assertEquals(listOf("Dance", "Pop"), RoomSummaries.of(history, null, emptyList(), playing = false, genreOf).genres)
+        // Under half have one yet: none.
+        val unknown = listOf(item("A"), item("E"), item("F"), item("G"))
+        assertEquals(emptyList(), RoomSummaries.of(unknown, null, emptyList(), playing = false, genreOf).genres)
+        // Podcasts aren't a genre.
+        val episodes = listOf(item("H", podcast = "Show"), item("H", podcast = "Show"))
+        assertEquals(emptyList(), RoomSummaries.of(episodes, null, emptyList(), playing = false) { "Podcast" }.genres)
+    }
+
+    @Test
+    fun `mixed when no artist is a quarter of the songs`() {
+        val varied = listOf("A", "B", "C", "D", "E", "F", "G", "A").map { item(it) }
+        assertTrue(RoomSummaries.of(varied, null, emptyList(), playing = false).mixed)
+        val focused = listOf("A", "B", "A", "C", "A", "D", "E", "F").map { item(it) }
+        assertFalse(RoomSummaries.of(focused, null, emptyList(), playing = false).mixed)
+        // Too few songs to tell.
+        assertFalse(RoomSummaries.of(listOf("A", "B", "C").map { item(it) }, null, emptyList(), playing = false).mixed)
+    }
 }

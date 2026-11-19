@@ -219,6 +219,10 @@ data class RoomSummary(
     val song: String? = null,
     /** [song] is playing now. */
     val playing: Boolean = false,
+    /** The genres it plays most right now, at most 2 (docs/implementation/sources/genres.md); empty when too few songs have one. */
+    val genres: List<String> = emptyList(),
+    /** No artist stands out (the top one is at most a quarter of its songs): a list names it after [genres]. */
+    val mixed: Boolean = false,
 )
 
 @Serializable
