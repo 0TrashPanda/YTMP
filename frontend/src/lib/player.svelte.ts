@@ -366,7 +366,11 @@ class WebPlayer implements RoomPlayer {
 		if (this.eq?.context.state === 'suspended' && state.playback.playing) this.eq.context.resume().catch(() => {});
 		if (this.loadedItemId !== now.item.itemId) {
 			// A new version of the page: between two songs is the moment, if the new page can play on by itself.
-			if (this.loadedItemId !== null && appUpdate.betweenSongs(this.room.roomCode, this.canStartWithoutGesture)) return;
+			// Meanwhile the song before doesn't play on (a TV takes a few seconds to reload).
+			if (this.loadedItemId !== null && appUpdate.betweenSongs(this.room.roomCode, this.canStartWithoutGesture)) {
+				if (!this.audio.paused) this.audio.pause();
+				return;
+			}
 			this.loadedItemId = now.item.itemId;
 			this.error = null;
 			this.showMetadata();
