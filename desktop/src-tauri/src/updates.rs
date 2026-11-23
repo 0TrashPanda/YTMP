@@ -145,7 +145,8 @@ pub async fn install_at_start(app: &AppHandle) -> bool {
             return false;
         }
     };
-    if asks_first(app) {
+    let failed_before = app.state::<State>().settings.lock().unwrap().failed_update.as_deref() == Some(update.version.as_str());
+    if asks_first(app) || failed_before {
         offer(app, update, notes);
         return false;
     }
@@ -312,7 +313,12 @@ fn install(app: &AppHandle, update: Update, bytes: Vec<u8>) {
     // app; the installer starts the new version when it's done.
     if let Err(e) = update.install(bytes) {
         eprintln!("update install: {e}");
-        app.state::<State>().settings.lock().unwrap().installing = None;
+        {
+            let state = app.state::<State>();
+            let mut settings = state.settings.lock().unwrap();
+            settings.installing = None;
+            settings.failed_update = Some(update.version.clone());
+        }
         save(app);
         set_splash(app, "The update didn't install", None, &e.to_string());
         std::thread::sleep(Duration::from_secs(4));

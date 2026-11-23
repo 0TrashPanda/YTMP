@@ -27,6 +27,10 @@ pub(crate) struct Settings {
     server: Option<String>,
     #[serde(default)]
     pub(crate) installing: Option<String>,
+    /// A version whose install failed (a full disk, say): not installed again at the start, only
+    /// offered, or the app would download it, fail and restart over and over (updates.rs).
+    #[serde(default)]
+    pub(crate) failed_update: Option<String>,
     /// A new version found at the start is offered (with *Later*), not installed right away.
     #[serde(default)]
     pub(crate) ask_before_updating: bool,
