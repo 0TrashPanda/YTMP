@@ -161,6 +161,11 @@ internal fun Route.roomSocket(host: HostContext) = with(host) {
                 val message = (frame as? Frame.Text)?.let { decode(it) } ?: continue
                 room.handle(participantId, message, outbox)
             }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException && e.cause == null) throw e
+            // Who it was, so a device that keeps dropping (no answer to pings: "Ping timeout") can be found.
+            val reason = (e.cause ?: e).let { it.message ?: it::class.simpleName }
+            log.info("Room {}: lost the connection of {} ({}): {}", room.code, room.participantName(participantId) ?: participantId, if (first is ClientMessage.Attach) "its app's second connection" else "its page", reason)
         } finally {
             room.disconnect(participantId, outbox)
             outgoing.close()

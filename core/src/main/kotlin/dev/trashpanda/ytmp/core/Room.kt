@@ -472,6 +472,9 @@ class Room(
         guestToken != null && members.values.any { it.screen && it.token == guestToken }
     }
 
+    /** The name of participant [participantId], for the log; null when not (or no longer) here. */
+    suspend fun participantName(participantId: String): String? = mutex.withLock { members[participantId]?.name }
+
     suspend fun disconnect(participantId: String, outbox: Outbox) = mutex.withLock {
         val member = members[participantId] ?: return@withLock
         if (!member.attached.remove(outbox)) {
