@@ -57,9 +57,12 @@ class CastOutputs(
         .map { all -> all.values.sortedBy { it.name }.map { OutputDevice(it.id, it.name, OutputKind.CHROMECAST) } }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-    fun add(device: CastDeviceAddress) {
-        known.update { it + (device.id to device) }
+    /** The search found [device]: true when it's new or changed (name, address), false when it was known like this. */
+    fun add(device: CastDeviceAddress): Boolean {
+        var changed = false
+        known.update { changed = it[device.id] != device; if (changed) it + (device.id to device) else it }
         found(device.id)
+        return changed
     }
 
     fun remove(id: String) {

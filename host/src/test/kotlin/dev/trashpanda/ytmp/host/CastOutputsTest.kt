@@ -305,6 +305,17 @@ class CastOutputsTest {
         scope.cancel()
     }
 
+    @Test
+    fun `the search finding a device again changes nothing, a new address does`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }
+        assertTrue(casts.add(CastDeviceAddress("cast:tv", "Tv", "10.0.0.101")))
+        assertTrue(!casts.add(CastDeviceAddress("cast:tv", "Tv", "10.0.0.101")))
+        assertTrue(casts.add(CastDeviceAddress("cast:tv", "Tv", "10.0.0.107")))
+        assertEquals("10.0.0.107", casts.address("cast:tv")?.host)
+        scope.cancel()
+    }
+
     /** A room with a song playing on [device]. */
     private suspend fun playOn(device: FakeCastDevice, scope: CoroutineScope) {
         val casts = CastOutputs(scope) { address -> "http://${address.hostAddress}:8765" }

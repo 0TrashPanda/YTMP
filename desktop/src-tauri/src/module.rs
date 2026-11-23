@@ -172,8 +172,10 @@ impl Module {
         let data = app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir());
         let module = &app.state::<Sidecars>().module;
         let mut command = Command::new(java);
+        // Out of memory, a JVM limps on with dead threads (its web server gone): exit instead,
+        // and the watch above starts it again.
         command
-            .args(["-XX:+UseSerialGC", "-Xss512k", "-XX:TieredStopAtLevel=1", "-Xmx256m", "-Xshare:auto", "-cp"])
+            .args(["-XX:+UseSerialGC", "-Xss512k", "-XX:TieredStopAtLevel=1", "-Xmx256m", "-XX:+ExitOnOutOfMemoryError", "-Xshare:auto", "-cp"])
             .arg(plain(&lib.join("*")))
             .arg("dev.trashpanda.ytmp.desktop.DesktopHostKt")
             .env("YTMP_HOST_PORT", self.port.to_string())

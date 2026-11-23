@@ -17,6 +17,8 @@ fun CastOutputs.discover(): AutoCloseable {
     val mdns = JmmDNS.Factory.getInstance()
     // A removed service comes without its TXT record: remember which device each instance was.
     val found = java.util.concurrent.ConcurrentHashMap<String, String>()
+    // When each instance's TXT record was last asked for, per network interface (nanoTime).
+    val asked = java.util.concurrent.ConcurrentHashMap<String, Long>()
     mdns.addServiceListener(
         "_googlecast._tcp.local.",
         object : ServiceListener {
@@ -29,13 +31,21 @@ fun CastOutputs.discover(): AutoCloseable {
                 if (name == null) {
                     // jmDNS can resolve it before the TXT record (its id and name) came, on one of
                     // the interfaces: without it, it would show as "Chromecast-<id>", a second time.
-                    event.dns.requestServiceInfo(event.type, event.name, true)
+                    // Ask once (not `persistent`: jmDNS never drops those, and each one fires again
+                    // on every record, which snowballed into thousands a second and ran the
+                    // desktop host out of memory), and again only after a while.
+                    val key = event.dns.name + "|" + event.name
+                    val now = System.nanoTime()
+                    val last = asked[key]
+                    if (last == null || now - last > ASK_AGAIN_NS) {
+                        asked[key] = now
+                        event.dns.requestServiceInfo(event.type, event.name, false)
+                    }
                     return
                 }
                 val id = "cast:" + (info.getPropertyString("id") ?: castIdFrom(info.name))
                 found[info.name] = id
-                add(CastDeviceAddress(id, name, host, info.port))
-                castLog.info("Found Cast device {} at {}", name, host)
+                if (add(CastDeviceAddress(id, name, host, info.port))) castLog.info("Found Cast device {} at {}", name, host)
             }
 
             override fun serviceRemoved(event: ServiceEvent) {
@@ -101,3 +111,6 @@ fun ZoneOutputs.discover(): AutoCloseable {
 }
 
 private const val ZONES_SERVICE = "_ytmp-zones._tcp"
+
+/** How long before a Cast instance's missing TXT record is asked for again. */
+private const val ASK_AGAIN_NS = 30_000_000_000L
