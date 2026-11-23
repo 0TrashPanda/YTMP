@@ -2,7 +2,7 @@
 	// A TV (or any screen) as a party screen, like YouTube's "Link with TV code": it shows a
 	// code, someone in a room enters it on their phone, and the room shows here. It remembers
 	// the room, so reloading (or turning the TV on again) goes straight back to it.
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { ApiRequestError, getHost, reportProblem, startScreenPairing, waitForScreenLink } from '../../lib/api';
 	import { createPlayer, type RoomPlayer } from '../../lib/player.svelte';
 	import Icon from '../../lib/components/Icon.svelte';
@@ -63,6 +63,17 @@
 		started = true;
 		player.setVolume(1);
 		player.enable().catch(() => {});
+	});
+	// Back after the connection dropped: the room forgets this TV plays the music unless it
+	// hears so again within a minute (and then pauses: "Nothing is playing the music any more").
+	let reconnecting = false;
+	$effect(() => {
+		const status = room?.status;
+		if (status === 'reconnecting') reconnecting = true;
+		else if (status === 'connected' && reconnecting) {
+			reconnecting = false;
+			untrack(() => player?.reconnected());
+		}
 	});
 	// Follow the room, like the room page does.
 	$effect(() => {
